@@ -1,44 +1,67 @@
-"use client";
-import { useState } from "react";
-import { useRouter } from "next/navigation";
-import { Trophy } from "lucide-react";
-import { setSession } from "@/lib/session";
-import { Role } from "@/lib/types";
+'use client';
+import { useState } from 'react';
+import { useRouter } from 'next/navigation';
+import { supabase } from '@/lib/supabase';
+
+const DEMO = {
+  participant: { email: 'participant@quest.local', label: 'Participant' },
+  educator:    { email: 'educator@quest.local',    label: 'Educator' },
+  admin:       { email: 'admin@quest.local',       label: 'Admin' },
+} as const;
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [pass, setPass] = useState("");
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
-  const quick = (r: Role) => {
-    setSession(r);
-    router.push(`/${r}/${r === "admin" ? "overview" : r === "educator" ? "activities" : "home"}`);
-  };
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  async function signIn(e?: React.FormEvent, override?: { email: string; password: string }) {
+    e?.preventDefault();
+    setBusy(true); setErr(null);
+    const creds = override ?? { email, password };
+    const { data, error } = await supabase.auth.signInWithPassword(creds);
+    setBusy(false);
+    if (error || !data.user) { setErr(error?.message || 'Sign-in failed'); return; }
+    const role = (data.user.user_metadata?.role as string) || 'participant';
+    router.replace(`/${role}/home`);
+  }
+
+  function quick(role: keyof typeof DEMO) {
+    signIn(undefined, { email: DEMO[role].email, password: 'Quest1234' });
+  }
+
   return (
-    <div className="min-h-screen bg-brand-gradient flex flex-col items-center px-6 pt-16 pb-10">
-      <div className="flex flex-col items-center text-white mb-8">
-        <div className="w-20 h-20 rounded-2xl bg-white/20 backdrop-blur flex items-center justify-center mb-4">
-          <Trophy className="w-10 h-10 text-yellow-300" />
+    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
+      <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
+        <div className="text-center mb-8">
+          <div className="text-4xl mb-2">🗺️</div>
+          <h1 className="text-3xl font-bold text-white">Welcome back 👋</h1>
+          <p className="text-white/80 mt-1">Sign in to your account to continue</p>
         </div>
-        <h1 className="text-3xl font-bold">QuestMaster</h1>
-        <p className="opacity-90">Epic Quest Adventures</p>
-      </div>
-      <div className="card w-full max-w-md">
-        <h2 className="text-2xl font-bold mb-1">Welcome back 👋</h2>
-        <p className="text-gray-500 mb-5">Sign in to your account to continue</p>
-        <label className="text-xs font-semibold text-gray-500">EMAIL ✉️</label>
-        <input className="input mb-4" placeholder="you@example.com" value={email} onChange={(e)=>setEmail(e.target.value)} />
-        <label className="text-xs font-semibold text-gray-500">PASSWORD 🔒</label>
-        <input type={show?"text":"password"} className="input" placeholder="••••••••" value={pass} onChange={(e)=>setPass(e.target.value)} />
-        <button onClick={()=>setShow(s=>!s)} className="text-brand-purple text-sm font-semibold mt-2">{show?"Hide":"Show"} password</button>
-        <button onClick={()=>quick("participant")} className="btn-primary w-full mt-4">Sign In →</button>
-        <div className="mt-6">
-          <div className="text-xs font-semibold text-gray-500 mb-2">QUICK DEMO LOGIN</div>
-          <div className="grid grid-cols-3 gap-2">
-            <button onClick={()=>quick("participant")} className="py-2 rounded-xl border border-brand-purple text-brand-purple text-sm font-semibold">Participant</button>
-            <button onClick={()=>quick("educator")} className="py-2 rounded-xl border border-brand-purple text-brand-purple text-sm font-semibold">Educator</button>
-            <button onClick={()=>quick("admin")} className="py-2 rounded-xl border border-brand-purple text-brand-purple text-sm font-semibold">Admin</button>
+        <form onSubmit={signIn} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+            <input value={email} onChange={e=>setEmail(e.target.value)} type="email" required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="you@example.com" />
           </div>
+          <div>
+            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
+            <input value={password} onChange={e=>setPassword(e.target.value)} type={show?'text':'password'} required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="••••••••" />
+            <label className="flex items-center gap-2 mt-2 text-sm text-gray-600">
+              <input type="checkbox" checked={show} onChange={e=>setShow(e.target.checked)} /> Show password
+            </label>
+          </div>
+          {err && <p className="text-sm text-red-600">{err}</p>}
+          <button disabled={busy} className="w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600 disabled:opacity-60">
+            {busy ? 'Signing in…' : 'Sign In'}
+          </button>
+        </form>
+        <div className="mt-6 text-center text-white/80 text-xs tracking-widest">QUICK DEMO LOGIN</div>
+        <div className="mt-3 grid grid-cols-3 gap-2">
+          {(Object.keys(DEMO) as (keyof typeof DEMO)[]).map(k => (
+            <button key={k} onClick={()=>quick(k)} disabled={busy} className="bg-white/15 hover:bg-white/25 text-white rounded-xl py-2 text-sm font-medium disabled:opacity-60">{DEMO[k].label}</button>
+          ))}
         </div>
       </div>
     </div>
