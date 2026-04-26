@@ -1,35 +1,43 @@
-"use client";
-import Shell from "@/components/Shell";
-import { Home, ListChecks, Trophy as Tp, FileText, UserCircle, Medal } from "lucide-react";
-import { demoLeaderboard } from "@/lib/demo";
+'use client';
+import { useEffect, useState } from 'react';
+import { Home, Compass, Trophy, Inbox, User as UserIcon } from 'lucide-react';
+import Shell from '@/components/Shell';
+import { useSession } from '@/lib/session';
+import { getActiveHunt, listTeams, Team } from '@/lib/data';
+
 const tabs = [
-  { href: "/participant/home", label: "Home", icon: <Home className="w-5 h-5"/> },
-  { href: "/participant/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  { href: "/participant/leaderboard", label: "Leaderboard", icon: <Tp className="w-5 h-5"/> },
-  { href: "/participant/submissions", label: "Submissions", icon: <FileText className="w-5 h-5"/> },
-  { href: "/participant/profile", label: "Profile", icon: <UserCircle className="w-5 h-5"/> },
+  { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
+  { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
+  { href: '/participant/leaderboard', label: 'Leaderboard', icon: <Trophy className="w-5 h-5" /> },
+  { href: '/participant/submissions', label: 'Submissions', icon: <Inbox className="w-5 h-5" /> },
+  { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
 ];
-export default function Leaderboard() {
-  const top3 = demoLeaderboard.slice(0,3);
-  const rest = demoLeaderboard.slice(3);
+export default function Page() {
+  useSession('participant');
+  const [teams,setTeams]=useState<Team[]>([]);
+  useEffect(()=>{ getActiveHunt().then(async h=>{ if(h) setTeams(await listTeams(h.id)); }); },[]);
+  const podium = teams.slice(0,3); const rest = teams.slice(3);
+  const medal = (i:number)=> i===0?'🥇':i===1?'🥈':'🥉';
   return (
     <Shell tabs={tabs}>
       <h2 className="font-bold text-lg mb-3">Leaderboard</h2>
-      <div className="flex justify-center items-end gap-4 mb-6">
-        {[top3[1],top3[0],top3[2]].map((r,i) => r && (
-          <div key={r.user_id} className="flex flex-col items-center">
-            <div className={`w-12 h-12 rounded-full ${i===1?"bg-yellow-400 w-16 h-16":(i===0?"bg-gray-300":"bg-orange-300")} flex items-center justify-center text-white font-bold text-lg mb-1`}>{r.display_name[0]}</div>
-            <div className="text-xs font-semibold">{r.display_name}</div>
-            <div className="text-xs text-gray-400">{r.total_points} pts</div>
+      <div className="grid grid-cols-3 gap-3 mb-4">
+        {podium.map((t,i)=>(
+          <div key={t.id} className={`rounded-2xl shadow p-4 text-center text-white ${i===0?'bg-gradient-to-br from-purple-600 to-blue-600 col-span-1':'bg-purple-500/80'}`}>
+            <div className="text-2xl">{medal(i)}</div>
+            <div className="font-semibold mt-1 truncate">{t.name}</div>
+            <div className="text-sm opacity-90">{t.total_points} pts</div>
           </div>
         ))}
       </div>
-      <div className="space-y-2">{rest.map(r => (
-        <div key={r.user_id} className="card flex items-center justify-between">
-          <div className="flex items-center gap-3"><span className="font-bold text-gray-400">#{r.rank}</span><span className="font-medium">{r.display_name}</span></div>
-          <span className="text-sm font-semibold text-brand-purple">{r.total_points} pts</span>
-        </div>
-      ))}</div>
+      <div className="space-y-2">
+        {rest.map((t,i)=>(
+          <div key={t.id} className="bg-white rounded-xl shadow flex items-center justify-between p-3">
+            <div className="flex items-center gap-3"><span className="w-7 h-7 rounded-full bg-purple-100 text-purple-700 grid place-items-center text-sm font-semibold">{i+4}</span><span className="font-medium">{t.name}</span></div>
+            <div className="text-sm text-gray-600">{t.total_points} pts</div>
+          </div>
+        ))}
+      </div>
     </Shell>
   );
 }

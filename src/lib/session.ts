@@ -12,8 +12,8 @@ let listenerAttached = false;
 function toUser(u: any): User | null {
   if (!u) return null;
   const role = (u.user_metadata?.role as Role) || 'participant';
-  const name = u.user_metadata?.name || (u.email?.split('@')[0] ?? 'User');
-  return { id: u.id, email: u.email, name, role, xp: u.user_metadata?.xp ?? 1240, level: u.user_metadata?.level ?? 4 } as unknown as User;
+  const display_name = u.user_metadata?.name || (u.email?.split('@')[0] ?? 'User');
+  return { id: u.id, email: u.email, display_name, role, xp: u.user_metadata?.xp ?? 1240, level: u.user_metadata?.level ?? 4 } as unknown as User;
 }
 
 function ensureListener() {
