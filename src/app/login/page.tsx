@@ -1,6 +1,7 @@
 'use client';
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
+import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 const DEMO = {
@@ -15,17 +16,24 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+  const [err, setErr] = useState('');
 
-  async function signIn(e?: React.FormEvent, override?: { email: string; password: string }) {
+  async function signIn(e: React.FormEvent | undefined, override?: { email: string; password: string }) {
     e?.preventDefault();
-    setBusy(true); setErr(null);
+    setBusy(true); setErr('');
     const creds = override ?? { email, password };
     const { data, error } = await supabase.auth.signInWithPassword(creds);
+    if (error || !data.user) { setBusy(false); setErr(error?.message || 'Sign-in failed'); return; }
+    // Read role + approved from qm_profiles (RLS allows self select)
+    const { data: prof } = await supabase.from('qm_profiles').select('role, approved').eq('id', data.user.id).maybeSingle();
+    const role = (prof?.role as string) || (data.user.user_metadata?.role as string) || 'participant';
+    if (role === 'educator' && prof && prof.approved === false) {
+      setBusy(false);
+      router.replace('/pending-approval');
+      return;
+    }
     setBusy(false);
-    if (error || !data.user) { setErr(error?.message || 'Sign-in failed'); return; }
-    const role = (data.user.user_metadata?.role as string) || 'participant';
-    router.replace(`/${role}/home`);
+    router.replace(role === 'educator' ? '/educator/classes' : role === 'admin' ? '/admin/overview' : '/participant/home');
   }
 
   function quick(role: keyof typeof DEMO) {
@@ -53,17 +61,21 @@ export default function LoginPage() {
             </label>
           </div>
           {err && <p className="text-sm text-red-600">{err}</p>}
-          <button disabled={busy} className="w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600 disabled:opacity-60">
-            {busy ? 'Signing in…' : 'Sign In'}
-          </button>
+          <button disabled={busy} className="w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600 disabled:opacity-60">{busy ? 'Signing in…' : 'Sign In'}</button>
+          <div className="flex justify-between text-sm">
+            <Link href="/forgot-password" className="text-purple-600 font-medium">Forgot password?</Link>
+            <Link href="/register" className="text-purple-600 font-medium">Create account</Link>
+          </div>
         </form>
         <div className="mt-6 text-center text-white/80 text-xs tracking-widest">QUICK DEMO LOGIN</div>
-        <div className="mt-3 grid grid-cols-3 gap-2">
-          {(Object.keys(DEMO) as (keyof typeof DEMO)[]).map(k => (
-            <button key={k} onClick={()=>quick(k)} disabled={busy} className="bg-white/15 hover:bg-white/25 text-white rounded-xl py-2 text-sm font-medium disabled:opacity-60">{DEMO[k].label}</button>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {(Object.keys(DEMO) as (keyof typeof DEMO)[]).map(r => (
+            <button key={r} onClick={()=>quick(r)} className="py-2 rounded-xl bg-white/15 text-white border border-white/30 hover:bg-white/25">{DEMO[r].label}</button>
           ))}
         </div>
       </div>
-    </div>
+    
+      <div className="text-center text-[11px] text-white/70 mt-6">Powered by <span className="font-semibold">Airiz Intelligence</span></div>
+</div>
   );
 }

@@ -1,71 +1,9 @@
-export type Role = "participant" | "educator" | "admin";
-
-export interface User {
-  id: string;
-  email: string;
-  display_name: string;
-  role: Role;
-  xp: number;
-  level: number;
-  avatar_url?: string;
-}
-
-export interface Hunt {
-  id: string;
-  name: string;
-  theme: string;
-  description: string;
-  location: string;
-  start_time: string;
-  end_time: string;
-  team_size: number;
-  max_teams: number;
-  status: "draft" | "active" | "completed";
-  created_by: string;
-  created_at?: string;
-  updated_at?: string;
-}
-
-export interface Challenge {
-  id: string;
-  hunt_id: string;
-  title: string;
-  description?: string;
-  order_index: number;
-  points: number;
-  created_at?: string;
-}
-
-export interface Submission {
-  id: string;
-  challenge_id: string;
-  hunt_id: string;
-  user_id: string;
-  team_id?: string;
-  content: string;
-  media_url?: string;
-  status: "pending" | "approved" | "rejected";
-  feedback?: string;
-  reviewed_by?: string;
-  awarded_points: number;
-  created_at?: string;
-  reviewed_at?: string;
-}
-
-export interface Team {
-  id: string;
-  hunt_id: string;
-  name: string;
-  members: string[];
-  total_points: number;
-  created_at?: string;
-}
-
-export interface LeaderboardRow {
-  rank: number;
-  user_id: string;
-  display_name: string;
-  team_name?: string;
-  total_points: number;
-  avatar_url?: string;
-}
+export type Role = 'participant' | 'educator' | 'admin';
+export type Profile = { id: string; role: Role; display_name: string | null; suspended: boolean; approved: boolean; logo_url: string | null; created_at: string };
+export type Hunt = { id: string; owner_id: string; class_id?: string|null; title: string; description: string | null; status: 'draft'|'active'|'archived'; invite_code: string; points: number; instructions: string|null; link1: string|null; link2: string|null; created_at: string };
+export type Challenge = { id: string; hunt_id: string; title: string; prompt: string | null; answer: string | null; points: number; order_idx: number };
+export type Team = { id: string; hunt_id: string; name: string; score: number; created_at: string };
+export type Membership = { hunt_id: string; user_id: string; joined_at: string };
+export type Submission = { id: string; challenge_id: string; team_id: string | null; user_id: string; answer: string | null; status: 'pending'|'approved'|'rejected'; reviewed_by: string | null; created_at: string };
+export type AuditEntry = { id: number; actor_id: string | null; action: string; target_type: string | null; target_id: string | null; meta: any; created_at: string };
+export type User = { id: string; email?: string; role: Role; display_name?: string };

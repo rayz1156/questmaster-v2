@@ -45,7 +45,7 @@ export function useSession(requiredRole?: Role) {
   useEffect(() => {
     if (loading) return;
     if (!user) { router.replace('/login'); return; }
-    if (requiredRole && user.role !== requiredRole) router.replace(`/${user.role}/home`);
+    if (requiredRole && user.role !== requiredRole) router.replace(user.role==='educator'?'/educator/classes':user.role==='admin'?'/admin/overview':'/participant/home');
   }, [loading, user, requiredRole, router]);
 
   return { session: user, user, loading };

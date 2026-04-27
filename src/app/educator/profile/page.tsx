@@ -1,18 +1,19 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Home, Compass, Trophy, User as UserIcon, LogOut, Save } from "lucide-react";
 import Shell from "@/components/Shell";
 import { useSession, signOut } from "@/lib/session";
 import { getMyProfile, updateMyDisplayName, updateMyEmail, updateMyPassword, type Profile } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
+import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, LogOut, Save } from "lucide-react";
 const tabs = [
-  { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
-  { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
-  { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
-  { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
+  { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
+  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
+  { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
+  { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
 ];
 export default function Page() {
-  const { user } = useSession('participant');
+  const { user } = useSession('educator');
   const [p, setP] = useState<Profile | null>(null);
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
@@ -25,9 +26,7 @@ export default function Page() {
   return (
     <Shell tabs={tabs}>
       <h2 className="font-bold text-lg mb-3">Profile</h2>
-      <div className="card mb-3">
-        <div className="text-xs text-gray-500">Role</div><div>{p?.role}</div>
-      </div>
+      <div className="card mb-3"><div className="text-xs text-gray-500">Role</div><div>{p?.role}</div></div>
       {msg && <div className="card mb-3 text-sm text-blue-700 bg-blue-50">{msg}</div>}
       <div className="card mb-3">
         <label className="text-xs text-gray-500">Username</label>
