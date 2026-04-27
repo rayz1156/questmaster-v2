@@ -13,13 +13,20 @@ export default function Shell({ tabs, children }: { tabs: { href: string; label:
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   useEffect(() => {
-    const u = getSession();
-    if (!u) router.replace("/login");
-    else { setUser(u); getMyProfile().then(p => setProfile(p)); }
-    const onAuth = () => { const u2 = getSession(); if (!u2) router.replace("/login"); else { setUser(u2); getMyProfile().then(p => setProfile(p)); } };
+    let cancelled = false;
+    let resolved = false;
+    const apply = (u: User | null) => { if (cancelled) return; resolved = true; if (!u) { router.replace("/login"); } else { setUser(u); getMyProfile().then(p => { if (!cancelled) setProfile(p); }); } };
+    const initial = getSession();
+    if (initial) apply(initial);
+    else {
+      // Wait briefly for Supabase async session hydration before redirecting
+      import("@/lib/supabase").then(({ supabase }) => supabase.auth.getUser()).then(() => { if (!resolved) apply(getSession()); }).catch(() => { if (!resolved) apply(null); });
+      setTimeout(() => { if (!resolved) apply(getSession()); }, 1500);
+    }
+    const onAuth = () => { apply(getSession()); };
     window.addEventListener('qm-auth', onAuth);
     window.addEventListener('qm-brand', onAuth);
-    return () => { window.removeEventListener('qm-auth', onAuth); window.removeEventListener('qm-brand', onAuth); };
+    return () => { cancelled = true; window.removeEventListener('qm-auth', onAuth); window.removeEventListener('qm-brand', onAuth); };
   }, [router]);
   if (!user) return null;
   const logoUrl = profile?.logo_url || null;

@@ -41,9 +41,35 @@ export default function Page() {
       alert('Delete failed: ' + (e?.message || e));
     }
   };
+  const pendingEducators = users.filter(u => u.role === 'educator' && !u.approved && !u.suspended);
   return (
     <Shell tabs={adminTabs}>
       <h2 className="font-bold text-lg mb-3">Users</h2>
+      {pendingEducators.length > 0 && (
+        <div className="card mb-3 border-2 border-yellow-300 bg-yellow-50">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xs font-bold uppercase text-yellow-800">Pending Educator Approvals</span>
+            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-900 font-bold">{pendingEducators.length}</span>
+          </div>
+          <div className="space-y-2">
+            {pendingEducators.map(u => { const m = meta[u.id]; return (
+              <div key={u.id} className="bg-white rounded-lg p-3 border border-yellow-200">
+                <div className="flex justify-between items-start gap-2">
+                  <div className="min-w-0 flex-1">
+                    <div className="font-semibold text-sm truncate">{u.display_name || u.id.slice(0,8)}</div>
+                    {m?.email && <div className="text-xs text-gray-600 truncate">{m.email}</div>}
+                    <div className="text-[11px] text-gray-500 mt-1">Registered: {fmt(m?.created_at || u.created_at)}</div>
+                  </div>
+                  <div className="flex gap-1 flex-shrink-0">
+                    <button onClick={()=>toggleApprove(u)} className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">Approve</button>
+                    <button onClick={()=>removeUser(u)} className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold hover:bg-red-200">Reject</button>
+                  </div>
+                </div>
+              </div>
+            ); })}
+          </div>
+        </div>
+      )}
       <div className="relative mb-3">
         <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400"/>
         <input className="input pl-9" placeholder="Search users…" value={q} onChange={e=>setQ(e.target.value)}/>

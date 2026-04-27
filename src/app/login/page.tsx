@@ -27,8 +27,11 @@ export default function LoginPage() {
       router.replace('/pending-approval');
       return;
     }
+    // Ensure session is fully cached before navigation to avoid double-login
+    try { await supabase.auth.getUser(); } catch {}
     setBusy(false);
-    router.replace(role === 'educator' ? '/educator/classes' : role === 'admin' ? '/admin/overview' : '/participant/home');
+    const dest = role === 'educator' ? '/educator/classes' : role === 'admin' ? '/admin/overview' : '/participant/home';
+    window.location.href = dest;
   }
 
 
