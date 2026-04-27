@@ -22,6 +22,10 @@ export default function Register() {
     });
     setBusy(false);
     if (error) { setErr(error.message); return; }
+    // Notify admin if a new educator registered (fire-and-forget; non-blocking)
+    if (role === 'educator') {
+      fetch('/api/notify-educator-pending', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name }) }).catch(() => {});
+    }
     setDone(true);
   }
 
