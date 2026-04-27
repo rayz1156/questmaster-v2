@@ -157,18 +157,7 @@ export default function Rankings() {
                   <span className="font-medium flex-1 truncate">{s.team_name}</span>
                   <span className="font-mono font-bold text-brand-purple">{s.total_score}</span>
                 </div>
-                {activeId && 'task_score' in s && (
-                  <>
-                    <div className="text-[10px] text-gray-400 ml-8">tasks {(s as TeamScore).task_score} · base {(s as TeamScore).base_score} · adj {(s as TeamScore).adjustment_score >= 0 ? '+' : ''}{(s as TeamScore).adjustment_score}</div>
-                    <div className="flex gap-1 mt-1 ml-8">
-                      <input type="number" min={1} placeholder="±pts" className="input w-20 text-xs py-1" value={delta[s.team_id] || ''} onChange={e => setDelta(d => ({...d, [s.team_id]: parseInt(e.target.value, 10) || 0}))}/>
-                      <input placeholder="reason" className="input flex-1 text-xs py-1" value={reason[s.team_id] || ''} onChange={e => setReason(r => ({...r, [s.team_id]: e.target.value}))}/>
-                      <button disabled={busy} onClick={() => adjust(s.team_id, 1)} className="btn-primary px-2 py-1 text-xs"><Plus className="w-3 h-3"/></button>
-                      <button disabled={busy} onClick={() => adjust(s.team_id, -1)} className="px-2 py-1 text-xs bg-red-600 text-white rounded"><Minus className="w-3 h-3"/></button>
-                    </div>
-                  </>
-                )}
-                {'quest_count' in s && (
+                    {'quest_count' in s && (
                   <div className="text-[10px] text-gray-400 ml-8">{(s as AggScore).quest_count} quest(s)</div>
                 )}
               </div>
@@ -176,23 +165,6 @@ export default function Rankings() {
           </div>
         )}
       </div>
-
-      {/* Recent adjustments */}
-      <div className="card">
-        <div className="font-semibold text-sm mb-2">Recent adjustments ({adj.length})</div>
-        {adj.length === 0 ? <p className="text-xs text-gray-500">None yet.</p> :
-          <div className="space-y-1">{adj.slice(0, 20).map(a => {
-            const team = (activeId ? scores : []).find(s => s.team_id === a.team_id)?.team_name || '–';
-            return (
-              <div key={a.id} className="flex items-center gap-2 py-1 text-xs border-b last:border-0">
-                <span className={`font-mono font-bold ${a.delta >= 0 ? 'text-green-600' : 'text-red-600'}`}>{a.delta >= 0 ? '+' : ''}{a.delta}</span>
-                <span className="flex-1 truncate">{team}{a.reason ? ` – ${a.reason}` : ''}</span>
-                <button onClick={async () => { if(confirm('Remove?')) { await deleteScoreAdjustment(a.id); loadScores(); }}} className="text-red-500"><Trash2 className="w-3 h-3"/></button>
-              </div>
-            );
-          })}</div>
-        }
-      </div>
-    </Shell>
+      </Shell>
   );
 }

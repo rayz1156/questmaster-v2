@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ListChecks, Users, BarChart3, GraduationCap, Plus, Pencil, Trash2 , User as UserIcon } from "lucide-react";
 import { listMyHunts, listTeams, createTeam, bulkCreateTeams, renameTeam, deleteTeam, setTeamMaxMembers, listMyClasses, listMyHuntsByClass, type Hunt, type Team, type Klass } from "@/lib/data";
-import { regenerateTeamCode } from '@/lib/data';
+import { regenerateTeamCode, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, addScoreAdjustment, type QuestCompletion } from '@/lib/data';
 
 const tabs = [
   { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
@@ -21,6 +21,7 @@ function TeamsInner() {
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [activeId, setActiveId] = useState<string>('');
   const [teams, setTeams] = useState<any[]>([]);
+  const [completions, setCompletions] = useState<QuestCompletion[]>([]);
   const [loading, setLoading] = useState(true);
   const [bulkN, setBulkN] = useState(4);
   const [bulkMax, setBulkMax] = useState(5);
@@ -34,10 +35,12 @@ function TeamsInner() {
   const reloadTeams = useCallback(async (id: string) => {
     try { setTeams(await listTeams(id) as any); setSelected(new Set()); } catch (e: any) { setErr(e.message); }
   }, []);
+  const reloadCompletions = useCallback(async (id: string) => { try { setCompletions(id ? await listQuestCompletions(id) : []); } catch {} }, []);
 
   // Load classes on mount
   useEffect(() => { (async () => { try { const cs = await listMyClasses(); setClasses(cs); } catch {} })(); }, []);
 
+  useEffect(() => { reloadCompletions(activeId); }, [activeId, reloadCompletions]);
   // Load hunts when class changes
   useEffect(() => {
     (async () => {
@@ -156,7 +159,7 @@ function TeamsInner() {
                 <button onClick={()=>onMax(t)} className="text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-100">Max</button>
                 <button onClick={()=>onDel(t)} className="text-red-600 px-2 py-1 rounded hover:bg-red-50 text-xs">Delete</button>
               </div>
-              <div className="flex items-start gap-3">
+              <div className="flex items-center gap-2 mb-2 p-2 bg-purple-50 rounded">{(() => { const done = completions.find(c=>c.team_id===t.id); return (<><input type="checkbox" checked={!!done} onChange={async ()=>{ try { if (done) { if(!confirm('Unmark completion? This will remove awarded points.')) return; await unmarkTeamCompletion(activeId, t.id); } else { await markTeamCompletion(activeId, t.id); } await reloadCompletions(activeId); await reloadTeams(activeId); } catch(e:any){ alert(e.message); } }} className="w-4 h-4 accent-purple-600"/><span className="text-sm font-medium">{done ? `Quest completed (+${(done as any).awarded_points} pts)` : 'Mark quest completed'}</span><button onClick={async ()=>{ const v = prompt('Bonus points to add (negative to deduct):','0'); if(v===null) return; const n = parseInt(v,10); if(!Number.isFinite(n)||n===0) return; const reason = prompt('Reason (optional):','Bonus')||''; try { await addScoreAdjustment(activeId, t.id, n, reason); await reloadTeams(activeId); } catch(e:any){ alert(e.message); } }} className="ml-auto text-xs px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700">+ Bonus pts</button></>); })()}</div><div className="flex items-start gap-3">
                 <img src={qr} alt="QR" className="w-20 h-20 rounded border bg-white" />
                 <div className="flex-1 min-w-0 text-xs space-y-1">
                   <div><span className="text-gray-500">Code: </span><span className="font-mono font-bold tracking-widest">{t.join_code || '-'}</span> <button onClick={async()=>{await navigator.clipboard.writeText(t.join_code||'');}} className="ml-1 text-purple-700 underline">copy</button> <button onClick={async()=>{ if(!confirm('Generate a new code? Old code will stop working.')) return; const c = await regenerateTeamCode(t.id); await reloadTeams(activeId); alert('New code: '+c); }} className="ml-1 text-purple-700 underline">regenerate</button></div>
