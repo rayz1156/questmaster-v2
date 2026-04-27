@@ -4,7 +4,7 @@ import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ListChecks, Users, BarChart3, GraduationCap, Plus, Pencil, Trash2 , User as UserIcon } from "lucide-react";
 import { listMyHunts, listTeams, createTeam, bulkCreateTeams, renameTeam, deleteTeam, setTeamMaxMembers, listMyClasses, listMyHuntsByClass, type Hunt, type Team, type Klass } from "@/lib/data";
-import { regenerateTeamCode, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, addScoreAdjustment, type QuestCompletion } from '@/lib/data';
+import { regenerateTeamCode, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, addScoreAdjustment, type QuestCompletion, listTeamsByClass, createTeamForClass, bulkCreateTeamsForClass } from '@/lib/data';
 
 const tabs = [
   { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
@@ -37,6 +37,7 @@ function TeamsInner() {
     try { setTeams(await listTeams(id) as any); setSelected(new Set()); } catch (e: any) { setErr(e.message); }
   }, []);
   const reloadCompletions = useCallback(async (id: string) => { try { setCompletions(id ? await listQuestCompletions(id) : []); } catch {} }, []);
+  const reloadClassTeams = useCallback(async (classId: string) => { try { setTeams((classId ? await listTeamsByClass(classId) : []) as any); } catch(e:any){ setErr?.(e.message); } }, []);
 
   // Load classes on mount
   useEffect(() => { (async () => { try { const cs = await listMyClasses(); setClasses(cs); } catch {} })(); }, []);
@@ -48,14 +49,14 @@ function TeamsInner() {
       try {
         const hs = activeClassId ? await listMyHuntsByClass(activeClassId) : await listMyHunts();
         setHunts(hs);
-        if (hs[0]) { setActiveId(hs[0].id); await reloadTeams(hs[0].id); }
-        else { setTeams([]); setActiveId(''); }
+        if (hs[0]) { setActiveId(hs[0].id); await reloadClassTeams(activeClassId); }
+        else { setActiveId(''); await reloadClassTeams(activeClassId); }
       } catch {}
       finally { setLoading(false); }
     })();
-  }, [activeClassId, reloadTeams]);
+  }, [activeClassId, reloadClassTeams]);
 
-  useEffect(() => { if (activeId) reloadTeams(activeId); }, [activeId, reloadTeams]);
+  useEffect(() => { if (activeId) reloadClassTeams(activeClassId); }, [activeClassId, reloadClassTeams]);
 
   // Indeterminate checkbox
   useEffect(() => {
@@ -63,18 +64,18 @@ function TeamsInner() {
   }, [selected, teams.length]);
 
   const onAdd = async () => {
-    if (!name.trim() || !activeId) return;
-    try { await createTeam(activeId, name.trim(), maxM); setName(''); await reloadTeams(activeId); }
+    if (!name.trim() || !activeClassId) return;
+    try { await createTeamForClass(activeClassId, name.trim(), maxM); setName(''); await reloadClassTeams(activeClassId); }
     catch (e: any) { setErr(e.message); }
   };
   const onBulk = async () => {
-    if (!activeId || bulkN < 1) return;
-    try { await bulkCreateTeams(activeId, bulkN, bulkPrefix.trim() || 'Team', bulkMax); await reloadTeams(activeId); }
+    if (!activeClassId || bulkN < 1) return;
+    try { await bulkCreateTeamsForClass(activeClassId, bulkN, bulkPrefix.trim() || 'Team', bulkMax); await reloadClassTeams(activeClassId); }
     catch (e: any) { setErr(e.message); }
   };
-  const onRename = (t: any) => { const n = prompt('New name', t.name); if (n && n.trim()) renameTeam(t.id, n.trim()).then(() => reloadTeams(activeId)); };
-  const onMax = (t: any) => { const n = prompt('Max members', String(t.max_members ?? 5)); if (n) setTeamMaxMembers(t.id, parseInt(n, 10) || 5).then(() => reloadTeams(activeId)); };
-  const onDel = (t: any) => { if (confirm('Delete team ' + t.name + '?')) deleteTeam(t.id).then(() => reloadTeams(activeId)); };
+  const onRename = (t: any) => { const n = prompt('New name', t.name); if (n && n.trim()) renameTeam(t.id, n.trim()).then(() => reloadClassTeams(activeClassId)); };
+  const onMax = (t: any) => { const n = prompt('Max members', String(t.max_members ?? 5)); if (n) setTeamMaxMembers(t.id, parseInt(n, 10) || 5).then(() => reloadClassTeams(activeClassId)); };
+  const onDel = (t: any) => { if (confirm('Delete team ' + t.name + '?')) deleteTeam(t.id).then(() => reloadClassTeams(activeClassId)); };
 
   const toggleOne = (id: string) => setSelected(prev => { const s = new Set(prev); if (s.has(id)) s.delete(id); else s.add(id); return s; });
   const toggleAll = () => setSelected(prev => prev.size === teams.length ? new Set() : new Set(teams.map(t => t.id)));
@@ -82,7 +83,7 @@ function TeamsInner() {
     if (selected.size === 0) return;
     if (!confirm('Delete ' + selected.size + ' selected team(s)?')) return;
     await Promise.all(Array.from(selected).map(id => deleteTeam(id)));
-    await reloadTeams(activeId);
+    await reloadClassTeams(activeClassId);
   };
 
   return (
@@ -160,11 +161,11 @@ function TeamsInner() {
                 <button onClick={()=>onMax(t)} className="text-gray-700 text-xs px-2 py-1 rounded hover:bg-gray-100">Max</button>
                 <button onClick={()=>onDel(t)} className="text-red-600 px-2 py-1 rounded hover:bg-red-50 text-xs">Delete</button>
               </div>
-              <div className="flex items-center gap-2 mb-2 p-2 bg-purple-50 rounded">{(() => { const done = completions.find(c=>c.team_id===t.id); return (<><input type="checkbox" checked={!!done} onChange={async ()=>{ try { if (done) { if(!confirm('Unmark completion? This will remove awarded points.')) return; await unmarkTeamCompletion(activeId, t.id); } else { await markTeamCompletion(activeId, t.id); } await reloadCompletions(activeId); await reloadTeams(activeId); } catch(e:any){ if(!String(e?.message||'').toLowerCase().includes('duplicate')) alert(e.message); await reloadCompletions(activeId); } }} className="w-4 h-4 accent-purple-600"/><span className="text-sm font-medium">{done ? `Quest completed (+${(done as any).awarded_points} pts)` : 'Mark quest completed'}</span><button onClick={async ()=>{ const v = prompt('Bonus points to add (negative to deduct):','0'); if(v===null) return; const n = parseInt(v,10); if(!Number.isFinite(n)||n===0) return; const reason = prompt('Reason (optional):','Bonus')||''; try { await addScoreAdjustment(activeId, t.id, n, reason); await reloadTeams(activeId); } catch(e:any){ alert(e.message); } }} className="ml-auto text-xs px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700">+ Bonus pts</button></>); })()}</div><button onClick={()=>setShowDetails(d=>({...d,[t.id]:!d[t.id]}))} className="text-xs text-purple-700 underline mb-1">{showDetails[t.id] ? 'Hide details' : 'Show join code & QR'}</button>
+              <div className="flex items-center gap-2 mb-2 p-2 bg-purple-50 rounded">{(() => { const done = completions.find(c=>c.team_id===t.id); return (<><input type="checkbox" checked={!!done} onChange={async ()=>{ try { if (done) { if(!confirm('Unmark completion? This will remove awarded points.')) return; await unmarkTeamCompletion(activeId, t.id); } else { await markTeamCompletion(activeId, t.id); } await reloadCompletions(activeId); await reloadClassTeams(activeClassId); } catch(e:any){ if(!String(e?.message||'').toLowerCase().includes('duplicate')) alert(e.message); await reloadCompletions(activeId); } }} className="w-4 h-4 accent-purple-600"/><span className="text-sm font-medium">{done ? `Quest completed (+${(done as any).awarded_points} pts)` : 'Mark quest completed'}</span><button onClick={async ()=>{ const v = prompt('Bonus points to add (negative to deduct):','0'); if(v===null) return; const n = parseInt(v,10); if(!Number.isFinite(n)||n===0) return; const reason = prompt('Reason (optional):','Bonus')||''; try { await addScoreAdjustment(activeId, t.id, n, reason); await reloadClassTeams(activeClassId); } catch(e:any){ alert(e.message); } }} className="ml-auto text-xs px-2 py-1 rounded bg-purple-600 text-white hover:bg-purple-700">+ Bonus pts</button></>); })()}</div><button onClick={()=>setShowDetails(d=>({...d,[t.id]:!d[t.id]}))} className="text-xs text-purple-700 underline mb-1">{showDetails[t.id] ? 'Hide details' : 'Show join code & QR'}</button>
                 {showDetails[t.id] && (<div className="flex items-start gap-3">
                 <img src={qr} alt="QR" className="w-20 h-20 rounded border bg-white" />
                 <div className="flex-1 min-w-0 text-xs space-y-1">
-                  <div><span className="text-gray-500">Code: </span><span className="font-mono font-bold tracking-widest">{t.join_code || '-'}</span> <button onClick={async()=>{await navigator.clipboard.writeText(t.join_code||'');}} className="ml-1 text-purple-700 underline">copy</button> <button onClick={async()=>{ if(!confirm('Generate a new code? Old code will stop working.')) return; const c = await regenerateTeamCode(t.id); await reloadTeams(activeId); alert('New code: '+c); }} className="ml-1 text-purple-700 underline">regenerate</button></div>
+                  <div><span className="text-gray-500">Code: </span><span className="font-mono font-bold tracking-widest">{t.join_code || '-'}</span> <button onClick={async()=>{await navigator.clipboard.writeText(t.join_code||'');}} className="ml-1 text-purple-700 underline">copy</button> <button onClick={async()=>{ if(!confirm('Generate a new code? Old code will stop working.')) return; const c = await regenerateTeamCode(t.id); await reloadClassTeams(activeClassId); alert('New code: '+c); }} className="ml-1 text-purple-700 underline">regenerate</button></div>
                   <div className="break-all"><span className="text-gray-500">Link: </span><a className="text-purple-700 underline" href={link} target="_blank" rel="noreferrer">{link}</a> <button onClick={async()=>{await navigator.clipboard.writeText(link);}} className="ml-1 text-purple-700 underline">copy</button></div>
                   <div><a className="text-purple-700 underline" href={qr} target="_blank" rel="noreferrer">Open QR image</a></div>
                 </div>

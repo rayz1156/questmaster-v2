@@ -76,6 +76,26 @@ export async function leaderboard(huntId: string): Promise<Team[]> {
   return listTeams(huntId);
 }
 
+
+// === CLASS-SCOPED TEAMS ===
+export async function listTeamsByClass(classId: string): Promise<any[]> {
+  const { data, error } = await supabase.from('qm_teams').select('*').eq('class_id', classId).order('score', { ascending: false });
+  if (error) throw error; return (data || []) as any[];
+}
+export async function createTeamForClass(classId: string, name: string, maxMembers: number = 5) {
+  const { data, error } = await supabase.from('qm_teams').insert({ class_id: classId, name, max_members: maxMembers }).select().single();
+  if (error) throw error; return data as any;
+}
+export async function bulkCreateTeamsForClass(classId: string, count: number, prefix: string = 'Team', maxMembers: number = 5) {
+  const rows = Array.from({ length: count }).map((_, i) => ({ class_id: classId, name: `${prefix} ${i + 1}`, max_members: maxMembers }));
+  const { data, error } = await supabase.from('qm_teams').insert(rows).select();
+  if (error) throw error; return data as any[];
+}
+export async function leaderboardByClass(classId: string): Promise<any[]> {
+  // Cumulative team score across all quests in the class (qm_teams.score is already aggregated by triggers/adjustments)
+  return listTeamsByClass(classId);
+}
+
 // === ADMIN ===
 export async function adminListProfiles(): Promise<Profile[]> {
   const { data, error } = await supabase.from('qm_profiles').select('*').order('created_at', { ascending: false });
