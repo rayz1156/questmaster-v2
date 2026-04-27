@@ -4,11 +4,6 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
-const DEMO = {
-  participant: { email: 'participant@quest.local', label: 'Participant' },
-  educator:    { email: 'educator@quest.local',    label: 'Educator' },
-  admin:       { email: 'admin@quest.local',       label: 'Admin' },
-} as const;
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,9 +31,6 @@ export default function LoginPage() {
     router.replace(role === 'educator' ? '/educator/classes' : role === 'admin' ? '/admin/overview' : '/participant/home');
   }
 
-  function quick(role: keyof typeof DEMO) {
-    signIn(undefined, { email: DEMO[role].email, password: 'Quest1234' });
-  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
@@ -67,13 +59,7 @@ export default function LoginPage() {
             <Link href="/register" className="text-purple-600 font-medium">Create account</Link>
           </div>
         </form>
-        <div className="mt-6 text-center text-white/80 text-xs tracking-widest">QUICK DEMO LOGIN</div>
-        <div className="mt-2 grid grid-cols-3 gap-2">
-          {(Object.keys(DEMO) as (keyof typeof DEMO)[]).map(r => (
-            <button key={r} onClick={()=>quick(r)} className="py-2 rounded-xl bg-white/15 text-white border border-white/30 hover:bg-white/25">{DEMO[r].label}</button>
-          ))}
         </div>
-      </div>
     
       <div className="text-center text-[11px] text-white/70 mt-6">Powered by <span className="font-semibold">Airiz Intelligence</span></div>
 </div>
