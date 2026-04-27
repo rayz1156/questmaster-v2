@@ -397,3 +397,16 @@ export async function adminListAllChallenges(): Promise<Challenge[]> {
 export async function adminUpdateChallenge(id: string, patch: Partial<Challenge>): Promise<void> {
   const { error } = await supabase.from('qm_challenges').update(patch).eq('id', id); if (error) throw error;
 }
+
+export type UserMeta = { id: string; email: string | null; created_at: string; last_sign_in_at: string | null };
+export async function adminListUsersMeta(): Promise<Record<string, UserMeta>> {
+  const { data, error } = await supabase.rpc('qm_admin_list_users_meta');
+  if (error) { console.error(error); return {}; }
+  const map: Record<string, UserMeta> = {};
+  for (const row of (data || []) as UserMeta[]) map[row.id] = row;
+  return map;
+}
+export async function adminDeleteUser(id: string): Promise<void> {
+  const { error } = await supabase.rpc('qm_admin_delete_user', { target: id });
+  if (error) throw error;
+}
