@@ -1,10 +1,10 @@
 "use client";
 import { useEffect, useState, useRef } from "react";
-import { Plus, Image as ImageIcon, Upload, X, Trash2, EyeOff, Eye, Loader2 } from "lucide-react";
+import { Plus, Image as ImageIcon, Upload, X, Trash2, Pencil, Loader2 } from "lucide-react";
 import {
   Board, IntroPost,
   listIntroPosts, getMyIntroPost, createOrUpdateIntroPost,
-  deleteIntroPost, hideIntroPost,
+  deleteIntroPost,
 } from "@/lib/boards";
 
 interface Props {
@@ -37,10 +37,6 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
   const handleDelete = async (p: IntroPost) => {
     if (!confirm("Padam post ini?")) return;
     try { await deleteIntroPost(p.id); await reload(); }
-    catch (e: any) { alert(e.message || String(e)); }
-  };
-  const handleHide = async (p: IntroPost) => {
-    try { await hideIntroPost(p.id, !p.is_hidden); await reload(); }
     catch (e: any) { alert(e.message || String(e)); }
   };
 
@@ -81,13 +77,13 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
             </div>
             <div className="p-3">
               <div className="font-semibold text-sm truncate">{p.display_name}</div>
-              {p.description && <div className="text-xs text-gray-600 mt-1 line-clamp-3">{p.description}</div>}
+              {p.description && <div className="text-xs text-gray-600 mt-1 whitespace-pre-wrap break-words">{p.description}</div>}
             </div>
             {(canManage || p.author_id === currentUserId) && (
               <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                {canManage && (
-                  <button onClick={() => handleHide(p)} title={p.is_hidden ? "Tunjukkan" : "Sembunyikan"} className="p-1.5 bg-white/90 rounded shadow hover:bg-white">
-                    {p.is_hidden ? <Eye className="w-3.5 h-3.5" /> : <EyeOff className="w-3.5 h-3.5" />}
+                {p.author_id === currentUserId && (
+                  <button onClick={() => setShowModal(true)} title="Edit" className="p-1.5 bg-white/90 rounded shadow hover:bg-white">
+                    <Pencil className="w-3.5 h-3.5" />
                   </button>
                 )}
                 <button onClick={() => handleDelete(p)} title="Padam" className="p-1.5 bg-white/90 rounded shadow hover:bg-white text-red-600">
