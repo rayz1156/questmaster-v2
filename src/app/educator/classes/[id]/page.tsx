@@ -45,10 +45,11 @@ export default function ClassDetail() {
           <div className="w-10 h-10 rounded-lg shrink-0" style={{ background: klass.color || '#6366f1' }}/>
           <div className="flex-1">{editingName ? (<div className="flex items-center gap-2"><input className="input flex-1" value={nameDraft} onChange={e=>setNameDraft(e.target.value)} autoFocus /><button className="btn-primary py-1 px-2 text-xs" disabled={busy || !nameDraft.trim()} onClick={async()=>{ const v=nameDraft.trim(); if(!v||v===klass.name){ setEditingName(false); return; } setBusy(true); setMsg(null); try{ await updateClass(klass.id,{ name: v }); setEditingName(false); await reload(); setMsg("Class renamed"); }catch(err:any){ setMsg(err.message||"Failed to rename"); } finally{ setBusy(false); } }}><Check className="w-4 h-4"/></button><button className="btn-secondary py-1 px-2 text-xs" onClick={()=>setEditingName(false)}><X className="w-4 h-4"/></button></div>) : (<div className="flex items-center gap-2"><div className="font-bold text-lg">{klass.name}</div><button title="Rename class" onClick={()=>{ setNameDraft(klass.name); setEditingName(true); }} className="text-gray-400 hover:text-gray-700"><Pencil className="w-3 h-3"/></button></div>)}{klass.description && <div className="text-xs text-gray-500">{klass.description}</div>}</div>
         </div>
-        <div className="mt-3 grid grid-cols-3 gap-2 text-center">
+        <div className="mt-3 grid grid-cols-4 gap-2 text-center">
           <Link href={`/educator/activities?classId=${klass.id}`} className="p-2 bg-gray-50 rounded-lg text-xs"><ListChecks className="w-4 h-4 mx-auto mb-1"/>Activities</Link>
           <Link href={`/educator/teams?classId=${klass.id}`} className="p-2 bg-gray-50 rounded-lg text-xs"><Users className="w-4 h-4 mx-auto mb-1"/>Teams</Link>
           <Link href={`/educator/rankings?classId=${klass.id}`} className="p-2 bg-gray-50 rounded-lg text-xs"><BarChart3 className="w-4 h-4 mx-auto mb-1"/>Rankings</Link>
+          <Link href={`/educator/classes/${klass.id}/board`} className="p-2 bg-indigo-50 rounded-lg text-xs text-indigo-700"><LinkIcon className="w-4 h-4 mx-auto mb-1"/>Intro Board</Link>
         </div>
       </div>
 

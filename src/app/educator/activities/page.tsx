@@ -46,6 +46,7 @@ export default function Page() {
             </div>
             <div className="flex flex-col gap-1 items-end shrink-0">
               <Link href={`/educator/activities/${h.id}`} className="btn-primary px-3 py-1 text-xs">Manage</Link>
+            <Link href={`/educator/activities/${h.id}/board`} className="text-xs px-3 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-center">Submission Board</Link>
               <button onClick={() => onDelete(h.id)} className="text-xs text-red-600 hover:underline">Delete</button>
             </div>
           </div>
