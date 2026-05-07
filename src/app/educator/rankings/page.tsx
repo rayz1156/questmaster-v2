@@ -47,7 +47,7 @@ function RankingsInner() {
     (async () => {
       const cs = await listMyClasses();
       setClasses(cs);
-      if (cs[0]) { setClassId(cs[0].id); }
+      if (cs[0]) { setClassId(prev => prev || cs[0].id); }
     })();
   }, []);
 
