@@ -79,8 +79,17 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
             </p>
           )}
         </div>
-        <div className="text-sm text-gray-500">
+        <div className="flex items-center gap-3 text-sm text-gray-500">
           {board.max_score != null && <span>Score penuh: <b>{board.max_score}</b></span>}
+          <button
+            type="button"
+            onClick={() => reload()}
+            disabled={loading}
+            className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
+            title="Refresh teams and submissions"
+          >
+            <span aria-hidden>↻</span> Refresh
+          </button>
         </div>
       </div>
 

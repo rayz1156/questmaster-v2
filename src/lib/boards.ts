@@ -351,10 +351,26 @@ export async function deleteGroupSubmission(submissionId: string): Promise<void>
 
 // =========================== TEAMS HELPER ==================================
 export async function listTeamsForHunt(huntId: string): Promise<Array<{ id: string; name: string; score: number }>> {
+  // Resolve the hunt's class so we can pull both hunt-attached teams (legacy)
+  // and class-level teams (current model). Every quest in a class auto-gets
+  // a column per team in that class.
+  const { data: hunt, error: hErr } = await supabase
+    .from('qm_hunts').select('class_id').eq('id', huntId).maybeSingle();
+  if (hErr) throw hErr;
+  const classId = (hunt as any)?.class_id || null;
+  const filter = classId ? `hunt_id.eq.${huntId},class_id.eq.${classId}` : `hunt_id.eq.${huntId}`;
   const { data, error } = await supabase
-    .from('qm_teams').select('id,name,score').eq('hunt_id', huntId).order('name');
+    .from('qm_teams').select('id,name,score').or(filter).order('name');
   if (error) throw error;
-  return (data || []) as any;
+  // Deduplicate in case a team is linked by both hunt_id and class_id.
+  const seen = new Set<string>();
+  const out: Array<{ id: string; name: string; score: number }> = [];
+  for (const r of (data || []) as any[]) {
+    if (seen.has(r.id)) continue;
+    seen.add(r.id);
+    out.push({ id: r.id, name: r.name, score: r.score });
+  }
+  return out;
 }
 
 export async function listTeamMembers(teamId: string): Promise<Array<{ user_id: string; display_name: string | null }>> {
