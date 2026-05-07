@@ -25,6 +25,9 @@ function PageInner() {
   const [instructions, setInstructions] = useState('');
   const [link1, setLink1] = useState('');
   const [link2, setLink2] = useState('');
+  const [submissionLink, setSubmissionLink] = useState('');
+  const [submissionLinkLabel, setSubmissionLinkLabel] = useState('');
+  const [submissionLinkEmbed, setSubmissionLinkEmbed] = useState(false);
   const [status, setStatus] = useState('draft');
   const [points, setPoints] = useState<number|string>("")
   const [err, setErr] = useState<string | null>(null);
@@ -40,6 +43,9 @@ function PageInner() {
       setTitle(h.title); setDescription((h as any).description || '');
       setInstructions((h as any).instructions || '');
       setLink1((h as any).link1 || ''); setLink2((h as any).link2 || '');
+      setSubmissionLink((h as any).submission_link || '');
+      setSubmissionLinkLabel((h as any).submission_link_label || '');
+      setSubmissionLinkEmbed(!!(h as any).submission_link_embed);
       setStatus((h as any).status || 'draft');
       setPoints((h as any).points_per_task ?? "");
     }
@@ -57,7 +63,7 @@ function PageInner() {
 
   const save = async () => {
     try {
-      await updateQuestDetails(huntId, { title, description, instructions, link1, link2, status: status as any, points: Number(points) || 0 });
+      await updateQuestDetails(huntId, { title, description, instructions, link1, link2, submission_link: submissionLink.trim() || null, submission_link_label: submissionLinkLabel.trim() || null, submission_link_embed: submissionLinkEmbed, status: status as any, points: Number(points) || 0 });
       await refresh();
     } catch (e: any) { setErr(e?.message || 'Save failed'); }
   };
@@ -100,6 +106,22 @@ function PageInner() {
           <label className="text-sm">
             <div className="text-gray-600 mb-1">Link 2 (any URL)</div>
             <input className="input w-full" value={link2} onChange={e => setLink2(e.target.value)} placeholder="https://youtu.be/..." />
+          </label>
+        </div>
+        <div className="mt-2 p-3 rounded-lg border bg-purple-50/40 space-y-2">
+          <div className="text-sm font-semibold text-purple-800">Submission link (optional)</div>
+          <div className="text-xs text-gray-600">When set, the activity board replaces team-column submissions with this link (Google Drive, Dropbox, Padlet, etc).</div>
+          <label className="text-sm block">
+            <div className="text-gray-600 mb-1">Submission URL</div>
+            <input className="input w-full" type="url" value={submissionLink} onChange={e => setSubmissionLink(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
+          </label>
+          <label className="text-sm block">
+            <div className="text-gray-600 mb-1">Button label (optional)</div>
+            <input className="input w-full" value={submissionLinkLabel} onChange={e => setSubmissionLinkLabel(e.target.value)} placeholder="e.g. Submit to our shared Drive folder" />
+          </label>
+          <label className="text-sm inline-flex items-center gap-2">
+            <input type="checkbox" checked={submissionLinkEmbed} onChange={e => setSubmissionLinkEmbed(e.target.checked)} />
+            <span>Try to embed on the board page (some providers block embedding; the new-tab button always works as a fallback)</span>
           </label>
         </div>
         <label className="text-sm">

@@ -384,3 +384,57 @@ export async function listTeamMembers(teamId: string): Promise<Array<{ user_id: 
     display_name: r.qm_profiles?.display_name || null,
   }));
 }
+
+// === Submission link (external Drive/Dropbox/Padlet/etc) ===
+export interface HuntSubmissionLink {
+  url: string | null;
+  label: string | null;
+  embed: boolean;
+}
+export async function getHuntSubmissionLink(huntId: string): Promise<HuntSubmissionLink> {
+  const { data, error } = await supabase
+    .from('qm_hunts')
+    .select('submission_link, submission_link_label, submission_link_embed')
+    .eq('id', huntId)
+    .single();
+  if (error) {
+    return { url: null, label: null, embed: false };
+  }
+  const r: any = data || {};
+  return {
+    url: (r.submission_link && String(r.submission_link).trim()) || null,
+    label: (r.submission_link_label && String(r.submission_link_label).trim()) || null,
+    embed: !!r.submission_link_embed,
+  };
+}
+
+// Best-effort rewrite of common provider "share" URLs into embed-friendly form.
+// Returns the original URL if no rewrite rule applies.
+export function toEmbedUrl(url: string): string {
+  try {
+    const u = new URL(url);
+    const host = u.hostname.toLowerCase();
+    // Google Drive: convert /file/d/ID/view -> /file/d/ID/preview
+    if (host.endsWith('drive.google.com')) {
+      const m = u.pathname.match(/^\/file\/d\/([^\/]+)/);
+      if (m) return `https://drive.google.com/file/d/${m[1]}/preview`;
+      // /drive/folders/ID -> /embeddedfolderview?id=ID#list (read-only)
+      const f = u.pathname.match(/^\/drive\/folders\/([^\/?]+)/);
+      if (f) return `https://drive.google.com/embeddedfolderview?id=${f[1]}#list`;
+    }
+    // Google Docs/Sheets/Slides: /edit -> /preview
+    if (host === 'docs.google.com') {
+      return url.replace(/\/edit(?=[?#]|$)/, '/preview');
+    }
+    // YouTube: youtu.be/ID or watch?v=ID -> embed/ID
+    if (host === 'youtu.be') {
+      const id = u.pathname.replace(/^\//, '').split('/')[0];
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+    if (host.endsWith('youtube.com')) {
+      const id = u.searchParams.get('v');
+      if (id) return `https://www.youtube.com/embed/${id}`;
+    }
+  } catch {}
+  return url;
+}

@@ -309,7 +309,7 @@ export async function listClassTeamScores(classId: string): Promise<ClassTeamSco
 // === QUEST MANAGEMENT (v2 simplified) ===
 export type QuestCompletion = { id: string; hunt_id: string; team_id: string; awarded_points: number; adjustment_id: string|null; marked_by: string|null; created_at: string };
 
-export async function updateQuestDetails(huntId: string, patch: { title?: string; description?: string|null; instructions?: string|null; link1?: string|null; link2?: string|null; points?: number; status?: 'draft'|'active'|'archived' }): Promise<void> {
+export async function updateQuestDetails(huntId: string, patch: { title?: string; description?: string|null; instructions?: string|null; link1?: string|null; link2?: string|null; submission_link?: string|null; submission_link_label?: string|null; submission_link_embed?: boolean; points?: number; status?: 'draft'|'active'|'archived' }): Promise<void> {
   const { error } = await supabase.from('qm_hunts').update(patch).eq('id', huntId);
   if (error) throw error;
 }

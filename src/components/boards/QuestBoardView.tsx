@@ -8,7 +8,7 @@ import {
   Board, GroupSubmission, SubmissionStatus,
   listGroupSubmissions, getMyGroupSubmission, getMyTeamForBoard,
   createOrUpdateGroupSubmission, gradeSubmission, deleteGroupSubmission,
-  listTeamsForHunt,
+  listTeamsForHunt, getHuntSubmissionLink, toEmbedUrl, HuntSubmissionLink,
 } from "@/lib/boards";
 
 interface Team { id: string; name: string; score: number; }
@@ -38,18 +38,23 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
   const [err, setErr] = useState<string | null>(null);
   const [uploadFor, setUploadFor] = useState<{ teamId: string; existing: GroupSubmission | null } | null>(null);
   const [gradeFor, setGradeFor] = useState<GroupSubmission | null>(null);
+  const [subLink, setSubLink] = useState<HuntSubmissionLink>({ url: null, label: null, embed: false });
+  const [embedFailed, setEmbedFailed] = useState<boolean>(false);
 
   const reload = async () => {
     setLoading(true);
     try {
-      const [t, s, my] = await Promise.all([
+      const [t, s, my, link] = await Promise.all([
         board.hunt_id ? listTeamsForHunt(board.hunt_id) : Promise.resolve([] as Team[]),
         listGroupSubmissions(board.id),
         getMyTeamForBoard(board.id),
+        board.hunt_id ? getHuntSubmissionLink(board.hunt_id) : Promise.resolve({ url: null, label: null, embed: false } as HuntSubmissionLink),
       ]);
       setTeams(t);
       setSubs(s);
       setMyTeamId(my);
+      setSubLink(link);
+      setEmbedFailed(false);
     } catch (e: any) {
       setErr(e.message || String(e));
     } finally {
@@ -96,13 +101,51 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
       {err && <div className="p-3 rounded bg-red-50 text-red-700 text-sm">{err}</div>}
       {loading && <div className="text-sm text-gray-500">Memuatkan…</div>}
 
-      {!loading && teams.length === 0 && (
+      {!loading && subLink.url && (
+        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
+          <div className="p-3 border-b bg-purple-50 flex items-center justify-between gap-2 flex-wrap">
+            <div className="font-semibold text-purple-900 text-sm">
+              {subLink.label || "Submission destination"}
+            </div>
+            <a
+              href={subLink.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm"
+            >Open in new tab ↗</a>
+          </div>
+          {subLink.embed && !embedFailed ? (
+            <iframe
+              src={toEmbedUrl(subLink.url!)}
+              className="w-full"
+              style={{ height: "70vh", border: 0 }}
+              referrerPolicy="no-referrer"
+              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
+              onError={() => setEmbedFailed(true)}
+              title="Submission destination"
+            />
+          ) : (
+            <div className="p-6 text-center text-sm text-gray-600 space-y-2">
+              {subLink.embed && embedFailed && (
+                <p className="text-rose-600">This destination cannot be embedded. Use the button above to open it in a new tab.</p>
+              )}
+              {!subLink.embed && (
+                <p>Click “Open in new tab” above to go to the submission destination.</p>
+              )}
+              <p className="text-xs text-gray-400 break-all">{subLink.url}</p>
+            </div>
+          )}
+        </div>
+      )}
+
+      {!loading && !subLink.url && teams.length === 0 && (
         <div className="p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
           <p className="text-gray-600">No teams found for this quest.</p>
           <p className="text-xs text-gray-500 mt-1">Please add a team first in the Teams tab.</p>
         </div>
       )}
 
+      {!subLink.url && (
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
         {teams.map(team => {
           const sub = subByTeam.get(team.id) || null;
@@ -200,6 +243,7 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
           );
         })}
       </div>
+      )}
 
       {uploadFor && (
         <SubmissionUploadModal
