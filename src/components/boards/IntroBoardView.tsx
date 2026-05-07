@@ -35,7 +35,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [board.id]);
 
   const handleDelete = async (p: IntroPost) => {
-    if (!confirm("Padam post ini?")) return;
+    if (!confirm("Delete this post?")) return;
     try { await deleteIntroPost(p.id); await reload(); }
     catch (e: any) { alert(e.message || String(e)); }
   };
@@ -53,7 +53,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
           >
             <Plus className="w-4 h-4" />
-            {mine ? "Edit Pengenalan Saya" : "Tambah Pengenalan Saya"}
+            {mine ? "Edit My Introduction" : "Add My Introduction"}
           </button>
         )}
       </div>
@@ -64,7 +64,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
       {!loading && posts.length === 0 && (
         <div className="p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
           <ImageIcon className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-600">Belum ada pengenalan. Jadilah orang pertama!</p>
+          <p className="text-gray-600">No introductions yet. Be the first!</p>
         </div>
       )}
 
@@ -86,7 +86,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
                     <Pencil className="w-3.5 h-3.5" />
                   </button>
                 )}
-                <button onClick={() => handleDelete(p)} title="Padam" className="p-1.5 bg-white/90 rounded shadow hover:bg-white text-red-600">
+                <button onClick={() => handleDelete(p)} title="Delete" className="p-1.5 bg-white/90 rounded shadow hover:bg-white text-red-600">
                   <Trash2 className="w-3.5 h-3.5" />
                 </button>
               </div>
@@ -132,8 +132,8 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
 
   const submit = async () => {
     setErr(null);
-    if (!name.trim()) { setErr("Sila isi nama."); return; }
-    if (!previewUrl && !file) { setErr("Sila pilih gambar."); return; }
+    if (!name.trim()) { setErr("Please enter your name."); return; }
+    if (!previewUrl && !file) { setErr("Please choose an image."); return; }
     setBusy(true);
     try {
       await createOrUpdateIntroPost({
@@ -156,7 +156,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-auto">
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{existing ? "Edit Pengenalan" : "Tambah Pengenalan"}</h3>
+          <h3 className="font-semibold">{existing ? "Edit Introduction" : "Add Introduction"}</h3>
           <button onClick={onClose}><X className="w-5 h-5" /></button>
         </div>
         <div className="p-4 space-y-3">
@@ -172,7 +172,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
             ) : (
               <div className="py-6 text-gray-500">
                 <Upload className="w-8 h-8 mx-auto mb-1" />
-                <p className="text-sm">Klik atau lepaskan gambar di sini</p>
+                <p className="text-sm">Click or drop an image here</p>
                 <p className="text-xs">JPG/PNG/WebP/GIF · Max 10MB</p>
               </div>
             )}
@@ -180,22 +180,22 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
               onChange={e => onPick(e.target.files?.[0] || null)} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Nama</label>
+            <label className="block text-sm font-medium mb-1">Name</label>
             <input value={name} onChange={e => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Nama anda" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder="Your name" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Tentang Anda</label>
+            <label className="block text-sm font-medium mb-1">About You</label>
             <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Cerita sedikit tentang diri anda…" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder="Tell us a bit about yourself…" />
           </div>
           {err && <div className="p-2 bg-red-50 text-red-700 text-sm rounded">{err}</div>}
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Batal</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Cancel</button>
           <button onClick={submit} disabled={busy} className="px-4 py-2 rounded-lg bg-indigo-600 text-white disabled:opacity-50 inline-flex items-center gap-2">
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-            Simpan
+            Save
           </button>
         </div>
       </div>

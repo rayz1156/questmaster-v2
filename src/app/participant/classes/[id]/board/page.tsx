@@ -40,7 +40,7 @@ export default function PartClassBoardPage() {
     <Shell tabs={tabs}>
       <div className="mb-3">
         <Link href={`/participant/home`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Kembali
+          <ArrowLeft className="w-4 h-4" /> Back
         </Link>
       </div>
       {loading && <p className="text-sm text-gray-500">Memuatkan…</p>}

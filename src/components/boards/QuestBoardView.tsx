@@ -20,9 +20,9 @@ interface Props {
 }
 
 const STATUS_LABEL: Record<SubmissionStatus, string> = {
-  in_review: "Dalam Semakan",
-  needs_revision: "Perlu Pembetulan",
-  complete: "Selesai",
+  in_review: "In Review",
+  needs_revision: "Needs Revision",
+  complete: "Complete",
 };
 const STATUS_COLOR: Record<SubmissionStatus, string> = {
   in_review: "bg-amber-100 text-amber-800",
@@ -75,12 +75,12 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
           {board.due_date && (
             <p className={`text-xs mt-1 inline-flex items-center gap-1 ${overdue ? 'text-rose-600' : 'text-gray-500'}`}>
               <Clock className="w-3.5 h-3.5" />
-              Tarikh akhir: {new Date(board.due_date).toLocaleString()}
+              Due date: {new Date(board.due_date).toLocaleString()}
             </p>
           )}
         </div>
         <div className="text-sm text-gray-500">
-          {board.max_score != null && <span>Markah penuh: <b>{board.max_score}</b></span>}
+          {board.max_score != null && <span>Score penuh: <b>{board.max_score}</b></span>}
         </div>
       </div>
 
@@ -89,8 +89,8 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
 
       {!loading && teams.length === 0 && (
         <div className="p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
-          <p className="text-gray-600">Tiada kumpulan ditemui untuk quest ini.</p>
-          <p className="text-xs text-gray-500 mt-1">Sila tambah kumpulan dahulu di tab Teams.</p>
+          <p className="text-gray-600">No teams found for this quest.</p>
+          <p className="text-xs text-gray-500 mt-1">Please add a team first in the Teams tab.</p>
         </div>
       )}
 
@@ -114,12 +114,12 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                     {isMyTeam ? (
                       <button onClick={() => setUploadFor({ teamId: team.id, existing: null })}
                         className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50">
-                        <Plus className="w-4 h-4" /> Hantar untuk kumpulan
+                        <Plus className="w-4 h-4" /> Submit for team
                       </button>
                     ) : canManage ? (
-                      <span className="text-gray-400">Belum dihantar</span>
+                      <span className="text-gray-400">Not submitted yet</span>
                     ) : (
-                      <span className="text-gray-400">Hanya ahli kumpulan boleh hantar</span>
+                      <span className="text-gray-400">Only team members can submit</span>
                     )}
                   </div>
                 )}
@@ -150,29 +150,29 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                     )}
                     {sub.status === 'complete' && (board.show_scores_publicly || canManage || isMyTeam) && sub.score != null && (
                       <div className="text-sm inline-flex items-center gap-1 text-emerald-700">
-                        <Award className="w-4 h-4" /> Markah: <b>{sub.score}</b>{board.max_score ? ` / ${board.max_score}` : ''}
+                        <Award className="w-4 h-4" /> Score: <b>{sub.score}</b>{board.max_score ? ` / ${board.max_score}` : ''}
                       </div>
                     )}
                     {sub.feedback && (canManage || isMyTeam) && (
                       <div className="text-xs text-gray-700 bg-gray-50 rounded p-2">
-                        <b>Maklum balas:</b> {sub.feedback}
+                        <b>Feedback:</b> {sub.feedback}
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2 pt-1">
                       {canManage && (
                         <button onClick={() => setGradeFor(sub)}
                           className="text-xs px-2.5 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Beri Markah
+                          <CheckCircle2 className="w-3.5 h-3.5" /> Give Score
                         </button>
                       )}
                       {(isMyTeam && (sub.status === 'in_review' || sub.status === 'needs_revision')) && (
                         <button onClick={() => setUploadFor({ teamId: team.id, existing: sub })}
                           className="text-xs px-2.5 py-1 rounded border hover:bg-gray-50 inline-flex items-center gap-1">
-                          <RefreshCcw className="w-3.5 h-3.5" /> Hantar Semula
+                          <RefreshCcw className="w-3.5 h-3.5" /> Resubmit
                         </button>
                       )}
                       {canManage && (
-                        <button onClick={async () => { if (confirm('Padam hantaran ini?')) { await deleteGroupSubmission(sub.id); reload(); } }}
+                        <button onClick={async () => { if (confirm('Delete this submission?')) { await deleteGroupSubmission(sub.id); reload(); } }}
                           className="text-xs px-2.5 py-1 rounded border text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
@@ -220,8 +220,8 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
 
   const submit = async () => {
     setErr(null);
-    if (!title.trim()) { setErr("Sila isi tajuk."); return; }
-    if (!file && !existing) { setErr("Sila pilih fail."); return; }
+    if (!title.trim()) { setErr("Please enter a title."); return; }
+    if (!file && !existing) { setErr("Please choose a file."); return; }
     setBusy(true);
     try {
       await createOrUpdateGroupSubmission({
@@ -239,7 +239,7 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-auto">
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{existing ? "Hantar Semula" : "Hantar Tugasan Kumpulan"}</h3>
+          <h3 className="font-semibold">{existing ? "Resubmit" : "Submit Team Assignment"}</h3>
           <button onClick={onClose}><X className="w-5 h-5" /></button>
         </div>
         <div className="p-4 space-y-3">
@@ -253,13 +253,13 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
               </div>
             ) : existing ? (
               <div className="text-sm text-gray-600">
-                <FileText className="w-6 h-6 mx-auto mb-1" />Fail semasa: {existing.file_name}
-                <div className="text-xs">Klik untuk gantikan</div>
+                <FileText className="w-6 h-6 mx-auto mb-1" />Current file: {existing.file_name}
+                <div className="text-xs">Click to replace</div>
               </div>
             ) : (
               <div className="py-4 text-gray-500">
                 <Upload className="w-8 h-8 mx-auto mb-1" />
-                <p className="text-sm">Klik atau lepaskan fail</p>
+                <p className="text-sm">Click or drop a file</p>
                 <p className="text-xs">PDF/Word/Excel/PowerPoint/Imej · Max 50MB</p>
               </div>
             )}
@@ -268,24 +268,24 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
               onChange={e => setFile(e.target.files?.[0] || null)} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Tajuk</label>
+            <label className="block text-sm font-medium mb-1">Title</label>
             <input value={title} onChange={e => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="cth: Laporan Projek Kumpulan" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., Group Project Report" />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Penerangan</label>
+            <label className="block text-sm font-medium mb-1">Description</label>
             <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Cerita ringkas tentang hantaran ini…" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder="Brief description of this submission…" />
           </div>
           {err && <div className="p-2 bg-red-50 text-red-700 text-sm rounded">{err}</div>}
           <p className="text-xs text-gray-500">
-            Markah & maklum balas akan diterima oleh semua ahli kumpulan.
+            Score & feedback will be received by all team members.
           </p>
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Batal</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Cancel</button>
           <button onClick={submit} disabled={busy} className="px-4 py-2 rounded-lg bg-indigo-600 text-white disabled:opacity-50 inline-flex items-center gap-2">
-            {busy && <Loader2 className="w-4 h-4 animate-spin" />}Hantar
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}Submit
           </button>
         </div>
       </div>
@@ -308,7 +308,7 @@ function GradeModal({ submission, maxScore, onClose, onSaved }: {
     try {
       const numScore = score === "" ? null : Number(score);
       if (status === 'complete' && (numScore == null || isNaN(numScore))) {
-        setErr("Sila masukkan markah untuk status 'Selesai'."); setBusy(false); return;
+        setErr("Please enter a score for status 'Complete'."); setBusy(false); return;
       }
       await gradeSubmission(submission.id, { status, score: numScore, feedback });
       onSaved();
@@ -320,12 +320,12 @@ function GradeModal({ submission, maxScore, onClose, onSaved }: {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-md w-full">
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">Beri Markah</h3>
+          <h3 className="font-semibold">Give Score</h3>
           <button onClick={onClose}><X className="w-5 h-5" /></button>
         </div>
         <div className="p-4 space-y-3">
           <div className="text-sm text-gray-600">
-            <b>Tajuk:</b> {submission.title}<br />
+            <b>Title:</b> {submission.title}<br />
             <a href={submission.file_url} target="_blank" rel="noreferrer"
               className="text-indigo-600 hover:underline inline-flex items-center gap-1 mt-1">
               <Download className="w-3.5 h-3.5" /> {submission.file_name}
@@ -335,33 +335,33 @@ function GradeModal({ submission, maxScore, onClose, onSaved }: {
             <label className="block text-sm font-medium mb-1">Status</label>
             <select value={status} onChange={e => setStatus(e.target.value as SubmissionStatus)}
               className="w-full px-3 py-2 border rounded-lg">
-              <option value="in_review">Dalam Semakan</option>
-              <option value="needs_revision">Perlu Pembetulan</option>
-              <option value="complete">Selesai</option>
+              <option value="in_review">In Review</option>
+              <option value="needs_revision">Needs Revision</option>
+              <option value="complete">Complete</option>
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
-              Markah {maxScore != null && <span className="text-gray-500">(0-{maxScore})</span>}
+              Score {maxScore != null && <span className="text-gray-500">(0-{maxScore})</span>}
             </label>
             <input type="number" value={score} onChange={e => setScore(e.target.value)}
               min={0} max={maxScore || undefined}
               className="w-full px-3 py-2 border rounded-lg"
               disabled={status !== 'complete'}
-              placeholder={status === 'complete' ? "Masukkan markah" : "Hanya untuk status 'Selesai'"} />
+              placeholder={status === 'complete' ? "Enter score" : "Only for status 'Complete'"} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Maklum Balas</label>
+            <label className="block text-sm font-medium mb-1">Feedback</label>
             <textarea value={feedback} onChange={e => setFeedback(e.target.value)} rows={4}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Maklum balas untuk kumpulan…" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder="Feedback for the team…" />
           </div>
           {err && <div className="p-2 bg-red-50 text-red-700 text-sm rounded">{err}</div>}
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Batal</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Cancel</button>
           <button onClick={submit} disabled={busy}
             className="px-4 py-2 rounded-lg bg-indigo-600 text-white disabled:opacity-50 inline-flex items-center gap-2">
-            {busy && <Loader2 className="w-4 h-4 animate-spin" />}Simpan
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}Save
           </button>
         </div>
       </div>

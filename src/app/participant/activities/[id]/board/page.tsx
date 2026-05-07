@@ -40,7 +40,7 @@ export default function PartActivityBoardPage() {
     <Shell tabs={tabs}>
       <div className="mb-3">
         <Link href={`/participant/activities`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Kembali ke Activities
+          <ArrowLeft className="w-4 h-4" /> Back to Activities
         </Link>
       </div>
       {loading && <p className="text-sm text-gray-500">Memuatkan…</p>}

@@ -41,7 +41,7 @@ export default function ClassBoardPage() {
     <Shell tabs={tabs}>
       <div className="mb-3">
         <Link href={`/educator/classes/${classId}`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Kembali ke Kelas
+          <ArrowLeft className="w-4 h-4" /> Back to Class
         </Link>
       </div>
       {loading && <p className="text-sm text-gray-500">Memuatkan…</p>}
