@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { cookies } from 'next/headers';
-import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 
 export async function POST(req: NextRequest) {
@@ -11,23 +10,39 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Missing classId, email, or code' }, { status: 400 });
     }
 
-    const cookieStore = cookies();
-    const supa = createServerClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-      { cookies: { get: (n: string) => cookieStore.get(n)?.value, set() {}, remove() {} } },
-    );
+    // The browser uses localStorage-based auth (no cookies). The client must
+    // forward its access token via the Authorization header.
+    const authHeader = req.headers.get('authorization') || '';
+    const accessToken = authHeader.toLowerCase().startsWith('bearer ')
+      ? authHeader.slice(7).trim()
+      : '';
+    if (!accessToken) {
+      return NextResponse.json({ error: 'Missing access token' }, { status: 401 });
+    }
 
-    const { data: { user } } = await supa.auth.getUser();
-    if (!user) return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const anon = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
+    const supa = createClient(url, anon, {
+      auth: { persistSession: false, autoRefreshToken: false },
+      global: { headers: { Authorization: `Bearer ${accessToken}` } },
+    });
 
-    // Verify caller is owner of the class
-    const { data: klass } = await supa
+    const { data: userData, error: userErr } = await supa.auth.getUser(accessToken);
+    if (userErr || !userData?.user) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+    }
+    const user = userData.user;
+
+    // Verify caller is owner of the class (using the user's RLS-scoped token)
+    const { data: klass, error: kErr } = await supa
       .from('qm_classes')
       .select('id, name, owner_id')
       .eq('id', classId)
       .single();
-    if (!klass || klass.owner_id !== user.id) {
+    if (kErr || !klass) {
+      return NextResponse.json({ error: 'Class not found' }, { status: 404 });
+    }
+    if (klass.owner_id !== user.id) {
       return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
     }
 
@@ -53,7 +68,9 @@ export async function POST(req: NextRequest) {
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.origin}`;
     const acceptUrl = `${siteUrl}/educator/invites?code=${encodeURIComponent(code)}`;
 
-    const transporter = nodemailer.createTransport({ host, port, secure: false, auth: { user: smtpUser, pass: smtpPass } });
+    const transporter = nodemailer.createTransport({
+      host, port, secure: false, auth: { user: smtpUser, pass: smtpPass },
+    });
 
     const subject = `[Cendekia] You're invited to co-teach "${klass.name}"`;
     const html = `

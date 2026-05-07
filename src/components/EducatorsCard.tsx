@@ -1,6 +1,7 @@
 "use client";
 import { useEffect, useState, useCallback } from "react";
 import { useSession } from "@/lib/session";
+import { supabase } from "@/lib/supabase";
 import {
   listClassEducators,
   listClassEducatorInvites,
@@ -58,9 +59,14 @@ export default function EducatorsCard({ classId }: Props) {
       setEmail("");
       let emailStatus = "";
       try {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const accessToken = sessionData?.session?.access_token || "";
         const r = await fetch("/api/educator-invites/notify", {
           method: "POST",
-          headers: { "content-type": "application/json" },
+          headers: {
+            "content-type": "application/json",
+            ...(accessToken ? { authorization: `Bearer ${accessToken}` } : {}),
+          },
           body: JSON.stringify({ classId, email: res.email, code: res.code }),
         });
         if (r.ok) {
@@ -167,77 +173,89 @@ export default function EducatorsCard({ classId }: Props) {
 
       {isOwner && (
         <>
-          <form onSubmit={handleInvite} className="flex gap-2 mb-2">
+          <form onSubmit={handleInvite} className="flex gap-2 mb-3">
             <input
               type="email"
               required
               placeholder="Educator email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="input flex-1 text-sm py-2"
-            />
-            <button type="submit" disabled={busy} className="btn-primary py-2 px-3 text-sm flex items-center gap-1">
-              <UserPlus className="w-4 h-4" /> Invite
-            </button>
+              className="flex-1 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent"
+          />
+          <button
+            type="submit"
+            disabled={busy}
+            className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-white font-medium text-sm bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
+          >
+            <UserPlus className="w-4 h-4" /> Invite
+          </button>
           </form>
 
-          {lastInvite && (
-            <div className="text-xs bg-purple-50 border border-purple-200 rounded p-2 mb-2">
-              <div className="text-gray-600">Invite code for {lastInvite.email}:</div>
-              <div className="flex items-center gap-2 mt-1">
-                <code className="font-mono text-base bg-white px-2 py-1 rounded border flex-1 text-center">{lastInvite.code}</code>
-                <button
-                  type="button"
-                  onClick={() => {
-                    navigator.clipboard.writeText(lastInvite.code);
-                    setMsg({ type: "ok", text: "Code copied" });
-                  }}
-                  className="btn-primary py-1 px-2 text-xs flex items-center gap-1"
-                >
-                  <Copy className="w-3 h-3" /> Copy
-                </button>
-              </div>
-              <div className="text-gray-500 mt-1">
-                They sign in with this email and paste the code at <span className="font-mono">/educator/invites</span>.
-              </div>
+        {lastInvite && (
+          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-3">
+            <div className="text-sm text-gray-700 mb-2">
+              Invite code for <span className="font-medium">{lastInvite.email}</span>:
             </div>
-          )}
+            <div className="flex items-center gap-2">
+              <code className="font-mono text-lg tracking-wider bg-white px-4 py-2.5 rounded-lg border border-gray-200 flex-1 text-center text-gray-900">
+                {lastInvite.code}
+              </code>
+              <button
+                type="button"
+                onClick={() => {
+                  navigator.clipboard.writeText(lastInvite.code);
+                  setMsg({ type: "ok", text: "Code copied" });
+                }}
+                className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-white font-medium text-sm bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-sm"
+              >
+                <Copy className="w-4 h-4" /> Copy
+              </button>
+            </div>
+            <div className="text-xs text-gray-600 mt-2">
+              We emailed {lastInvite.email} an accept link. They can also sign in and paste the code at <span className="font-mono">/educator/invites</span>.
+            </div>
+          </div>
+        )}
 
-          {pending.length > 0 && (
-            <div className="mt-2">
-              <div className="text-xs font-semibold text-gray-600 mb-1">Pending invites ({pending.length})</div>
-              <div className="space-y-1">
-                {pending.map((inv) => (
-                  <div key={inv.id} className="flex items-center gap-2 text-xs py-1 border-b last:border-0">
-                    <div className="flex-1 min-w-0 truncate">{inv.email}</div>
-                    <code className="font-mono bg-gray-100 px-1 rounded">{inv.code}</code>
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(inv.code);
-                        setMsg({ type: "ok", text: "Code copied" });
-                      }}
-                      className="text-gray-500 hover:text-gray-700"
-                      title="Copy code"
-                    >
-                      <Copy className="w-3 h-3" />
-                    </button>
-                    <button
-                      onClick={() => handleRevoke(inv.id)}
-                      className="text-red-600 hover:bg-red-50 px-1 rounded"
-                      title="Revoke"
-                    >
-                      <Trash2 className="w-3 h-3" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+        {pending.length > 0 && (
+          <div className="mt-3">
+            <div className="text-sm font-semibold text-gray-800 mb-2">
+              Pending invites <span className="text-gray-500 font-normal">({pending.length})</span>
             </div>
-          )}
+            <div className="space-y-1">
+              {pending.map((inv) => (
+                <div key={inv.id} className="flex items-center gap-3 text-sm py-2 border-b last:border-0">
+                  <div className="flex-1 min-w-0 truncate text-gray-800">{inv.email}</div>
+                  <code className="font-mono text-xs tracking-wider bg-gray-100 text-gray-700 px-2 py-1 rounded">{inv.code}</code>
+                  <button
+                    onClick={() => {
+                      navigator.clipboard.writeText(inv.code);
+                      setMsg({ type: "ok", text: "Code copied" });
+                    }}
+                    className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded"
+                    title="Copy code"
+                  >
+                    <Copy className="w-4 h-4" />
+                  </button>
+                  <button
+                    onClick={() => handleRevoke(inv.id)}
+                    className="p-1.5 text-red-600 hover:bg-red-50 rounded"
+                    title="Revoke"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         </>
       )}
 
       {msg && (
-        <div className={"text-xs mt-2 " + (msg.type === "ok" ? "text-blue-700" : "text-red-600")}>{msg.text}</div>
+        <div className={"text-sm mt-3 px-3 py-2 rounded-lg " + (msg.type === "ok" ? "text-indigo-700 bg-indigo-50 border border-indigo-100" : "text-red-700 bg-red-50 border border-red-100")}>
+          {msg.text}
+        </div>
       )}
     </div>
   );
