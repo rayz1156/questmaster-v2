@@ -1,7 +1,9 @@
 "use client";
-import { useEffect, useState } from "react";
+
+export const dynamic = "force-dynamic";
+import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Shell from "@/components/Shell";
 import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Mail, Check } from "lucide-react";
 import {
@@ -18,7 +20,7 @@ const tabs = [
   { href: "/educator/profile", label: "Profile", icon: <SettingsIcon className="w-5 h-5" /> },
 ];
 
-export default function EducatorInvitesPage() {
+function EducatorInvitesPageInner() {
   const router = useRouter();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,6 +40,13 @@ export default function EducatorInvitesPage() {
   }
   useEffect(() => {
     reload();
+  }, []);
+
+  const search = useSearchParams();
+  useEffect(() => {
+    const c = (search?.get("code") || "").trim().toUpperCase();
+    if (c) setCode(c);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function accept(c: string) {
@@ -124,5 +133,13 @@ export default function EducatorInvitesPage() {
         )}
       </div>
     </Shell>
+  );
+}
+
+export default function EducatorInvitesPage() {
+  return (
+    <Suspense fallback={null}>
+      <EducatorInvitesPageInner />
+    </Suspense>
   );
 }

@@ -56,7 +56,23 @@ export default function EducatorsCard({ classId }: Props) {
       const res = await inviteClassEducator(classId, email.trim());
       setLastInvite({ code: res.code, email: res.email });
       setEmail("");
-      setMsg({ type: "ok", text: `Invite created. Share the code with ${res.email}.` });
+      let emailStatus = "";
+      try {
+        const r = await fetch("/api/educator-invites/notify", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({ classId, email: res.email, code: res.code }),
+        });
+        if (r.ok) {
+          emailStatus = ` Invite email sent to ${res.email}.`;
+        } else {
+          const j = await r.json().catch(() => ({}));
+          emailStatus = ` (email not sent: ${j.error || r.status})`;
+        }
+      } catch (mailErr: any) {
+        emailStatus = ` (email not sent: ${mailErr?.message || "network"})`;
+      }
+      setMsg({ type: "ok", text: `Invite created.${emailStatus} Share the code with ${res.email} as a fallback.` });
       await reload();
     } catch (err: any) {
       setMsg({ type: "err", text: err?.message || "Failed to invite" });
