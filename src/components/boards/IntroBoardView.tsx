@@ -51,7 +51,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
           <h2 className="text-xl font-semibold">{board.title}</h2>
           {board.description && <p className="text-sm text-gray-600">{board.description}</p>}
         </div>
-        {!canManage && (
+        {(
           <button
             onClick={() => setShowModal(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
