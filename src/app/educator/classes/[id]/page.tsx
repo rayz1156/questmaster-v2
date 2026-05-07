@@ -54,33 +54,33 @@ export default function ClassDetail() {
       </div>
 
       <div className="card mb-3">
-        <div className="font-semibold mb-2">Share with participants</div>
+        <div className="font-semibold mb-3">Share with participants</div>
         <div className="text-xs text-gray-500 mb-1">Class code</div>
-        <div className="flex items-center gap-2 mb-3">
-          <code className="font-mono bg-gray-100 px-3 py-2 rounded text-lg flex-1 text-center">{klass.join_code}</code>
-          <button onClick={()=>{navigator.clipboard.writeText(klass.join_code); setMsg('Code copied');}} className="btn-primary py-2 px-3 text-sm flex items-center gap-1"><Copy className="w-4 h-4"/></button>
+        <div className="flex items-center gap-2">
+          <code className="font-mono bg-gray-50 border border-gray-200 px-4 py-3 rounded-xl text-lg flex-1 text-center tracking-wider">{klass.join_code}</code>
+          <button onClick={()=>{navigator.clipboard.writeText(klass.join_code); setMsg('Code copied');}} className="inline-flex items-center justify-center gap-2 px-4 py-3 rounded-xl text-white text-sm font-medium bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-sm" aria-label="Copy code"><Copy className="w-4 h-4"/></button>
         </div>
-        {msg && <div className="text-xs text-blue-700 mt-2">{msg}</div>}
+        {msg && <div className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-3">{msg}</div>}
       </div>
 
       <div className="card mb-3">
-        <div className="font-semibold mb-2">Members ({members.length})</div>
-        {members.length === 0 ? <p className="text-xs text-gray-500">No members yet.</p> :
-          <div className="space-y-1">{members.map((m: any) => (
-            <div key={m.user_id} className="flex items-center gap-2 text-sm py-1 border-b last:border-0">
-              <div className="flex-1 min-w-0"><div className="truncate font-medium">{m.qm_profiles?.display_name || (m.user_id ? ('User ' + String(m.user_id).slice(0,8)) : 'User')}</div><div className="text-xs text-gray-500 truncate">{m.qm_profiles?.email}</div></div>
-              <button onClick={async()=>{ if(confirm('Remove this member?')){ await removeClassMember(id, m.user_id); reload(); }}} className="text-red-600 px-2 py-1 rounded hover:bg-red-50"><Trash2 className="w-3 h-3"/></button>
+        <div className="font-semibold mb-3">Members <span className="text-gray-500 font-normal">({members.length})</span></div>
+        {members.length === 0 ? <p className="text-sm text-gray-500">No members yet.</p> :
+          <div className="divide-y divide-gray-100">{members.map((m: any) => (
+            <div key={m.user_id} className="flex items-center gap-3 py-2.5">
+              <div className="flex-1 min-w-0"><div className="truncate text-sm font-medium text-gray-900">{m.qm_profiles?.display_name || (m.user_id ? ('User ' + String(m.user_id).slice(0,8)) : 'User')}</div><div className="text-xs text-gray-500 truncate">{m.qm_profiles?.email}</div></div>
+              <button onClick={async()=>{ if(confirm('Remove this member?')){ await removeClassMember(id, m.user_id); reload(); }}} className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-red-600 hover:bg-red-50" aria-label="Remove member"><Trash2 className="w-4 h-4"/></button>
             </div>
           ))}</div>}
       </div>
 
-      <div className="card">
-        <div className="font-semibold mb-2">Pending invites ({invites.filter(i=>!i.accepted_at).length})</div>
-        {invites.length === 0 ? <p className="text-xs text-gray-500">No invites sent.</p> :
-          <div className="space-y-1">{invites.map(inv => (
-            <div key={inv.id} className="text-xs py-1 border-b last:border-0 flex items-center gap-2">
-              <span className="flex-1 truncate">{inv.email || '(code)'}</span>
-              <span className={inv.accepted_at ? 'text-green-600' : 'text-gray-400'}>{inv.accepted_at ? 'accepted' : 'pending'}</span>
+      <div className="card mb-3">
+        <div className="font-semibold mb-3">Pending invites <span className="text-gray-500 font-normal">({invites.filter(i=>!i.accepted_at).length})</span></div>
+        {invites.length === 0 ? <p className="text-sm text-gray-500">No invites sent.</p> :
+          <div className="divide-y divide-gray-100">{invites.map(inv => (
+            <div key={inv.id} className="flex items-center gap-3 py-2.5">
+              <span className="flex-1 truncate text-sm text-gray-900">{inv.email || '(code)'}</span>
+              <span className={inv.accepted_at ? 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700 border border-emerald-200' : 'inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200'}>{inv.accepted_at ? 'Accepted' : 'Pending'}</span>
             </div>
           ))}</div>}
       </div>
