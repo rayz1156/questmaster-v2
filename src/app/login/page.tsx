@@ -1,12 +1,13 @@
 'use client';
-import { useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { useState, Suspense } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 
 
-export default function LoginPage() {
+function LoginInner() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -30,7 +31,10 @@ export default function LoginPage() {
     // Ensure session is fully cached before navigation to avoid double-login
     try { await supabase.auth.getUser(); } catch {}
     setBusy(false);
-    const dest = role === 'educator' ? '/educator/classes' : role === 'admin' ? '/admin/overview' : '/participant/home';
+    const nextParam = searchParams?.get('next');
+    const isSafeNext = !!nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//');
+    const defaultDest = role === 'educator' ? '/educator/classes' : (role === 'admin' || role === 'superadmin') ? '/admin/overview' : '/participant/home';
+    const dest = isSafeNext ? nextParam : defaultDest;
     window.location.href = dest;
   }
 
@@ -39,9 +43,11 @@ export default function LoginPage() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
       <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
         <div className="text-center mb-8">
-          <div className="text-4xl mb-2">🗺️</div>
-          <h1 className="text-3xl font-bold text-white">Welcome back 👋</h1>
-          <p className="text-white/80 mt-1">Sign in to your account to continue</p>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg mb-3 text-3xl" aria-hidden="true">📚</div>
+          <h1 className="text-4xl font-bold text-white tracking-tight">Cendekia</h1>
+          <p className="text-white/90 mt-2 text-base font-medium tracking-wide">Learn. Compete. Conquer.</p>
+          <p className="text-white/75 mt-1 text-sm">Where classrooms become arenas and learners become champions.</p>
+          <p className="text-white/70 mt-3 text-sm">Welcome back 👋 Sign in to continue</p>
         </div>
         <form onSubmit={signIn} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">
           <div>
@@ -64,7 +70,14 @@ export default function LoginPage() {
         </form>
         </div>
     
-      <div className="text-center text-[11px] text-white/70 mt-6">Powered by <span className="font-semibold">Airiz Intelligence</span></div>
+      <div className="text-center mt-8 space-y-1">
+        <div className="text-[11px] text-white/60 uppercase tracking-widest">In collaboration with</div>
+        <div className="text-sm text-white/90 font-medium">UPSI · AFK · Airiz</div>
+        <div className="text-[11px] text-white/60 mt-2">Powered by <span className="font-semibold text-white/80">Airiz Intelligence</span></div>
+      </div>
 </div>
   );
 }
+
+
+export default function LoginPage(){ return (<Suspense fallback={null}><LoginInner/></Suspense>); }

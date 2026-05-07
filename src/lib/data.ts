@@ -174,8 +174,22 @@ export async function getClass(id: string): Promise<Klass | null> {
   if (error) return null; return data as Klass;
 }
 export async function listClassMembers(classId: string) {
-  const { data, error } = await supabase.from('qm_class_members').select('user_id, joined_at, qm_profiles(id, display_name, email, role)').eq('class_id', classId);
-  if (error) throw error; return (data || []) as any[];
+  // Fetch memberships without embed first so missing profile rows don't hide members
+  const { data: members, error } = await supabase
+    .from('qm_class_members')
+    .select('user_id, joined_at')
+    .eq('class_id', classId);
+  if (error) throw error;
+  const list = (members || []) as any[];
+  if (list.length === 0) return list;
+  // Then look up profiles separately and merge
+  const ids = list.map((m: any) => m.user_id);
+  const { data: profsRpc } = await supabase.rpc('qm_user_directory', { p_ids: ids });
+  const { data: profsRoles } = await supabase.from('qm_profiles').select('id, role').in('id', ids);
+  const roleById = new Map<string,string>((profsRoles||[]).map((p:any)=>[p.id, p.role]));
+  const profs = ((profsRpc as any[]) || []).map((p:any)=>({ id: p.user_id, display_name: p.display_name, email: p.email, role: roleById.get(p.user_id) || 'participant' }));
+  const byId = new Map<string, any>((profs || []).map((p: any) => [p.id, p]));
+  return list.map((m: any) => ({ ...m, qm_profiles: byId.get(m.user_id) || null }));
 }
 export async function removeClassMember(classId: string, userId: string) {
   const { error } = await supabase.from('qm_class_members').delete().eq('class_id', classId).eq('user_id', userId); if (error) throw error;
@@ -270,6 +284,12 @@ export async function listTeamScores(huntId: string): Promise<TeamScore[]> {
   if (error) throw error; return (data || []) as TeamScore[];
 }
 
+export type ClassTeamScore = { team_id: string; class_id: string; team_name: string; base_score: number; task_score: number; adjustment_score: number; total_score: number };
+export async function listClassTeamScores(classId: string): Promise<ClassTeamScore[]> {
+  const { data, error } = await supabase.from('qm_class_team_scores').select('*').eq('class_id', classId).order('total_score', { ascending: false });
+  if (error) throw error; return (data || []) as ClassTeamScore[];
+}
+
 // === QUEST MANAGEMENT (v2 simplified) ===
 export type QuestCompletion = { id: string; hunt_id: string; team_id: string; awarded_points: number; adjustment_id: string|null; marked_by: string|null; created_at: string };
 
@@ -334,6 +354,15 @@ export async function joinTeamByCode(code: string): Promise<{ team_id: string; h
   const { data: team, error: e1 } = await supabase.from('qm_teams').select('id, hunt_id, max_members').eq('join_code', norm).maybeSingle();
   if (e1) throw e1;
   if (!team) throw new Error('Invalid team code');
+  // auto-enroll in class if not already a member
+  const huntId = (team as any).hunt_id;
+  const { data: hunt } = await supabase.from('qm_hunts').select('class_id').eq('id', huntId).maybeSingle();
+  if (hunt?.class_id) {
+    const { data: membership } = await supabase.from('qm_class_members').select('class_id').eq('class_id', hunt.class_id).eq('user_id', me).maybeSingle();
+    if (!membership) {
+      await supabase.from('qm_class_members').insert({ class_id: hunt.class_id, user_id: me });
+    }
+  }
   // capacity check
   const { count } = await supabase.from('qm_team_members').select('*', { count: 'exact', head: true }).eq('team_id', (team as any).id);
   if ((team as any).max_members && (count || 0) >= (team as any).max_members) throw new Error('This team is full');
@@ -429,4 +458,81 @@ export async function adminListUsersMeta(): Promise<Record<string, UserMeta>> {
 export async function adminDeleteUser(id: string): Promise<void> {
   const { error } = await supabase.rpc('qm_admin_delete_user', { target: id });
   if (error) throw error;
+}
+
+// List members of a team (joins qm_profiles client-side)
+export async function listTeamMembers(teamId: string) {
+  const { data: rows, error } = await supabase.from('qm_team_members').select('user_id').eq('team_id', teamId);
+  if (error) throw error;
+  const list = (rows || []) as any[];
+  if (list.length === 0) return list;
+  const ids = list.map((r:any)=>r.user_id);
+  const { data: profs, error: e2 } = await supabase.rpc('qm_user_directory', { p_ids: ids });
+  if (e2) console.warn('qm_user_directory failed', e2);
+  const byId = new Map<string, any>(((profs as any[]) || []).map((p:any)=>[p.user_id,p]));
+  return list.map((r:any)=>({ user_id: r.user_id, profile: byId.get(r.user_id) || null }));
+}
+
+// === CO-EDUCATORS (migration 0009_co_educators) ===
+import type {
+  ClassEducator, ClassEducatorInvite, MyClassEducatorInvite, EducatorClassRow,
+} from './types';
+
+export async function listClassEducators(classId: string): Promise<ClassEducator[]> {
+  const { data, error } = await supabase.rpc('qm_list_class_educators', { p_class: classId });
+  if (error) throw error;
+  return (data || []) as ClassEducator[];
+}
+
+export async function listClassEducatorInvites(classId: string): Promise<ClassEducatorInvite[]> {
+  const { data, error } = await supabase.rpc('qm_list_class_educator_invites', { p_class: classId });
+  if (error) throw error;
+  return (data || []) as ClassEducatorInvite[];
+}
+
+export async function inviteClassEducator(classId: string, email: string) {
+  const { data, error } = await supabase.rpc('qm_invite_class_educator', {
+    p_class: classId, p_email: email,
+  });
+  if (error) throw error;
+  // RPC returns a single-row TABLE; supabase-js gives us an array
+  const row = Array.isArray(data) ? data[0] : data;
+  return row as { id: string; code: string; token: string; expires_at: string; email: string; status: string };
+}
+
+export async function revokeClassEducatorInvite(inviteId: string) {
+  const { error } = await supabase.rpc('qm_revoke_class_educator_invite', { p_invite: inviteId });
+  if (error) throw error;
+}
+
+export async function removeClassEducator(classId: string, educatorId: string) {
+  const { error } = await supabase.rpc('qm_remove_class_educator', {
+    p_class: classId, p_educator: educatorId,
+  });
+  if (error) throw error;
+}
+
+export async function transferClassOwnership(classId: string, newOwnerId: string) {
+  const { error } = await supabase.rpc('qm_transfer_class_ownership', {
+    p_class: classId, p_new_owner: newOwnerId,
+  });
+  if (error) throw error;
+}
+
+export async function acceptClassEducatorInviteByCode(code: string): Promise<string> {
+  const { data, error } = await supabase.rpc('qm_accept_class_educator_invite_by_code', { p_code: code });
+  if (error) throw error;
+  return data as string; // class_id
+}
+
+export async function listMyClassEducatorInvites(): Promise<MyClassEducatorInvite[]> {
+  const { data, error } = await supabase.rpc('qm_list_my_class_educator_invites');
+  if (error) throw error;
+  return (data || []) as MyClassEducatorInvite[];
+}
+
+export async function listMyEducatorClasses(): Promise<EducatorClassRow[]> {
+  const { data, error } = await supabase.rpc('qm_list_my_educator_classes');
+  if (error) throw error;
+  return (data || []) as EducatorClassRow[];
 }

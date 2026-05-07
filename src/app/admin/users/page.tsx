@@ -20,7 +20,7 @@ export default function Page() {
   };
   useEffect(() => { reload(); }, []);
   const filtered = users.filter(u => !q || (u.display_name || "").toLowerCase().includes(q.toLowerCase()) || u.role.includes(q.toLowerCase()) || (meta[u.id]?.email || "").toLowerCase().includes(q.toLowerCase()));
-  const setRole = async (u: Profile, role: 'participant'|'educator'|'admin') => {
+  const setRole = async (u: Profile, role: 'participant'|'educator'|'admin'|'superadmin') => {
     await adminUpdateProfile(u.id, { role }); await logAudit('role_change', 'profile', u.id, { from: u.role, to: role }); reload();
   };
   const toggleSuspend = async (u: Profile) => {

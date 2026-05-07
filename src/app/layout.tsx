@@ -5,8 +5,8 @@ import "./globals.css";
 const poppins = Poppins({ subsets: ["latin"], weight: ["300","400","500","600","700"] });
 
 export const metadata: Metadata = {
-  title: "QuestMaster",
-  description: "Epic Quest Adventures — scavenger hunts powered by Next.js + Supabase.",
+  title: "Cendekia",
+  description: "Cendekia — Learn. Compete. Conquer. Where classrooms become arenas and learners become champions.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

@@ -9,7 +9,7 @@ export default function Callback(){
     const { data } = await supabase.auth.getSession();
     if (!data.session){ setMsg('No session. Please sign in.'); setTimeout(()=>router.replace('/login'), 2000); return; }
     const role = (data.session.user.user_metadata as Record<string,unknown>).role as string || 'participant';
-    if (role==='admin') router.replace('/admin/overview');
+    if (role==='admin' || role==='superadmin') router.replace('/admin/overview');
     else if (role==='educator') router.replace('/educator/activities');
     else router.replace('/participant/home');
   })()},[router]);

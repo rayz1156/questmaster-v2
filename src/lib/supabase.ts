@@ -7,7 +7,7 @@ export const supabase = createClient(url, anon, {
   auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true, storageKey: 'qm-auth' },
 });
 
-export type Role = 'participant' | 'educator' | 'admin';
+export type Role = 'participant' | 'educator' | 'admin' | 'superadmin';
 
 export async function getSessionUser() {
   const { data } = await supabase.auth.getUser();

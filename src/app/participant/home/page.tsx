@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Home, Compass, Trophy, Inbox, User as UserIcon } from "lucide-react";
+import { Home, Compass, Trophy, Inbox, User as UserIcon, Users } from "lucide-react";
 import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, type Hunt } from "@/lib/data";
@@ -9,6 +9,7 @@ import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, type Hunt 
 const tabs = [
   { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
   { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
+  { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
   { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
   { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
 ];
@@ -18,11 +19,13 @@ export default function Page() {
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [name, setName] = useState<string>("");
+  const [dataReady, setDataReady] = useState(false);
 
   useEffect(() => { if (!user) return; (async () => {
     setHunts(await listQuestsForParticipant());
     setClasses(await listEnrolledClasses());
     const p = await getMyProfile(); setName(p?.display_name || "");
+      setDataReady(true);
   })(); }, [user]);
 
   return (
@@ -30,12 +33,12 @@ export default function Page() {
       <div className="space-y-4">
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="text-xs font-semibold text-purple-700 tracking-widest">WELCOME</div>
-          <div className="mt-1 text-xl font-bold">{name || 'Participant'}</div>
+          <div className="mt-1 text-xl font-bold">{dataReady ? (name || 'Participant') : ''}</div>
         </div>
 
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="text-xs font-semibold text-purple-700 tracking-widest mb-2">MY CLASSES</div>
-          {classes.length === 0 ? (
+          {!dataReady ? null : classes.length === 0 ? (
             <p className="text-sm text-gray-500">You have not joined any class yet. <Link className="underline" href="/participant/join">Join a class</Link> using the code from your educator.</p>
           ) : (
             <ul className="space-y-1 text-sm">
@@ -49,7 +52,7 @@ export default function Page() {
 
         <div className="bg-white rounded-2xl shadow p-5">
           <div className="text-xs font-semibold text-purple-700 tracking-widest mb-2">MY QUESTS</div>
-          {hunts.length === 0 ? (
+          {!dataReady ? (<div className="space-y-2">{[1,2,3].map(i=><div key={i} className="h-16 bg-gray-100 rounded-xl animate-pulse mb-2"></div>)}</div>) : hunts.length === 0 ? (
             <p className="text-sm text-gray-500">No quests yet. Quests appear automatically when you join a class.</p>
           ) : (
             <div className="space-y-2">{hunts.map(h => (

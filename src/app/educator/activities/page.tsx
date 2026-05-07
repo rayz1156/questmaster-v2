@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useSession } from '@/lib/session';
 import Shell from '@/components/Shell';
 import { GraduationCap, ListChecks, Users, BarChart3 } from 'lucide-react';
-import { listMyHunts, deleteHunt, type Hunt } from '@/lib/data';
+import { listMyHunts, deleteHunt, listMyClasses, type Hunt, type Klass } from '@/lib/data';
 
 const tabs = [
   { href: "/educator/classes",    label: "Classes",    icon: <GraduationCap className="w-5 h-5"/> },
@@ -16,8 +16,9 @@ const tabs = [
 export default function Page() {
   const { user } = useSession('educator');
   const [hunts, setHunts] = useState<Hunt[]>([]);
+  const [classMap, setClassMap] = useState<Record<string,string>>({});
   const [busy, setBusy] = useState(false);
-  async function refresh() { setHunts(await listMyHunts()); }
+  async function refresh() { setHunts(await listMyHunts()); listMyClasses().then((cls: Klass[]) => { const m: Record<string,string> = {}; cls.forEach(k => m[k.id] = k.name); setClassMap(m); }).catch(() => {}); }
   useEffect(() => { if (!user) return; (async () => { setBusy(true); try { await refresh(); } finally { setBusy(false); } })(); }, [user]);
   async function onDelete(id: string) {
     if (!confirm('Delete this quest? This cannot be undone.')) return;
@@ -26,17 +27,18 @@ export default function Page() {
   return (
     <Shell tabs={tabs}>
       <div className="flex justify-between items-center mb-3">
-        <h2 className="font-bold text-lg">My Quests</h2>
+        <h2 className="page-title">My Quests</h2>
         <Link href="/educator/activities/new" className="btn-primary px-3 py-1 text-sm">+ New Quest</Link>
       </div>
       {busy && <p className="text-sm text-gray-500">Loading...</p>}
       {!busy && hunts.length === 0 && <p className="text-sm text-gray-500">No quests yet. Create one to get started.</p>}
-      <div className="space-y-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {hunts.map(h => (
           <div key={h.id} className="card flex justify-between items-start gap-3">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold">{h.title}</span>
+              {h.class_id && classMap[h.class_id] && <span className="text-xs text-purple-600 bg-purple-50 rounded px-2 py-0.5 ml-2">{classMap[h.class_id]}</span>}
                 <span className="text-xs text-purple-700">{h.points ?? 0} pts</span>
                 <span className="text-xs text-gray-500">- {h.status}</span>
               </div>

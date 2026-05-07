@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useState } from "react";
-import { Home, Compass, Trophy, User as UserIcon, LogOut, Save } from "lucide-react";
+import { Home, Compass, Trophy, User as UserIcon, LogOut, Save, Users } from "lucide-react";
 import Shell from "@/components/Shell";
 import { useSession, signOut } from "@/lib/session";
 import { getMyProfile, updateMyDisplayName, updateMyEmail, updateMyPassword, type Profile } from "@/lib/data";
@@ -8,6 +8,7 @@ import { supabase } from "@/lib/supabase";
 const tabs = [
   { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
   { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
+  { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
   { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
   { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
 ];

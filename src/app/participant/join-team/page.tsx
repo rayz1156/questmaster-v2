@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { joinTeamByCode, getTeamByCode } from '@/lib/data';
-import { getSession } from '@/lib/session';
+import { supabase } from '@/lib/supabase';
 
 function Inner() {
   const router = useRouter();
@@ -13,7 +13,11 @@ function Inner() {
   const [ok, setOk] = useState<string|null>(null);
   const [preview, setPreview] = useState<{ name: string } | null>(null);
 
-  useEffect(() => { if (!getSession()) router.replace(`/login?next=/participant/join-team${code?`?code=${code}`:''}`); }, []);
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      if (!data.user) router.replace(`/login?next=/participant/join-team${code?`?code=${code}`:''}`); 
+    });
+  }, []);
 
   async function lookup(c: string) {
     setErr(null); setPreview(null);

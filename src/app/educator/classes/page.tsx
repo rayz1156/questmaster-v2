@@ -43,7 +43,7 @@ export default function EduClasses() {
   return (
     <Shell tabs={tabs}>
       <div className="flex justify-between items-center mb-3">
-        <h2 className="font-bold text-lg">My Classes</h2>
+        <h2 className="page-title">My Classes</h2>
         <button onClick={() => { setShowNew(!showNew); setErr(null); }} className="btn-primary flex items-center gap-1 py-2 px-3 text-sm"><Plus className="w-4 h-4"/>New Class</button>
       </div>
       {showNew && (
@@ -61,7 +61,7 @@ export default function EduClasses() {
       {!showNew && err && <div className="text-xs text-red-600 mb-2">{err}</div>}
       {loading ? <p className="text-sm text-gray-500">Loading…</p> :
         classes.length === 0 ? <p className="text-sm text-gray-500">No classes yet. Create one to organise your activities, teams and rankings.</p> :
-        <div className="space-y-3">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {classes.map(k => (
             <div key={k.id} className="card">
               <div className="flex items-center justify-between gap-2">

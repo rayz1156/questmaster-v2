@@ -5,7 +5,8 @@ import { useParams } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import Shell from '@/components/Shell';
 import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, ArrowLeft } from 'lucide-react';
-import { listMyHunts, updateQuestDetails, type Hunt } from '@/lib/data';
+import { listMyHunts, updateQuestDetails, type Hunt, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, listTeamsByClass } from '@/lib/data';
+import { CheckCircle, Circle } from 'lucide-react';
 
 const tabs = [
   { href: "/educator/classes",    label: "Classes",    icon: <GraduationCap className="w-5 h-5"/> },
@@ -25,8 +26,11 @@ function PageInner() {
   const [link1, setLink1] = useState('');
   const [link2, setLink2] = useState('');
   const [status, setStatus] = useState('draft');
-  const [points, setPoints] = useState(10);
+  const [points, setPoints] = useState<number|string>("")
   const [err, setErr] = useState<string | null>(null);
+  const [teams, setTeams] = useState<any[]>([]);
+  const [completions, setCompletions] = useState<any[]>([]);
+  const [toggling, setToggling] = useState("");
 
   const refresh = async () => {
     const hunts = await listMyHunts();
@@ -37,14 +41,23 @@ function PageInner() {
       setInstructions((h as any).instructions || '');
       setLink1((h as any).link1 || ''); setLink2((h as any).link2 || '');
       setStatus((h as any).status || 'draft');
-      setPoints((h as any).points_per_task ?? 10);
+      setPoints((h as any).points_per_task ?? "");
     }
   };
   useEffect(() => { refresh(); }, [huntId]);
 
+  const toggleComplete = async (teamId: string, isDone: boolean) => {
+    setToggling(teamId);
+    try {
+      if (isDone) await unmarkTeamCompletion(huntId, teamId);
+      else await markTeamCompletion(huntId, teamId);
+      setCompletions(await listQuestCompletions(huntId));
+    } catch {} finally { setToggling(""); }
+  };
+
   const save = async () => {
     try {
-      await updateQuestDetails(huntId, { title, description, instructions, link1, link2, status: status as any, points });
+      await updateQuestDetails(huntId, { title, description, instructions, link1, link2, status: status as any, points: Number(points) || 0 });
       await refresh();
     } catch (e: any) { setErr(e?.message || 'Save failed'); }
   };
@@ -91,11 +104,31 @@ function PageInner() {
         </div>
         <label className="text-sm">
           <div className="text-gray-600 mb-1">Completion points</div>
-          <input type="number" min={0} max={1000} className="input w-full" value={points} onChange={e => setPoints(parseInt(e.target.value, 10) || 0)} />
+          <input type="number" min={0} max={1000} className="input w-full" value={points} onChange={e => setPoints(e.target.value === "" ? "" : parseInt(e.target.value, 10))} />
         </label>
         <div>
           <button onClick={save} className="btn-primary px-4 py-2 text-sm">Save changes</button>
         </div>
+      {/* Team Completions */}
+      <div className="mt-6 pt-4 border-t">
+        <h3 className="font-semibold text-sm mb-3">Team Completions</h3>
+        {teams.length === 0 ? <p className="text-xs text-gray-400">No teams in this class.</p> :
+          <div className="space-y-1">
+            {teams.map((t: any) => {
+              const done = completions.some((c: any) => c.team_id === t.id);
+              return (
+                <div key={t.id} className={`flex items-center gap-2 p-2 rounded-lg cursor-pointer transition ${done ? 'bg-green-50' : 'bg-gray-50 hover:bg-gray-100'}`}
+                  onClick={() => toggleComplete(t.id, done)}>
+                  {toggling===t.id ? <div className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-purple-600 animate-spin"/> :
+                    done ? <CheckCircle className="w-4 h-4 text-green-600"/> : <Circle className="w-4 h-4 text-gray-300"/>}
+                  <span className={`text-sm ${done ? 'text-green-700 font-medium' : 'text-gray-600'}`}>{t.name}</span>
+                  {done && <span className="text-xs text-green-500 ml-auto">Complete</span>}
+                </div>
+              );
+            })}
+          </div>
+        }
+      </div>
       </div>
     </Shell>
   );

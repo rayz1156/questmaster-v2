@@ -1,8 +1,8 @@
 "use client";
 import Shell from "@/components/Shell";
 import { useEffect, useState } from "react";
-import { ListChecks, Users, BarChart3, GraduationCap, Plus, Minus, Trash2, RefreshCw, Trophy , User as UserIcon } from "lucide-react";
-import { listMyHunts, listMyHuntsByClass, listTeamScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listMyClasses, type Hunt, type TeamScore, type ScoreAdjustment, type Klass } from "@/lib/data";
+import { ListChecks, Users, BarChart3, GraduationCap, Plus, Minus, Trash2, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight } from "lucide-react";
+import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listMyClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type Klass } from "@/lib/data";
 
 const tabs = [
   { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
@@ -26,6 +26,19 @@ export default function Rankings() {
   const [delta, setDelta] = useState<Record<string, number>>({});
   const [reason, setReason] = useState<Record<string, string>>({});
   const [busy, setBusy] = useState(false);
+  const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
+  const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({});
+
+  const toggleTeam = async (teamId: string) => {
+    if (expandedTeam === teamId) { setExpandedTeam(null); return; }
+    setExpandedTeam(teamId);
+    if (!teamMembers[teamId]) {
+      try {
+        const members = await listTeamMembers(teamId);
+        setTeamMembers(prev => ({ ...prev, [teamId]: members }));
+      } catch (e) { console.error(e); }
+    }
+  };
 
   // Load classes on mount
   useEffect(() => {
@@ -65,6 +78,18 @@ export default function Rankings() {
         const a = await listScoreAdjustments(activeId);
         setAdj(a);
       } else {
+      // Try class-level team scores first (handles class-scoped teams)
+      try {
+        const cts = await listClassTeamScores(classId);
+        if (cts && cts.length > 0) {
+          const aggCls = cts.map(r => ({ team_id: r.team_id, team_name: r.team_name, total_score: Number(r.total_score)||0, quest_count: hunts.length }))
+            .sort((a,b)=>b.total_score-a.total_score);
+          setScores([]);
+          setAggScores(aggCls);
+          setAdj([]);
+          return;
+        }
+      } catch (e) { /* fall through to legacy per-hunt aggregation */ }
         // All quests in class - aggregate
         const allScores: TeamScore[] = [];
         const allAdj: ScoreAdjustment[] = [];
@@ -150,18 +175,43 @@ export default function Rankings() {
         </div>
         {leaderboard.length === 0 ? <p className="text-xs text-gray-500">No teams yet.</p> : (
           <div className="space-y-2">
-            {leaderboard.map((s, i) => (
-              <div key={s.team_id} className="py-2 border-b last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className={`font-mono text-xs w-6 ${i === 0 ? 'text-yellow-500 font-bold' : i === 1 ? 'text-gray-400 font-bold' : i === 2 ? 'text-orange-400 font-bold' : 'text-gray-500'}`}>{i + 1}.</span>
-                  <span className="font-medium flex-1 truncate">{s.team_name}</span>
-                  <span className="font-mono font-bold text-brand-purple">{s.total_score}</span>
+          {leaderboard.map((s, i) => {
+            const medal = i === 0 ? '🥇' : i === 1 ? '🥈' : i === 2 ? '🥉' : null;
+            const isExpanded = expandedTeam === s.team_id;
+            return (
+              <div key={s.team_id}>
+                <div
+                  className={`flex items-center gap-3 p-3 rounded-xl border transition cursor-pointer ${i < 3 ? 'bg-gradient-to-r from-purple-50 to-white border-purple-200' : 'bg-white border-gray-100'}`}
+                  onClick={() => toggleTeam(s.team_id)}
+                >
+                  {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-400 shrink-0"/> : <ChevronRight className="w-4 h-4 text-gray-400 shrink-0"/>}
+                  <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${i < 3 ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500'}`}>
+                    {medal || (i + 1)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="font-semibold text-sm truncate">{s.team_name}</div>
+                    {'quest_count' in s && <div className="text-xs text-gray-400">{(s as AggScore).quest_count} quest(s)</div>}
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="font-bold text-purple-700">{s.total_score}</div>
+                    <div className="text-xs text-gray-400">pts</div>
+                  </div>
                 </div>
-                    {'quest_count' in s && (
-                  <div className="text-[10px] text-gray-400 ml-8">{(s as AggScore).quest_count} quest(s)</div>
+                {isExpanded && (
+                  <div className="ml-14 mt-1 mb-1 pl-3 border-l-2 border-purple-200 space-y-1">
+                    {!teamMembers[s.team_id] ? <p className="text-xs text-gray-400 py-1">Loading members...</p> :
+                     teamMembers[s.team_id].length === 0 ? <p className="text-xs text-gray-400 py-1">No members</p> :
+                     teamMembers[s.team_id].map((m: any) => (
+                      <div key={m.user_id} className="text-xs text-gray-600 flex items-center gap-2 py-0.5">
+                        <UserIcon className="w-3 h-3 text-purple-400"/>
+                        <span>{m.profile?.display_name || m.profile?.email || m.user_id.slice(0,8)}</span>
+                      </div>
+                    ))}
+                  </div>
                 )}
               </div>
-            ))}
+            );
+          })}
           </div>
         )}
       </div>
