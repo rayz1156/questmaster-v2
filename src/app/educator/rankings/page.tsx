@@ -1,6 +1,7 @@
 "use client";
 import Shell from "@/components/Shell";
-import { useEffect, useState } from "react";
+import { useEffect, useState, Suspense } from "react";
+import { useSearchParams } from "next/navigation";
 import { ListChecks, Users, BarChart3, GraduationCap, Plus, Minus, Trash2, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight } from "lucide-react";
 import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listMyClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type Klass } from "@/lib/data";
 
@@ -14,9 +15,10 @@ const tabs = [
 
 type AggScore = { team_id: string; team_name: string; total_score: number; quest_count: number };
 
-export default function Rankings() {
+function RankingsInner() {
   const [classes, setClasses] = useState<Klass[]>([]);
-  const [classId, setClassId] = useState("");
+  const sp = useSearchParams();
+  const [classId, setClassId] = useState(sp.get('classId') || "");
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [activeId, setActiveId] = useState(""); // "" means all quests, or a specific hunt id
   const [scores, setScores] = useState<TeamScore[]>([]);
@@ -218,3 +220,6 @@ export default function Rankings() {
       </Shell>
   );
 }
+
+
+export default function Rankings() { return <Suspense fallback={<p>Loading...</p>}><RankingsInner /></Suspense>; }
