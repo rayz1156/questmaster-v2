@@ -14,7 +14,14 @@ export async function getMyProfile(): Promise<Profile | null> {
 // === EDUCATOR ===
 export async function listMyHunts(): Promise<Hunt[]> {
   const id = await uid(); if (!id) return [];
-  const { data, error } = await supabase.from('qm_hunts').select('*').eq('owner_id', id).order('created_at', { ascending: false });
+  // Include hunts in classes the user owns OR co-educates
+  const { data: cs, error: cErr } = await supabase.rpc('qm_list_my_educator_classes');
+  if (cErr) throw cErr;
+  const classIds = ((cs || []) as Array<{ id: string }>).map(c => c.id);
+  // Build OR filter: owner-of-hunt OR hunt in any of my classes
+  const filters: string[] = [`owner_id.eq.${id}`];
+  if (classIds.length > 0) filters.push(`class_id.in.(${classIds.join(',')})`);
+  const { data, error } = await supabase.from('qm_hunts').select('*').or(filters.join(',')).order('created_at', { ascending: false });
   if (error) throw error; return (data || []) as Hunt[];
 }
 export async function createHunt(title: string, description = ''): Promise<Hunt> {
@@ -148,9 +155,18 @@ export type ClassMember = { class_id: string; user_id: string; joined_at: string
 export type ClassInvite = { id: string; class_id: string; email: string | null; token: string; invited_by: string | null; accepted_at: string | null; expires_at: string | null; created_at: string };
 
 export async function listMyClasses(): Promise<Klass[]> {
-  const id = await uid(); if (!id) return [];
-  const { data, error } = await supabase.from('qm_classes').select('*').eq('owner_id', id).order('created_at', { ascending: false });
-  if (error) throw error; return (data || []) as Klass[];
+  // Include classes the user owns OR co-educates (uses existing RPC)
+  const rows = await listMyEducatorClasses();
+  return rows.map(r => ({
+    id: r.id,
+    owner_id: "",
+    name: r.name,
+    description: r.description ?? null,
+    color: r.color ?? null,
+    join_code: r.join_code,
+    is_archived: r.is_archived ?? false,
+    created_at: r.created_at,
+  })) as Klass[];
 }
 export async function listEnrolledClasses(): Promise<Klass[]> {
   const id = await uid(); if (!id) return [];
@@ -213,7 +229,7 @@ export async function acceptClassInvite(token: string): Promise<string> {
 }
 export async function listMyHuntsByClass(classId: string): Promise<Hunt[]> {
   const id = await uid(); if (!id) return [];
-  const { data, error } = await supabase.from('qm_hunts').select('*').eq('owner_id', id).eq('class_id', classId).order('created_at', { ascending: false });
+  const { data, error } = await supabase.from('qm_hunts').select('*').eq('class_id', classId).order('created_at', { ascending: false });
   if (error) throw error; return (data || []) as Hunt[];
 }
 export async function createHuntInClass(classId: string, title: string, description?: string): Promise<Hunt> {
