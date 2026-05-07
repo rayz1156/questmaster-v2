@@ -126,7 +126,11 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                         <Plus className="w-4 h-4" /> Submit for team
                       </button>
                     ) : canManage ? (
-                      <span className="text-gray-400">Not submitted yet</span>
+                      <button onClick={() => setUploadFor({ teamId: team.id, existing: null })}
+                        className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50"
+                        title="Submit on behalf of this team">
+                        <Plus className="w-4 h-4" /> Submit on behalf
+                      </button>
                     ) : (
                       <span className="text-gray-400">Only team members can submit</span>
                     )}
@@ -174,15 +178,17 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                           <CheckCircle2 className="w-3.5 h-3.5" /> Give Score
                         </button>
                       )}
-                      {(isMyTeam && (sub.status === 'in_review' || sub.status === 'needs_revision')) && (
+                      {((isMyTeam && (sub.status === 'in_review' || sub.status === 'needs_revision')) || canManage) && (
                         <button onClick={() => setUploadFor({ teamId: team.id, existing: sub })}
-                          className="text-xs px-2.5 py-1 rounded border hover:bg-gray-50 inline-flex items-center gap-1">
-                          <RefreshCcw className="w-3.5 h-3.5" /> Resubmit
+                          className="text-xs px-2.5 py-1 rounded border hover:bg-gray-50 inline-flex items-center gap-1"
+                          title={canManage && !isMyTeam ? 'Edit submission on behalf of this team' : 'Resubmit'}>
+                          <RefreshCcw className="w-3.5 h-3.5" /> {canManage && !isMyTeam ? 'Edit' : 'Resubmit'}
                         </button>
                       )}
-                      {canManage && (
+                      {(canManage || isMyTeam) && (
                         <button onClick={async () => { if (confirm('Delete this submission?')) { await deleteGroupSubmission(sub.id); reload(); } }}
-                          className="text-xs px-2.5 py-1 rounded border text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1">
+                          className="text-xs px-2.5 py-1 rounded border text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1"
+                          title="Delete submission">
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
