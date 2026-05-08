@@ -8,7 +8,7 @@ import {
   Board, GroupSubmission, SubmissionStatus,
   listGroupSubmissions, getMyGroupSubmission, getMyTeamForBoard,
   createOrUpdateGroupSubmission, gradeSubmission, deleteGroupSubmission,
-  listTeamsForHunt, getHuntSubmissionLink, toEmbedUrl, HuntSubmissionLink,
+  listTeamsForHunt, getHuntSubmissionLink, HuntSubmissionLink,
 } from "@/lib/boards";
 
 interface Team { id: string; name: string; score: number; }
@@ -39,7 +39,6 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
   const [uploadFor, setUploadFor] = useState<{ teamId: string; existing: GroupSubmission | null } | null>(null);
   const [gradeFor, setGradeFor] = useState<GroupSubmission | null>(null);
   const [subLink, setSubLink] = useState<HuntSubmissionLink>({ url: null, label: null, embed: false });
-  const [embedFailed, setEmbedFailed] = useState<boolean>(false);
 
   const reload = async () => {
     setLoading(true);
@@ -54,7 +53,6 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
       setSubs(s);
       setMyTeamId(my);
       setSubLink(link);
-      setEmbedFailed(false);
     } catch (e: any) {
       setErr(e.message || String(e));
     } finally {
@@ -102,40 +100,21 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
       {loading && <div className="text-sm text-gray-500">Memuatkan…</div>}
 
       {!loading && subLink.url && (
-        <div className="rounded-xl border bg-white shadow-sm overflow-hidden">
-          <div className="p-3 border-b bg-purple-50 flex items-center justify-between gap-2 flex-wrap">
+        <a
+          href={subLink.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block rounded-xl border bg-white shadow-sm overflow-hidden hover:shadow-md transition-shadow"
+        >
+          <div className="p-3 bg-purple-50 flex items-center justify-between gap-2 flex-wrap">
             <div className="font-semibold text-purple-900 text-sm">
-              {subLink.label || "Submission destination"}
+              Submission Link
             </div>
-            <a
-              href={subLink.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm"
-            >Open in new tab ↗</a>
+            <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm">
+              Open in new tab ↗
+            </span>
           </div>
-          {subLink.embed && !embedFailed ? (
-            <iframe
-              src={toEmbedUrl(subLink.url!)}
-              className="w-full"
-              style={{ height: "70vh", border: 0 }}
-              referrerPolicy="no-referrer"
-              sandbox="allow-scripts allow-same-origin allow-forms allow-popups allow-popups-to-escape-sandbox"
-              onError={() => setEmbedFailed(true)}
-              title="Submission destination"
-            />
-          ) : (
-            <div className="p-6 text-center text-sm text-gray-600 space-y-2">
-              {subLink.embed && embedFailed && (
-                <p className="text-rose-600">This destination cannot be embedded. Use the button above to open it in a new tab.</p>
-              )}
-              {!subLink.embed && (
-                <p>Click “Open in new tab” above to go to the submission destination.</p>
-              )}
-              <p className="text-xs text-gray-400 break-all">{subLink.url}</p>
-            </div>
-          )}
-        </div>
+        </a>
       )}
 
       {!loading && !subLink.url && teams.length === 0 && (

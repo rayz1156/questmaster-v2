@@ -1,5 +1,6 @@
 "use client";
 import Shell from "@/components/Shell";
+import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ListChecks, Users, BarChart3, GraduationCap, Plus, Pencil, Trash2, User as UserIcon, Search, Copy, RefreshCw, ChevronRight, X, Settings, Link2 } from "lucide-react";
@@ -118,38 +119,38 @@ function TeamsInner() {
 
   return (
     <Shell tabs={navTabs}>
+      {activeClassId && (
+        <Link href={`/educator/classes/${activeClassId}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
+      )}
       {/* Top bar: class + hunt selectors inline */}
       <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <select className="border rounded-lg px-3 py-2 text-sm bg-white min-w-[180px]" value={activeClassId} onChange={e=>{setActiveClassId(e.target.value);setSelectedTeamId(null);}}>
+        <select className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white min-w-[200px] font-medium" value={activeClassId} onChange={e=>{setActiveClassId(e.target.value);setSelectedTeamId(null);}}>
           <option value="">All classes</option>
           {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
-        {hunts.length>0 && <select className="border rounded-lg px-3 py-2 text-sm bg-white min-w-[140px]" value={activeId} onChange={e=>setActiveId(e.target.value)}>
-          {hunts.map(h=><option key={h.id} value={h.id}>{h.title}</option>)}
-        </select>}
-        <div className="ml-auto text-sm text-gray-400">{teams.length} team{teams.length!==1?'s':''}</div>
+        
+        <div className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm"><Users className="w-4 h-4 text-purple-600"/><span className="text-gray-700">{teams.length} team{teams.length!==1?'s':''} created</span></div>
       </div>
 
       {loading ? <p className="text-center py-12 text-gray-400">Loading teams...</p> : (
-        <div className="flex flex-col gap-4">
+        <div className="grid gap-4 lg:[grid-template-columns:minmax(280px,320px)_1fr]">
 
           {/* ── LEFT: Team list ── */}
-          <div className="flex flex-col">
+          <div className={`flex flex-col ${sel ? "hidden lg:flex" : ""}`}>
             <div className="flex gap-2 mb-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"/>
                 <input className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:ring-2 focus:ring-purple-300 outline-none" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)}/>
               </div>
-              <button onClick={()=>setShowCreate(true)} className="bg-purple-600 hover:bg-purple-700 text-white px-3 py-2 rounded-lg transition" title="Create team"><Plus className="w-4 h-4"/></button>
+              <button onClick={()=>setShowCreate(true)} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 font-medium text-sm shrink-0"><Plus className="w-4 h-4"/>Add team</button>
             </div>
-            <div className="flex gap-1 mb-2">
-              {(['name','members','score'] as const).map(s=>(
-                <button key={s} onClick={()=>setSortBy(s)} className={`text-xs px-2 py-1 rounded-md transition ${sortBy===s?'bg-purple-100 text-purple-700 font-semibold':'text-gray-400 hover:bg-gray-100'}`}>{s}</button>
-              ))}
+            <div className="flex items-center gap-2 mb-2">
+              <label className="text-xs text-gray-500">Sort by:</label>
+              <select value={sortBy} onChange={e=>setSortBy(e.target.value as any)} className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white"><option value="name">Name</option><option value="members">Members</option><option value="score">Score</option></select>
               {selected.size>0 && <button onClick={onBulkDelete} className="ml-auto text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded-md"><Trash2 className="w-3 h-3 inline mr-0.5"/>{selected.size}</button>}
             </div>
 
-            <div className="flex overflow-x-auto gap-2 pb-2">
+            <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pb-2">
               {filtered.length===0 && <p className="text-sm text-gray-300 text-center py-8">No teams</p>}
               {filtered.map(t=>{
                 const act = selectedTeamId===t.id;
@@ -157,7 +158,7 @@ function TeamsInner() {
                 const bon = bonusMap[t.id]?.bonus ?? 0;
                 const mc = (typeof memberCountByTeam[t.id]==="number")?memberCountByTeam[t.id]:((membersByTeam[t.id]||[]).length||t.member_count||0);
                 return (
-                  <div key={t.id} onClick={()=>{setSelectedTeamId(t.id);setDetailTab('members');}} className={`group flex items-center gap-2 p-2.5 rounded-lg cursor-pointer border transition-all shrink-0 w-56 ${act?'border-purple-400 bg-purple-50 shadow':'border-gray-100 hover:border-purple-200 hover:bg-gray-50 bg-white'}`}>
+                  <div key={t.id} onClick={()=>{setSelectedTeamId(t.id);setDetailTab('members');}} className={`group flex items-center gap-2 p-2.5 rounded-lg cursor-pointer border transition-all shrink-0 w-full lg:w-56 ${act?'border-purple-400 bg-purple-50 shadow':'border-gray-100 hover:border-purple-200 hover:bg-gray-50 bg-white'}`}>
                     <input type="checkbox" checked={selected.has(t.id)} onChange={()=>toggleOne(t.id)} onClick={e=>e.stopPropagation()} className="w-3.5 h-3.5 accent-purple-600 shrink-0"/>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{t.name}</div>
@@ -178,7 +179,7 @@ function TeamsInner() {
           </div>
 
           {/* ── RIGHT: Detail panel ── */}
-          <div className="flex-1 min-w-0 overflow-hidden">
+          <div className={`flex-1 min-w-0 overflow-hidden ${sel ? "block" : "hidden lg:block"}`}>
             {!sel ? (
               <div className="h-full flex flex-col items-center justify-center text-gray-300">
                 <Users className="w-12 h-12 mb-3"/>
@@ -188,6 +189,7 @@ function TeamsInner() {
               <div className="bg-white border rounded-xl shadow-sm flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="px-6 py-4 border-b bg-gray-50/50">
+                  <button onClick={()=>{setSelectedTeamId(null);}} className="lg:hidden inline-flex items-center gap-1 text-sm text-purple-700 hover:text-purple-900 mb-3">← Back to teams</button>
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
                       <h2 className="text-xl font-bold truncate">{sel.name}</h2>

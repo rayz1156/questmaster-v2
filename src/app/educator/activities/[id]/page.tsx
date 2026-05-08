@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import { useSession } from '@/lib/session';
 import Shell from '@/components/Shell';
-import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, ArrowLeft } from 'lucide-react';
+import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, ArrowLeft, User as UserIcon } from 'lucide-react';
 import { listMyHunts, updateQuestDetails, type Hunt, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, listTeamsByClass } from '@/lib/data';
 import { CheckCircle, Circle } from 'lucide-react';
 
@@ -13,7 +13,7 @@ const tabs = [
   { href: "/educator/activities",  label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
   { href: "/educator/teams",      label: "Teams",      icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings",   label: "Rankings",   icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/settings",   label: "Settings",   icon: <SettingsIcon className="w-5 h-5"/> },
+  { href: "/educator/profile",    label: "Profile",    icon: <UserIcon className="w-5 h-5"/> },
 ];
 
 function PageInner() {
@@ -114,14 +114,6 @@ function PageInner() {
           <label className="text-sm block">
             <div className="text-gray-600 mb-1">Submission URL</div>
             <input className="input w-full" type="url" value={submissionLink} onChange={e => setSubmissionLink(e.target.value)} placeholder="https://drive.google.com/drive/folders/..." />
-          </label>
-          <label className="text-sm block">
-            <div className="text-gray-600 mb-1">Button label (optional)</div>
-            <input className="input w-full" value={submissionLinkLabel} onChange={e => setSubmissionLinkLabel(e.target.value)} placeholder="e.g. Submit to our shared Drive folder" />
-          </label>
-          <label className="text-sm inline-flex items-center gap-2">
-            <input type="checkbox" checked={submissionLinkEmbed} onChange={e => setSubmissionLinkEmbed(e.target.checked)} />
-            <span>Try to embed on the board page (some providers block embedding; the new-tab button always works as a fallback)</span>
           </label>
         </div>
         <label className="text-sm">

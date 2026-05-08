@@ -14,7 +14,6 @@ const tabs = [
   { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
   { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
-  { href: "/educator/settings", label: "Settings", icon: <SettingsIcon className="w-5 h-5"/> },
 ];
 
 export default function ClassBoardPage() {

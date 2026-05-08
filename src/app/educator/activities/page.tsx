@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import { useSession } from '@/lib/session';
 import Shell from '@/components/Shell';
-import { GraduationCap, ListChecks, Users, BarChart3 } from 'lucide-react';
+import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon } from 'lucide-react';
 import { listMyHunts, deleteHunt, listMyClasses, type Hunt, type Klass } from '@/lib/data';
 
 const tabs = [
@@ -12,6 +12,7 @@ const tabs = [
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
   { href: "/educator/teams",      label: "Teams",      icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings",   label: "Rankings",   icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/profile",    label: "Profile",    icon: <UserIcon className="w-5 h-5"/> },
 ];
 
 function PageInner() {
@@ -29,6 +30,9 @@ function PageInner() {
   }
   return (
     <Shell tabs={tabs}>
+      {classFilter && (
+        <Link href={`/educator/classes/${classFilter}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
+      )}
       <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
         <h2 className="page-title">My Quests</h2>
         <div className="flex items-center gap-2">
@@ -55,7 +59,7 @@ function PageInner() {
             </div>
             <div className="flex flex-col gap-1 items-end shrink-0">
               <Link href={`/educator/activities/${h.id}`} className="btn-primary px-3 py-1 text-xs">Manage</Link>
-            <Link href={`/educator/activities/${h.id}/board`} className="text-xs px-3 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-center">Submission Board</Link>
+            {h.submission_link && (<a href={h.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs px-3 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-center">Submission Link ↗</a>)}
               <button onClick={() => onDelete(h.id)} className="text-xs text-red-600 hover:underline">Delete</button>
             </div>
           </div>

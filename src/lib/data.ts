@@ -177,7 +177,12 @@ export async function listEnrolledClasses(): Promise<Klass[]> {
 export async function createClass(name: string, description?: string, color?: string): Promise<Klass> {
   const id = await uid(); if (!id) throw new Error('not authed');
   const { data, error } = await supabase.from('qm_classes').insert({ owner_id: id, name, description: description || null, color: color || '#6366f1' }).select().single();
-  if (error) throw error; return data as Klass;
+  if (error) throw error;
+  // Ensure creator is registered as an accepted owner-educator so qm_list_my_educator_classes picks up this class.
+  try {
+    await supabase.from('qm_class_educators').upsert({ class_id: (data as any).id, educator_id: id, role: 'owner', invited_by: id, accepted_at: new Date().toISOString() }, { onConflict: 'class_id,educator_id' });
+  } catch (_) { /* trigger or backfill may already cover this */ }
+  return data as Klass;
 }
 export async function updateClass(id: string, patch: Partial<Klass>): Promise<void> {
   const { error } = await supabase.from('qm_classes').update(patch).eq('id', id); if (error) throw error;
@@ -426,6 +431,18 @@ export async function updateMyEmail(email: string): Promise<void> {
 export async function updateMyPassword(password: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) throw error;
+}
+
+
+export async function softDeleteMyAccount(): Promise<void> {
+  const id = await uid(); if (!id) throw new Error('not authed');
+  // Soft-delete: mark profile as suspended and tag display name so admin can identify self-deleted accounts.
+  const { data: prof } = await supabase.from('qm_profiles').select('display_name').eq('id', id).maybeSingle();
+  const currentName = (prof && (prof as any).display_name) || '';
+  const newName = currentName.startsWith('[Deleted]') ? currentName : `[Deleted] ${currentName}`.trim();
+  const { error } = await supabase.from('qm_profiles').update({ suspended: true, display_name: newName }).eq('id', id);
+  if (error) throw error;
+  await supabase.auth.signOut();
 }
 
 // === ADMIN EXTENDED CRUD ===

@@ -1,10 +1,11 @@
 "use client";
 import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useSession, signOut } from "@/lib/session";
-import { getMyProfile, updateMyDisplayName, updateMyEmail, updateMyPassword, type Profile } from "@/lib/data";
+import { getMyProfile, updateMyDisplayName, updateMyEmail, updateMyPassword, softDeleteMyAccount, type Profile } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
-import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, LogOut, Save } from "lucide-react";
+import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, LogOut, Save, Trash2, AlertTriangle} from "lucide-react";
 const tabs = [
   { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
@@ -19,6 +20,18 @@ export default function Page() {
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [msg, setMsg] = useState("");
+  const router = useRouter();
+  const [showDelConfirm, setShowDelConfirm] = useState(false);
+  const [delConfirmText, setDelConfirmText] = useState("");
+  const [delBusy, setDelBusy] = useState(false);
+  async function deleteAccount() {
+    if (delConfirmText.trim() !== "DELETE") { setMsg("Type DELETE to confirm"); return; }
+    setDelBusy(true);
+    try {
+      await softDeleteMyAccount();
+      router.replace("/login");
+    } catch(e:any) { setMsg(e.message || "Failed to delete account"); setDelBusy(false); }
+  }
   useEffect(() => { if (!user) return; getMyProfile().then(pr => { setP(pr); setName(pr?.display_name||""); }); supabase.auth.getUser().then(({data})=>setEmail(data.user?.email||"")); }, [user]);
   async function saveName() { try { await updateMyDisplayName(name); setMsg("Username updated"); } catch(e:any){ setMsg(e.message);} }
   async function saveEmail() { try { await updateMyEmail(email); setMsg("Email update requested - check inbox"); } catch(e:any){ setMsg(e.message);} }
@@ -43,6 +56,23 @@ export default function Page() {
         <input type="password" className="w-full border rounded-lg px-3 py-2 mt-1" value={pw} onChange={e=>setPw(e.target.value)} placeholder="At least 6 characters" />
         <button onClick={savePw} className="mt-2 px-3 py-2 rounded-xl bg-black text-white text-sm flex items-center gap-1"><Save className="w-4 h-4"/>Change password</button>
       </div>
+
+              <div className="card mb-3 border border-red-200 bg-red-50">
+                <div className="flex items-center gap-2 text-red-700 font-semibold text-sm mb-1"><AlertTriangle className="w-4 h-4"/>Danger zone</div>
+                <div className="text-xs text-red-700/80 mb-2">Deleting your account will deactivate it. You will be signed out and lose access. Contact an administrator if you change your mind.</div>
+                {!showDelConfirm ? (
+                  <button onClick={()=>{setShowDelConfirm(true); setMsg("");}} className="px-3 py-2 rounded-xl bg-red-600 text-white text-sm flex items-center gap-1"><Trash2 className="w-4 h-4"/>Delete account</button>
+                ) : (
+                  <div>
+                    <label className="text-xs text-red-700">Type <b>DELETE</b> to confirm</label>
+                    <input value={delConfirmText} onChange={e=>setDelConfirmText(e.target.value)} className="w-full border border-red-300 rounded-lg px-3 py-2 mt-1" placeholder="DELETE" />
+                    <div className="flex gap-2 mt-2">
+                      <button disabled={delBusy} onClick={deleteAccount} className="px-3 py-2 rounded-xl bg-red-600 text-white text-sm flex items-center gap-1 disabled:opacity-50"><Trash2 className="w-4 h-4"/>{delBusy ? "Deleting..." : "Confirm delete"}</button>
+                      <button disabled={delBusy} onClick={()=>{setShowDelConfirm(false); setDelConfirmText("");}} className="px-3 py-2 rounded-xl bg-white border text-sm">Cancel</button>
+                    </div>
+                  </div>
+                )}
+              </div>
       <button onClick={()=>signOut()} className="mt-2 w-full py-2 rounded-xl bg-red-50 text-red-700 flex items-center justify-center gap-1"><LogOut className="w-4 h-4"/>Sign out</button>
     </Shell>
   );
