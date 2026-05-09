@@ -14,8 +14,8 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const owner = await requireClassOwner(req, params.classId);
   if (owner.response) return owner.response;
   const body = await req.json().catch(() => ({}));
-  const { columnId, uploadId, eTag, projectId, filename, mimeType, sizeBytes, durationSeconds, title, description } = body;
-  if (!columnId || !uploadId || !eTag || !projectId || !filename || !mimeType || !sizeBytes) {
+  const { columnId, uploadId, key, eTag, projectId, filename, mimeType, sizeBytes, durationSeconds, title, description } = body;
+  if (!columnId || !uploadId || !key || !eTag || !projectId || !filename || !mimeType || !sizeBytes) {
     return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
   }
 
@@ -25,6 +25,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   try {
     const completed = await completeAdiloUpload({
       uploadId,
+      key,
       parts: [{ ETag: eTag, PartNumber: 1 }],
       projectId,
       filename,

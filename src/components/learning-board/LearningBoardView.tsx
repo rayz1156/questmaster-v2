@@ -455,6 +455,7 @@ function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId
         body: JSON.stringify({
           columnId,
           uploadId: initData.uploadId,
+          key: initData.key,
           eTag,
           projectId: initData.projectId,
           filename: file.name,
