@@ -25,7 +25,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playingFileId, setPlayingFileId] = useState<{ fileId: string; title: string | null } | null>(null);
-  const [addCardForColumn, setAddCardForColumn] = useState<string | null>(null);
+  const [addCardTarget, setAddCardTarget] = useState<{ columnId: string; insertIndex: number | null } | null>(null);
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null);
 
   const refresh = useCallback(async () => {
@@ -77,7 +77,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
             column={col}
             isEditor={isEditor}
             onPlayVideo={(fileId, title) => setPlayingFileId({ fileId, title })}
-            onAddCard={() => setAddCardForColumn(col.id)}
+            onAddCard={(insertIndex?: number | null) => setAddCardTarget({ columnId: col.id, insertIndex: typeof insertIndex === 'number' ? insertIndex : null })}
             onChanged={refresh}
             menuOpen={openMenuColumnId === col.id}
             onToggleMenu={(open) => setOpenMenuColumnId(open ? col.id : null)}
@@ -89,12 +89,13 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
         )}
       </div>
 
-      {addCardForColumn && (
+      {addCardTarget && (
         <AddCardModal
           classId={classId}
-          columnId={addCardForColumn}
-          onClose={() => setAddCardForColumn(null)}
-          onCreated={() => { setAddCardForColumn(null); refresh(); }}
+          columnId={addCardTarget.columnId}
+          insertIndex={addCardTarget.insertIndex}
+          onClose={() => setAddCardTarget(null)}
+          onCreated={() => { setAddCardTarget(null); refresh(); setTimeout(() => refresh(), 15000); }}
         />
       )}
     </div>
@@ -115,7 +116,7 @@ function ColumnCard({
   column: LearningColumn & { cards: LearningCard[] };
   isEditor: boolean;
   onPlayVideo: (fileId: string, title: string | null) => void;
-  onAddCard: () => void;
+  onAddCard: (insertIndex?: number | null) => void;
   onChanged: () => void;
   menuOpen: boolean;
   onToggleMenu: (open: boolean) => void;
@@ -162,7 +163,7 @@ function ColumnCard({
 
       {isEditor && (
         <button
-          onClick={onAddCard}
+          onClick={() => onAddCard()}
           className="mx-3 my-3 flex items-center justify-center w-10 h-10 self-center rounded-full border border-dashed border-gray-300 text-gray-600 hover:text-gray-900 hover:border-indigo-400 transition"
           aria-label="Add card"
         >+</button>
@@ -172,18 +173,40 @@ function ColumnCard({
         {column.cards.length === 0 && !isEditor && (
           <div className="text-gray-500 text-xs text-center py-6">No items yet.</div>
         )}
-        {column.cards.map((card) => (
-          <CardRenderer
-            key={card.id}
-            classId={classId}
-            card={card}
-            isEditor={isEditor}
-            onPlayVideo={onPlayVideo}
-            onChanged={onChanged}
-          />
+        {column.cards.map((card, idx) => (
+          <div key={card.id}>
+            {isEditor && (
+              <InsertCardStrip onClick={() => onAddCard(idx)} />
+            )}
+            <CardRenderer
+              classId={classId}
+              card={card}
+              isEditor={isEditor}
+              onPlayVideo={onPlayVideo}
+              onChanged={onChanged}
+            />
+          </div>
         ))}
+        {isEditor && column.cards.length > 0 && (
+          <InsertCardStrip onClick={() => onAddCard(column.cards.length)} />
+        )}
       </div>
     </div>
+  );
+}
+
+function InsertCardStrip({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Insert card here"
+      className="group block w-full my-1 py-1 flex items-center justify-center text-slate-300 hover:text-indigo-500 transition-colors"
+    >
+      <span className="flex-1 h-px bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
+      <span className="mx-2 w-5 h-5 rounded-full border border-current flex items-center justify-center text-xs leading-none">+</span>
+      <span className="flex-1 h-px bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
+    </button>
   );
 }
 
@@ -340,11 +363,13 @@ function CardRenderer({
 function AddCardModal({
   classId,
   columnId,
+  insertIndex,
   onClose,
   onCreated,
 }: {
   classId: string;
   columnId: string;
+  insertIndex?: number | null;
   onClose: () => void;
   onCreated: () => void;
 }) {
@@ -368,16 +393,16 @@ function AddCardModal({
             >{t}</button>
           ))}
         </div>
-        {tab === 'video' && <VideoForm classId={classId} columnId={columnId} onCreated={onCreated} />}
-        {tab === 'link'  && <LinkForm  classId={classId} columnId={columnId} onCreated={onCreated} />}
-        {tab === 'image' && <ImageForm classId={classId} columnId={columnId} onCreated={onCreated} />}
-        {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} onCreated={onCreated} />}
+        {tab === 'video' && <VideoForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'link'  && <LinkForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       </div>
     </div>
   );
 }
 
-function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId: string; onCreated: () => void }) {
+function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -415,6 +440,7 @@ function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId
           mimeType: file.type || 'video/mp4',
           sizeBytes: file.size,
           durationSeconds,
+          insertIndex,
         }),
       });
       initData = await initRes.json();
@@ -464,6 +490,7 @@ function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId
           durationSeconds,
           title: title || file.name,
           description,
+          insertIndex,
         }),
       });
       const data = await r.json();
@@ -512,7 +539,7 @@ function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId
   );
 }
 
-function LinkForm({ classId, columnId, onCreated }: { classId: string; columnId: string; onCreated: () => void }) {
+function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
   const [url, setUrl] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -534,6 +561,7 @@ function LinkForm({ classId, columnId, onCreated }: { classId: string; columnId:
           linkImageUrl: meta.image || null,
           linkSiteName: meta.siteName || null,
           linkFaviconUrl: meta.favicon || null,
+          insertIndex,
         }),
       });
       const data = await r.json();
@@ -558,7 +586,7 @@ function LinkForm({ classId, columnId, onCreated }: { classId: string; columnId:
   );
 }
 
-function ImageForm({ classId, columnId, onCreated }: { classId: string; columnId: string; onCreated: () => void }) {
+function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
   // For Phase 1, accept an image URL the user pastes. (Direct upload to Supabase
   // Storage 'learning-cards' bucket is wired up in the bucket but a polished
   // uploader UI is Phase 2.)
@@ -572,7 +600,7 @@ function ImageForm({ classId, columnId, onCreated }: { classId: string; columnId
       const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columnId, cardType: 'image', imageUrl, title: title || null }),
+        body: JSON.stringify({ columnId, cardType: 'image', imageUrl, title: title || null, insertIndex }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed');
@@ -601,7 +629,7 @@ function ImageForm({ classId, columnId, onCreated }: { classId: string; columnId
   );
 }
 
-function TextForm({ classId, columnId, onCreated }: { classId: string; columnId: string; onCreated: () => void }) {
+function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
@@ -613,7 +641,7 @@ function TextForm({ classId, columnId, onCreated }: { classId: string; columnId:
       const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columnId, cardType: 'text', title: title || null, description: description || null }),
+        body: JSON.stringify({ columnId, cardType: 'text', title: title || null, description: description || null, insertIndex }),
       });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed');

@@ -22,14 +22,25 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const { data: col } = await owner.supa.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
   if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
 
-  const { data: maxRow } = await owner.supa
+  const { data: existing } = await owner.supa
     .from('qm_learning_cards')
-    .select('position')
+    .select('id, position')
     .eq('column_id', columnId)
-    .order('position', { ascending: false })
-    .limit(1)
-    .maybeSingle();
-  const nextPos = (maxRow?.position ?? -1) + 1;
+    .order('position', { ascending: true });
+  const cardsList = existing || [];
+  const maxPos = cardsList.length ? cardsList[cardsList.length - 1].position : -1;
+  const rawInsert = (body as any).insertIndex;
+  const hasInsert = typeof rawInsert === 'number' && rawInsert >= 0 && rawInsert <= cardsList.length;
+  const nextPos = hasInsert ? rawInsert : maxPos + 1;
+  if (hasInsert) {
+    // Shift cards at or after insertIndex up by 1, descending to avoid unique conflicts
+    for (let i = cardsList.length - 1; i >= 0; i--) {
+      const c = cardsList[i];
+      if (c.position >= rawInsert) {
+        await owner.supa.from('qm_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
+      }
+    }
+  }
 
   const insert: any = {
     column_id: columnId,

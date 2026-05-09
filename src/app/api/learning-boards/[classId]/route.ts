@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, requireClassOwner } from '@/lib/supabase-route';
+import { getAdiloFile } from '@/lib/adilo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,9 +42,29 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
     .eq('board_id', board.id)
     .order('position', { ascending: true });
 
+  // Enrich video cards that are still missing a thumbnail by querying Adilo.
+  // Adilo encodes uploads asynchronously, so the thumbnail isn't ready when
+  // upload/complete first inserts the row. This auto-heals on every load.
+  const cardsArr: any[] = (cards || []) as any[];
+  const needsThumb = cardsArr.filter((c) => c.card_type === 'video' && !c.video_thumbnail_url && c.adilo_file_id);
+  if (needsThumb.length) {
+    await Promise.all(needsThumb.map(async (c) => {
+      try {
+        const info = await getAdiloFile(c.adilo_file_id);
+        const updates: any = {};
+        if (info.thumbnailUrl) updates.video_thumbnail_url = info.thumbnailUrl;
+        if (typeof info.durationSeconds === 'number' && !c.video_duration_seconds) updates.video_duration_seconds = info.durationSeconds;
+        if (Object.keys(updates).length) {
+          await supa.from('qm_learning_cards').update(updates).eq('id', c.id);
+          Object.assign(c, updates);
+        }
+      } catch { /* ignore - Adilo may still be processing */ }
+    }));
+  }
+
   const grouped = (columns || []).map((c: any) => ({
     ...c,
-    cards: (cards || []).filter((x: any) => x.column_id === c.id),
+    cards: cardsArr.filter((x: any) => x.column_id === c.id),
   }));
   return NextResponse.json({ board, columns: grouped });
 }
