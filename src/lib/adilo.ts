@@ -74,16 +74,25 @@ export async function startAdiloUpload(input: {
   sizeBytes: number;
   durationSeconds?: number;
 }): Promise<AdiloUploadStart> {
+  const dur = Math.max(0, Math.floor(input.durationSeconds ?? 0));
+  const hh = String(Math.floor(dur / 3600)).padStart(2, '0');
+  const mm = String(Math.floor((dur % 3600) / 60)).padStart(2, '0');
+  const ss = String(dur % 60).padStart(2, '0');
+  const durationString = `${hh}:${mm}:${ss}`;
   const body = {
-    projectId: input.projectId,
     project_id: input.projectId,
+    projectId: input.projectId,
     name: input.filename,
     title: input.filename,
     filename: input.filename,
-    mimeType: input.mimeType,
     mime_type: input.mimeType,
+    mimeType: input.mimeType,
+    filesize: input.sizeBytes,
     size: input.sizeBytes,
-    duration: input.durationSeconds ?? 0,
+    duration_seconds: dur,
+    duration_string: durationString,
+    duration: dur,
+    drm_protection: 0,
   };
   const res = await fetch(`${ADILO_BASE}/v1/files/upload/start`, {
     method: 'POST',
