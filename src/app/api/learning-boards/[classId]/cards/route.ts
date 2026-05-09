@@ -1,0 +1,62 @@
+import { NextRequest, NextResponse } from 'next/server';
+import { requireClassOwner } from '@/lib/supabase-route';
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+/**
+ * POST /api/learning-boards/[classId]/cards
+ * Body: { columnId, cardType, ...payload }
+ * Used for non-video card types (link, image, text). Video cards are created
+ * by the upload/complete route which has the Adilo file metadata.
+ */
+export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
+  const owner = await requireClassOwner(params.classId);
+  if (owner.response) return owner.response;
+  const body = await req.json().catch(() => ({}));
+  const { columnId, cardType } = body;
+  if (!columnId || !cardType) return NextResponse.json({ error: 'columnId and cardType required' }, { status: 400 });
+  if (!['link', 'image', 'text'].includes(cardType)) {
+    return NextResponse.json({ error: 'Use upload/complete for video cards' }, { status: 400 });
+  }
+
+  const { data: col } = await owner.supa.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
+  if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
+
+  const { data: maxRow } = await owner.supa
+    .from('qm_learning_cards')
+    .select('position')
+    .eq('column_id', columnId)
+    .order('position', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const nextPos = (maxRow?.position ?? -1) + 1;
+
+  const insert: any = {
+    column_id: columnId,
+    board_id: col.board_id,
+    position: nextPos,
+    card_type: cardType,
+    created_by: owner.user!.id,
+    title: typeof body.title === 'string' ? body.title : null,
+    description: typeof body.description === 'string' ? body.description : null,
+  };
+
+  if (cardType === 'link') {
+    if (!body.linkUrl) return NextResponse.json({ error: 'linkUrl required' }, { status: 400 });
+    insert.link_url = body.linkUrl;
+    insert.link_title = body.linkTitle ?? null;
+    insert.link_description = body.linkDescription ?? null;
+    insert.link_image_url = body.linkImageUrl ?? null;
+    insert.link_site_name = body.linkSiteName ?? null;
+    insert.link_favicon_url = body.linkFaviconUrl ?? null;
+  } else if (cardType === 'image') {
+    if (!body.imageUrl) return NextResponse.json({ error: 'imageUrl required' }, { status: 400 });
+    insert.image_url = body.imageUrl;
+    insert.image_path = body.imagePath ?? null;
+  }
+  // 'text' card just uses title + description.
+
+  const { data, error } = await owner.supa.from('qm_learning_cards').insert(insert).select('*').single();
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  return NextResponse.json({ card: data });
+}

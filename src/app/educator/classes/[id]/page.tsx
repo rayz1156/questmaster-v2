@@ -149,6 +149,9 @@ export default function ClassDetail() {
             <LinkIcon className="w-5 h-5"/><span className="font-medium">Intro Board</span>
             <span className="absolute left-3 right-3 -bottom-px h-0.5 bg-indigo-600 rounded-full"/>
           </Link>
+              <Link href={`/educator/classes/${klass.id}/learning-board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition text-sm">
+                <LinkIcon className="w-5 h-5"/><span className="font-medium">Learning Board</span>
+              </Link>
         </div>
       </div>
 
