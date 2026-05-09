@@ -1,5 +1,6 @@
 'use client';
 import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabase';
 
 /**
  * Full-screen lightbox that plays an Adilo-hosted video inside an iframe.
@@ -22,14 +23,21 @@ export default function VideoLightbox({
 
   useEffect(() => {
     let alive = true;
-    fetch(`/api/learning-boards/${classId}/embed/${fileId}`)
-      .then(async (r) => {
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const token = session?.access_token;
+        const headers: Record<string, string> = {};
+        if (token) headers['Authorization'] = `Bearer ${token}`;
+        const r = await fetch(`/api/learning-boards/${classId}/embed/${fileId}`, { headers });
         const data = await r.json();
         if (!alive) return;
         if (!r.ok) setError(data.error || 'Failed to load video');
         else setEmbedUrl(data.embedUrl);
-      })
-      .catch((e) => alive && setError(String(e)));
+      } catch (e: any) {
+        if (alive) setError(e?.message || String(e));
+      }
+    })();
     return () => { alive = false; };
   }, [classId, fileId]);
 
