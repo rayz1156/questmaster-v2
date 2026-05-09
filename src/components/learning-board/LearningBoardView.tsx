@@ -139,7 +139,7 @@ function ColumnCard({
   };
 
   return (
-    <div className="flex-shrink-0 w-72 bg-gray-50 rounded-xl border border-gray-200 flex flex-col max-h-[80vh]">
+    <div className="flex-shrink-0 w-72 bg-white rounded-xl border border-slate-300 shadow-md hover:shadow-lg transition-shadow flex flex-col max-h-[80vh]">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200">
         <span className="text-gray-600 select-none" aria-hidden>≡</span>
         <h3 className="flex-1 text-gray-900 font-semibold truncate text-sm">{column.title}</h3>
@@ -206,7 +206,7 @@ function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: (
     <button
       onClick={create}
       disabled={busy}
-      className="flex-shrink-0 w-72 bg-gray-50 hover:bg-gray-50 border border-dashed border-gray-200 rounded-xl text-gray-600 hover:text-gray-900 text-sm py-3 self-start transition"
+      className="flex-shrink-0 w-72 bg-white hover:bg-slate-50 border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl text-slate-600 hover:text-indigo-600 text-sm py-3 self-start transition shadow-sm hover:shadow-md"
     >+ Add column</button>
   );
 }
@@ -302,7 +302,7 @@ function CardRenderer({
   const desc = card.card_type === 'link' ? (card.link_description || card.description) : card.description;
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-3 relative">
+    <div className="bg-white border border-slate-300 rounded-lg p-3 relative shadow-sm hover:shadow-md hover:border-slate-400 transition-shadow">
       <div className="flex items-center gap-2 mb-2">
         <span className="text-gray-500 select-none flex-shrink-0" aria-hidden>≡</span>
         <div className="flex-1" />
