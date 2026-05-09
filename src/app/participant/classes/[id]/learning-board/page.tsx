@@ -1,13 +1,14 @@
 'use client';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, ListChecks, BarChart3, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, GraduationCap, ListChecks, BarChart3, BookOpen, User as UserIcon } from 'lucide-react';
 import Shell from '@/components/Shell';
 import LearningBoardView from '@/components/learning-board/LearningBoardView';
 
 const tabs = [
-  { href: '/participant/classes', label: 'Classes', icon: <GraduationCap className="w-5 h-5" /> },
+  { href: '/participant/home', label: 'Home', icon: <GraduationCap className="w-5 h-5" /> },
   { href: '/participant/activities', label: 'Activities', icon: <ListChecks className="w-5 h-5" /> },
+  { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
   { href: '/participant/rankings', label: 'Rankings', icon: <BarChart3 className="w-5 h-5" /> },
   { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
 ];

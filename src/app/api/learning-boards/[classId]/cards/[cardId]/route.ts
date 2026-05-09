@@ -15,7 +15,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
   if (typeof body.position === 'number') updates.position = body.position;
   if (typeof body.column_id === 'string') updates.column_id = body.column_id;
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
-  const { data, error } = await owner.supa
+  const { data, error } = await admin
     .from('qm_learning_cards')
     .update(updates)
     .eq('id', params.cardId)

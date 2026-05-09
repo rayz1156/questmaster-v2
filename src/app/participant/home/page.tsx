@@ -1,7 +1,7 @@
 "use client";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound } from "lucide-react";
+import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound, BookOpen } from "lucide-react";
 import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, type Hunt } from "@/lib/data";
@@ -11,6 +11,7 @@ const tabs = [
   { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
   { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
   { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
+  { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
   { href: '/participant/rankings', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
   { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
 ];
@@ -165,7 +166,7 @@ export default function Page() {
           </div>
 
           {/* Intro Board */}
-          <div className="lg:col-span-2 relative overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <div className="relative overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
             <div className="flex items-start gap-3">
               <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-100 text-purple-700 shrink-0"><ClipboardList className="w-5 h-5" /></span>
               <div className="flex-1">
@@ -188,6 +189,31 @@ export default function Page() {
               <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded-xl cursor-not-allowed">Select a class to open Intro Board</button>
             )}
           </div>
+
+        {/* Learning Board */}
+        <div className="relative overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
+          <div className="flex items-start gap-3">
+            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 shrink-0"><BookOpen className="w-5 h-5" /></span>
+            <div className="flex-1">
+              <div className="text-xl font-bold text-slate-900">Learning Board</div>
+              {activeClass && (<div className="mt-1 inline-block text-xs font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">{activeClass.name}</div>)}
+              <p className="mt-3 text-sm text-slate-600 max-w-md">Your daily learning hub. Access modules, lessons, and materials and track your progress.</p>
+              <ul className="mt-4 space-y-2 text-sm text-slate-700">
+                <li className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-emerald-600" /> Modules &amp; lessons</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-emerald-600" /> Learning materials</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Track your progress</li>
+              </ul>
+            </div>
+            <div aria-hidden className="hidden sm:flex w-32 h-32 rounded-full bg-emerald-50 items-center justify-center shrink-0"><BookOpen className="w-16 h-16 text-emerald-500" /></div>
+          </div>
+          {activeClassId ? (
+            <Link href={`/participant/classes/${activeClassId}/learning-board`} className="mt-5 flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition">
+              Continue Learning <ArrowRight className="w-4 h-4" />
+            </Link>
+          ) : (
+            <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded-xl cursor-not-allowed">Select a class to open Learning Board</button>
+          )}
+        </div>
         </div>
 
         {/* 3 stat cards */}

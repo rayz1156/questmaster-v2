@@ -29,6 +29,12 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   const [openImage, setOpenImage] = useState<{ src: string; title: string | null } | null>(null);
   const [addCardTarget, setAddCardTarget] = useState<{ columnId: string; insertIndex: number | null } | null>(null);
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null);
+  // Drag-and-drop state (editor only)
+  const [dragCardId, setDragCardId] = useState<string | null>(null);
+  const [dragColumnId, setDragColumnId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ columnId: string; index: number } | null>(null);
+  const [dragColId, setDragColId] = useState<string | null>(null);
+  const [colDropIdx, setColDropIdx] = useState<number | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -46,6 +52,25 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   }, [classId]);
 
   useEffect(() => { refresh(); }, [refresh]);
+
+  const moveCard = useCallback(async (cardId: string, payload: any) => {
+    try {
+      await authedFetch(`/api/learning-boards/${classId}/cards/${cardId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } finally { refresh(); }
+  }, [classId, refresh]);
+  const moveColumn = useCallback(async (columnId: string, payload: any) => {
+    try {
+      await authedFetch(`/api/learning-boards/${classId}/columns/${columnId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } finally { refresh(); }
+  }, [classId, refresh]);
 
   if (loading && !snap) return <div className="text-gray-600 p-8">Loading…</div>;
   if (error) return <div className="text-red-400 p-8">Error: {error}</div>;
@@ -79,11 +104,13 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
         className="flex gap-4 overflow-x-auto p-4 pb-8 min-h-[60vh]"
         onClick={() => setOpenMenuColumnId(null)}
       >
-        {snap.columns.map((col) => (
+        {snap.columns.map((col, ci) => (
           <ColumnCard
             key={col.id}
             classId={classId}
             column={col}
+            columnIndex={ci}
+            totalColumns={snap.columns.length}
             isEditor={isEditor}
             onPlayVideo={(fileId, title) => setPlayingFileId({ fileId, title })}
             onOpenImage={(src, title) => setOpenImage({ src, title })}
@@ -91,6 +118,21 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
             onChanged={refresh}
             menuOpen={openMenuColumnId === col.id}
             onToggleMenu={(open) => setOpenMenuColumnId(open ? col.id : null)}
+            dragCardId={dragCardId}
+            dragColumnId={dragColumnId}
+            dropTarget={dropTarget}
+            onCardDragStart={(cId, colId) => { setDragCardId(cId); setDragColumnId(colId); }}
+            onCardDragEnd={() => { setDragCardId(null); setDragColumnId(null); setDropTarget(null); }}
+            onCardDragOver={(colId, idx) => setDropTarget({ columnId: colId, index: idx })}
+            onCardDrop={(colId, idx) => { if (dragCardId) moveCard(dragCardId, { action: 'to', columnId: colId, position: idx }); setDragCardId(null); setDragColumnId(null); setDropTarget(null); }}
+            moveCard={moveCard}
+            moveColumn={moveColumn}
+            dragColId={dragColId}
+            colDropIdx={colDropIdx}
+            onColumnDragStart={(id) => setDragColId(id)}
+            onColumnDragEnd={() => { setDragColId(null); setColDropIdx(null); }}
+            onColumnDragOverIndex={(i) => setColDropIdx(i)}
+            onColumnDrop={(i) => { if (dragColId) moveColumn(dragColId, { action: 'to', position: i }); setDragColId(null); setColDropIdx(null); }}
           />
         ))}
 
@@ -115,6 +157,8 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
 function ColumnCard({
   classId,
   column,
+  columnIndex,
+  totalColumns,
   isEditor,
   onPlayVideo,
   onOpenImage,
@@ -122,9 +166,26 @@ function ColumnCard({
   onChanged,
   menuOpen,
   onToggleMenu,
+  dragCardId,
+  dragColumnId,
+  dropTarget,
+  onCardDragStart,
+  onCardDragEnd,
+  onCardDragOver,
+  onCardDrop,
+  moveCard,
+  moveColumn,
+  dragColId,
+  colDropIdx,
+  onColumnDragStart,
+  onColumnDragEnd,
+  onColumnDragOverIndex,
+  onColumnDrop,
 }: {
   classId: string;
   column: LearningColumn & { cards: LearningCard[] };
+  columnIndex: number;
+  totalColumns: number;
   isEditor: boolean;
   onPlayVideo: (fileId: string, title: string | null) => void;
   onOpenImage: (src: string, title: string | null) => void;
@@ -132,6 +193,21 @@ function ColumnCard({
   onChanged: () => void;
   menuOpen: boolean;
   onToggleMenu: (open: boolean) => void;
+  dragCardId: string | null;
+  dragColumnId: string | null;
+  dropTarget: { columnId: string; index: number } | null;
+  onCardDragStart: (cardId: string, columnId: string) => void;
+  onCardDragEnd: () => void;
+  onCardDragOver: (columnId: string, index: number) => void;
+  onCardDrop: (columnId: string, index: number) => void;
+  moveCard: (cardId: string, payload: any) => Promise<void>;
+  moveColumn: (columnId: string, payload: any) => Promise<void>;
+  dragColId: string | null;
+  colDropIdx: number | null;
+  onColumnDragStart: (columnId: string) => void;
+  onColumnDragEnd: () => void;
+  onColumnDragOverIndex: (index: number) => void;
+  onColumnDrop: (index: number) => void;
 }) {
   const renameColumn = async () => {
     const next = window.prompt('Rename column', column.title);
@@ -151,10 +227,39 @@ function ColumnCard({
     onChanged();
   };
 
+  const isColDragging = dragColId === column.id;
+  const isColDropAfter = !!(isEditor && dragColId && dragColId !== column.id && colDropIdx === columnIndex);
   return (
-    <div className="flex-shrink-0 w-72 bg-white rounded-xl border border-slate-300 shadow-md hover:shadow-lg transition-shadow flex flex-col self-start">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200">
-        <span className="text-gray-600 select-none" aria-hidden>≡</span>
+    <div
+      className={`flex-shrink-0 w-72 bg-white rounded-xl border ${isColDragging ? 'opacity-40 border-indigo-400' : isColDropAfter ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-300'} shadow-md hover:shadow-lg transition-shadow flex flex-col self-start`}
+      onDragOver={(e) => {
+        if (!isEditor) return;
+        if (dragColId && dragColId !== column.id) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          onColumnDragOverIndex(columnIndex);
+        }
+      }}
+      onDrop={(e) => {
+        if (!isEditor) return;
+        if (dragColId && dragColId !== column.id) {
+          e.preventDefault();
+          onColumnDrop(columnIndex);
+        }
+      }}
+    >
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b border-gray-200"
+        draggable={isEditor}
+        onDragStart={(e) => {
+          if (!isEditor) return;
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', `col:${column.id}`); } catch {}
+          onColumnDragStart(column.id);
+        }}
+        onDragEnd={() => onColumnDragEnd()}
+      >
+        <span className={`select-none ${isEditor ? 'text-gray-600 cursor-grab active:cursor-grabbing' : 'text-gray-400'}`} aria-hidden title={isEditor ? 'Drag column to reorder' : ''}>≡</span>
         <h3 className="flex-1 text-gray-900 font-semibold truncate text-sm">{column.title}</h3>
         {isEditor && (
           <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -164,8 +269,14 @@ function ColumnCard({
               onClick={() => onToggleMenu(!menuOpen)}
             >…</button>
             {menuOpen && (
-              <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-36 text-sm">
+              <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
                 <button onClick={renameColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">Rename</button>
+                <div className="h-px bg-gray-100" />
+                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'first' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to first</button>
+                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'left' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move left</button>
+                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'right' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move right</button>
+                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'last' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to last</button>
+                <div className="h-px bg-gray-100" />
                 <button onClick={deleteColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
               </div>
             )}
@@ -181,25 +292,88 @@ function ColumnCard({
         >+</button>
       )}
 
-      <div className="px-3 pb-3 space-y-3">
+      <div
+        className="px-3 pb-3 space-y-3"
+        onDragOver={(e) => {
+          if (!isEditor || !dragCardId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => {
+          if (!isEditor || !dragCardId) return;
+          // Drop at end if dropping on empty area
+          e.preventDefault();
+          onCardDrop(column.id, column.cards.length);
+        }}
+      >
         {column.cards.length === 0 && !isEditor && (
           <div className="text-gray-500 text-xs text-center py-6">No items yet.</div>
         )}
-        {column.cards.map((card, idx) => (
-          <div key={card.id}>
-            {isEditor && (
-              <InsertCardStrip onClick={() => onAddCard(idx)} />
-            )}
-            <CardRenderer
-              classId={classId}
-              card={card}
-              isEditor={isEditor}
-              onPlayVideo={onPlayVideo}
-              onOpenImage={onOpenImage}
-              onChanged={onChanged}
-            />
-          </div>
-        ))}
+        {column.cards.length === 0 && isEditor && dragCardId && (
+          <div
+            className={`h-16 rounded-md border-2 border-dashed ${dropTarget && dropTarget.columnId === column.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'}`}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onCardDragOver(column.id, 0); }}
+            onDrop={(e) => { e.preventDefault(); onCardDrop(column.id, 0); }}
+          />
+        )}
+        {column.cards.map((card, idx) => {
+          const isDragging = dragCardId === card.id;
+          const showIndicatorBefore = isEditor && dragCardId && dropTarget && dropTarget.columnId === column.id && dropTarget.index === idx && dragCardId !== card.id;
+          return (
+            <div key={card.id}>
+              {showIndicatorBefore && (
+                <div className="h-1.5 bg-indigo-500 rounded-full mb-2" aria-hidden />
+              )}
+              {isEditor && (
+                <InsertCardStrip onClick={() => onAddCard(idx)} />
+              )}
+              <div
+                className={isDragging ? 'opacity-40' : ''}
+                draggable={isEditor}
+                onDragStart={(e) => {
+                  if (!isEditor) return;
+                  e.dataTransfer.effectAllowed = 'move';
+                  try { e.dataTransfer.setData('text/plain', `card:${card.id}`); } catch {}
+                  onCardDragStart(card.id, column.id);
+                }}
+                onDragEnd={() => onCardDragEnd()}
+                onDragOver={(e) => {
+                  if (!isEditor || !dragCardId) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.dataTransfer.dropEffect = 'move';
+                  // Decide drop position: above or below this card based on cursor Y
+                  const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                  const before = (e.clientY - rect.top) < rect.height / 2;
+                  onCardDragOver(column.id, before ? idx : idx + 1);
+                }}
+                onDrop={(e) => {
+                  if (!isEditor || !dragCardId) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                  const before = (e.clientY - rect.top) < rect.height / 2;
+                  onCardDrop(column.id, before ? idx : idx + 1);
+                }}
+              >
+                <CardRenderer
+                  classId={classId}
+                  card={card}
+                  cardIndex={idx}
+                  totalCards={column.cards.length}
+                  isEditor={isEditor}
+                  onPlayVideo={onPlayVideo}
+                  onOpenImage={onOpenImage}
+                  onChanged={onChanged}
+                  moveCard={moveCard}
+                />
+              </div>
+            </div>
+          );
+        })}
+        {isEditor && dragCardId && dropTarget && dropTarget.columnId === column.id && dropTarget.index === column.cards.length && (
+          <div className="h-1.5 bg-indigo-500 rounded-full" aria-hidden />
+        )}
         {isEditor && column.cards.length > 0 && (
           <InsertCardStrip onClick={() => onAddCard(column.cards.length)} />
         )}
@@ -250,17 +424,23 @@ function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: (
 function CardRenderer({
   classId,
   card,
+  cardIndex,
+  totalCards,
   isEditor,
   onPlayVideo,
   onOpenImage,
   onChanged,
+  moveCard,
 }: {
   classId: string;
   card: LearningCard;
+  cardIndex: number;
+  totalCards: number;
   isEditor: boolean;
   onPlayVideo: (fileId: string, title: string | null) => void;
   onOpenImage: (src: string, title: string | null) => void;
   onChanged: () => void;
+  moveCard: (cardId: string, payload: any) => Promise<void>;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -386,7 +566,12 @@ function CardRenderer({
               aria-label="Card menu"
             >…</button>
             {menuOpen && (
-              <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-32 text-sm">
+              <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
+                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'top' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to top</button>
+                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'up' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move up</button>
+                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'down' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move down</button>
+                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'bottom' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to bottom</button>
+                <div className="h-px bg-gray-100" />
                 <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
               </div>
             )}
