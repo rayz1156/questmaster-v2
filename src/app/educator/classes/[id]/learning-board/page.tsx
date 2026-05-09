@@ -18,12 +18,12 @@ export default function EducatorLearningBoardPage() {
   const classId = params.id;
   return (
     <Shell tabs={tabs}>
-      <div className="bg-slate-950 min-h-screen">
-        <div className="px-4 md:px-6 py-4 flex items-center gap-3 border-b border-slate-800">
-          <Link href={`/educator/classes/${classId}`} className="text-slate-400 hover:text-white inline-flex items-center gap-1 text-sm">
+      <div className="bg-gray-50 min-h-screen">
+        <div className="px-4 md:px-6 py-4 flex items-center gap-3 border-b border-gray-200">
+          <Link href={`/educator/classes/${classId}`} className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1 text-sm">
             <ArrowLeft className="w-4 h-4" /> Back to class
           </Link>
-          <h1 className="text-white text-lg font-semibold ml-2">Learning Board</h1>
+          <h1 className="text-xl font-semibold ml-2">Learning Board</h1>
         </div>
         <LearningBoardView classId={classId} isEditor={true} />
       </div>

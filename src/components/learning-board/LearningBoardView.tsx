@@ -45,11 +45,11 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
 
   useEffect(() => { refresh(); }, [refresh]);
 
-  if (loading && !snap) return <div className="text-slate-300 p-8">Loading…</div>;
+  if (loading && !snap) return <div className="text-gray-600 p-8">Loading…</div>;
   if (error) return <div className="text-red-400 p-8">Error: {error}</div>;
   if (!snap || !snap.board) {
     return (
-      <div className="text-slate-300 p-8">
+      <div className="text-gray-600 p-8">
         {isEditor ? 'No learning board yet. It will be created automatically.' : 'No learning board has been set up for this class yet.'}
       </div>
     );
@@ -139,21 +139,21 @@ function ColumnCard({
   };
 
   return (
-    <div className="flex-shrink-0 w-72 bg-slate-800/60 rounded-xl border border-slate-700/60 flex flex-col max-h-[80vh]">
-      <div className="flex items-center gap-2 px-3 py-2 border-b border-slate-700/60">
-        <span className="text-slate-400 select-none" aria-hidden>≡</span>
-        <h3 className="flex-1 text-white font-semibold truncate text-sm">{column.title}</h3>
+    <div className="flex-shrink-0 w-72 bg-gray-50 rounded-xl border border-gray-200 flex flex-col max-h-[80vh]">
+      <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200">
+        <span className="text-gray-600 select-none" aria-hidden>≡</span>
+        <h3 className="flex-1 text-gray-900 font-semibold truncate text-sm">{column.title}</h3>
         {isEditor && (
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <button
-              className="text-slate-400 hover:text-white px-1"
+              className="text-gray-600 hover:text-gray-900 px-1"
               aria-label="Column menu"
               onClick={() => onToggleMenu(!menuOpen)}
             >…</button>
             {menuOpen && (
-              <div className="absolute right-0 top-7 z-20 bg-slate-900 border border-slate-700 rounded-md shadow-lg w-36 text-sm">
-                <button onClick={renameColumn} className="w-full text-left px-3 py-2 hover:bg-slate-800 text-slate-200">Rename</button>
-                <button onClick={deleteColumn} className="w-full text-left px-3 py-2 hover:bg-slate-800 text-red-400">Delete</button>
+              <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-36 text-sm">
+                <button onClick={renameColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">Rename</button>
+                <button onClick={deleteColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
               </div>
             )}
           </div>
@@ -163,14 +163,14 @@ function ColumnCard({
       {isEditor && (
         <button
           onClick={onAddCard}
-          className="mx-3 my-3 flex items-center justify-center w-10 h-10 self-center rounded-full border border-dashed border-slate-600 text-slate-400 hover:text-white hover:border-slate-400 transition"
+          className="mx-3 my-3 flex items-center justify-center w-10 h-10 self-center rounded-full border border-dashed border-gray-300 text-gray-600 hover:text-gray-900 hover:border-indigo-400 transition"
           aria-label="Add card"
         >+</button>
       )}
 
       <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3">
         {column.cards.length === 0 && !isEditor && (
-          <div className="text-slate-500 text-xs text-center py-6">No items yet.</div>
+          <div className="text-gray-500 text-xs text-center py-6">No items yet.</div>
         )}
         {column.cards.map((card) => (
           <CardRenderer
@@ -206,7 +206,7 @@ function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: (
     <button
       onClick={create}
       disabled={busy}
-      className="flex-shrink-0 w-72 bg-slate-800/30 hover:bg-slate-800/60 border border-dashed border-slate-700 rounded-xl text-slate-400 hover:text-slate-100 text-sm py-3 self-start transition"
+      className="flex-shrink-0 w-72 bg-gray-50 hover:bg-gray-50 border border-dashed border-gray-200 rounded-xl text-gray-600 hover:text-gray-900 text-sm py-3 self-start transition"
     >+ Add column</button>
   );
 }
@@ -239,18 +239,18 @@ function CardRenderer({
           className="block w-full text-left"
           onClick={() => card.adilo_file_id && onPlayVideo(card.adilo_file_id, card.title)}
         >
-          <div className="relative aspect-video bg-slate-900 rounded-md overflow-hidden">
+          <div className="relative aspect-video bg-white rounded-md overflow-hidden">
             {card.video_thumbnail_url ? (
               // eslint-disable-next-line @next/next/no-img-element
               <img src={card.video_thumbnail_url} alt={card.title || ''} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-slate-500 text-xs">Processing…</div>
+              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Processing…</div>
             )}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-black/60 rounded-full w-12 h-12 flex items-center justify-center text-white">▶</div>
             </div>
             {card.video_duration_seconds ? (
-              <div className="absolute bottom-1 right-1 bg-black/70 text-white text-[10px] px-1.5 py-0.5 rounded">
+              <div className="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">
                 {formatDuration(card.video_duration_seconds)}
               </div>
             ) : null}
@@ -262,7 +262,7 @@ function CardRenderer({
       return (
         <a href={card.link_url} target="_blank" rel="noopener noreferrer" className="block">
           {card.link_image_url && (
-            <div className="aspect-video bg-slate-900 rounded-md overflow-hidden">
+            <div className="aspect-video bg-white rounded-md overflow-hidden">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={card.link_image_url} alt={card.link_title || ''} className="w-full h-full object-cover" />
             </div>
@@ -272,7 +272,7 @@ function CardRenderer({
     }
     if (card.card_type === 'image' && card.image_url) {
       return (
-        <div className="rounded-md overflow-hidden bg-slate-900">
+        <div className="rounded-md overflow-hidden bg-white">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={card.image_url} alt={card.title || ''} className="w-full object-cover" />
         </div>
@@ -286,7 +286,7 @@ function CardRenderer({
     const host = card.link_site_name || (card.link_url ? hostnameFromUrl(card.link_url) : '');
     if (!host) return null;
     return (
-      <div className="flex items-center gap-1.5 mb-2 text-xs text-slate-400">
+      <div className="flex items-center gap-1.5 mb-2 text-xs text-gray-600">
         {card.link_favicon_url ? (
           // eslint-disable-next-line @next/next/no-img-element
           <img src={card.link_favicon_url} alt="" className="w-4 h-4 rounded" />
@@ -302,20 +302,20 @@ function CardRenderer({
   const desc = card.card_type === 'link' ? (card.link_description || card.description) : card.description;
 
   return (
-    <div className="bg-slate-900/70 border border-slate-700/60 rounded-lg p-3 relative">
+    <div className="bg-white border border-gray-200 rounded-lg p-3 relative">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-slate-500 select-none flex-shrink-0" aria-hidden>≡</span>
+        <span className="text-gray-500 select-none flex-shrink-0" aria-hidden>≡</span>
         <div className="flex-1" />
         {isEditor && (
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <button
-              className="text-slate-400 hover:text-white px-1"
+              className="text-gray-600 hover:text-gray-900 px-1"
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Card menu"
             >…</button>
             {menuOpen && (
-              <div className="absolute right-0 top-6 z-20 bg-slate-900 border border-slate-700 rounded-md shadow-lg w-32 text-sm">
-                <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-slate-800 text-red-400">Delete</button>
+              <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-32 text-sm">
+                <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
               </div>
             )}
           </div>
@@ -325,8 +325,8 @@ function CardRenderer({
       <Body />
       {(title || desc) && (
         <div className="mt-2">
-          {title && <div className="text-white text-sm font-semibold leading-snug mb-1 line-clamp-2">{title}</div>}
-          {desc && <div className="text-slate-400 text-xs leading-snug line-clamp-4">{desc}</div>}
+          {title && <div className="text-gray-900 text-sm font-semibold leading-snug mb-1 line-clamp-2">{title}</div>}
+          {desc && <div className="text-gray-600 text-xs leading-snug line-clamp-4">{desc}</div>}
         </div>
       )}
     </div>
@@ -350,21 +350,21 @@ function AddCardModal({
 }) {
   const [tab, setTab] = useState<LearningCardType>('video');
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-lg p-5 shadow-2xl"
+        className="bg-white border border-gray-200 rounded-xl w-full max-w-lg p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-white text-lg font-semibold">Add card</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+          <h3 className="text-xl font-semibold">Add card</h3>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
-        <div className="flex gap-1 mb-5 bg-slate-800 p-1 rounded-lg">
+        <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
           {(['video', 'link', 'image', 'text'] as LearningCardType[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 px-3 py-1.5 rounded-md text-sm capitalize ${tab === t ? 'bg-slate-700 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`flex-1 px-3 py-1.5 rounded-md text-sm capitalize ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
             >{t}</button>
           ))}
         </div>
@@ -480,23 +480,23 @@ function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId
         type="file"
         accept="video/*"
         onChange={(e) => setFile(e.target.files?.[0] || null)}
-        className="block w-full text-sm text-slate-300 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500"
+        className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500"
       />
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
         placeholder="Title (optional)"
-        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-white text-sm"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       <textarea
         value={description} onChange={(e) => setDescription(e.target.value)}
         placeholder="Description (optional)"
         rows={2}
-        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-white text-sm"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       {stage !== 'idle' && stage !== 'done' && stage !== 'error' && (
         <div>
-          <div className="text-xs text-slate-400 mb-1 capitalize">{stage}… {progress > 0 && `${progress}%`}</div>
-          <div className="w-full bg-slate-800 rounded-full h-1.5 overflow-hidden">
+          <div className="text-xs text-gray-600 mb-1 capitalize">{stage}… {progress > 0 && `${progress}%`}</div>
+          <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
             <div className="bg-indigo-500 h-full transition-all" style={{ width: `${progress}%` }} />
           </div>
         </div>
@@ -545,7 +545,7 @@ function LinkForm({ classId, columnId, onCreated }: { classId: string; columnId:
       <input
         value={url} onChange={(e) => setUrl(e.target.value)}
         placeholder="https://..."
-        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-white text-sm"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       {err && <div className="text-red-400 text-xs">{err}</div>}
       <button
@@ -583,12 +583,12 @@ function ImageForm({ classId, columnId, onCreated }: { classId: string; columnId
       <input
         value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
         placeholder="Image URL (https://...)"
-        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-white text-sm"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
         placeholder="Caption (optional)"
-        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-white text-sm"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       {err && <div className="text-red-400 text-xs">{err}</div>}
       <button
@@ -624,13 +624,13 @@ function TextForm({ classId, columnId, onCreated }: { classId: string; columnId:
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
         placeholder="Title"
-        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-white text-sm"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       <textarea
         value={description} onChange={(e) => setDescription(e.target.value)}
         placeholder="Note text"
         rows={5}
-        className="w-full bg-slate-800 border border-slate-700 rounded-md px-3 py-2 text-white text-sm"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       {err && <div className="text-red-400 text-xs">{err}</div>}
       <button
