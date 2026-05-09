@@ -260,10 +260,10 @@ export async function getAdiloFile(fileId: string): Promise<{
 
 /**
  * Build the Adilo embed URL we render inside our own iframe.
- * Adilo's player URL pattern for embeds: https://adilo.bigcommand.com/watch/{fileId}
+ * Adilo's player URL pattern for embeds: https://adilo.bigcommand.com/embed/{fileId}
  * Students never see this URL in their address bar — only inside an iframe
  * inside our LightboxPlayer component.
  */
 export function buildAdiloEmbedUrl(fileId: string): string {
-  return `https://adilo.bigcommand.com/watch/${fileId}`;
+  return `https://adilo.bigcommand.com/embed/${fileId}`;
 }

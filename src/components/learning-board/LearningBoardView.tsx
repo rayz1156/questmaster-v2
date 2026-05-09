@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatDuration, hostnameFromUrl, type LearningCard, type LearningCardType, type LearningColumn } from '@/lib/learning-boards';
 import VideoLightbox from './VideoLightbox';
+import ImageLightbox from './ImageLightbox';
 import { supabase } from '@/lib/supabase';
 
 
@@ -25,6 +26,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playingFileId, setPlayingFileId] = useState<{ fileId: string; title: string | null } | null>(null);
+  const [openImage, setOpenImage] = useState<{ src: string; title: string | null } | null>(null);
   const [addCardTarget, setAddCardTarget] = useState<{ columnId: string; insertIndex: number | null } | null>(null);
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null);
 
@@ -65,6 +67,13 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
           onClose={() => setPlayingFileId(null)}
         />
       )}
+      {openImage && (
+        <ImageLightbox
+          src={openImage.src}
+          title={openImage.title}
+          onClose={() => setOpenImage(null)}
+        />
+      )}
 
       <div
         className="flex gap-4 overflow-x-auto p-4 pb-8 min-h-[60vh]"
@@ -77,6 +86,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
             column={col}
             isEditor={isEditor}
             onPlayVideo={(fileId, title) => setPlayingFileId({ fileId, title })}
+            onOpenImage={(src, title) => setOpenImage({ src, title })}
             onAddCard={(insertIndex?: number | null) => setAddCardTarget({ columnId: col.id, insertIndex: typeof insertIndex === 'number' ? insertIndex : null })}
             onChanged={refresh}
             menuOpen={openMenuColumnId === col.id}
@@ -107,6 +117,7 @@ function ColumnCard({
   column,
   isEditor,
   onPlayVideo,
+  onOpenImage,
   onAddCard,
   onChanged,
   menuOpen,
@@ -116,6 +127,7 @@ function ColumnCard({
   column: LearningColumn & { cards: LearningCard[] };
   isEditor: boolean;
   onPlayVideo: (fileId: string, title: string | null) => void;
+  onOpenImage: (src: string, title: string | null) => void;
   onAddCard: (insertIndex?: number | null) => void;
   onChanged: () => void;
   menuOpen: boolean;
@@ -140,7 +152,7 @@ function ColumnCard({
   };
 
   return (
-    <div className="flex-shrink-0 w-72 bg-white rounded-xl border border-slate-300 shadow-md hover:shadow-lg transition-shadow flex flex-col max-h-[80vh]">
+    <div className="flex-shrink-0 w-72 bg-white rounded-xl border border-slate-300 shadow-md hover:shadow-lg transition-shadow flex flex-col self-start">
       <div className="flex items-center gap-2 px-3 py-2 border-b border-gray-200">
         <span className="text-gray-600 select-none" aria-hidden>≡</span>
         <h3 className="flex-1 text-gray-900 font-semibold truncate text-sm">{column.title}</h3>
@@ -169,7 +181,7 @@ function ColumnCard({
         >+</button>
       )}
 
-      <div className="flex-1 overflow-y-auto px-3 pb-3 space-y-3">
+      <div className="px-3 pb-3 space-y-3">
         {column.cards.length === 0 && !isEditor && (
           <div className="text-gray-500 text-xs text-center py-6">No items yet.</div>
         )}
@@ -183,6 +195,7 @@ function ColumnCard({
               card={card}
               isEditor={isEditor}
               onPlayVideo={onPlayVideo}
+              onOpenImage={onOpenImage}
               onChanged={onChanged}
             />
           </div>
@@ -239,12 +252,14 @@ function CardRenderer({
   card,
   isEditor,
   onPlayVideo,
+  onOpenImage,
   onChanged,
 }: {
   classId: string;
   card: LearningCard;
   isEditor: boolean;
   onPlayVideo: (fileId: string, title: string | null) => void;
+  onOpenImage: (src: string, title: string | null) => void;
   onChanged: () => void;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -293,14 +308,19 @@ function CardRenderer({
         </a>
       );
     }
-    if (card.card_type === 'image' && card.image_url) {
-      return (
-        <div className="rounded-md overflow-hidden bg-white">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src={card.image_url} alt={card.title || ''} className="w-full object-cover" />
-        </div>
-      );
-    }
+  if (card.card_type === 'image' && card.image_url) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenImage(card.image_url!, card.title || null)}
+        className="block w-full rounded-md overflow-hidden bg-white cursor-zoom-in group"
+        aria-label="View image full screen"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={card.image_url} alt={card.title || ''} className="w-full object-cover transition-opacity group-hover:opacity-90" />
+      </button>
+    );
+  }
     if (card.card_type === 'file' && card.file_url) {
       const ext = (card.file_extension || '').toLowerCase();
       const sizeKb = card.file_size_bytes ? Math.round(card.file_size_bytes / 1024) : null;
