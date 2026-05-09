@@ -50,7 +50,7 @@ export async function createAdiloProject(name: string): Promise<AdiloProject> {
   const res = await fetch(`${ADILO_BASE}/v1/projects`, {
     method: 'POST',
     headers: adiloHeaders(),
-    body: JSON.stringify({ name }),
+    body: JSON.stringify({ title: name, name }),
   });
   if (!res.ok) {
     const t = await res.text();
@@ -58,7 +58,7 @@ export async function createAdiloProject(name: string): Promise<AdiloProject> {
   }
   const json = await res.json();
   const p = json.data ?? json;
-  return { id: p.id ?? p.project_id, name: p.name ?? name };
+  return { id: p.id ?? p.project_id, name: p.name ?? p.title ?? name };
 }
 
 export type AdiloUploadStart = {
@@ -76,8 +76,12 @@ export async function startAdiloUpload(input: {
 }): Promise<AdiloUploadStart> {
   const body = {
     projectId: input.projectId,
+    project_id: input.projectId,
     name: input.filename,
+    title: input.filename,
+    filename: input.filename,
     mimeType: input.mimeType,
+    mime_type: input.mimeType,
     size: input.sizeBytes,
     duration: input.durationSeconds ?? 0,
   };
