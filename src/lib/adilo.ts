@@ -123,18 +123,11 @@ export async function startAdiloUpload(input: {
 }
 
 export async function getAdiloSignedUrl(uploadId: string, key: string, partNumber = 1): Promise<string> {
-  const body = {
-    key,
-    upload_id: uploadId,
-    uploadId,
-    part_number: partNumber,
-    partNumber,
-  };
-  const res = await fetch(`${ADILO_BASE}/v1/files/upload/get-signed-url`, {
-    method: 'POST',
-    headers: adiloHeaders(),
-    body: JSON.stringify(body),
-  });
+  const qs = new URLSearchParams({ key, upload_id: uploadId, part_number: String(partNumber) });
+  const res = await fetch(
+    `${ADILO_BASE}/v1/files/upload/get-signed-url/${encodeURIComponent(uploadId)}/${partNumber}?${qs.toString()}`,
+    { method: 'GET', headers: adiloHeaders() }
+  );
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`Adilo get-signed-url failed: ${res.status} ${t}`);
