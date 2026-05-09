@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const body = await req.json().catch(() => ({}));
   const { columnId, cardType } = body;
   if (!columnId || !cardType) return NextResponse.json({ error: 'columnId and cardType required' }, { status: 400 });
-  if (!['link', 'image', 'text'].includes(cardType)) {
+  if (!['link', 'image', 'text', 'file'].includes(cardType)) {
     return NextResponse.json({ error: 'Use upload/complete for video cards' }, { status: 400 });
   }
 
@@ -64,6 +64,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     if (!body.imageUrl) return NextResponse.json({ error: 'imageUrl required' }, { status: 400 });
     insert.image_url = body.imageUrl;
     insert.image_path = body.imagePath ?? null;
+  } else if (cardType === 'file') {
+    if (!body.fileUrl) return NextResponse.json({ error: 'fileUrl required' }, { status: 400 });
+    insert.file_url = body.fileUrl;
+    insert.file_path = body.filePath ?? null;
+    insert.file_name = body.fileName ?? null;
+    insert.file_mime_type = body.fileMimeType ?? null;
+    insert.file_size_bytes = typeof body.fileSizeBytes === 'number' ? body.fileSizeBytes : null;
+    insert.file_extension = body.fileExtension ?? null;
   }
   // 'text' card just uses title + description.
 

@@ -301,6 +301,35 @@ function CardRenderer({
         </div>
       );
     }
+    if (card.card_type === 'file' && card.file_url) {
+      const ext = (card.file_extension || '').toLowerCase();
+      const sizeKb = card.file_size_bytes ? Math.round(card.file_size_bytes / 1024) : null;
+      const sizeLabel = sizeKb == null ? '' : sizeKb >= 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`;
+      const iconBg =
+        ext === 'pdf' ? 'bg-red-100 text-red-700' :
+        ext === 'doc' || ext === 'docx' ? 'bg-blue-100 text-blue-700' :
+        ext === 'xls' || ext === 'xlsx' || ext === 'csv' ? 'bg-emerald-100 text-emerald-700' :
+        ext === 'ppt' || ext === 'pptx' ? 'bg-orange-100 text-orange-700' :
+        ext === 'zip' || ext === 'rar' || ext === '7z' ? 'bg-amber-100 text-amber-800' :
+        'bg-slate-100 text-slate-700';
+      return (
+        <a
+          href={card.file_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-md bg-white p-2 hover:bg-slate-50 transition-colors"
+          title={card.file_name || ''}
+        >
+          <div className={`w-12 h-14 rounded-md flex items-center justify-center text-[10px] font-bold ${iconBg}`}>
+            {ext ? ext.toUpperCase().slice(0, 4) : 'FILE'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900 truncate">{card.file_name || card.title || 'File'}</div>
+            <div className="text-xs text-gray-500">{sizeLabel}</div>
+          </div>
+        </a>
+      );
+    }
     return null;
   };
 
@@ -321,7 +350,7 @@ function CardRenderer({
     );
   };
 
-  const title = card.card_type === 'link' ? (card.link_title || card.title) : card.title;
+  const title = card.card_type === 'link' ? (card.link_title || card.title) : (card.card_type === 'file' ? (card.title || card.file_name) : card.title);
   const desc = card.card_type === 'link' ? (card.link_description || card.description) : card.description;
 
   return (
@@ -385,7 +414,7 @@ function AddCardModal({
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
         <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
-          {(['link', 'text', 'image', 'video'] as LearningCardType[]).map((t) => (
+          {(['link', 'text', 'file', 'image', 'video'] as LearningCardType[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -396,6 +425,7 @@ function AddCardModal({
         {tab === 'video' && <VideoForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'link'  && <LinkForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'file'  && <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       </div>
     </div>
@@ -667,6 +697,91 @@ function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         disabled={busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
       >{busy ? 'Adding…' : 'Add note'}</button>
+    </div>
+  );
+}
+
+function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!file) { setErr('Choose a file'); return; }
+    setBusy(true); setErr(null); setProgress(0);
+    try {
+      // 1) Upload to Supabase Storage via our API route
+      const fd = new FormData();
+      fd.append('file', file);
+      const upRes = await authedFetch(`/api/learning-boards/${classId}/upload-file`, {
+        method: 'POST',
+        body: fd,
+      });
+      const upData = await upRes.json();
+      if (!upRes.ok) throw new Error(upData.error || 'Upload failed');
+      setProgress(70);
+
+      // 2) Create the card record
+      const cardRes = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          columnId,
+          cardType: 'file',
+          title: title || null,
+          fileUrl: upData.fileUrl,
+          filePath: upData.filePath,
+          fileName: upData.fileName,
+          fileMimeType: upData.fileMimeType,
+          fileSizeBytes: upData.fileSizeBytes,
+          fileExtension: upData.fileExtension,
+          insertIndex,
+        }),
+      });
+      const cardData = await cardRes.json();
+      if (!cardRes.ok) throw new Error(cardData.error || 'Failed to create card');
+      setProgress(100);
+      onCreated();
+    } catch (e: any) {
+      setErr(e.message || 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="file"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.odt,.ods,.odp,.zip,.rar,.7z,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        disabled={busy}
+        className="w-full text-sm text-gray-900 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:text-sm file:font-medium hover:file:bg-indigo-500 file:cursor-pointer disabled:opacity-50"
+      />
+      {file && (
+        <div className="text-xs text-gray-600">
+          {file.name} · {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
+        </div>
+      )}
+      <input
+        value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title (optional)"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      {busy && (
+        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button
+        onClick={submit}
+        disabled={!file || busy}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
+      >{busy ? 'Uploading…' : 'Upload file'}</button>
+      <div className="text-[11px] text-gray-500">Supports PDF, Word, Excel, PowerPoint, text, archives, and more (up to 50 MB).</div>
     </div>
   );
 }

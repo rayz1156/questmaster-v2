@@ -3,7 +3,7 @@
  * Server logic lives in src/app/api/learning-boards/* routes.
  */
 
-export type LearningCardType = 'video' | 'link' | 'image' | 'text';
+export type LearningCardType = 'video' | 'link' | 'image' | 'text' | 'file';
 
 export interface LearningBoard {
   id: string;
@@ -48,6 +48,13 @@ export interface LearningCard {
   // image
   image_url: string | null;
   image_path: string | null;
+  // file
+  file_url: string | null;
+  file_path: string | null;
+  file_name: string | null;
+  file_mime_type: string | null;
+  file_size_bytes: number | null;
+  file_extension: string | null;
   // audit
   created_by: string;
   created_at: string;
