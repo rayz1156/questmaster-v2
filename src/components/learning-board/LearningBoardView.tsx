@@ -781,6 +781,9 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
       setProgress(70);
 
       // 2) Create the card record
+      // File card stores the FileLu redirect endpoint as file_url so it works
+      // even when FileLu has not made the share link public.
+      const fileUrl = `/api/learning-boards/${classId}/file-redirect/${upData.fileCode}`;
       const cardRes = await authedFetch(`/api/learning-boards/${classId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -788,7 +791,7 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
           columnId,
           cardType: 'file',
           title: title || null,
-          fileUrl: upData.fileUrl,
+          fileUrl,
           filePath: upData.filePath,
           fileName: upData.fileName,
           fileMimeType: upData.fileMimeType,
