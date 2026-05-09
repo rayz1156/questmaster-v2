@@ -42,7 +42,7 @@ export async function listAdiloProjects(): Promise<AdiloProject[]> {
   if (!res.ok) throw new Error(`Adilo listProjects failed: ${res.status}`);
   const json = await res.json();
   // Defensive: response shape varies; commonly { data: [...] } or array
-  const arr: any[] = Array.isArray(json) ? json : json.data ?? json.projects ?? [];
+  const arr: any[] = Array.isArray(json) ? json : (json.payload ?? json.data ?? json.projects ?? []);
   return arr.map((p) => ({ id: p.id ?? p.project_id ?? p._id, name: p.name ?? p.title ?? '' }));
 }
 
@@ -57,7 +57,7 @@ export async function createAdiloProject(name: string): Promise<AdiloProject> {
     throw new Error(`Adilo createProject failed: ${res.status} ${t}`);
   }
   const json = await res.json();
-  const p = json.data ?? json;
+  const p = json.payload ?? json.data ?? json;
   const projectId = p.project_id ?? p.projectId ?? p.id ?? p._id ?? p.pid ?? p.slug ?? p.uuid ?? p.uid;
   if (!projectId) {
     // eslint-disable-next-line no-console
@@ -110,7 +110,7 @@ export async function startAdiloUpload(input: {
     throw new Error(`Adilo upload/start failed: ${res.status} ${t}`);
   }
   const json = await res.json();
-  const data = json.data ?? json;
+  const data = json.payload ?? json.data ?? json;
   return {
     uploadId: data.uploadId ?? data.upload_id,
     key: data.key,
@@ -161,7 +161,7 @@ export async function completeAdiloUpload(input: {
     throw new Error(`Adilo upload/complete failed: ${res.status} ${t}`);
   }
   const json = await res.json();
-  const data = json.data ?? json;
+  const data = json.payload ?? json.data ?? json;
   return {
     fileId: data.id ?? data.fileId ?? data.file_id,
     thumbnailUrl: data.thumbnail ?? data.thumbnailUrl,
@@ -183,7 +183,7 @@ export async function getAdiloFile(fileId: string): Promise<{
   });
   if (!res.ok) throw new Error(`Adilo getFile failed: ${res.status}`);
   const json = await res.json();
-  const data = json.data ?? json;
+  const data = json.payload ?? json.data ?? json;
   return {
     id: data.id ?? fileId,
     thumbnailUrl: data.thumbnail ?? data.thumbnailUrl,
