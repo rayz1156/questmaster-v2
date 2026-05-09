@@ -195,6 +195,27 @@ export async function completeAdiloUpload(input: {
   };
 }
 
+/**
+ * Adilo's REST API does not expose video thumbnail URLs. The only place they
+ * are advertised is the public watch page HTML (stream.adilo.com CDN).
+ * This best-effort helper scrapes the first thumbnail URL it finds.
+ */
+export async function fetchAdiloWatchThumbnail(fileId: string): Promise<string | undefined> {
+  try {
+    const res = await fetch(`https://adilo.bigcommand.com/watch/${encodeURIComponent(fileId)}`, {
+      method: 'GET',
+      headers: { 'User-Agent': 'Mozilla/5.0 (compatible; QuestmasterBot/1.0)' },
+      cache: 'no-store',
+    });
+    if (!res.ok) return undefined;
+    const html = await res.text();
+    const m = html.match(/https?:\/\/stream\.adilo\.com\/[^"'\s)]+\.(?:jpg|jpeg|png|webp)/i);
+    return m ? m[0] : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export async function getAdiloFile(fileId: string): Promise<{
   id: string;
   thumbnailUrl?: string;
@@ -215,10 +236,23 @@ export async function getAdiloFile(fileId: string): Promise<{
   if (!thumbCandidate) {
     console.warn('[adilo] getFile: no thumbnail field. Response keys:', Object.keys(data || {}).join(','), '| raw:', JSON.stringify(json).slice(0, 600));
   }
+  let finalThumb = (thumbCandidate as string | undefined) || undefined;
+  if (!finalThumb) {
+    finalThumb = await fetchAdiloWatchThumbnail(fileId);
+  }
+  // Adilo also exposes duration_formatted ("00:00:08") instead of duration in seconds.
+  let durSec: number | undefined = data.duration ?? data.durationSeconds ?? data.duration_seconds;
+  if (typeof durSec !== 'number' && typeof data.duration_formatted === 'string') {
+    const parts = data.duration_formatted.split(':').map((x: string) => parseInt(x, 10));
+    if (parts.every((n: number) => !isNaN(n))) {
+      if (parts.length === 3) durSec = parts[0] * 3600 + parts[1] * 60 + parts[2];
+      else if (parts.length === 2) durSec = parts[0] * 60 + parts[1];
+    }
+  }
   return {
     id: data.id ?? fileId,
-    thumbnailUrl: thumbCandidate || undefined,
-    durationSeconds: data.duration ?? data.durationSeconds ?? data.duration_seconds,
+    thumbnailUrl: finalThumb,
+    durationSeconds: durSec,
     status: data.status,
     embedUrl: data.embedUrl ?? data.embed_url ?? data.share?.embedUrl,
   };
