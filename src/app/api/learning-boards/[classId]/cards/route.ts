@@ -64,6 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     if (!body.imageUrl) return NextResponse.json({ error: 'imageUrl required' }, { status: 400 });
     insert.image_url = body.imageUrl;
     insert.image_path = body.imagePath ?? null;
+    if (typeof body.fileluFileCode === 'string') insert.filelu_file_code = body.fileluFileCode;
   } else if (cardType === 'file') {
     if (!body.fileUrl) return NextResponse.json({ error: 'fileUrl required' }, { status: 400 });
     insert.file_url = body.fileUrl;
@@ -72,6 +73,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     insert.file_mime_type = body.fileMimeType ?? null;
     insert.file_size_bytes = typeof body.fileSizeBytes === 'number' ? body.fileSizeBytes : null;
     insert.file_extension = body.fileExtension ?? null;
+    if (typeof body.fileluFileCode === 'string') insert.filelu_file_code = body.fileluFileCode;
   }
   // 'text' card just uses title + description.
 

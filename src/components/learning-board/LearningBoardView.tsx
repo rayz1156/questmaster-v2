@@ -617,48 +617,85 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
 }
 
 function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
-  // For Phase 1, accept an image URL the user pastes. (Direct upload to Supabase
-  // Storage 'learning-cards' bucket is wired up in the bucket but a polished
-  // uploader UI is Phase 2.)
-  const [imageUrl, setImageUrl] = useState('');
+  const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
   const [err, setErr] = useState<string | null>(null);
+
   const submit = async () => {
-    setBusy(true); setErr(null);
+    if (!file) { setErr('Choose an image'); return; }
+    setBusy(true); setErr(null); setProgress(0);
     try {
-      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+      const fd = new FormData();
+      fd.append('file', file);
+      const upRes = await authedFetch(`/api/learning-boards/${classId}/upload-file`, {
+        method: 'POST',
+        body: fd,
+      });
+      const upData = await upRes.json();
+      if (!upRes.ok) throw new Error(upData.error || 'Upload failed');
+      setProgress(70);
+
+      // Image card stores the FileLu redirect endpoint as image_url so <img src> works.
+      const imageUrl = `/api/learning-boards/${classId}/file-redirect/${upData.fileCode}`;
+
+      const cardRes = await authedFetch(`/api/learning-boards/${classId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columnId, cardType: 'image', imageUrl, title: title || null, insertIndex }),
+        body: JSON.stringify({
+          columnId,
+          cardType: 'image',
+          title: title || null,
+          imageUrl,
+          fileluFileCode: upData.fileCode,
+          insertIndex,
+        }),
       });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      const cardData = await cardRes.json();
+      if (!cardRes.ok) throw new Error(cardData.error || 'Failed to create card');
+      setProgress(100);
       onCreated();
-    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+    } catch (e: any) {
+      setErr(e.message || 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
   };
+
   return (
     <div className="space-y-3">
       <input
-        value={imageUrl} onChange={(e) => setImageUrl(e.target.value)}
-        placeholder="Image URL (https://...)"
-        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+        type="file"
+        accept="image/*"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        disabled={busy}
+        className="w-full text-sm text-gray-900 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:text-sm file:font-medium hover:file:bg-indigo-500 file:cursor-pointer disabled:opacity-50"
       />
+      {file && (
+        <div className="text-xs text-gray-600">
+          {file.name} · {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
+        </div>
+      )}
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
         placeholder="Caption (optional)"
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
+      {busy && (
+        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
       {err && <div className="text-red-400 text-xs">{err}</div>}
       <button
         onClick={submit}
-        disabled={!imageUrl || busy}
+        disabled={!file || busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Adding…' : 'Add image'}</button>
+      >{busy ? 'Uploading…' : 'Add image'}</button>
     </div>
   );
 }
-
 function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -737,6 +774,7 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
           fileMimeType: upData.fileMimeType,
           fileSizeBytes: upData.fileSizeBytes,
           fileExtension: upData.fileExtension,
+          fileluFileCode: upData.fileCode,
           insertIndex,
         }),
       });

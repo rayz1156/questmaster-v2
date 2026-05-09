@@ -55,6 +55,7 @@ export interface LearningCard {
   file_mime_type: string | null;
   file_size_bytes: number | null;
   file_extension: string | null;
+  filelu_file_code: string | null;
   // audit
   created_by: string;
   created_at: string;

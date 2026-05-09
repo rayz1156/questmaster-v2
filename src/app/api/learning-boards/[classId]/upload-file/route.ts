@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassOwner } from '@/lib/supabase-route';
+import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60;
+export const maxDuration = 300;
 
-// 50 MB cap (configurable later if needed)
-const MAX_BYTES = 50 * 1024 * 1024;
-const BUCKET = 'learning-cards';
+// 1 GiB cap per file (FileLu Premium allows large files; we keep a sane app-level cap).
+const MAX_BYTES = 1024 * 1024 * 1024;
 
 const ALLOWED_MIME_PREFIXES = [
   'application/pdf',
@@ -26,6 +26,7 @@ const ALLOWED_MIME_PREFIXES = [
   'text/',
   'image/',
   'audio/',
+  'video/',
 ];
 
 function extOf(name: string): string {
@@ -48,7 +49,10 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
 
   if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
   if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: `File too large. Max ${MAX_BYTES / 1024 / 1024}MB` }, { status: 413 });
+    return NextResponse.json(
+      { error: `File too large. Max ${Math.round(MAX_BYTES / 1024 / 1024)} MB` },
+      { status: 413 },
+    );
   }
 
   const mime = file.type || 'application/octet-stream';
@@ -57,38 +61,23 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
   }
 
-  // Resolve board id for namespacing storage
-  const { data: board } = await owner.supa
-    .from('qm_learning_boards')
-    .select('id')
-    .eq('class_id', params.classId)
-    .single();
-  if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
-
   const ext = extOf(file.name);
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]+/g, '_').slice(0, 120);
-  const objectKey = `${board.id}/${Date.now()}_${Math.random().toString(36).slice(2, 8)}_${safeName}`;
-
   const arrayBuf = await file.arrayBuffer();
   const bytes = Buffer.from(arrayBuf);
 
-  const { error: upErr } = await owner.supa.storage.from(BUCKET).upload(objectKey, bytes, {
-    contentType: mime,
-    cacheControl: '3600',
-    upsert: false,
-  });
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
-
-  const { data: pub } = owner.supa.storage.from(BUCKET).getPublicUrl(objectKey);
-  const fileUrl = pub?.publicUrl;
-  if (!fileUrl) return NextResponse.json({ error: 'failed to resolve public url' }, { status: 500 });
+  let uploaded;
+  try {
+    uploaded = await fileluUpload(bytes, file.name || `upload.${ext || 'bin'}`, mime);
+  } catch (e: any) {
+    return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
+  }
 
   return NextResponse.json({
-    fileUrl,
-    filePath: objectKey,
-    fileName: file.name,
-    fileMimeType: mime,
-    fileSizeBytes: file.size,
+    fileCode: uploaded.fileCode,
+    fileUrl: fileluShareUrl(uploaded.fileCode),
+    fileName: uploaded.fileName,
+    fileMimeType: uploaded.mimeType,
+    fileSizeBytes: uploaded.sizeBytes,
     fileExtension: ext || null,
   });
 }
