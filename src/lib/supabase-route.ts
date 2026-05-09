@@ -1,12 +1,44 @@
 /**
  * Supabase server client + auth/ownership helpers for API routes.
- * Mirrors the pattern already used in src/app/api/classes/[id]/invite/route.ts.
+ *
+ * IMPORTANT: This app stores the Supabase session in the browser's
+ * localStorage (storageKey 'qm-auth' in src/lib/supabase.ts) and NOT in
+ * cookies. Therefore the standard @supabase/ssr cookie pattern doesn't
+ * find a session. To authenticate API requests we read the access_token
+ * from an `Authorization: Bearer <token>` header that the client sends.
+ *
+ * Falls back to cookie-based auth when no header is present, for any
+ * routes that may rely on it (e.g. existing /api/classes/[id]/invite).
  */
 import { createServerClient } from '@supabase/ssr';
+import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 
-export function getRouteSupabase() {
+function bearerFromReq(req?: NextRequest | Request | null): string | null {
+  if (!req) return null;
+  const h = req.headers.get('authorization') || req.headers.get('Authorization');
+  if (!h) return null;
+  const m = /^Bearer\s+(.+)$/i.exec(h.trim());
+  return m ? m[1] : null;
+}
+
+/** Build a Supabase client for use in route handlers.
+ *  If a Bearer token is present on the request, the client is bound to
+ *  that user (RLS will see auth.uid()). Otherwise we fall back to the
+ *  cookie-based @supabase/ssr client. */
+export function getRouteSupabase(req?: NextRequest | Request | null) {
+  const token = bearerFromReq(req);
+  if (token) {
+    return createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+      {
+        auth: { persistSession: false, autoRefreshToken: false },
+        global: { headers: { Authorization: `Bearer ${token}` } },
+      },
+    );
+  }
   const cookieStore = cookies();
   return createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -17,12 +49,12 @@ export function getRouteSupabase() {
         set() {},
         remove() {},
       },
-    }
+    },
   );
 }
 
-export async function requireUser() {
-  const supa = getRouteSupabase();
+export async function requireUser(req?: NextRequest | Request | null) {
+  const supa = getRouteSupabase(req);
   const { data } = await supa.auth.getUser();
   const user = data.user;
   if (!user) {
@@ -32,8 +64,8 @@ export async function requireUser() {
 }
 
 /** Verify the current user owns the class (educator). */
-export async function requireClassOwner(classId: string) {
-  const auth = await requireUser();
+export async function requireClassOwner(req: NextRequest | Request | null, classId: string) {
+  const auth = await requireUser(req);
   if (auth.response) return { ...auth, klass: null as null };
   const { data: klass } = await auth.supa
     .from('qm_classes')
@@ -51,8 +83,8 @@ export async function requireClassOwner(classId: string) {
 }
 
 /** Verify the current user is owner OR enrolled member of the class (read access). */
-export async function requireClassMember(classId: string) {
-  const auth = await requireUser();
+export async function requireClassMember(req: NextRequest | Request | null, classId: string) {
+  const auth = await requireUser(req);
   if (auth.response) return { ...auth, klass: null as null };
   const { data: klass } = await auth.supa
     .from('qm_classes')

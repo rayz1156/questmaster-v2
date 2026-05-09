@@ -4,8 +4,8 @@ import { requireClassMember, requireClassOwner } from '@/lib/supabase-route';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function GET(_req: NextRequest, { params }: { params: { classId: string } }) {
-  const access = await requireClassMember(params.classId);
+export async function GET(req: NextRequest, { params }: { params: { classId: string } }) {
+  const access = await requireClassMember(req, params.classId);
   if (access.response) return access.response;
   const supa = access.supa;
   const classId = params.classId;
@@ -17,7 +17,7 @@ export async function GET(_req: NextRequest, { params }: { params: { classId: st
     .maybeSingle();
 
   if (!board) {
-    const owner = await requireClassOwner(classId);
+    const owner = await requireClassOwner(req, classId);
     if (owner.response) return NextResponse.json({ board: null, columns: [] });
     const { data: created, error: cErr } = await owner.supa
       .from('qm_learning_boards')
@@ -49,7 +49,7 @@ export async function GET(_req: NextRequest, { params }: { params: { classId: st
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(params.classId);
+  const owner = await requireClassOwner(req, params.classId);
   if (owner.response) return owner.response;
   const body = await req.json().catch(() => ({}));
   const updates: any = {};

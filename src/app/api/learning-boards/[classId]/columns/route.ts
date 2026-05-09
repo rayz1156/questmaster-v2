@@ -4,7 +4,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(params.classId);
+  const owner = await requireClassOwner(req, params.classId);
   if (owner.response) return owner.response;
   const { title } = await req.json().catch(() => ({}));
   if (!title || typeof title !== 'string') return NextResponse.json({ error: 'title required' }, { status: 400 });

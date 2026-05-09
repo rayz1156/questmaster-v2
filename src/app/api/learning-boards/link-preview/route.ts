@@ -19,7 +19,7 @@ function pick(html: string, attr: string, key: string): string | null {
 }
 
 export async function GET(req: NextRequest) {
-  const auth = await requireUser();
+  const auth = await requireUser(req);
   if (auth.response) return auth.response;
   const url = req.nextUrl.searchParams.get('url');
   if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 });

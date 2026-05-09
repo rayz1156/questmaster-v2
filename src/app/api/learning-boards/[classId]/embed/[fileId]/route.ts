@@ -10,8 +10,8 @@ export const dynamic = 'force-dynamic';
  * Caller verifies class membership; we never reveal Adilo credentials.
  * The embedUrl is rendered inside our own iframe — students never see this URL.
  */
-export async function GET(_req: NextRequest, { params }: { params: { classId: string; fileId: string } }) {
-  const access = await requireClassMember(params.classId);
+export async function GET(req: NextRequest, { params }: { params: { classId: string; fileId: string } }) {
+  const access = await requireClassMember(req, params.classId);
   if (access.response) return access.response;
   // Confirm this fileId actually belongs to this class's board (don't allow
   // a member of class A to fetch embed URLs for class B's videos).

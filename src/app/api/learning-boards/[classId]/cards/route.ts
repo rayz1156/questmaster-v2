@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
  * by the upload/complete route which has the Adilo file metadata.
  */
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(params.classId);
+  const owner = await requireClassOwner(req, params.classId);
   if (owner.response) return owner.response;
   const body = await req.json().catch(() => ({}));
   const { columnId, cardType } = body;

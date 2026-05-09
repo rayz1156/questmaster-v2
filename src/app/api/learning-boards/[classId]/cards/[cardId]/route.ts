@@ -4,7 +4,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: NextRequest, { params }: { params: { classId: string; cardId: string } }) {
-  const owner = await requireClassOwner(params.classId);
+  const owner = await requireClassOwner(req, params.classId);
   if (owner.response) return owner.response;
   const body = await req.json().catch(() => ({}));
   const updates: any = {};
@@ -24,8 +24,8 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
   return NextResponse.json({ card: data });
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { classId: string; cardId: string } }) {
-  const owner = await requireClassOwner(params.classId);
+export async function DELETE(req: NextRequest, { params }: { params: { classId: string; cardId: string } }) {
+  const owner = await requireClassOwner(req, params.classId);
   if (owner.response) return owner.response;
   // Note: Adilo file is intentionally NOT deleted here — the educator may
   // re-link or recover. Cleanup is a Phase 2 admin operation.

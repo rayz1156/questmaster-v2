@@ -13,7 +13,7 @@ export const maxDuration = 30;
  * Response: { uploadId, signedUrl, partNumber: 1, projectId }
  */
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(params.classId);
+  const owner = await requireClassOwner(req, params.classId);
   if (owner.response) return owner.response;
   const body = await req.json().catch(() => ({}));
   const { columnId, filename, mimeType, sizeBytes, durationSeconds } = body;

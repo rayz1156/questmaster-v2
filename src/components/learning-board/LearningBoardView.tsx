@@ -2,6 +2,18 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { formatDuration, hostnameFromUrl, type LearningCard, type LearningCardType, type LearningColumn } from '@/lib/learning-boards';
 import VideoLightbox from './VideoLightbox';
+import { supabase } from '@/lib/supabase';
+
+
+/** Wrap fetch() to attach the Supabase access token from localStorage so
+ *  our /api/learning-boards/* routes can authenticate the request. */
+async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const headers = new Headers(init.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
 
 type Snapshot = {
   board: { id: string; title: string; description: string | null; adilo_project_id: string | null } | null;
@@ -19,7 +31,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   const refresh = useCallback(async () => {
     setLoading(true);
     try {
-      const r = await fetch(`/api/learning-boards/${classId}`);
+      const r = await authedFetch(`/api/learning-boards/${classId}`);
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Failed to load');
       setSnap(data);
@@ -111,7 +123,7 @@ function ColumnCard({
   const renameColumn = async () => {
     const next = window.prompt('Rename column', column.title);
     if (!next || next === column.title) return;
-    await fetch(`/api/learning-boards/${classId}/columns/${column.id}`, {
+    await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title: next }),
@@ -121,7 +133,7 @@ function ColumnCard({
   };
   const deleteColumn = async () => {
     if (!window.confirm(`Delete column "${column.title}" and all its cards? This cannot be undone.`)) return;
-    await fetch(`/api/learning-boards/${classId}/columns/${column.id}`, { method: 'DELETE' });
+    await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, { method: 'DELETE' });
     onToggleMenu(false);
     onChanged();
   };
@@ -182,7 +194,7 @@ function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: (
     if (!title) return;
     setBusy(true);
     try {
-      await fetch(`/api/learning-boards/${classId}/columns`, {
+      await authedFetch(`/api/learning-boards/${classId}/columns`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title }),
@@ -216,7 +228,7 @@ function CardRenderer({
 
   const handleDelete = async () => {
     if (!window.confirm('Delete this card?')) return;
-    await fetch(`/api/learning-boards/${classId}/cards/${card.id}`, { method: 'DELETE' });
+    await authedFetch(`/api/learning-boards/${classId}/cards/${card.id}`, { method: 'DELETE' });
     onChanged();
   };
 
@@ -394,7 +406,7 @@ function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId
 
     let initData: any;
     try {
-      const initRes = await fetch(`/api/learning-boards/${classId}/upload/start`, {
+      const initRes = await authedFetch(`/api/learning-boards/${classId}/upload/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -437,7 +449,7 @@ function VideoForm({ classId, columnId, onCreated }: { classId: string; columnId
 
     setStage('finalizing');
     try {
-      const r = await fetch(`/api/learning-boards/${classId}/upload/complete`, {
+      const r = await authedFetch(`/api/learning-boards/${classId}/upload/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -507,9 +519,9 @@ function LinkForm({ classId, columnId, onCreated }: { classId: string; columnId:
     if (!url) return;
     setBusy(true); setErr(null);
     try {
-      const pres = await fetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(url)}`);
+      const pres = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(url)}`);
       const meta = await pres.json();
-      const r = await fetch(`/api/learning-boards/${classId}/cards`, {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -556,7 +568,7 @@ function ImageForm({ classId, columnId, onCreated }: { classId: string; columnId
   const submit = async () => {
     setBusy(true); setErr(null);
     try {
-      const r = await fetch(`/api/learning-boards/${classId}/cards`, {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ columnId, cardType: 'image', imageUrl, title: title || null }),
@@ -597,7 +609,7 @@ function TextForm({ classId, columnId, onCreated }: { classId: string; columnId:
     if (!title && !description) { setErr('Add a title or description'); return; }
     setBusy(true); setErr(null);
     try {
-      const r = await fetch(`/api/learning-boards/${classId}/cards`, {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ columnId, cardType: 'text', title: title || null, description: description || null }),
