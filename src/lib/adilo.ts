@@ -111,25 +111,42 @@ export async function startAdiloUpload(input: {
   }
   const json = await res.json();
   const data = json.payload ?? json.data ?? json;
-  return {
-    uploadId: data.uploadId ?? data.upload_id,
-    key: data.key,
-    fileId: data.fileId ?? data.file_id,
-  };
+  const uploadId = data.uploadId ?? data.upload_id ?? data.uploadID;
+  const key = data.key ?? data.upload_key ?? data.objectKey ?? data.object_key ?? data.path;
+  const fileId = data.fileId ?? data.file_id ?? data.id;
+  if (!uploadId || !key) {
+    // eslint-disable-next-line no-console
+    console.error('[adilo] upload/start returned incomplete data. Raw:', JSON.stringify(json));
+    throw new Error('Adilo upload/start missing uploadId or key: ' + JSON.stringify(json).slice(0, 400));
+  }
+  return { uploadId, key, fileId };
 }
 
-export async function getAdiloSignedUrl(uploadId: string, partNumber = 1): Promise<string> {
-  const res = await fetch(
-    `${ADILO_BASE}/v1/files/upload/get-signed-url/${uploadId}/${partNumber}`,
-    { method: 'GET', headers: adiloHeaders() }
-  );
+export async function getAdiloSignedUrl(uploadId: string, key: string, partNumber = 1): Promise<string> {
+  const body = {
+    key,
+    upload_id: uploadId,
+    uploadId,
+    part_number: partNumber,
+    partNumber,
+  };
+  const res = await fetch(`${ADILO_BASE}/v1/files/upload/get-signed-url`, {
+    method: 'POST',
+    headers: adiloHeaders(),
+    body: JSON.stringify(body),
+  });
   if (!res.ok) {
     const t = await res.text();
     throw new Error(`Adilo get-signed-url failed: ${res.status} ${t}`);
   }
   const json = await res.json();
-  const url = json.url ?? json.signedUrl ?? json.data?.url ?? json.data?.signedUrl;
-  if (!url) throw new Error('Adilo signed URL missing in response');
+  const data = json.payload ?? json.data ?? json;
+  const url = data.url ?? data.signedUrl ?? data.signed_url ?? data.presignedUrl ?? data.presigned_url;
+  if (!url) {
+    // eslint-disable-next-line no-console
+    console.error('[adilo] get-signed-url returned no url. Raw:', JSON.stringify(json));
+    throw new Error('Adilo signed URL missing in response: ' + JSON.stringify(json).slice(0, 400));
+  }
   return url;
 }
 

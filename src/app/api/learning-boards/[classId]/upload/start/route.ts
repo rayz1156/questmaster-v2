@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       sizeBytes,
       durationSeconds,
     });
-    const signedUrl = await getAdiloSignedUrl(start.uploadId, 1);
+    const signedUrl = await getAdiloSignedUrl(start.uploadId, start.key, 1);
     return NextResponse.json({
       uploadId: start.uploadId,
       key: start.key,
