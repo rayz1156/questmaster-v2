@@ -210,10 +210,15 @@ export async function getAdiloFile(fileId: string): Promise<{
   if (!res.ok) throw new Error(`Adilo getFile failed: ${res.status}`);
   const json = await res.json();
   const data = json.payload ?? json.data ?? json;
+  // Adilo can deliver thumbnail under many names — also try posters/snapshots arrays.
+  const thumbCandidate = data.thumbnail ?? data.thumbnailUrl ?? data.thumbnail_url ?? data.thumb ?? data.thumb_url ?? data.poster ?? data.poster_url ?? data.image ?? data.image_url ?? (Array.isArray(data.thumbnails) && data.thumbnails[0]?.url) ?? (Array.isArray(data.posters) && data.posters[0]?.url) ?? (Array.isArray(data.snapshots) && data.snapshots[0]?.url) ?? null;
+  if (!thumbCandidate) {
+    console.warn('[adilo] getFile: no thumbnail field. Response keys:', Object.keys(data || {}).join(','), '| raw:', JSON.stringify(json).slice(0, 600));
+  }
   return {
     id: data.id ?? fileId,
-    thumbnailUrl: data.thumbnail ?? data.thumbnailUrl,
-    durationSeconds: data.duration ?? data.durationSeconds,
+    thumbnailUrl: thumbCandidate || undefined,
+    durationSeconds: data.duration ?? data.durationSeconds ?? data.duration_seconds,
     status: data.status,
     embedUrl: data.embedUrl ?? data.embed_url ?? data.share?.embedUrl,
   };
