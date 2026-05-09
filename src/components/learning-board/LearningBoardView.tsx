@@ -348,7 +348,7 @@ function AddCardModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [tab, setTab] = useState<LearningCardType>('video');
+  const [tab, setTab] = useState<LearningCardType>('link');
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
@@ -360,7 +360,7 @@ function AddCardModal({
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
         <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
-          {(['video', 'link', 'image', 'text'] as LearningCardType[]).map((t) => (
+          {(['link', 'text', 'image', 'video'] as LearningCardType[]).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
