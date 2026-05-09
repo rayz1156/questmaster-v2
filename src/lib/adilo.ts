@@ -58,7 +58,13 @@ export async function createAdiloProject(name: string): Promise<AdiloProject> {
   }
   const json = await res.json();
   const p = json.data ?? json;
-  return { id: p.id ?? p.project_id, name: p.name ?? p.title ?? name };
+  const projectId = p.project_id ?? p.projectId ?? p.id ?? p._id ?? p.pid ?? p.slug ?? p.uuid ?? p.uid;
+  if (!projectId) {
+    // eslint-disable-next-line no-console
+    console.error('[adilo] createProject returned no id. Raw:', JSON.stringify(json));
+    throw new Error('Adilo createProject: no project id in response: ' + JSON.stringify(json).slice(0, 400));
+  }
+  return { id: String(projectId), name: p.name ?? p.title ?? name };
 }
 
 export type AdiloUploadStart = {

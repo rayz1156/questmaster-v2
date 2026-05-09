@@ -32,7 +32,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .single();
   if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
 
-  let projectId = board.adilo_project_id;
+  let projectId = (board.adilo_project_id || '').trim() || null;
   if (!projectId) {
     try {
       const proj = await createAdiloProject(`Cendekia · ${owner.klass!.name}`);
