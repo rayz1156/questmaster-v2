@@ -135,7 +135,14 @@ export default function ClassDetail() {
         </div>
 
         {/* Tab pills */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-2">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
+          <Link href={`/educator/classes/${klass.id}/board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition text-sm relative">
+            <LinkIcon className="w-5 h-5"/><span className="font-medium">Intro Board</span>
+            <span className="absolute left-3 right-3 -bottom-px h-0.5 bg-indigo-600 rounded-full"/>
+          </Link>
+          <Link href={`/educator/classes/${klass.id}/learning-board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
+            <GraduationCap className="w-5 h-5"/><span className="font-medium">Learning Board</span>
+          </Link>
           <Link href={`/educator/activities?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
             <ListChecks className="w-5 h-5"/><span>Activities</span>
           </Link>
@@ -145,13 +152,6 @@ export default function ClassDetail() {
           <Link href={`/educator/rankings?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
             <BarChart3 className="w-5 h-5"/><span>Rankings</span>
           </Link>
-          <Link href={`/educator/classes/${klass.id}/board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition text-sm relative">
-            <LinkIcon className="w-5 h-5"/><span className="font-medium">Intro Board</span>
-            <span className="absolute left-3 right-3 -bottom-px h-0.5 bg-indigo-600 rounded-full"/>
-          </Link>
-              <Link href={`/educator/classes/${klass.id}/learning-board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition text-sm">
-                <LinkIcon className="w-5 h-5"/><span className="font-medium">Learning Board</span>
-              </Link>
         </div>
       </div>
 
