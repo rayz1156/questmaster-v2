@@ -112,3 +112,15 @@ export async function requireClassMember(req: NextRequest | Request | null, clas
   }
   return { ...auth, klass };
 }
+
+/** Service-role client. Bypasses RLS. Use ONLY for trusted server-side maintenance work
+ *  (e.g. enriching video thumbnails after Adilo finishes encoding). NEVER expose to the browser. */
+export function getServiceSupabase() {
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!key) throw new Error('SUPABASE_SERVICE_ROLE_KEY is not configured');
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    key,
+    { auth: { persistSession: false, autoRefreshToken: false } },
+  );
+}

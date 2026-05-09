@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireClassMember, requireClassOwner } from '@/lib/supabase-route';
+import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 import { getAdiloFile } from '@/lib/adilo';
 
 export const runtime = 'nodejs';
@@ -18,7 +18,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
     .maybeSingle();
 
   if (!board) {
-    const owner = await requireClassOwner(req, classId);
+    const owner = await requireClassMember(req, classId);
     if (owner.response) return NextResponse.json({ board: null, columns: [] });
     const { data: created, error: cErr } = await owner.supa
       .from('qm_learning_boards')
@@ -48,6 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
   const cardsArr: any[] = (cards || []) as any[];
   const needsThumb = cardsArr.filter((c) => c.card_type === 'video' && !c.video_thumbnail_url && c.adilo_file_id);
   if (needsThumb.length) {
+    const admin = getServiceSupabase();
     await Promise.all(needsThumb.map(async (c) => {
       try {
         const info = await getAdiloFile(c.adilo_file_id);
@@ -55,7 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
         if (info.thumbnailUrl) updates.video_thumbnail_url = info.thumbnailUrl;
         if (typeof info.durationSeconds === 'number' && !c.video_duration_seconds) updates.video_duration_seconds = info.durationSeconds;
         if (Object.keys(updates).length) {
-          await supa.from('qm_learning_cards').update(updates).eq('id', c.id);
+          await admin.from('qm_learning_cards').update(updates).eq('id', c.id);
           Object.assign(c, updates);
         }
       } catch { /* ignore - Adilo may still be processing */ }
@@ -70,7 +71,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(req, params.classId);
+  const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
   const body = await req.json().catch(() => ({}));
   const updates: any = {};

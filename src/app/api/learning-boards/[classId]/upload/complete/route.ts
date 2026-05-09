@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireClassOwner } from '@/lib/supabase-route';
+import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 import { completeAdiloUpload, getAdiloFile } from '@/lib/adilo';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,8 +11,9 @@ export const maxDuration = 30;
  *         durationSeconds?, title?, description? }
  */
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(req, params.classId);
+  const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
+  const admin = getServiceSupabase();
   const body = await req.json().catch(() => ({}));
   const { columnId, uploadId, key, eTag, projectId, filename, mimeType, sizeBytes, durationSeconds, title, description, insertIndex } = body;
   if (!columnId || !uploadId || !key || !eTag || !projectId || !filename || !mimeType || !sizeBytes) {
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     for (let i = cardsList.length - 1; i >= 0; i--) {
       const c = cardsList[i];
       if (c.position >= insertIndex) {
-        await owner.supa.from('qm_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
+        await admin.from('qm_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
       }
     }
   }

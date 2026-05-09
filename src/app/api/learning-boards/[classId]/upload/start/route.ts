@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireClassOwner } from '@/lib/supabase-route';
+import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 import { createAdiloProject, getAdiloSignedUrl, startAdiloUpload } from '@/lib/adilo';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,8 +13,9 @@ export const maxDuration = 30;
  * Response: { uploadId, signedUrl, partNumber: 1, projectId }
  */
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(req, params.classId);
+  const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
+  const admin = getServiceSupabase();
   const body = await req.json().catch(() => ({}));
   const { columnId, filename, mimeType, sizeBytes, durationSeconds } = body;
   if (!columnId || !filename || !mimeType || !sizeBytes) {

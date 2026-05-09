@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireClassOwner } from '@/lib/supabase-route';
+import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -10,8 +10,9 @@ export const dynamic = 'force-dynamic';
  * by the upload/complete route which has the Adilo file metadata.
  */
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(req, params.classId);
+  const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
+  const admin = getServiceSupabase();
   const body = await req.json().catch(() => ({}));
   const { columnId, cardType } = body;
   if (!columnId || !cardType) return NextResponse.json({ error: 'columnId and cardType required' }, { status: 400 });
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     return NextResponse.json({ error: 'Use upload/complete for video cards' }, { status: 400 });
   }
 
-  const { data: col } = await owner.supa.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
+  const { data: col } = await admin.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
   if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
 
   const { data: existing } = await owner.supa
@@ -37,7 +38,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     for (let i = cardsList.length - 1; i >= 0; i--) {
       const c = cardsList[i];
       if (c.position >= rawInsert) {
-        await owner.supa.from('qm_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
+        await admin.from('qm_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
       }
     }
   }
@@ -77,7 +78,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   }
   // 'text' card just uses title + description.
 
-  const { data, error } = await owner.supa.from('qm_learning_cards').insert(insert).select('*').single();
+  const { data, error } = await admin.from('qm_learning_cards').insert(insert).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ card: data });
 }

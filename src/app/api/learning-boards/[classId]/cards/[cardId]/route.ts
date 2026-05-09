@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireClassOwner } from '@/lib/supabase-route';
+import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function PATCH(req: NextRequest, { params }: { params: { classId: string; cardId: string } }) {
-  const owner = await requireClassOwner(req, params.classId);
+  const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
+  const admin = getServiceSupabase();
   const body = await req.json().catch(() => ({}));
   const updates: any = {};
   for (const k of ['title', 'description', 'link_url', 'link_title', 'link_description', 'link_image_url', 'link_site_name', 'link_favicon_url', 'image_url']) {
@@ -25,11 +26,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
 }
 
 export async function DELETE(req: NextRequest, { params }: { params: { classId: string; cardId: string } }) {
-  const owner = await requireClassOwner(req, params.classId);
+  const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
+  const admin = getServiceSupabase();
   // Note: Adilo file is intentionally NOT deleted here — the educator may
   // re-link or recover. Cleanup is a Phase 2 admin operation.
-  const { error } = await owner.supa.from('qm_learning_cards').delete().eq('id', params.cardId);
+  const { error } = await admin.from('qm_learning_cards').delete().eq('id', params.cardId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireClassOwner } from '@/lib/supabase-route';
+import { requireClassMember } from '@/lib/supabase-route';
 import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
 
 export const runtime = 'nodejs';
@@ -36,7 +36,7 @@ function extOf(name: string): string {
 }
 
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
-  const owner = await requireClassOwner(req, params.classId);
+  const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
 
   const form = await req.formData().catch(() => null);
