@@ -19,7 +19,6 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   if (!['link', 'image', 'text', 'file'].includes(cardType)) {
     return NextResponse.json({ error: 'Use upload/complete for video cards' }, { status: 400 });
   }
-
   const { data: col } = await admin.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
   if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
 

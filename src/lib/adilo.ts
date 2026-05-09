@@ -209,8 +209,18 @@ export async function fetchAdiloWatchThumbnail(fileId: string): Promise<string |
     });
     if (!res.ok) return undefined;
     const html = await res.text();
-    const m = html.match(/https?:\/\/stream\.adilo\.com\/[^"'\s)]+\.(?:jpg|jpeg|png|webp)/i);
-    return m ? m[0] : undefined;
+    // Adilo watch page embeds thumbnail URLs as escaped JSON: stream.adilo.com\/adilo-encoding\/<token>\/<id>\/thumb\/720_3.jpg
+    // Match both escaped (with \/) and unescaped (with /) forms.
+    const candidates: string[] = [];
+    const re = /stream\.adilo\.com(?:\\\/|\/)[^"'\s\\<>]+?\.(?:jpg|jpeg|png|webp)/gi;
+    let mm: RegExpExecArray | null;
+    while ((mm = re.exec(html)) !== null) {
+      const url = 'https://' + mm[0].replace(/\\\//g, '/');
+      candidates.push(url);
+    }
+    if (candidates.length === 0) return undefined;
+    // Prefer the larger thumbnail (skip 150x150 tiny ones).
+    return candidates.find((u) => !/[-_]150x150/.test(u)) ?? candidates[0];
   } catch {
     return undefined;
   }
