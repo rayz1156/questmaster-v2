@@ -114,7 +114,11 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
             isEditor={isEditor}
             onPlayVideo={(fileId, title) => setPlayingFileId({ fileId, title })}
             onOpenImage={(src, title) => setOpenImage({ src, title })}
-            onAddCard={(insertIndex?: number | null) => setAddCardTarget({ columnId: col.id, insertIndex: typeof insertIndex === 'number' ? insertIndex : null })}
+            onAddCard={async (insertIndex?: number | null) => {
+                  // Refresh first to ensure column still exists (avoid 'Column not found' from stale UI)
+                  try { await refresh(); } catch {}
+                  setAddCardTarget({ columnId: col.id, insertIndex: typeof insertIndex === 'number' ? insertIndex : null });
+                }}
             onChanged={refresh}
             menuOpen={openMenuColumnId === col.id}
             onToggleMenu={(open) => setOpenMenuColumnId(open ? col.id : null)}

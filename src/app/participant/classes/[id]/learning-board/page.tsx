@@ -20,7 +20,7 @@ export default function ParticipantLearningBoardPage() {
     <Shell tabs={tabs}>
       <div className="bg-gray-50 min-h-screen">
         <div className="px-4 md:px-6 py-4 flex items-center gap-3 border-b border-gray-200">
-          <Link href={`/participant/classes/${classId}`} className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1 text-sm">
+          <Link href={`/participant/home`} className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1 text-sm">
             <ArrowLeft className="w-4 h-4" /> Back
           </Link>
           <h1 className="text-xl font-semibold ml-2">Learning Board</h1>
