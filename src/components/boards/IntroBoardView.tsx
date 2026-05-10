@@ -248,13 +248,29 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
     if (!previewUrl && !file) { setErr("Please choose an image."); return; }
     setBusy(true);
     try {
+      // 1) If a NEW file was chosen, upload it to FileLu first via our intro upload route.
+      let imageUrl = existing?.image_url ?? undefined;
+      let imagePath = existing?.image_path ?? undefined;
+      if (file) {
+        const fd = new FormData();
+        fd.append('file', file);
+        const r = await fetch(`/api/intro-boards/${boardId}/upload-image`, { method: 'POST', body: fd, credentials: 'include' });
+        if (!r.ok) {
+          const j = await r.json().catch(() => ({}));
+          throw new Error(j?.error || `Upload failed (${r.status})`);
+        }
+        const j = await r.json();
+        imageUrl = j.url as string;
+        imagePath = j.fileCode as string; // store the FileLu file_code in image_path so we can stream it later
+      }
+      // 2) Upsert the intro_post row WITHOUT re-uploading (we already pushed to FileLu).
       await createOrUpdateIntroPost({
         boardId,
         displayName: name,
         description: desc,
-        imageFile: file || undefined,
-        existingPath: existing?.image_path ?? undefined,
-        existingUrl: existing?.image_url ?? undefined,
+        imageFile: undefined,
+        existingPath: imagePath,
+        existingUrl: imageUrl,
       });
       onSaved();
     } catch (e: any) { setErr(e.message || String(e)); }

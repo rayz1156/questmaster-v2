@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
-import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
+import { fileluUpload } from '@/lib/filelu';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   } catch (e: any) {
     return NextResponse.json({ error: `Upload failed: ${e?.message || e}` }, { status: 502 });
   }
-  const qrImageUrl = fileluShareUrl(uploaded.fileCode);
+  const qrImageUrl = `/api/learning-boards/${params.classId}/file-redirect/${uploaded.fileCode}`;
 
   // Compute next position with optional insertIndex shift (mirrors cards/route.ts)
   const { data: existingCards } = await admin
