@@ -440,6 +440,13 @@ export async function updateMyBio(bio: string): Promise<void> {
   const { error } = await supabase.from('qm_profiles').update({ bio: value, bio_updated_at: new Date().toISOString() }).eq('id', id);
   if (error) throw error;
 }
+export async function updateMyIntroDisplayName(name: string): Promise<void> {
+  const id = await uid(); if (!id) throw new Error('not authed');
+  const trimmed = (name || '').trim();
+  const value = trimmed.length === 0 ? null : trimmed.slice(0, 80);
+  const { error } = await supabase.from('qm_profiles').update({ intro_display_name: value }).eq('id', id);
+  if (error) throw error;
+}
 
 
 export async function softDeleteMyAccount(): Promise<void> {

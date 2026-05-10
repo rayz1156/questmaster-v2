@@ -5,6 +5,7 @@ import { Home, Compass, Trophy, User as UserIcon, LogOut, Save, Users, Trash2, A
 import Shell from "@/components/Shell";
 import { useSession, signOut } from "@/lib/session";
 import { getMyProfile, updateMyDisplayName, updateMyBio, updateMyEmail, updateMyPassword, softDeleteMyAccount, type Profile } from "@/lib/data";
+import ProfileIntroEditor from "@/components/ProfileIntroEditor";
 import { supabase } from "@/lib/supabase";
 const tabs = [
   { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
@@ -66,6 +67,7 @@ export default function Page() {
           <button onClick={saveBio} disabled={bioSaving} className="px-3 py-2 rounded-xl bg-black text-white text-sm flex items-center gap-1 disabled:opacity-50"><Save className="w-4 h-4"/>{bioSaving?"Saving...":"Save bio"}</button>
         </div>
       </div>
+      <ProfileIntroEditor />
       <div className="card mb-3">
         <label className="text-xs text-gray-500">Email</label>
         <input type="email" className="w-full border rounded-lg px-3 py-2 mt-1" value={email} onChange={e=>setEmail(e.target.value)} />

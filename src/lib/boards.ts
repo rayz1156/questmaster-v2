@@ -51,6 +51,14 @@ export interface IntroPost {
   author_bio?: string | null;
   author_display_name?: string | null;
   author_avatar_url?: string | null;
+  // Intro card overrides from profile (fully replace the post's media when set)
+  author_intro_display_name?: string | null;
+  author_intro_media_type?: 'image' | 'video' | null;
+  author_intro_image_file_code?: string | null;
+  author_intro_video_adilo_file_id?: string | null;
+  author_intro_video_adilo_project_id?: string | null;
+  author_intro_video_thumbnail_url?: string | null;
+  author_intro_video_duration_seconds?: number | null;
 }
 
 export interface GroupSubmission {
@@ -133,10 +141,22 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
   if (authorIds.length === 0) return posts;
   const { data: profs } = await supabase
     .from('qm_profiles')
-    .select('id, display_name, bio, avatar_url')
+    .select('id, display_name, bio, avatar_url, intro_display_name, intro_media_type, intro_image_file_code, intro_video_adilo_file_id, intro_video_adilo_project_id, intro_video_thumbnail_url, intro_video_duration_seconds')
     .in('id', authorIds);
-  const byId = new Map<string, { display_name: string | null; bio: string | null; avatar_url: string | null }>();
-  (profs || []).forEach((r: any) => byId.set(r.id, { display_name: r.display_name ?? null, bio: r.bio ?? null, avatar_url: r.avatar_url ?? null }));
+  type ProfRow = { display_name: string | null; bio: string | null; avatar_url: string | null; intro_display_name: string | null; intro_media_type: 'image' | 'video' | null; intro_image_file_code: string | null; intro_video_adilo_file_id: string | null; intro_video_adilo_project_id: string | null; intro_video_thumbnail_url: string | null; intro_video_duration_seconds: number | null; };
+  const byId = new Map<string, ProfRow>();
+  (profs || []).forEach((r: any) => byId.set(r.id, {
+    display_name: r.display_name ?? null,
+    bio: r.bio ?? null,
+    avatar_url: r.avatar_url ?? null,
+    intro_display_name: r.intro_display_name ?? null,
+    intro_media_type: r.intro_media_type ?? null,
+    intro_image_file_code: r.intro_image_file_code ?? null,
+    intro_video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
+    intro_video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
+    intro_video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
+    intro_video_duration_seconds: r.intro_video_duration_seconds ?? null,
+  }));
   return posts.map(p => {
     const prof = byId.get(p.author_id);
     return {
@@ -144,6 +164,13 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
       author_bio: prof?.bio ?? null,
       author_display_name: prof?.display_name ?? null,
       author_avatar_url: prof?.avatar_url ?? null,
+      author_intro_display_name: prof?.intro_display_name ?? null,
+      author_intro_media_type: prof?.intro_media_type ?? null,
+      author_intro_image_file_code: prof?.intro_image_file_code ?? null,
+      author_intro_video_adilo_file_id: prof?.intro_video_adilo_file_id ?? null,
+      author_intro_video_adilo_project_id: prof?.intro_video_adilo_project_id ?? null,
+      author_intro_video_thumbnail_url: prof?.intro_video_thumbnail_url ?? null,
+      author_intro_video_duration_seconds: prof?.intro_video_duration_seconds ?? null,
     };
   });
 }

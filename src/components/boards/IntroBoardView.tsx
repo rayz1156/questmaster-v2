@@ -30,7 +30,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
   const [showModal, setShowModal] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [openImage, setOpenImage] = useState<{ src: string; title: string | null } | null>(null);
-  const [playingFile, setPlayingFile] = useState<{ fileId: string; title: string | null } | null>(null);
+  const [playingFile, setPlayingFile] = useState<{ fileId: string; title: string | null; scope?: 'board' | 'profile' } | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -82,17 +82,32 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
 
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
         {posts.map(p => {
-          const isVideo = (p as any).media_type === 'video';
-          const thumb = isVideo ? ((p as any).video_thumbnail_url || null) : p.image_url;
+          // Profile intro media (set via /profile) wins over the per-post media.
+          const profMediaType = (p as any).author_intro_media_type as ("image"|"video"|null);
+          const profImageCode = (p as any).author_intro_image_file_code as (string|null);
+          const profVideoFileId = (p as any).author_intro_video_adilo_file_id as (string|null);
+          const profVideoThumb = (p as any).author_intro_video_thumbnail_url as (string|null);
+          const useProfile = !!(profMediaType && (profImageCode || profVideoFileId));
+          const isVideo = useProfile ? profMediaType === "video" : (p as any).media_type === "video";
+          let thumb: string | null = null;
+          if (useProfile) {
+            if (profMediaType === "image" && profImageCode) thumb = `/api/profile/image/${profImageCode}`;
+            else if (profMediaType === "video") thumb = profVideoThumb || null;
+          } else {
+            thumb = isVideo ? ((p as any).video_thumbnail_url || null) : p.image_url;
+          }
+          if (!thumb) thumb = "/default-intro-avatar.svg";
+          const cardName = (p as any).author_intro_display_name || (p as any).author_display_name || p.display_name;
           return (
             <div key={p.id} className="group rounded-xl overflow-hidden border bg-white shadow-sm hover:shadow-md transition relative">
               <button
                 type="button"
                 onClick={() => {
-                  if (isVideo && (p as any).video_adilo_file_id) {
-                    setPlayingFile({ fileId: (p as any).video_adilo_file_id, title: p.display_name });
+                  const playFileId = useProfile && profMediaType === "video" ? profVideoFileId : (p as any).video_adilo_file_id;
+                  if (isVideo && playFileId) {
+                    setPlayingFile({ fileId: playFileId, title: cardName, scope: useProfile ? "profile" : "board" });
                   } else if (thumb) {
-                    setOpenImage({ src: thumb, title: p.display_name });
+                    setOpenImage({ src: thumb, title: cardName });
                   }
                 }}
                 className="block w-full aspect-square bg-gray-100 cursor-zoom-in"
@@ -100,7 +115,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
               >
                 {thumb ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
-                  <img src={thumb} alt={p.display_name} className="w-full h-full object-cover" />
+                  <img src={thumb} alt={cardName as string} className="w-full h-full object-cover" />
                 ) : (
                   <div className="w-full h-full flex items-center justify-center text-gray-400">
                     <VideoIcon className="w-10 h-10" />
@@ -115,7 +130,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
                 )}
               </button>
               <div className="p-3">
-                <div className="font-semibold text-sm truncate">{p.author_display_name || p.display_name}</div>
+                <div className="font-semibold text-sm truncate">{cardName}</div>
                 {(p.author_bio || p.description) && <div className="text-xs text-gray-600 mt-1 whitespace-pre-wrap break-words">{p.author_bio || p.description}</div>}
               </div>
               {(canManage || p.author_id === currentUserId) && (
@@ -152,8 +167,9 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
           boardId={board.id}
           fileId={playingFile.fileId}
           title={playingFile.title}
+          scope={playingFile.scope || "board"}
           onClose={() => setPlayingFile(null)}
-        />
+          />
       )}
     </div>
   );
@@ -161,14 +177,14 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
 
 // Lightbox for intro videos: same UI as Learning Board's VideoLightbox but using the
 // /api/intro-boards/[boardId]/embed/[fileId] endpoint.
-function IntroVideoLightbox({ boardId, fileId, title, onClose }: { boardId: string; fileId: string; title: string | null; onClose: () => void }) {
+function IntroVideoLightbox({ boardId, fileId, title, scope, onClose }: { boardId: string; fileId: string; title: string | null; scope?: "board" | "profile"; onClose: () => void }) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const r = await authedFetch(`/api/intro-boards/${boardId}/embed/${fileId}`);
+        const r = await authedFetch(scope === "profile" ? `/api/profile/embed/${fileId}` : `/api/intro-boards/${boardId}/embed/${fileId}`);
         const data = await r.json();
         if (!alive) return;
         if (!r.ok) setError(data.error || 'Failed to load video');
