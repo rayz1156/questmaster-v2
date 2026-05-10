@@ -481,6 +481,30 @@ function CardRenderer({
       );
     }
     if (card.card_type === 'link' && card.link_url) {
+      if ((card as any).is_qr && card.link_image_url) {
+        return (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => onOpenImage(card.link_image_url!, card.title || 'QR code')}
+              className="block w-full bg-white rounded-md overflow-hidden cursor-zoom-in group"
+              aria-label="View QR code full screen"
+            >
+              <div className="aspect-square bg-white p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={card.link_image_url} alt={card.title || 'QR code'} className="w-full h-full object-contain transition-opacity group-hover:opacity-90" />
+              </div>
+            </button>
+            <a
+              href={card.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute bottom-1 right-1 inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded-md hover:bg-indigo-500"
+              title="Open link"
+            >Open ↗</a>
+          </div>
+        );
+      }
       return (
         <a href={card.link_url} target="_blank" rel="noopener noreferrer" className="block">
           {card.link_image_url && (
@@ -611,7 +635,7 @@ function AddCardModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [tab, setTab] = useState<LearningCardType>('link');
+  const [tab, setTab] = useState<LearningCardType | 'qr'>('link');
   return (
     <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
       <div
@@ -623,7 +647,7 @@ function AddCardModal({
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
         <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
-          {(['link', 'text', 'file', 'image', 'video'] as LearningCardType[]).map((t) => (
+          {(['link', 'qr', 'text', 'file', 'image', 'video'] as Array<LearningCardType | 'qr'>).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -633,6 +657,7 @@ function AddCardModal({
         </div>
         {tab === 'video' && <VideoForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'link'  && <LinkForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+          {tab === 'qr'    && <QRForm    classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'file'  && <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
@@ -821,6 +846,48 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         disabled={!url || busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
       >{busy ? 'Adding…' : 'Add link'}</button>
+    </div>
+  );
+}
+
+function QRForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url.trim()) { setErr('Please enter a URL.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/qr-card`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId, url: url.trim(), title: title.trim() || null, insertIndex }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <input
+        value={url} onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://..."
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      <input
+        value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title (optional)"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      <p className="text-xs text-gray-500">A QR code image will be generated for this URL. Tapping the card opens the URL; the QR enlarges when clicked.</p>
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button
+        onClick={submit}
+        disabled={!url.trim() || busy}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
+      >{busy ? 'Creating QR...' : 'Add QR card'}</button>
     </div>
   );
 }

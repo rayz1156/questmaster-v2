@@ -34,13 +34,19 @@ export interface IntroPost {
   author_id: string;
   display_name: string;
   description: string | null;
-  image_url: string;
-  image_path: string;
+  image_url: string | null;
+  image_path: string | null;
   is_hidden: boolean;
   hidden_by: string | null;
   hidden_at: string | null;
   created_at: string;
   updated_at: string;
+  // Media-type extension (image OR video)
+  media_type?: 'image' | 'video';
+  video_adilo_file_id?: string | null;
+  video_adilo_project_id?: string | null;
+  video_thumbnail_url?: string | null;
+  video_duration_seconds?: number | null;
 }
 
 export interface GroupSubmission {
