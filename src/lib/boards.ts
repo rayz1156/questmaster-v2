@@ -47,6 +47,10 @@ export interface IntroPost {
   video_adilo_project_id?: string | null;
   video_thumbnail_url?: string | null;
   video_duration_seconds?: number | null;
+  // Live profile bio (joined from qm_profiles) - overrides description when present
+  author_bio?: string | null;
+  author_display_name?: string | null;
+  author_avatar_url?: string | null;
 }
 
 export interface GroupSubmission {
@@ -121,7 +125,27 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
     .eq('is_hidden', false)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data || []) as IntroPost[];
+  const posts = (data || []) as IntroPost[];
+  if (posts.length === 0) return posts;
+  // Fetch live author profiles (bio + avatar) so the intro board
+  // always reflects the user's current profile, not the stale per-post copy.
+  const authorIds = Array.from(new Set(posts.map(p => p.author_id))).filter(Boolean);
+  if (authorIds.length === 0) return posts;
+  const { data: profs } = await supabase
+    .from('qm_profiles')
+    .select('id, display_name, bio, avatar_url')
+    .in('id', authorIds);
+  const byId = new Map<string, { display_name: string | null; bio: string | null; avatar_url: string | null }>();
+  (profs || []).forEach((r: any) => byId.set(r.id, { display_name: r.display_name ?? null, bio: r.bio ?? null, avatar_url: r.avatar_url ?? null }));
+  return posts.map(p => {
+    const prof = byId.get(p.author_id);
+    return {
+      ...p,
+      author_bio: prof?.bio ?? null,
+      author_display_name: prof?.display_name ?? null,
+      author_avatar_url: prof?.avatar_url ?? null,
+    };
+  });
 }
 
 export async function getMyIntroPost(boardId: string): Promise<IntroPost | null> {

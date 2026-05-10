@@ -432,6 +432,14 @@ export async function updateMyPassword(password: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ password });
   if (error) throw error;
 }
+export async function updateMyBio(bio: string): Promise<void> {
+  const id = await uid(); if (!id) throw new Error('not authed');
+  const trimmed = (bio || '').trim();
+  if (trimmed.length > 500) throw new Error('Bio must be 500 characters or fewer');
+  const value = trimmed.length === 0 ? null : trimmed;
+  const { error } = await supabase.from('qm_profiles').update({ bio: value, bio_updated_at: new Date().toISOString() }).eq('id', id);
+  if (error) throw error;
+}
 
 
 export async function softDeleteMyAccount(): Promise<void> {

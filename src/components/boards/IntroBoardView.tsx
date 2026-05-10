@@ -115,8 +115,8 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
                 )}
               </button>
               <div className="p-3">
-                <div className="font-semibold text-sm truncate">{p.display_name}</div>
-                {p.description && <div className="text-xs text-gray-600 mt-1 whitespace-pre-wrap break-words">{p.description}</div>}
+                <div className="font-semibold text-sm truncate">{p.author_display_name || p.display_name}</div>
+                {(p.author_bio || p.description) && <div className="text-xs text-gray-600 mt-1 whitespace-pre-wrap break-words">{p.author_bio || p.description}</div>}
               </div>
               {(canManage || p.author_id === currentUserId) && (
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">

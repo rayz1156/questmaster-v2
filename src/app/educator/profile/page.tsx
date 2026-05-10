@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Shell from "@/components/Shell";
 import { useSession, signOut } from "@/lib/session";
-import { getMyProfile, updateMyDisplayName, updateMyEmail, updateMyPassword, softDeleteMyAccount, type Profile } from "@/lib/data";
+import { getMyProfile, updateMyDisplayName, updateMyBio, updateMyEmail, updateMyPassword, softDeleteMyAccount, type Profile } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, LogOut, Save, Trash2, AlertTriangle} from "lucide-react";
 const tabs = [
@@ -17,6 +17,8 @@ export default function Page() {
   const { user } = useSession('educator');
   const [p, setP] = useState<Profile | null>(null);
   const [name, setName] = useState("");
+  const [bio, setBio] = useState("");
+  const [bioSaving, setBioSaving] = useState(false);
   const [email, setEmail] = useState("");
   const [pw, setPw] = useState("");
   const [msg, setMsg] = useState("");
@@ -32,7 +34,8 @@ export default function Page() {
       router.replace("/login");
     } catch(e:any) { setMsg(e.message || "Failed to delete account"); setDelBusy(false); }
   }
-  useEffect(() => { if (!user) return; getMyProfile().then(pr => { setP(pr); setName(pr?.display_name||""); }); supabase.auth.getUser().then(({data})=>setEmail(data.user?.email||"")); }, [user]);
+  useEffect(() => { if (!user) return; getMyProfile().then(pr => { setP(pr); setName(pr?.display_name||""); setBio((pr as any)?.bio||""); }); supabase.auth.getUser().then(({data})=>setEmail(data.user?.email||"")); }, [user]);
+  async function saveBio() { setBioSaving(true); try { await updateMyBio(bio); setMsg("Bio updated"); } catch(e:any){ setMsg(e.message);} finally { setBioSaving(false); } }
   async function saveName() { try { await updateMyDisplayName(name); setMsg("Username updated"); } catch(e:any){ setMsg(e.message);} }
   async function saveEmail() { try { await updateMyEmail(email); setMsg("Email update requested - check inbox"); } catch(e:any){ setMsg(e.message);} }
   async function savePw() { if(pw.length<6){setMsg("Password must be 6+ chars");return;} try { await updateMyPassword(pw); setPw(""); setMsg("Password updated"); } catch(e:any){ setMsg(e.message);} }
@@ -45,6 +48,21 @@ export default function Page() {
         <label className="text-xs text-gray-500">Username</label>
         <input className="w-full border rounded-lg px-3 py-2 mt-1" value={name} onChange={e=>setName(e.target.value)} />
         <button onClick={saveName} className="mt-2 px-3 py-2 rounded-xl bg-black text-white text-sm flex items-center gap-1"><Save className="w-4 h-4"/>Save username</button>
+      </div>
+      <div className="card mb-3">
+        <label className="text-xs text-gray-500">About me <span className="text-gray-400">(shown on every class intro board you join)</span></label>
+        <textarea
+          className="w-full border rounded-lg px-3 py-2 mt-1"
+          rows={3}
+          maxLength={500}
+          value={bio}
+          onChange={(e)=>setBio(e.target.value)}
+          placeholder="Tell your classmates a bit about yourself..."
+        />
+        <div className="flex justify-between items-center mt-1">
+          <span className="text-xs text-gray-400">{bio.length}/500</span>
+          <button onClick={saveBio} disabled={bioSaving} className="px-3 py-2 rounded-xl bg-black text-white text-sm flex items-center gap-1 disabled:opacity-50"><Save className="w-4 h-4"/>{bioSaving?"Saving...":"Save bio"}</button>
+        </div>
       </div>
       <div className="card mb-3">
         <label className="text-xs text-gray-500">Email</label>

@@ -1,5 +1,5 @@
 export type Role = 'participant' | 'educator' | 'admin' | 'superadmin';
-export type Profile = { id: string; role: Role; display_name: string | null; suspended: boolean; approved: boolean; logo_url: string | null; created_at: string };
+export type Profile = { id: string; role: Role; display_name: string | null; suspended: boolean; approved: boolean; logo_url: string | null; bio: string | null; avatar_url: string | null; bio_updated_at: string | null; created_at: string };
 export type Hunt = { id: string; owner_id: string; class_id?: string|null; title: string; description: string | null; status: 'draft'|'active'|'archived'; invite_code: string; points: number; instructions: string|null; link1: string|null; link2: string|null; submission_link: string|null; submission_link_label: string|null; submission_link_embed: boolean; created_at: string };
 export type Challenge = { id: string; hunt_id: string; title: string; prompt: string | null; answer: string | null; points: number; order_idx: number };
 export type Team = { id: string; hunt_id: string; name: string; score: number; created_at: string };
