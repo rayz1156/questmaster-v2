@@ -424,6 +424,31 @@ export async function updateMyDisplayName(name: string): Promise<void> {
   if (error) throw error;
   await supabase.auth.updateUser({ data: { display_name: name } });
 }
+
+
+export async function updateMyUsername(username: string): Promise<void> {
+  const u = (username || '').trim().toLowerCase();
+  if (!u) throw new Error('Username cannot be empty');
+  if (!/^[a-z0-9][a-z0-9._-]{1,28}[a-z0-9]$/.test(u)) {
+    throw new Error('Username must be 3-30 chars: lowercase letters, digits, dot, hyphen or underscore');
+  }
+  const { data: au } = await supabase.auth.getUser();
+  if (!au.user) throw new Error('Not signed in');
+  // Check uniqueness (case-insensitive)
+  const { data: existing, error: selErr } = await supabase
+    .from('qm_profiles')
+    .select('id')
+    .ilike('username', u)
+    .neq('id', au.user.id)
+    .maybeSingle();
+  if (selErr && selErr.code !== 'PGRST116') throw selErr;
+  if (existing) throw new Error('That username is taken');
+  const { error } = await supabase
+    .from('qm_profiles')
+    .update({ username: u, username_updated_at: new Date().toISOString() })
+    .eq('id', au.user.id);
+  if (error) throw error;
+}
 export async function updateMyEmail(email: string): Promise<void> {
   const { error } = await supabase.auth.updateUser({ email });
   if (error) throw error;
