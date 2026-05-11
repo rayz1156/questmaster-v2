@@ -190,22 +190,25 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     const f = e.target.files?.[0];
     if (!f) return;
     if (f.size > 200 * 1024 * 1024) { flash("err", "Video must be ≤ 200 MB"); return; }
+    const filename = f.name;
+    const mimeType = f.type || "video/mp4";
+    const sizeBytes = f.size;
     setMediaBusy(true); setMediaProgress(0);
     try {
       const startRes = await fetch("/api/profile/intro/video/start", {
         method: "POST",
         headers: await authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ filename: f.name, size: f.size, mime: f.type || "video/mp4" }),
+        body: JSON.stringify({ filename, mimeType, sizeBytes }),
       });
       if (!startRes.ok) throw new Error(await startRes.text());
-      const { uploadUrl, fileId, projectId } = await startRes.json();
-      const putRes = await fetch(uploadUrl, { method: "PUT", headers: { "Content-Type": f.type || "application/octet-stream" }, body: f });
+      const { signedUrl, uploadId, key, projectId } = await startRes.json();
+      const putRes = await fetch(signedUrl, { method: "PUT", headers: { "Content-Type": mimeType }, body: f });
       if (!putRes.ok) throw new Error("Adilo upload failed");
-      const eTag = putRes.headers.get("ETag") || "";
+      const eTag = (putRes.headers.get("ETag") || "").replace(/"/g, "");
       const completeRes = await fetch("/api/profile/intro/video/complete", {
         method: "POST",
         headers: await authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ fileId, projectId, parts: [{ PartNumber: 1, ETag: eTag }] }),
+        body: JSON.stringify({ uploadId, key, eTag, projectId, filename, mimeType, sizeBytes }),
       });
       if (!completeRes.ok) throw new Error(await completeRes.text());
       await reloadProfile();
