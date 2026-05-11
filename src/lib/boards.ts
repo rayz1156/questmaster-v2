@@ -59,6 +59,8 @@ export interface IntroPost {
   author_intro_video_adilo_project_id?: string | null;
   author_intro_video_thumbnail_url?: string | null;
   author_intro_video_duration_seconds?: number | null;
+  // Marker: true when this card represents a class educator (owner/co-creator)
+  is_educator?: boolean;
 }
 
 export interface GroupSubmission {
@@ -126,54 +128,73 @@ export interface IntroPostWithAuthor extends IntroPost {
 }
 
 export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
-  // Auto-populate: every class member shows up automatically using their current profile.
+  // Auto-populate: every class member (educator + student) shows up using their current profile.
   // 1. Find the board's class_id.
   const { data: board, error: bErr } = await supabase
     .from('qm_boards').select('id, class_id, created_at').eq('id', boardId).maybeSingle();
   if (bErr) throw bErr;
   if (!board?.class_id) return [];
-  // 2. Find all members of that class.
+  // 2a. Educators of that class (owners + co-creators) -- shown first, at the top.
+  let educatorIds: string[] = [];
+  try {
+    const { data: eds } = await supabase.rpc('qm_list_class_educators', { p_class: board.class_id });
+    educatorIds = ((eds || []) as any[]).map((e: any) => e.id as string).filter(Boolean);
+  } catch { /* RPC may not be available in some envs; ignore */ }
+  // 2b. Students enrolled via qm_class_members.
   const { data: members, error: mErr } = await supabase
     .from('qm_class_members').select('user_id').eq('class_id', board.class_id);
   if (mErr) throw mErr;
   const memberIds = (members || []).map((m: any) => m.user_id as string).filter(Boolean);
-  if (memberIds.length === 0) return [];
-  // 3. Fetch their profiles.
+  // 3. Combine + dedupe (educator wins).
+  const educatorSet = new Set(educatorIds);
+  const allIds = [...educatorIds, ...memberIds.filter(id => !educatorSet.has(id))];
+  if (allIds.length === 0) return [];
+  // 4. Fetch profiles for everyone.
   const { data: profs, error: pErr } = await supabase
     .from('qm_profiles')
     .select('id, display_name, bio, avatar_url, intro_display_name, intro_media_type, intro_image_file_code, intro_video_adilo_file_id, intro_video_adilo_project_id, intro_video_thumbnail_url, intro_video_duration_seconds, intro_media_updated_at')
-    .in('id', memberIds);
+    .in('id', allIds);
   if (pErr) throw pErr;
-  // 4. Build IntroPost rows from each member's profile.
-  const items: IntroPost[] = (profs || []).map((r: any) => ({
-    id: `auto-${r.id}`,
-    board_id: boardId,
-    author_id: r.id,
-    display_name: r.intro_display_name || r.display_name || null,
-    description: r.bio || null,
-    image_url: null,
-    image_path: null,
-    media_type: (r.intro_video_adilo_file_id ? 'video' : 'image'),
-    video_adilo_file_id: r.intro_video_adilo_file_id || null,
-    video_adilo_project_id: r.intro_video_adilo_project_id || null,
-    video_thumbnail_url: r.intro_video_thumbnail_url || null,
-    video_duration_seconds: r.intro_video_duration_seconds || null,
-    is_hidden: false,
-    created_at: r.intro_media_updated_at || board.created_at || new Date().toISOString(),
-    updated_at: r.intro_media_updated_at || board.created_at || new Date().toISOString(),
-    // Author fields used by IntroBoardView rendering
-    author_bio: r.bio ?? null,
-    author_display_name: r.display_name ?? null,
-    author_avatar_url: r.avatar_url ?? null,
-    author_intro_display_name: r.intro_display_name ?? null,
-    author_intro_media_type: r.intro_media_type ?? null,
-    author_intro_image_file_code: r.intro_image_file_code ?? null,
-    author_intro_video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
-    author_intro_video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
-    author_intro_video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
-    author_intro_video_duration_seconds: r.intro_video_duration_seconds ?? null,
-  } as any));
+  const profById = new Map<string, any>(((profs || []) as any[]).map((p: any) => [p.id, p]));
+  // 5. Build IntroPost rows preserving the order: educators first, then students.
+  const items: IntroPost[] = allIds.map((uid) => {
+    const r: any = profById.get(uid) || { id: uid };
+    return {
+      id: `auto-${uid}`,
+      board_id: boardId,
+      author_id: uid,
+      display_name: r.display_name ?? '',
+      description: r.bio ?? null,
+      image_url: null,
+      image_path: null,
+      is_hidden: false,
+      hidden_by: null,
+      hidden_at: null,
+      created_at: (board as any).created_at ?? new Date().toISOString(),
+      updated_at: r.intro_media_updated_at ?? (board as any).created_at ?? new Date().toISOString(),
+      media_type: r.intro_video_adilo_file_id ? 'video' : 'image',
+      video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
+      video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
+      video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
+      video_duration_seconds: r.intro_video_duration_seconds ?? null,
+      author_bio: r.bio ?? null,
+      author_display_name: r.display_name ?? null,
+      author_avatar_url: r.avatar_url ?? null,
+      author_intro_display_name: r.intro_display_name ?? null,
+      author_intro_media_type: r.intro_media_type ?? null,
+      author_intro_image_file_code: r.intro_image_file_code ?? null,
+      author_intro_video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
+      author_intro_video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
+      author_intro_video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
+      author_intro_video_duration_seconds: r.intro_video_duration_seconds ?? null,
+      is_educator: educatorSet.has(uid),
+    } as any;
+  });
+  // 6. Stable sort -- educators first; within each group, most recent profile update first, then by name.
   items.sort((a, b) => {
+    const ea = (a as any).is_educator ? 1 : 0;
+    const eb = (b as any).is_educator ? 1 : 0;
+    if (ea !== eb) return eb - ea;
     const am = (a as any).updated_at || '';
     const bm = (b as any).updated_at || '';
     if (am && bm && am !== bm) return bm.localeCompare(am);

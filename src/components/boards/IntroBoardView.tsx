@@ -126,6 +126,9 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
               </button>
               <div className="p-3">
                 <div className="font-semibold text-sm truncate">{cardName}</div>
+              {(p as any).is_educator && (
+                <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold uppercase tracking-wide">Educator</div>
+              )}
                 {(p.author_bio || p.description) && <div className="text-xs text-gray-600 mt-1 whitespace-pre-wrap break-words">{p.author_bio || p.description}</div>}
               </div>
               {(canManage || p.author_id === currentUserId) && (

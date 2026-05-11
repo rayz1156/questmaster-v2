@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal } from "lucide-react";
 import Shell from "@/components/Shell";
-import { getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, Klass, ClassInvite } from "@/lib/data";
+import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, Klass, ClassInvite } from "@/lib/data";
 import EducatorsCard from "@/components/EducatorsCard";
 
 const tabs = [
@@ -68,6 +68,7 @@ export default function ClassDetail() {
   const id = params.id;
   const [klass, setKlass] = useState<Klass | null>(null);
   const [members, setMembers] = useState<any[]>([]);
+  const [educators, setEducators] = useState<any[]>([]);
   const [invites, setInvites] = useState<ClassInvite[]>([]);
   const [busy, setBusy] = useState(false);
   const [editingName, setEditingName] = useState(false);
@@ -79,6 +80,7 @@ export default function ClassDetail() {
   const reload = async () => {
     const k = await getClass(id); setKlass(k);
     setMembers(await listClassMembers(id));
+    try { setEducators(await listClassEducators(id)); } catch { setEducators([]); }
     setInvites(await listClassInvites(id));
   };
   useEffect(() => { reload(); }, [id]);
@@ -194,7 +196,7 @@ export default function ClassDetail() {
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-sm font-semibold text-gray-900">Active educators</div>
-            <div className="text-2xl font-bold text-gray-900 leading-tight">1</div>
+            <div className="text-2xl font-bold text-gray-900 leading-tight">{educators.length}</div>
             <div className="text-xs text-gray-500">Educators with access</div>
           </div>
         </div>
