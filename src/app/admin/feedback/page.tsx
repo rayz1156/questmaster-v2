@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 
 type FeedbackItem = {
   id: string;
@@ -36,7 +37,10 @@ export default function AdminFeedbackPage() {
       const params = new URLSearchParams();
       if (filterStatus) params.set('status', filterStatus);
       if (filterType) params.set('type', filterType);
-      const res = await fetch(`/api/admin/feedback?${params.toString()}`, { credentials: 'include' });
+      const { data: { session } } = await supabase.auth.getSession();
+      const headers: Record<string, string> = {};
+      if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+      const res = await fetch(`/api/admin/feedback?${params.toString()}`, { headers });
       if (!res.ok) throw new Error(res.status === 403 ? 'Admin access required.' : 'Failed to load feedback.');
       const json = await res.json();
       setItems(json.items ?? []);
@@ -50,10 +54,12 @@ export default function AdminFeedbackPage() {
   useEffect(() => { load(); }, [load]);
 
   async function updateStatus(id: string, status: string) {
+    const { data: { session } } = await supabase.auth.getSession();
+    const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+    if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
     const res = await fetch('/api/admin/feedback', {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json' },
-      credentials: 'include',
+      headers,
       body: JSON.stringify({ id, status }),
     });
     if (res.ok) {
