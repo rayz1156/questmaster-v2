@@ -15,6 +15,14 @@ import {
 import type { Profile } from "@/lib/types";
 import { Save, Eye, AlertTriangle, Trash2, Image as ImageIcon, Video, User as UserIcon, Lock, Mail } from "lucide-react";
 
+async function authHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  const h: Record<string, string> = { ...extra };
+  if (token) h["Authorization"] = `Bearer ${token}`;
+  return h;
+}
+
 function Section({ title, subtitle, children, className = "" }: { title: string; subtitle?: string; children: React.ReactNode; className?: string }) {
   return (
     <div className={`bg-white rounded-2xl border border-gray-200 p-6 shadow-sm ${className}`}>
@@ -166,7 +174,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     try {
       const fd = new FormData();
       fd.append("file", f);
-      const r = await fetch("/api/profile/intro/upload-image", { method: "POST", body: fd });
+      const r = await fetch("/api/profile/intro/upload-image", { method: "POST", body: fd, headers: await authHeaders() });
       if (!r.ok) throw new Error(await r.text());
       await reloadProfile();
       flash("ok", "Photo uploaded");
@@ -186,7 +194,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     try {
       const startRes = await fetch("/api/profile/intro/video/start", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ filename: f.name, size: f.size, mime: f.type || "video/mp4" }),
       });
       if (!startRes.ok) throw new Error(await startRes.text());
@@ -196,7 +204,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
       const eTag = putRes.headers.get("ETag") || "";
       const completeRes = await fetch("/api/profile/intro/video/complete", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
+        headers: await authHeaders({ "Content-Type": "application/json" }),
         body: JSON.stringify({ fileId, projectId, parts: [{ PartNumber: 1, ETag: eTag }] }),
       });
       if (!completeRes.ok) throw new Error(await completeRes.text());
@@ -309,8 +317,8 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
                 </button>
               </div>
               <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-                Photos are stored on Filelu (≤ 15 MB).<br />
-                Videos are streamed via Adilo (≤ 200 MB).<br />
+                Photos up to 15 MB.<br />
+                Videos up to 200 MB.<br />
                 One photo OR one video at a time.
               </p>
               {mediaBusy && <div className="mt-2 text-xs text-indigo-600">Uploading…</div>}
