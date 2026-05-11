@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
       .single();
     if (cErr || !created) return NextResponse.json({ error: cErr?.message || 'Could not create board' }, { status: 500 });
     board = created;
-    await owner.supa.from('qm_learning_columns').insert({ board_id: board.id, title: 'Pengenalan', position: 0 });
+    // Board is created empty; users add columns via the '+ Add column' button.
   }
 
   const { data: columns } = await supa

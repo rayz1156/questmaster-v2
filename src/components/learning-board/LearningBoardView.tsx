@@ -53,6 +53,19 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
 
   useEffect(() => { refresh(); }, [refresh]);
 
+  const layoutStorageKey = `lb_layout_${classId}`;
+  const [layoutMode, setLayoutMode] = useState<'columns' | 'mood'>('columns');
+  useEffect(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? window.localStorage.getItem(layoutStorageKey) : null;
+      if (saved === 'mood' || saved === 'columns') setLayoutMode(saved);
+    } catch {}
+  }, [layoutStorageKey]);
+  const changeLayout = (m: 'columns' | 'mood') => {
+    setLayoutMode(m);
+    try { window.localStorage.setItem(layoutStorageKey, m); } catch {}
+  };
+
   const moveCard = useCallback(async (cardId: string, payload: any) => {
     try {
       await authedFetch(`/api/learning-boards/${classId}/cards/${cardId}/move`, {
@@ -84,6 +97,22 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
 
   return (
     <div className="h-full">
+      <div className="px-4 pt-3 flex items-center justify-end">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
+          <button
+            type="button"
+            onClick={() => changeLayout('columns')}
+            className={`px-3 py-1.5 transition ${layoutMode === 'columns' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            title="Display items side by side in columns"
+          >Columns</button>
+          <button
+            type="button"
+            onClick={() => changeLayout('mood')}
+            className={`px-3 py-1.5 transition border-l border-gray-200 ${layoutMode === 'mood' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            title="Display items in a visual mood-board grid"
+          >Mood Board</button>
+        </div>
+      </div>
       {playingFileId && (
         <VideoLightbox
           classId={classId}
@@ -100,6 +129,17 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
         />
       )}
 
+      {layoutMode === 'mood' ? (
+        <MoodBoardGrid
+          classId={classId}
+          snap={snap}
+          isEditor={isEditor}
+          onPlayVideo={(fileId, title) => setPlayingFileId({ fileId, title })}
+          onOpenImage={(src, title) => setOpenImage({ src, title })}
+          onChanged={refresh}
+          moveCard={moveCard}
+        />
+      ) : (
       <div
         className="flex gap-4 overflow-x-auto p-4 pb-8 min-h-[60vh]"
         onClick={() => setOpenMenuColumnId(null)}
@@ -144,6 +184,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
           <NewColumnButton classId={classId} onCreated={refresh} />
         )}
       </div>
+      )}
 
       {addCardTarget && (
         <AddCardModal
@@ -1099,6 +1140,63 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
       >{busy ? 'Uploading…' : 'Upload file'}</button>
       <div className="text-[11px] text-gray-500">Supports PDF, Word, Excel, PowerPoint, text, archives, and more (up to 50 MB).</div>
+    </div>
+  );
+}
+
+function MoodBoardGrid({
+  classId,
+  snap,
+  isEditor,
+  onPlayVideo,
+  onOpenImage,
+  onChanged,
+  moveCard,
+}: {
+  classId: string;
+  snap: Snapshot;
+  isEditor: boolean;
+  onPlayVideo: (fileId: string, title: string | null) => void;
+  onOpenImage: (src: string, title: string | null) => void;
+  onChanged: () => void;
+  moveCard: (cardId: string, payload: any) => Promise<void>;
+}) {
+  // Flatten every card across every column into one stream for the visual board.
+  const allCards = snap.columns.flatMap((col) => (col.cards || []).map((c: LearningCard) => ({ card: c, columnTitle: col.title })));
+  if (allCards.length === 0) {
+    return (
+      <div className="p-8 text-center text-gray-500 text-sm">
+        {isEditor
+          ? 'No items yet. Switch to Columns to add a column, then add cards inside it.'
+          : 'No items have been added to this board yet.'}
+      </div>
+    );
+  }
+  return (
+    <div className="p-4 pb-8 min-h-[60vh]">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        {allCards.map(({ card, columnTitle }, idx) => (
+          <div
+            key={card.id}
+            className="bg-white rounded-xl border border-gray-200 shadow-sm hover:shadow-md transition overflow-hidden flex flex-col"
+          >
+            <div className="p-3">
+              <CardRenderer
+                classId={classId}
+                card={card}
+                cardIndex={idx}
+                totalCards={allCards.length}
+                isEditor={isEditor}
+                onPlayVideo={onPlayVideo}
+                onOpenImage={onOpenImage}
+                onChanged={onChanged}
+                moveCard={moveCard}
+              />
+            </div>
+            <div className="px-3 pb-2 text-[10px] uppercase tracking-wide text-gray-400 truncate" title={columnTitle}>{columnTitle}</div>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }
