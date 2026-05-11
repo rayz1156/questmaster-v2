@@ -138,7 +138,7 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
   let educatorIds: string[] = [];
   try {
     const { data: eds } = await supabase.rpc('qm_list_class_educators', { p_class: board.class_id });
-    educatorIds = ((eds || []) as any[]).map((e: any) => e.id as string).filter(Boolean);
+    educatorIds = ((eds || []) as any[]).map((e: any) => (e.educator_id || e.id) as string).filter(Boolean);
   } catch { /* RPC may not be available in some envs; ignore */ }
   // 2b. Students enrolled via qm_class_members.
   const { data: members, error: mErr } = await supabase
