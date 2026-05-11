@@ -173,7 +173,7 @@ export default function EducatorAnalyticsPage() {
         <TeamStatsPanel classId={classId} />
         <AtRiskPanel classId={classId} />
         <p className="mt-6 text-xs text-gray-500">
-            More tiers (mastery, predictive risk) are on the roadmap.
+            More tiers (learning outcomes & mastery) are on the roadmap.
             Submit ideas via <a className="text-purple-600 underline" href="/help">Help → Send Feedback</a>.
           </p>
         </>
