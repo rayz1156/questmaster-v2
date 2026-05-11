@@ -158,28 +158,53 @@ export default function EducatorAnalyticsPage() {
             <Stat icon={<AlertTriangle className="w-4 h-4 text-amber-600"/>} label="At risk (>7d)" value={inact!.at_risk_inactive_7d} hint="Inactive for over a week" />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <h2 className="font-bold text-gray-900 flex items-center gap-2"><TrendingUp className="w-5 h-5 text-purple-600"/> Daily active users</h2>
-              <p className="text-xs text-gray-500">Unique users per day across this {classId === 'all' ? 'account' : 'class'}.</p>
-              <div className="mt-3"><LineChart data={summary.daily} /></div>
-            </div>
-            <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-              <h2 className="font-bold text-gray-900 flex items-center gap-2"><BookOpen className="w-5 h-5 text-purple-600"/> Time-of-day heatmap</h2>
-              <p className="text-xs text-gray-500">When students actually work — a tall bar near midnight means deadline crunching.</p>
-              <div className="mt-3"><HourBars data={summary.hourly} /></div>
-            </div>
-          </div>
+          <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
+              {/* Left column: key tables & performance summaries */}
+              <div className="lg:col-span-8 space-y-4">
+                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
+                  <div className="flex items-center justify-between gap-2 flex-wrap">
+                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
+                      <TrendingUp className="w-5 h-5 text-purple-600"/>
+                      Engagement overview
+                      <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 1">1</span>
+                    </h2>
+                    <span className="text-xs text-gray-500">Last 90 days</span>
+                  </div>
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div>
+                      <p className="text-xs text-gray-500">Unique users per day across this {classId === 'all' ? 'account' : 'class'}.</p>
+                      <div className="mt-2"><LineChart data={summary.daily} /></div>
+                    </div>
+                    <div>
+                      <p className="text-xs text-gray-500 flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-purple-600"/> Time-of-day heatmap — when students actually work.</p>
+                      <div className="mt-2"><HourBars data={summary.hourly} /></div>
+                    </div>
+                  </div>
+                </div>
+                <div className="max-h-[520px] overflow-auto rounded-xl">
+                  <ActivityStatsPanel classId={classId} />
+                </div>
+                <div className="max-h-[520px] overflow-auto rounded-xl">
+                  <TeamStatsPanel classId={classId} />
+                </div>
+              </div>
 
-          <ActivityStatsPanel classId={classId} />
-        <TeamStatsPanel classId={classId} />
-        <AtRiskPanel classId={classId} />
-        <MasteryPanel classId={classId} />
-        <GamificationPanel classId={classId} />
-        <p className="mt-6 text-xs text-gray-500">
-            All six tiers (engagement, activity, contribution, mastery, at-risk, gamification) are live.
-            Submit ideas via <a className="text-purple-600 underline" href="/help">Help → Send Feedback</a>.
-          </p>
+              {/* Right column: insights, topic summary, quick filters */}
+              <div className="lg:col-span-4 space-y-4">
+                <div className="max-h-[420px] overflow-auto rounded-xl">
+                  <MasteryPanel classId={classId} />
+                </div>
+                <div className="max-h-[420px] overflow-auto rounded-xl">
+                  <AtRiskPanel classId={classId} />
+                </div>
+                <div className="max-h-[420px] overflow-auto rounded-xl">
+                  <GamificationPanel classId={classId} />
+                </div>
+                <p className="text-xs text-gray-500 px-1">
+                  All six levels (engagement, activity, contribution, mastery, at-risk, gamification) are live. Submit ideas via <a className="text-purple-600 underline" href="/help">Help → Send Feedback</a>.
+                </p>
+              </div>
+            </div>
         </>
       )}
     </Shell>

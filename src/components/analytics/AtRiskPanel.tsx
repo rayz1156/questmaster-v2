@@ -108,7 +108,7 @@ export default function AtRiskPanel({ classId }: { classId: string | null }) {
       <div className="flex items-center justify-between p-4 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-            <AlertTriangle className="w-4 h-4 text-rose-500" /> At-risk students (Tier 5)
+            <AlertTriangle className="w-4 h-4 text-rose-500" /> At-risk students <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 5">5</span>
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
             {loading ? "Loading\u2026" : `${students.length} students \u00b7 ${high} high \u00b7 ${medium} medium \u00b7 ${low} low`}

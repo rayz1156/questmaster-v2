@@ -107,7 +107,7 @@ export default function GamificationPanel({ classId }: { classId: string | null 
       <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-            <Trophy className="w-4 h-4 text-amber-500" /> Gamification (Tier 6)
+            <Trophy className="w-4 h-4 text-amber-500" /> Gamification <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 6">6</span>
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
             {loading ? "Loading…" : data

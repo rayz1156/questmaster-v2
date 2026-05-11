@@ -96,7 +96,7 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
       <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-            <Target className="w-4 h-4 text-indigo-500" /> Learning outcomes &amp; mastery (Tier 4)
+            <Target className="w-4 h-4 text-indigo-500" /> Learning outcomes &amp; mastery <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 4">4</span>
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
             {loading ? "Loading\u2026" : data
