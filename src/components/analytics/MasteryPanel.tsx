@@ -67,7 +67,7 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
 
   useEffect(() => {
     let cancelled = false;
-    if (!classId) { setData(null); return; }
+    if (!classId || classId === "all") { setData(null); return; }
     (async () => {
       try {
         setError(null);

@@ -35,7 +35,7 @@ export default function AtRiskPanel({ classId }: { classId: string | null }) {
   const [filter, setFilter] = useState<"all" | "high" | "medium" | "low">("all");
 
   useEffect(() => {
-    if (!classId) { setData(null); return; }
+    if (!classId || classId === "all") { setData(null); return; }
     let cancelled = false;
     (async () => {
       setLoading(true);
