@@ -2,6 +2,7 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { IntroVideoLightbox } from "@/components/boards/IntroBoardView";
 import {
   getMyProfile,
   updateMyBio,
@@ -13,7 +14,7 @@ import {
   softDeleteMyAccount,
 } from "@/lib/data";
 import type { Profile } from "@/lib/types";
-import { Save, Eye, AlertTriangle, Trash2, Image as ImageIcon, Video, User as UserIcon, Lock, Mail } from "lucide-react";
+import { Save, Eye, AlertTriangle, Trash2, Image as ImageIcon, Video, User as UserIcon, Play, Lock, Mail } from "lucide-react";
 
 async function authHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -45,32 +46,33 @@ function PrimaryButton({ children, onClick, disabled, type = "button", variant =
   );
 }
 
-function IntroCardPreview({ name, bio, mediaType, imageUrl, videoThumb }: { name: string; bio: string; mediaType: "image" | "video" | null; imageUrl: string | null; videoThumb: string | null }) {
-  const usingDefault = !imageUrl && !videoThumb;
+function IntroCardPreview({ name, bio, imageUrl, videoThumb, hasVideo, onPlay }: { name: string; bio: string; imageUrl: string | null; videoThumb: string | null; hasVideo: boolean; onPlay: () => void; }) {
+  // Picture: prefer the uploaded photo. If only video uploaded, use the video thumbnail. Else default avatar.
+  const pic = imageUrl || videoThumb;
   return (
-    <div className="w-full max-w-sm mx-auto rounded-2xl border border-gray-200 overflow-hidden bg-white">
-      <div className="relative h-48 bg-gradient-to-br from-purple-500 via-indigo-500 to-blue-500 flex items-center justify-center">
-        {imageUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={imageUrl} alt="intro" className="absolute inset-0 w-full h-full object-cover" />
-        ) : videoThumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src={videoThumb} alt="intro video" className="absolute inset-0 w-full h-full object-cover" />
+    <div className="rounded-2xl border border-gray-200 overflow-hidden bg-white">
+      <div className="h-44 bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center relative">
+        {pic ? (
+          /* eslint-disable-next-line @next/next/no-img-element */
+          <img src={pic} alt={name} className="h-32 w-32 rounded-2xl object-cover shadow-lg" />
         ) : (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img src="/default-intro-avatar.svg" alt="default avatar" className="w-28 h-28" />
+          <div className="h-32 w-32 rounded-full bg-white/20 flex items-center justify-center">
+            <UserIcon className="w-16 h-16 text-white" />
+          </div>
+        )}
+        {hasVideo && (
+          <button type="button" onClick={onPlay} aria-label="Play intro video" className="absolute inset-0 flex items-center justify-center group">
+            <span className="bg-black/60 group-hover:bg-black/75 rounded-full p-4 transition shadow-lg">
+              <Play className="w-7 h-7 text-white fill-white" />
+            </span>
+          </button>
         )}
       </div>
-      <div className="p-4 text-center">
-        <div className="font-bold text-gray-900 text-lg">{name || "Your name"}</div>
-        {bio && (
-          <>
-            <div className="mt-3 mb-2 h-px bg-gray-200" />
-            <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{bio}</p>
-          </>
-        )}
-        {usingDefault && (
-          <div className="mt-3 text-xs text-gray-400 flex items-center justify-center gap-1">
+      <div className="px-5 pt-4 pb-5 text-center">
+        <div className="font-semibold text-gray-900">{name}</div>
+        {bio && <div className="text-sm text-gray-600 mt-3 whitespace-pre-wrap">{bio}</div>}
+        {!imageUrl && !videoThumb && (
+          <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">
             <UserIcon className="w-3.5 h-3.5" /> Using default avatar
           </div>
         )}
@@ -91,6 +93,8 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
   const [videoThumb, setVideoThumb] = useState<string | null>(null);
+  const [videoFileId, setVideoFileId] = useState<string | null>(null);
+  const [videoOpen, setVideoOpen] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaProgress, setMediaProgress] = useState(0);
   const imgInputRef = useRef<HTMLInputElement>(null);
@@ -119,16 +123,12 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     setBio((pr.bio as any) || "");
     const mt = (pr as any).intro_media_type as "image" | "video" | null;
     setMediaType(mt || null);
-    if (mt === "image" && (pr as any).intro_image_file_code) {
-      setImageUrl(`/api/profile/image/${(pr as any).intro_image_file_code}`);
-      setVideoThumb(null);
-    } else if (mt === "video" && (pr as any).intro_video_thumbnail_url) {
-      setVideoThumb((pr as any).intro_video_thumbnail_url);
-      setImageUrl(null);
-    } else {
-      setImageUrl(null);
-      setVideoThumb(null);
-    }
+    const imgCode = (pr as any).intro_image_file_code as string | null;
+    const vidThumb = (pr as any).intro_video_thumbnail_url as string | null;
+    const vidFileId = (pr as any).intro_video_adilo_file_id as string | null;
+    setImageUrl(imgCode ? `/api/profile/image/${imgCode}` : null);
+    setVideoThumb(vidThumb || null);
+    setVideoFileId(vidFileId || null);
     setUsername((pr as any).username || "");
   }
 
@@ -288,7 +288,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
         <div className="text-xs text-gray-400 -mt-3 mb-5">(this is what others see)</div>
         <div className="grid md:grid-cols-2 gap-8">
           <div className="flex items-start justify-center md:justify-start">
-            <IntroCardPreview name={introName || (p as any)?.display_name || "Your name"} bio={bio} mediaType={mediaType} imageUrl={imageUrl} videoThumb={videoThumb} />
+            <IntroCardPreview name={introName || (p as any)?.display_name || "Your name"} bio={bio} imageUrl={imageUrl} videoThumb={videoThumb} hasVideo={!!videoFileId} onPlay={() => setVideoOpen(true)} />
           </div>
           <div className="space-y-5">
             <div>
@@ -408,6 +408,9 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
           </div>
         )}
       </div>
+    {videoOpen && videoFileId && (
+      <IntroVideoLightbox boardId="" fileId={videoFileId} title={introName || (p as any)?.display_name || null} scope="profile" onClose={() => setVideoOpen(false)} />
+    )}
     </div>
   );
 }

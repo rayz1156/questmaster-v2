@@ -87,15 +87,18 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
           const profImageCode = (p as any).author_intro_image_file_code as (string|null);
           const profVideoFileId = (p as any).author_intro_video_adilo_file_id as (string|null);
           const profVideoThumb = (p as any).author_intro_video_thumbnail_url as (string|null);
-          const useProfile = !!(profMediaType && (profImageCode || profVideoFileId));
-          const isVideo = useProfile ? profMediaType === "video" : (p as any).media_type === "video";
-          let thumb: string | null = null;
-          if (useProfile) {
-            if (profMediaType === "image" && profImageCode) thumb = `/api/profile/image/${profImageCode}`;
-            else if (profMediaType === "video") thumb = profVideoThumb || null;
-          } else {
-            thumb = isVideo ? ((p as any).video_thumbnail_url || null) : p.image_url;
-          }
+        // Image and video can coexist. Prefer image as the displayed picture; video (if any) is playable via overlay.
+        const profHasVideo = !!profVideoFileId;
+        const useProfile = !!(profMediaType && (profImageCode || profVideoFileId));
+        const postHasVideo = (p as any).media_type === "video" && !!(p as any).video_adilo_file_id;
+        const isVideo = useProfile ? profHasVideo : postHasVideo;
+        let thumb: string | null = null;
+        if (useProfile) {
+          if (profImageCode) thumb = `/api/profile/image/${profImageCode}`;
+          else if (profVideoThumb) thumb = profVideoThumb;
+        } else {
+          thumb = p.image_url || ((p as any).video_thumbnail_url || null);
+        }
           if (!thumb) thumb = "/default-intro-avatar.svg";
           const cardName = (p as any).author_intro_display_name || (p as any).author_display_name || p.display_name;
           return (
@@ -177,7 +180,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
 
 // Lightbox for intro videos: same UI as Learning Board's VideoLightbox but using the
 // /api/intro-boards/[boardId]/embed/[fileId] endpoint.
-function IntroVideoLightbox({ boardId, fileId, title, scope, onClose }: { boardId: string; fileId: string; title: string | null; scope?: "board" | "profile"; onClose: () => void }) {
+export function IntroVideoLightbox({ boardId, fileId, title, scope, onClose }: { boardId: string; fileId: string; title: string | null; scope?: "board" | "profile"; onClose: () => void }) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {

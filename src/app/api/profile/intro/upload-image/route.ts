@@ -35,10 +35,6 @@ export async function POST(req: NextRequest) {
     intro_media_type: 'image',
     intro_image_file_code: uploaded.fileCode,
     intro_image_path: uploaded.fileCode,
-    intro_video_adilo_file_id: null,
-    intro_video_adilo_project_id: null,
-    intro_video_thumbnail_url: null,
-    intro_video_duration_seconds: null,
     intro_media_updated_at: new Date().toISOString(),
   }).eq('id', auth.user!.id);
   if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });

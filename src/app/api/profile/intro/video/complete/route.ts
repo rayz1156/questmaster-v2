@@ -44,8 +44,6 @@ export async function POST(req: NextRequest) {
 
   const { error } = await admin.from('qm_profiles').update({
     intro_media_type: 'video',
-    intro_image_file_code: null,
-    intro_image_path: null,
     intro_video_adilo_file_id: fileId,
     intro_video_adilo_project_id: projectId,
     intro_video_thumbnail_url: thumbnailUrl ?? null,
