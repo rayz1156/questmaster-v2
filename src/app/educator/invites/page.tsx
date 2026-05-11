@@ -5,7 +5,7 @@ import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Shell from "@/components/Shell";
-import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Mail, Check } from "lucide-react";
+import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Mail, Check, Activity } from "lucide-react";
 import {
   acceptClassEducatorInviteByCode,
   listMyClassEducatorInvites,
@@ -17,6 +17,7 @@ const tabs = [
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5" /> },
   { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5" /> },
   { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5" /> },
+  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
   { href: "/educator/profile", label: "Profile", icon: <SettingsIcon className="w-5 h-5" /> },
 ];
 

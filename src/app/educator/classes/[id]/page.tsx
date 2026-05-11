@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal } from "lucide-react";
+import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity } from "lucide-react";
 import Shell from "@/components/Shell";
 import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, Klass, ClassInvite } from "@/lib/data";
 import EducatorsCard from "@/components/EducatorsCard";
@@ -12,6 +12,7 @@ const tabs = [
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
   { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
   { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
 ];
 

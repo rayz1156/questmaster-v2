@@ -2,7 +2,7 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, User as UserIcon, ArrowLeft } from "lucide-react";
+import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, User as UserIcon, ArrowLeft, Activity } from "lucide-react";
 import Shell from "@/components/Shell";
 import { supabase } from "@/lib/supabase";
 import { Board, getBoardForClass } from "@/lib/boards";
@@ -13,6 +13,7 @@ const tabs = [
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
   { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
   { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
 ];
 

@@ -4,7 +4,7 @@ import { useSearchParams } from "next/navigation";
 import Link from 'next/link';
 import { useSession } from '@/lib/session';
 import Shell from '@/components/Shell';
-import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon } from 'lucide-react';
+import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, Activity } from "lucide-react";
 import { listMyHunts, deleteHunt, listMyClasses, type Hunt, type Klass } from '@/lib/data';
 
 const tabs = [
@@ -12,6 +12,7 @@ const tabs = [
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
   { href: "/educator/teams",      label: "Teams",      icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings",   label: "Rankings",   icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
   { href: "/educator/profile",    label: "Profile",    icon: <UserIcon className="w-5 h-5"/> },
 ];
 

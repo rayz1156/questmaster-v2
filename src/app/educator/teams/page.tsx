@@ -4,7 +4,7 @@ import Shell from "@/components/Shell";
 import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { ListChecks, Users, BarChart3, GraduationCap, Plus, Pencil, Trash2, User as UserIcon, Search, Copy, RefreshCw, ChevronRight, X, Settings, Link2 } from "lucide-react";
+import { ListChecks, Users, BarChart3, GraduationCap, Plus, Pencil, Trash2, User as UserIcon, Search, Copy, RefreshCw, ChevronRight, X, Settings, Link2, Activity } from "lucide-react";
 import { listMyHunts, listTeams, createTeam, bulkCreateTeams, renameTeam, deleteTeam, setTeamMaxMembers, listMyClasses, listMyHuntsByClass, type Hunt, type Team, type Klass } from "@/lib/data";
 import { regenerateTeamCode, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, addScoreAdjustment, type QuestCompletion, listTeamsByClass, createTeamForClass, bulkCreateTeamsForClass, listClassTeamScores, listTeamMembers } from '@/lib/data';
 
@@ -13,6 +13,7 @@ const navTabs = [
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
   { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
   { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
 ];
 

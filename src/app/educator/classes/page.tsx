@@ -2,7 +2,7 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { useEffect, useState } from "react";
-import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus} from "lucide-react";
+import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus, Activity} from "lucide-react";
 import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass } from "@/lib/data";
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 
@@ -11,6 +11,7 @@ const tabs = [
   { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
   { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
   { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
   { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
 ];
 
