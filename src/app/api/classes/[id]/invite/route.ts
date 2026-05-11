@@ -23,7 +23,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const link = `${origin}/join/${inv.token}`;
     const apiKey = process.env.BREVO_API_KEY;
     const sender = process.env.BREVO_SENDER_EMAIL || 'noreply@airiz.tech';
-    const senderName = process.env.BREVO_SENDER_NAME || 'Cendekia';
+    const senderName = process.env.BREVO_SENDER_NAME || 'Kuizen';
     if (apiKey) {
       const r = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
@@ -31,8 +31,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         body: JSON.stringify({
           sender: { email: sender, name: senderName },
           to: [{ email }],
-          subject: `You\'re invited to join "${klass.name}" on Cendekia`,
-          htmlContent: `<p>Hello!</p><p>You\'ve been invited to join the class <b>${klass.name}</b> on Cendekia.</p><p><a href="${link}" style="display:inline-block;background:#6366f1;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Accept invite</a></p><p>Or open this link: <a href="${link}">${link}</a></p>`
+          subject: `You\'re invited to join "${klass.name}" on Kuizen`,
+          htmlContent: `<p>Hello!</p><p>You\'ve been invited to join the class <b>${klass.name}</b> on Kuizen.</p><p><a href="${link}" style="display:inline-block;background:#6366f1;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Accept invite</a></p><p>Or open this link: <a href="${link}">${link}</a></p>`
         })
       });
       if (!r.ok) { const t = await r.text(); return NextResponse.json({ error: `Brevo: ${t}` }, { status: 500 }); }

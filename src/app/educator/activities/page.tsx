@@ -34,17 +34,17 @@ function PageInner() {
         <Link href={`/educator/classes/${classFilter}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
       )}
       <div className="flex justify-between items-center mb-3 flex-wrap gap-2">
-        <h2 className="page-title">My Quests</h2>
+        <h2 className="page-title">My Activities</h2>
         <div className="flex items-center gap-2">
           <select value={classFilter} onChange={e=>setClassFilter(e.target.value)} className="text-sm border border-gray-200 rounded-lg px-2 py-1 bg-white">
             <option value="">All classes</option>
             {Object.entries(classMap).map(([id,name]) => (<option key={id} value={id}>{name}</option>))}
           </select>
-          <Link href="/educator/activities/new" className="btn-primary px-3 py-1 text-sm">+ New Quest</Link>
+          <Link href="/educator/activities/new" className="btn-primary px-3 py-1 text-sm">+ New Activity</Link>
         </div>
       </div>
       {busy && <p className="text-sm text-gray-500">Loading...</p>}
-      {!busy && hunts.length === 0 && <p className="text-sm text-gray-500">No quests yet. Create one to get started.</p>}
+      {!busy && hunts.length === 0 && <p className="text-sm text-gray-500">No activities yet. Create one to get started.</p>}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
         {(classFilter ? hunts.filter(h => h.class_id === classFilter) : hunts).map(h => (
           <div key={h.id} className="card flex justify-between items-start gap-3">

@@ -35,7 +35,7 @@ export default function Register() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg mb-3 text-3xl" aria-hidden="true">📚</div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Create your account</h1>
-          <p className="text-white/80 mt-1">Join Cendekia as a participant or educator</p>
+          <p className="text-white/80 mt-1">Join Kuizen as a participant or educator</p>
         </div>
         {done ? (
           <div className="bg-white rounded-2xl shadow-xl p-6 space-y-3">

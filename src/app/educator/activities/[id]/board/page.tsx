@@ -45,7 +45,7 @@ export default function ActivityBoardPage() {
       </div>
       {loading && <p className="text-sm text-gray-500">Memuatkan…</p>}
       {err && <p className="text-sm text-red-600">{err}</p>}
-      {!loading && !board && <p className="text-sm text-gray-600">Board hantaran belum dicipta untuk quest ini.</p>}
+      {!loading && !board && <p className="text-sm text-gray-600">Board hantaran belum dicipta untuk aktiviti ini.</p>}
       {board && <QuestBoardView board={board} canManage={true} currentUserId={userId} />}
     </Shell>
   );

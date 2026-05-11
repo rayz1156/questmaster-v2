@@ -68,7 +68,7 @@ function PageInner() {
     } catch (e: any) { setErr(e?.message || 'Save failed'); }
   };
 
-  if (!hunt) return <Shell tabs={tabs}><p className="text-sm text-gray-500">Loading quest...</p></Shell>;
+  if (!hunt) return <Shell tabs={tabs}><p className="text-sm text-gray-500">Loading activity...</p></Shell>;
 
   return (
     <Shell tabs={tabs}>

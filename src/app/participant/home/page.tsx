@@ -222,9 +222,9 @@ export default function Page() {
             <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 shrink-0"><ClipboardList className="w-7 h-7" /></span>
             <div className="min-w-0">
               <div className="text-3xl font-extrabold text-purple-700">{dataReady ? activeQuestCount : 0}</div>
-              <div className="font-semibold text-slate-800">Active Quests</div>
+              <div className="font-semibold text-slate-800">Active Activities</div>
               <div className="text-xs text-slate-500 mt-0.5">Keep going! Complete more to earn points.</div>
-              <Link href="/participant/activities" className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900">Go to Quests <ArrowRight className="w-3 h-3" /></Link>
+              <Link href="/participant/activities" className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900">Go to Activities <ArrowRight className="w-3 h-3" /></Link>
             </div>
           </div>
           <div className="bg-emerald-50 rounded-2xl p-5 flex items-center gap-4">
@@ -289,8 +289,8 @@ export default function Page() {
         {/* Footer banner */}
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl p-4">
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 text-amber-600 shrink-0"><Star className="w-5 h-5" /></span>
-          <div className="flex-1 text-sm text-slate-700">Complete quests, earn points, and climb the leaderboard!</div>
-          <Link href="/participant/activities" className="text-sm font-semibold text-amber-600 hover:text-amber-800 inline-flex items-center gap-1 whitespace-nowrap">Go to Quests <ArrowRight className="w-4 h-4" /></Link>
+          <div className="flex-1 text-sm text-slate-700">Complete activities, earn points, and climb the leaderboard!</div>
+          <Link href="/participant/activities" className="text-sm font-semibold text-amber-600 hover:text-amber-800 inline-flex items-center gap-1 whitespace-nowrap">Go to Activities <ArrowRight className="w-4 h-4" /></Link>
         </div>
       </div>
     </Shell>

@@ -162,7 +162,7 @@ function RankingsInner() {
         </div>
       </div>
 
-      {/* Class & Quest selectors */}
+      {/* Class & Activity selectors */}
       <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4 sm:p-5 mb-5">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
@@ -177,17 +177,17 @@ function RankingsInner() {
             )}
           </div>
           <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Quest</label>
+            <label className="text-xs font-semibold text-gray-500 mb-1 block">Activity</label>
             {classId && hunts.length > 0 ? (
               <div className="relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-purple-100 text-purple-600 inline-flex items-center justify-center pointer-events-none"><ClipboardList className="w-4 h-4"/></span>
                 <select className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-300" value={activeId} onChange={e => setActiveId(e.target.value)}>
-                  <option value="">All Quests (Class Leaderboard)</option>
+                  <option value="">All Activities (Class Leaderboard)</option>
                   {hunts.map(h => <option key={h.id} value={h.id}>{h.title}</option>)}
                 </select>
               </div>
             ) : (
-              <p className="text-sm text-gray-400 italic py-2.5">Select a class with quests</p>
+              <p className="text-sm text-gray-400 italic py-2.5">Select a class with activities</p>
             )}
           </div>
         </div>
@@ -201,7 +201,7 @@ function RankingsInner() {
         <div className="flex items-start gap-3 mb-4">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center shrink-0 shadow-md"><Trophy className="w-5 h-5"/></div>
           <div className="min-w-0">
-            <div className="font-bold text-base sm:text-lg">{activeId ? `Quest Leaderboard` : `Class Leaderboard`}</div>
+            <div className="font-bold text-base sm:text-lg">{activeId ? `Activity Leaderboard` : `Class Leaderboard`}</div>
             <div className="text-xs text-gray-500">Rankings update automatically as groups complete quests.</div>
           </div>
         </div>
@@ -235,7 +235,7 @@ function RankingsInner() {
                   </div>
                   <div className="flex-1 min-w-0">
                     <div className="font-bold text-sm sm:text-base truncate">{s.team_name}</div>
-                    {'quest_count' in s && <div className="text-xs text-gray-500">{(s as AggScore).quest_count} quest(s)</div>}
+                    {'quest_count' in s && <div className="text-xs text-gray-500">{(s as AggScore).quest_count} activity(s)</div>}
                   </div>
                   <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${ptsBg}`}>
                     <div className="text-center">

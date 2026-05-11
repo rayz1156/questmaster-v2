@@ -1,4 +1,5 @@
 "use client";
+import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import Shell from "@/components/Shell";
 import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
@@ -103,12 +104,12 @@ function TeamsInner() {
 
   const onAdd = async () => { if (!name.trim()||!activeClassId) return; try { await createTeamForClass(activeClassId,name.trim(),maxM); setName(''); await reloadClassTeams(activeClassId); setShowCreate(false); } catch(e:any){ setErr(e.message); } };
   const onBulk = async () => { if (!activeClassId||bulkN<1) return; try { await bulkCreateTeamsForClass(activeClassId,bulkN,bulkPrefix.trim()||'Team',bulkMax); await reloadClassTeams(activeClassId); setShowCreate(false); } catch(e:any){ setErr(e.message); } };
-  const onRename = (t:any) => { const n=prompt('New name',t.name); if(n&&n.trim()) renameTeam(t.id,n.trim()).then(()=>reloadClassTeams(activeClassId)); };
-  const onMax = (t:any) => { const n=prompt('Max members',String(t.max_members??5)); if(n) setTeamMaxMembers(t.id,parseInt(n,10)||5).then(()=>reloadClassTeams(activeClassId)); };
-  const onDel = (t:any) => { if(confirm('Delete team '+t.name+'?')) deleteTeam(t.id).then(()=>{ reloadClassTeams(activeClassId); if(selectedTeamId===t.id) setSelectedTeamId(null); }); };
+  const onRename = async (t:any) => { const n = await showPrompt({ title: 'Rename team', initialValue: t.name, confirmLabel: 'Save' }); if(n && n.trim()) { await renameTeam(t.id, n.trim()); reloadClassTeams(activeClassId); } };
+  const onMax = async (t:any) => { const n = await showPrompt({ title: 'Max members', initialValue: String(t.max_members ?? 5), inputType: 'number', confirmLabel: 'Save' }); if(n) { await setTeamMaxMembers(t.id, parseInt(n, 10) || 5); reloadClassTeams(activeClassId); } };
+  const onDel = async (t:any) => { const ok = await showConfirm({ title: `Delete team ${t.name}?`, description: 'This action cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }); if(ok) { await deleteTeam(t.id); reloadClassTeams(activeClassId); if(selectedTeamId===t.id) setSelectedTeamId(null); } };
   const toggleOne = (id:string) => setSelected(p=>{ const s=new Set(p); if(s.has(id)) s.delete(id); else s.add(id); return s; });
   const toggleAll = () => setSelected(p=>p.size===teams.length?new Set():new Set(teams.map(t=>t.id)));
-  const onBulkDelete = async () => { if(!selected.size||!confirm('Delete '+selected.size+' team(s)?')) return; await Promise.all(Array.from(selected).map(id=>deleteTeam(id))); await reloadClassTeams(activeClassId); };
+  const onBulkDelete = async () => { if(!selected.size) return; const ok = await showConfirm({ title: `Delete ${selected.size} team(s)?`, description: 'This action cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }); if(!ok) return; await Promise.all(Array.from(selected).map(id=>deleteTeam(id))); await reloadClassTeams(activeClassId); };
 
   const sel = teams.find(t=>t.id===selectedTeamId);
   const filtered = teams.filter(t=>!search||t.name?.toLowerCase().includes(search.toLowerCase())).sort((a:any,b:any)=>{
@@ -233,8 +234,8 @@ function TeamsInner() {
 
                   {detailTab==='scores' && (
                     <div className="space-y-4">
-                      <div className="text-sm text-gray-500 mb-1">Mark quest completions for <strong>{sel.name}</strong>:</div>
-                      {hunts.length === 0 ? <p className="text-sm text-gray-400">No quests/activities in this class.</p> :
+                      <div className="text-sm text-gray-500 mb-1">Mark activity completions for <strong>{sel.name}</strong>:</div>
+                      {hunts.length === 0 ? <p className="text-sm text-gray-400">No activities in this class.</p> :
                         hunts.map(h => {
                           const done = completions.find(c => c.hunt_id === h.id && c.team_id === sel.id);
                           return (

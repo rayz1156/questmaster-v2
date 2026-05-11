@@ -32,7 +32,7 @@ export async function POST(req: NextRequest) {
   let projectId: string | null = (prof?.intro_video_adilo_project_id || '').trim() || null;
   if (!projectId) {
     try {
-      const proj = await createAdiloProject(`Cendekia · ${prof?.display_name || auth.user!.email || auth.user!.id} · Profile Intro`);
+      const proj = await createAdiloProject(`Kuizen · ${prof?.display_name || auth.user!.email || auth.user!.id} · Profile Intro`);
       projectId = proj.id;
       await admin.from('qm_profiles').update({ intro_video_adilo_project_id: projectId }).eq('id', auth.user!.id);
     } catch (e: any) {

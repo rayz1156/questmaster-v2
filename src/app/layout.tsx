@@ -7,14 +7,14 @@ import RegisterSW from "@/components/pwa/RegisterSW";
 const poppins = Poppins({ subsets: ["latin"], weight: ["300","400","500","600","700"] });
 
 export const metadata: Metadata = {
-  title: "Cendekia",
+  title: "Kuizen",
   description:
-    "Cendekia — Learn. Compete. Conquer. Where classrooms become arenas and learners become champions.",
-  applicationName: "Cendekia",
+    "Kuizen — Learn. Compete. Conquer. Where classrooms become arenas and learners become champions.",
+  applicationName: "Kuizen",
   manifest: "/manifest.json",
   appleWebApp: {
     capable: true,
-    title: "Cendekia",
+    title: "Kuizen",
     statusBarStyle: "default",
   },
   icons: {

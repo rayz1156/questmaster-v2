@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   let projectId = (board.adilo_project_id || '').trim() || null;
   if (!projectId) {
     try {
-      const proj = await createAdiloProject(`Cendekia · ${owner.klass!.name}`);
+      const proj = await createAdiloProject(`Kuizen · ${owner.klass!.name}`);
       projectId = proj.id;
       await owner.supa
         .from('qm_learning_boards')

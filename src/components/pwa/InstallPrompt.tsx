@@ -99,14 +99,14 @@ export default function InstallPrompt() {
   return (
     <div
       role="dialog"
-      aria-label="Install Cendekia"
+      aria-label="Install Kuizen"
       className="fixed inset-x-3 bottom-3 z-[1000] rounded-2xl bg-white shadow-2xl ring-1 ring-purple-200 p-4 flex items-start gap-3 sm:hidden"
     >
       <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 text-white text-xl font-bold">
         C
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-gray-900">Install Cendekia</div>
+        <div className="font-semibold text-gray-900">Install Kuizen</div>
         {deferred ? (
           <p className="text-sm text-gray-600 mt-0.5">
             Add to your home screen for a faster, fullscreen experience.

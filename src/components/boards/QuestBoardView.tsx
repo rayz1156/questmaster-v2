@@ -119,7 +119,7 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
 
       {!loading && !subLink.url && teams.length === 0 && (
         <div className="p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
-          <p className="text-gray-600">No teams found for this quest.</p>
+          <p className="text-gray-600">No teams found for this activity.</p>
           <p className="text-xs text-gray-500 mt-1">Please add a team first in the Teams tab.</p>
         </div>
       )}

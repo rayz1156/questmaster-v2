@@ -40,7 +40,7 @@ export default function Page() {
 
   return (
     <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">All Quests</h2>
+      <h2 className="font-bold text-lg mb-3">All Activities</h2>
       <div className="space-y-2">{hunts.map(h => {
         const isDone = (tid: string) => completions.some(c => c.team_id === tid);
         return (
@@ -62,7 +62,7 @@ export default function Page() {
             </div>
             {expandedHunt === h.id && (
               <div className="mt-3 pt-3 border-t space-y-1">
-                <div className="text-xs font-semibold text-gray-500 mb-2">Team Quest Completions</div>
+                <div className="text-xs font-semibold text-gray-500 mb-2">Team Activity Completions</div>
                 {teams.length === 0 ? <div className="text-xs text-gray-400">No teams yet.</div> :
                   teams.map(t => {
                     const done = isDone(t.id);

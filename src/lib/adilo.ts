@@ -11,7 +11,7 @@
  *   3. PUT  signed URL with file bytes  -> ETag header
  *   4. POST /v1/files/upload/complete -> { fileId }
  *
- * For Cendekia we keep all calls server-side so credentials never reach the
+ * For Kuizen we keep all calls server-side so credentials never reach the
  * browser; the browser only PUTs to the signed Wasabi S3 URL we hand it.
  */
 

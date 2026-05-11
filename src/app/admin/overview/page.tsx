@@ -27,7 +27,7 @@ export default function Page() {
       <div className="grid grid-cols-3 gap-2 mb-4">
         <Card label="Users" value={stats.users}/>
         <Card label="Educators" value={stats.educators}/>
-        <Card label="Quests" value={stats.hunts}/>
+        <Card label="Activities" value={stats.hunts}/>
         <Card label="Active" value={stats.active}/>
         <Card label="Submissions" value={stats.subs}/>
         <Card label="Pending" value={stats.pending}/>

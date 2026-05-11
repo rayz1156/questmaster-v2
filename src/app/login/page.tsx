@@ -44,7 +44,7 @@ function LoginInner() {
       <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg mb-3 text-3xl" aria-hidden="true">📚</div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">Cendekia</h1>
+          <h1 className="text-4xl font-bold text-white tracking-tight">Kuizen</h1>
           <p className="text-white/90 mt-2 text-base font-medium tracking-wide">Learn. Compete. Conquer.</p>
           <p className="text-white/75 mt-1 text-sm">Where classrooms become arenas and learners become champions.</p>
           <p className="text-white/70 mt-3 text-sm">Welcome back 👋 Sign in to continue</p>

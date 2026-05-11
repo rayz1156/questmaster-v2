@@ -1,5 +1,5 @@
 // =============================================================================
-// Boards data layer (Padlet/Wakelet-style content sharing for Cendekia)
+// Boards data layer (Padlet/Wakelet-style content sharing for Kuizen)
 // Tables: qm_boards, qm_intro_posts, qm_group_submissions
 // Storage buckets: intro-photos, quest-submissions
 // =============================================================================

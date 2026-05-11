@@ -59,7 +59,7 @@ export async function POST(req: NextRequest) {
     const smtpUser = process.env.BREVO_SMTP_USER;
     const smtpPass = process.env.BREVO_SMTP_PASS;
     const fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@airizintelligence.com';
-    const fromName = process.env.BREVO_FROM_NAME || 'Cendekia';
+    const fromName = process.env.BREVO_FROM_NAME || 'Kuizen';
 
     if (!host || !smtpUser || !smtpPass) {
       return NextResponse.json({ error: 'SMTP not configured' }, { status: 500 });
@@ -72,7 +72,7 @@ export async function POST(req: NextRequest) {
       host, port, secure: false, auth: { user: smtpUser, pass: smtpPass },
     });
 
-    const subject = `[Cendekia] You're invited to co-teach "${klass.name}"`;
+    const subject = `[Kuizen] You're invited to co-teach "${klass.name}"`;
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f9fafb;">
         <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
@@ -80,7 +80,7 @@ export async function POST(req: NextRequest) {
           <p style="color:#374151;line-height:1.5;">Hello,</p>
           <p style="color:#374151;line-height:1.5;">
             <b>${escapeHtml(inviterName)}</b> has invited you to co-teach the class
-            <b>${escapeHtml(klass.name)}</b> on Cendekia.
+            <b>${escapeHtml(klass.name)}</b> on Kuizen.
           </p>
           <p style="text-align:center;margin:24px 0;">
             <a href="${acceptUrl}" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
@@ -88,7 +88,7 @@ export async function POST(req: NextRequest) {
             </a>
           </p>
           <p style="color:#374151;line-height:1.5;font-size:13px;">
-            If the button doesn't work, sign in to Cendekia using
+            If the button doesn't work, sign in to Kuizen using
             <b>${escapeHtml(email)}</b> and paste this 8-character code at
             <a href="${siteUrl}/educator/invites">${siteUrl}/educator/invites</a>:
           </p>
@@ -96,13 +96,13 @@ export async function POST(req: NextRequest) {
             <code style="display:inline-block;font-family:monospace;font-size:22px;letter-spacing:4px;background:#f3f4f6;color:#111827;padding:12px 20px;border-radius:8px;border:1px solid #e5e7eb;">${escapeHtml(code)}</code>
           </div>
           <p style="color:#6b7280;font-size:12px;margin-top:24px;">
-            You received this because someone invited you as an educator on Cendekia.
+            You received this because someone invited you as an educator on Kuizen.
             If this wasn't expected, you can ignore this email.
           </p>
         </div>
       </div>`;
     const text =
-      `${inviterName} invited you to co-teach "${klass.name}" on Cendekia.\n\n` +
+      `${inviterName} invited you to co-teach "${klass.name}" on Kuizen.\n\n` +
       `Accept link: ${acceptUrl}\n\n` +
       `If the link doesn't work, sign in with ${email} and paste this code at ${siteUrl}/educator/invites :\n` +
       `${code}\n`;

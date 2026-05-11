@@ -4,6 +4,7 @@ import { formatDuration, hostnameFromUrl, type LearningCard, type LearningCardTy
 import VideoLightbox from './VideoLightbox';
 import ImageLightbox from './ImageLightbox';
 import { supabase } from '@/lib/supabase';
+import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 
 
 /** Wrap fetch() to attach the Supabase access token from localStorage so
@@ -255,7 +256,7 @@ function ColumnCard({
   onColumnDrop: (index: number) => void;
 }) {
   const renameColumn = async () => {
-    const next = window.prompt('Rename column', column.title);
+    const next = await showPrompt({ title: 'Rename column', initialValue: column.title, confirmLabel: 'Save' });
     if (!next || next === column.title) return;
     await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, {
       method: 'PATCH',
@@ -266,7 +267,7 @@ function ColumnCard({
     onChanged();
   };
   const deleteColumn = async () => {
-    if (!window.confirm(`Delete column "${column.title}" and all its cards? This cannot be undone.`)) return;
+    const ok = await showConfirm({ title: `Delete column "${column.title}"?`, description: "All cards in this column will be permanently removed. This cannot be undone.", confirmLabel: "Delete", tone: "danger" }); if (!ok) return;
     await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, { method: 'DELETE' });
     onToggleMenu(false);
     onChanged();
@@ -445,7 +446,7 @@ function InsertCardStrip({ onClick }: { onClick: () => void }) {
 function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: () => void }) {
   const [busy, setBusy] = useState(false);
   const create = async () => {
-    const title = window.prompt('New column title (e.g. "Modul 4")');
+    const title = await showPrompt({ title: 'New column', placeholder: 'e.g. Modul 4', confirmLabel: 'Create' });
     if (!title) return;
     setBusy(true);
     try {
@@ -490,7 +491,7 @@ function CardRenderer({
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleDelete = async () => {
-    if (!window.confirm('Delete this card?')) return;
+    const ok = await showConfirm({ title: "Delete this card?", description: "This action cannot be undone.", confirmLabel: "Delete", tone: "danger" }); if (!ok) return;
     await authedFetch(`/api/learning-boards/${classId}/cards/${card.id}`, { method: 'DELETE' });
     onChanged();
   };

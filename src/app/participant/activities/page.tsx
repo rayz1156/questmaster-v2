@@ -74,8 +74,8 @@ function Inner() {
             <div className="flex items-center gap-4 flex-1 min-w-0">
               <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-100 text-purple-600 shrink-0"><Target className="w-7 h-7" /></span>
               <div className="min-w-0">
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">My Quests</div>
-                <div className="text-sm text-slate-600 mt-0.5">Complete quests to earn points and climb the leaderboard!</div>
+                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">My Activities</div>
+                <div className="text-sm text-slate-600 mt-0.5">Complete activities to earn points and climb the leaderboard!</div>
               </div>
             </div>
             <div className="md:w-80 shrink-0">
@@ -91,11 +91,11 @@ function Inner() {
           </div>
         </div>
 
-        {/* Quest tabs row */}
+        {/* Activity tabs row */}
         {busy && hunts.length === 0 ? (
           <div className="flex gap-2 overflow-x-auto pb-2">{[1,2,3,4].map(i => <div key={i} className="shrink-0 h-10 w-32 bg-gray-100 rounded-full animate-pulse" />)}</div>
         ) : filteredHunts.length === 0 ? (
-          <div className="text-sm text-slate-500">No quests yet. Quests appear here once your educator creates them in your classes.</div>
+          <div className="text-sm text-slate-500">No activities yet. Activities appear here once your educator creates them in your classes.</div>
         ) : (
           <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
             {filteredHunts.map(h => {
@@ -187,8 +187,8 @@ function Inner() {
         {!busy && hunts.length === 0 && (
           <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
             <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-50 text-purple-500 mb-3"><ClipboardList className="w-7 h-7" /></span>
-            <div className="font-semibold text-slate-800">No quests yet</div>
-            <p className="text-sm text-slate-500 mt-1">Quests appear here once your educator creates them in your classes.</p>
+            <div className="font-semibold text-slate-800">No activities yet</div>
+            <p className="text-sm text-slate-500 mt-1">Activities appear here once your educator creates them in your classes.</p>
           </div>
         )}
       </div>

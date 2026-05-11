@@ -74,7 +74,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
         </div>
       )}
       <div className="min-w-0">
-        <div className="font-bold text-lg leading-tight truncate">Cendekia</div>
+        <div className="font-bold text-lg leading-tight truncate">Kuizen</div>
         <div className="text-xs opacity-90 truncate">
           {user.display_name} · {user.role}
         </div>

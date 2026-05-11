@@ -47,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   let projectId = (board.adilo_project_id || '').trim() || null;
   if (!projectId) {
     try {
-      const proj = await createAdiloProject(`Cendekia · ${klass.name} · Intro`);
+      const proj = await createAdiloProject(`Kuizen · ${klass.name} · Intro`);
       projectId = proj.id;
       await admin.from('qm_boards').update({ adilo_project_id: projectId }).eq('id', board.id);
     } catch (e: any) {

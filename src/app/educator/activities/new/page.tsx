@@ -24,18 +24,18 @@ function Inner() {
     <div className="min-h-screen bg-gray-50 max-w-md mx-auto">
       <div className="bg-brand-gradient text-white p-5 rounded-b-3xl">
         <button onClick={()=>router.back()} className="mb-2 flex items-center gap-1 text-sm opacity-90"><ArrowLeft className="w-4 h-4"/>Back</button>
-        <h1 className="text-xl font-bold">Create New Quest</h1>
+        <h1 className="text-xl font-bold">Create New Activity</h1>
       </div>
       <div className="p-4 space-y-3">
         {classes.length === 0 ? (
-          <div className="card text-sm"><p className="text-gray-600 mb-2">You need to create a class first. Each quest belongs to a class.</p><Link href="/educator/classes" className="btn-primary inline-block py-2 px-3">Create a class</Link></div>
+          <div className="card text-sm"><p className="text-gray-600 mb-2">You need to create a class first. Each activity belongs to a class.</p><Link href="/educator/classes" className="btn-primary inline-block py-2 px-3">Create a class</Link></div>
         ) : (<>
           <label className="text-xs text-gray-500">Class</label>
           <select value={classId} onChange={e=>setClassId(e.target.value)} className="input w-full">{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          <input className="input" placeholder="Quest title" value={title} onChange={e=>setTitle(e.target.value)}/>
+          <input className="input" placeholder="Activity title" value={title} onChange={e=>setTitle(e.target.value)}/>
           <textarea className="input min-h-[100px]" placeholder="Description" value={desc} onChange={e=>setDesc(e.target.value)}/>
           {err && <p className="text-sm text-red-600">{err}</p>}
-          <button disabled={busy} onClick={submit} className="btn-primary w-full flex items-center justify-center gap-1"><Check className="w-4 h-4"/>{busy ? "Creating…" : "Create Quest"}</button>
+          <button disabled={busy} onClick={submit} className="btn-primary w-full flex items-center justify-center gap-1"><Check className="w-4 h-4"/>{busy ? "Creating…" : "Create Activity"}</button>
         </>)}
       </div>
     </div>
