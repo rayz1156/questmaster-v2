@@ -1,0 +1,311 @@
+/**
+ * AI image generation with multi-provider fallback.
+ *
+ * Provider chain (in order, configurable via AI_IMAGE_PROVIDERS env var, csv):
+ *   horde      -> AI Horde (stablehorde.net) — free, crowdsourced, no hard cap, variable queue
+ *   cloudflare -> Cloudflare Workers AI (FLUX.1-schnell), ~10k neurons/day free
+ *   huggingface-> Hugging Face Inference API (FLUX.1-schnell), free tier
+ *   pollinations -> Pollinations.ai (no key required)
+ *
+ * Each provider falls through on error to the next in the chain.
+ * Returns a Buffer with PNG/JPEG bytes ready to hand to fileluUpload().
+ */
+export interface AiImageResult {
+  bytes: Buffer;
+  mime: string;
+  prompt: string;
+  provider: string;
+}
+
+function sanitize(s: string | null | undefined, max = 200): string {
+  return (s || '').replace(/\s+/g, ' ').trim().slice(0, max);
+}
+
+export function buildPromptForCard(card: {
+  title?: string | null;
+  description?: string | null;
+  link_title?: string | null;
+  link_description?: string | null;
+  link_url?: string | null;
+  card_type?: string | null;
+  file_name?: string | null;
+}): string {
+  const subject = sanitize(card.link_title || card.title || card.file_name || 'learning resource', 120);
+  const blurb = sanitize(card.link_description || card.description, 200);
+  let host = '';
+  try {
+    if (card.link_url) host = new URL(card.link_url).hostname.replace(/^www\./, '');
+  } catch {}
+  const subjectClean = subject.replace(/["\\]/g, '');
+  const blurbClean = blurb.replace(/["\\]/g, '');
+  const parts = [
+    `editorial flat illustration thumbnail for: ${subjectClean}`,
+    blurbClean ? `theme: ${blurbClean}` : '',
+    host ? `context: ${host}` : '',
+    'clean modern vector style, soft gradient background, abstract symbolic composition',
+    'no text, no letters, no words, no typography, no watermark, no logo',
+    'centered, balanced composition, suitable as a card thumbnail',
+  ].filter(Boolean);
+  return parts.join(', ');
+}
+
+const NEGATIVE_PROMPT =
+  'text, letters, words, typography, watermark, logo, ugly, deformed, blurry, low quality, low resolution, jpeg artifacts';
+
+type GenOpts = {
+  width?: number;
+  height?: number;
+  seed?: number;
+  signal?: AbortSignal;
+};
+
+function sleep(ms: number, signal?: AbortSignal): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(resolve, ms);
+    if (signal) {
+      const onAbort = () => { clearTimeout(t); reject(new Error('aborted')); };
+      if (signal.aborted) onAbort();
+      else signal.addEventListener('abort', onAbort, { once: true });
+    }
+  });
+}
+
+// ---------------------------------------------------------------------------
+// Provider: AI Horde (stablehorde.net) — crowdsourced, free, no hard cap
+// Docs: https://stablehorde.net/api/  (POST /v2/generate/async, GET /v2/generate/status/{id})
+// ---------------------------------------------------------------------------
+async function generateHorde(prompt: string, opts: GenOpts): Promise<AiImageResult> {
+  const apiKey = process.env.HORDE_API_KEY || '0000000000'; // anonymous fallback
+  const base = process.env.HORDE_BASE || 'https://stablehorde.net/api/v2';
+  const width = opts.width || 1024;
+  const height = opts.height || 576;
+  // Horde requires multiples of 64
+  const w = Math.round(width / 64) * 64;
+  const h = Math.round(height / 64) * 64;
+  const model = process.env.HORDE_MODEL || 'Flux.1-Schnell fp8 (Compact)';
+  const submit = await fetch(`${base}/generate/async`, {
+    method: 'POST',
+    signal: opts.signal,
+    headers: {
+      'Content-Type': 'application/json',
+      apikey: apiKey,
+      'Client-Agent': 'Kuizen:1.0:contact@veltrix.technology',
+    },
+    body: JSON.stringify({
+      prompt: `${prompt} ### ${NEGATIVE_PROMPT}`,
+      params: {
+        sampler_name: 'k_euler',
+        cfg_scale: 1.0,
+        steps: 8,
+        width: w,
+        height: h,
+        n: 1,
+      },
+      nsfw: false,
+      censor_nsfw: true,
+      r2: true,
+      models: [model],
+    }),
+  });
+  if (!submit.ok) {
+    const txt = await submit.text().catch(() => '');
+    throw new Error(`Horde submit ${submit.status}: ${txt.slice(0, 200)}`);
+  }
+  const submitJson: any = await submit.json();
+  const id = submitJson?.id;
+  if (!id) throw new Error('Horde: no job id returned');
+
+  // Poll for completion. Max ~120s.
+  const deadline = Date.now() + 120_000;
+  let lastStatus: any = null;
+  while (Date.now() < deadline) {
+    await sleep(2500, opts.signal);
+    const stat = await fetch(`${base}/generate/check/${id}`, { signal: opts.signal });
+    if (!stat.ok) continue;
+    lastStatus = await stat.json().catch(() => null);
+    if (lastStatus?.done) break;
+    if (lastStatus?.faulted) throw new Error('Horde: job faulted');
+  }
+  if (!lastStatus?.done) {
+    // Try to cancel the lingering job to free worker.
+    fetch(`${base}/generate/status/${id}`, { method: 'DELETE' }).catch(() => {});
+    throw new Error('Horde: timeout waiting for image');
+  }
+  // Fetch final status with image URL.
+  const final = await fetch(`${base}/generate/status/${id}`, { signal: opts.signal });
+  if (!final.ok) throw new Error(`Horde status ${final.status}`);
+  const finalJson: any = await final.json();
+  const gen = finalJson?.generations?.[0];
+  if (!gen?.img) throw new Error('Horde: no image in result');
+  // r2=true returns a URL; otherwise base64.
+  let bytes: Buffer;
+  let mime = 'image/webp';
+  if (gen.img.startsWith('http')) {
+    const r = await fetch(gen.img, { signal: opts.signal });
+    if (!r.ok) throw new Error(`Horde image fetch ${r.status}`);
+    bytes = Buffer.from(await r.arrayBuffer());
+    mime = r.headers.get('content-type') || 'image/webp';
+  } else {
+    bytes = Buffer.from(gen.img, 'base64');
+  }
+  if (bytes.length < 200) throw new Error('Horde: image too small');
+  return { bytes, mime, prompt, provider: 'horde' };
+}
+
+// ---------------------------------------------------------------------------
+// Provider: Cloudflare Workers AI — FLUX.1-schnell, fast edge inference
+// Docs: https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/
+// ---------------------------------------------------------------------------
+async function generateCloudflare(prompt: string, opts: GenOpts): Promise<AiImageResult> {
+  const accountId = process.env.CF_ACCOUNT_ID;
+  const token = process.env.CF_API_TOKEN;
+  if (!accountId || !token) throw new Error('Cloudflare not configured');
+  const model = process.env.CF_AI_MODEL || '@cf/black-forest-labs/flux-1-schnell';
+  const url = `https://api.cloudflare.com/client/v4/accounts/${accountId}/ai/run/${model}`;
+  const r = await fetch(url, {
+    method: 'POST',
+    signal: opts.signal,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      prompt,
+      num_steps: 4, // schnell is 4-step distilled
+      seed: opts.seed,
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`Cloudflare ${r.status}: ${txt.slice(0, 200)}`);
+  }
+  // Cloudflare returns JSON with base64 image in result.image.
+  const json: any = await r.json();
+  const b64: string | undefined = json?.result?.image;
+  if (!b64) throw new Error('Cloudflare: no image in result');
+  const bytes = Buffer.from(b64, 'base64');
+  if (bytes.length < 200) throw new Error('Cloudflare: image too small');
+  return { bytes, mime: 'image/jpeg', prompt, provider: 'cloudflare' };
+}
+
+// ---------------------------------------------------------------------------
+// Provider: Hugging Face Inference API — FLUX.1-schnell or configurable
+// Docs: https://huggingface.co/docs/api-inference
+// ---------------------------------------------------------------------------
+async function generateHuggingFace(prompt: string, opts: GenOpts): Promise<AiImageResult> {
+  const token = process.env.HF_TOKEN || process.env.HUGGINGFACE_API_KEY;
+  if (!token) throw new Error('HuggingFace not configured');
+  const model = process.env.HF_MODEL || 'black-forest-labs/FLUX.1-schnell';
+  const url = `https://router.huggingface.co/hf-inference/models/${model}`;
+  const r = await fetch(url, {
+    method: 'POST',
+    signal: opts.signal,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      'Content-Type': 'application/json',
+      Accept: 'image/png',
+    },
+    body: JSON.stringify({
+      inputs: prompt,
+      parameters: {
+        width: opts.width || 1024,
+        height: opts.height || 576,
+        num_inference_steps: 4,
+        guidance_scale: 0.0,
+        seed: opts.seed,
+      },
+      options: { wait_for_model: true },
+    }),
+  });
+  if (!r.ok) {
+    const txt = await r.text().catch(() => '');
+    throw new Error(`HuggingFace ${r.status}: ${txt.slice(0, 200)}`);
+  }
+  const bytes = Buffer.from(await r.arrayBuffer());
+  if (bytes.length < 200) throw new Error('HuggingFace: image too small');
+  const mime = r.headers.get('content-type') || 'image/png';
+  return { bytes, mime, prompt, provider: 'huggingface' };
+}
+
+// ---------------------------------------------------------------------------
+// Provider: Pollinations.ai — no key required (fallback)
+// ---------------------------------------------------------------------------
+const POLLINATIONS_BASE = 'https://image.pollinations.ai/prompt';
+async function generatePollinations(prompt: string, opts: GenOpts): Promise<AiImageResult> {
+  const width = opts.width || 1024;
+  const height = opts.height || 576;
+  const seed = opts.seed ?? Math.floor(Math.random() * 1_000_000);
+  const token = process.env.POLLINATIONS_TOKEN || '';
+  const qs = new URLSearchParams({
+    width: String(width),
+    height: String(height),
+    model: 'flux',
+    seed: String(seed),
+    nologo: 'true',
+    safe: 'true',
+    enhance: 'false',
+    private: 'true',
+    referrer: 'kuizen.veltrix.technology',
+  });
+  const url = `${POLLINATIONS_BASE}/${encodeURIComponent(prompt)}?${qs.toString()}`;
+  const headers: Record<string, string> = {};
+  if (token) headers['Authorization'] = `Bearer ${token}`;
+  const r = await fetch(url, { headers, signal: opts.signal });
+  if (!r.ok) {
+    const text = await r.text().catch(() => '');
+    throw new Error(`Pollinations ${r.status}: ${text.slice(0, 200)}`);
+  }
+  const bytes = Buffer.from(await r.arrayBuffer());
+  const mime = r.headers.get('content-type') || 'image/jpeg';
+  if (bytes.length < 200) throw new Error('Pollinations: image too small');
+  return { bytes, mime, prompt, provider: 'pollinations' };
+}
+
+// ---------------------------------------------------------------------------
+// Public entrypoint: tries providers in order, falls through on error.
+// ---------------------------------------------------------------------------
+type ProviderName = 'horde' | 'cloudflare' | 'huggingface' | 'pollinations';
+const PROVIDER_FNS: Record<ProviderName, (p: string, o: GenOpts) => Promise<AiImageResult>> = {
+  horde: generateHorde,
+  cloudflare: generateCloudflare,
+  huggingface: generateHuggingFace,
+  pollinations: generatePollinations,
+};
+
+function parseProviderChain(): ProviderName[] {
+  const raw = (process.env.AI_IMAGE_PROVIDERS || 'horde,cloudflare,huggingface,pollinations')
+    .split(',')
+    .map((s) => s.trim().toLowerCase())
+    .filter(Boolean) as ProviderName[];
+  const valid: ProviderName[] = ['horde', 'cloudflare', 'huggingface', 'pollinations'];
+  return raw.filter((p) => (valid as string[]).includes(p));
+}
+
+export async function generateAiImage(prompt: string, opts?: GenOpts): Promise<AiImageResult> {
+  const chain = parseProviderChain();
+  if (!chain.length) throw new Error('No AI image providers configured');
+  const maxRounds = Math.max(1, Math.min(10, Number(process.env.AI_IMAGE_MAX_ROUNDS) || 3));
+  const errors: string[] = [];
+  let lastErr: any = null;
+  for (let round = 0; round < maxRounds; round++) {
+    for (const name of chain) {
+      const fn = PROVIDER_FNS[name];
+      try {
+        const result = await fn(prompt, opts || {});
+        return result;
+      } catch (e: any) {
+        if (e?.name === 'AbortError') throw e; // user cancelled — don't try other providers
+        lastErr = e;
+        const msg = e?.message || String(e);
+        errors.push(`r${round + 1}/${name}: ${msg}`);
+        // continue rotating through the chain
+      }
+    }
+    // small backoff between full rounds (200ms, 400ms, ...)
+    if (round + 1 < maxRounds) {
+      await new Promise((res) => setTimeout(res, 200 * (round + 1)));
+    }
+  }
+  throw new Error(`All AI providers failed after ${maxRounds} round(s). ${errors.slice(-8).join(' | ')}`);
+}
+

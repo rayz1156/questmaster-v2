@@ -2,7 +2,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { Home, Compass, Trophy, User as UserIcon, Users, Target, ClipboardList, Calendar, ExternalLink, Info, Star, Drama } from "lucide-react";
+import { Home, Compass, Trophy, User as UserIcon, Users, Target, ClipboardList, Calendar, ExternalLink, Info, Star, Drama, BookOpen } from "lucide-react";
 import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listQuestCompletions, listEnrolledClasses, type Hunt } from "@/lib/data";
@@ -10,9 +10,10 @@ import { supabase } from "@/lib/supabaseClient";
 
 const tabs = [
   { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
-  { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
+      { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
+      { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
   { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
-  { href: '/participant/rankings', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
+  { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
   { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
 ];
 

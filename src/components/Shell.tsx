@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, Trophy } from "lucide-react";
+import { LogOut, Trophy, HelpCircle } from "lucide-react";
 import { getSession, clearSession } from "@/lib/session";
 import type { User, Profile } from "@/lib/types";
 import { getMyProfile } from "@/lib/data";
@@ -107,7 +107,18 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
               </Link>
             );
           })}
-        </nav>
+                <Link
+          href="/help"
+          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium transition mt-2 ${
+            pathname === "/help" || pathname?.startsWith("/help/")
+              ? "bg-white text-brand-purple shadow-sm"
+              : "text-white/90 hover:bg-white/10"
+          }`}
+        >
+          <span className={pathname === "/help" ? "text-brand-purple" : "text-white"}><HelpCircle className="w-5 h-5" /></span>
+          <span>Help</span>
+        </Link>
+</nav>
         <div className="p-3 border-t border-white/10">
           <button
             onClick={onLogout}
@@ -156,7 +167,17 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
               </Link>
             );
           })}
-        </nav>
+                    <Link
+              key="__help"
+              href="/help"
+              className={`flex flex-col items-center text-xs px-2 py-1 ${
+                pathname === "/help" ? "text-brand-purple font-semibold" : "text-gray-500"
+              }`}
+            >
+              <HelpCircle className="w-5 h-5" />
+              Help
+            </Link>
+</nav>
       </div>
     </div>
   );

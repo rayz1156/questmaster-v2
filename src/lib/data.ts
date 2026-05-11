@@ -609,3 +609,47 @@ export async function listMyEducatorClasses(): Promise<EducatorClassRow[]> {
   if (error) throw error;
   return (data || []) as EducatorClassRow[];
 }
+
+/* ============================================================
+ * Class duplication & learning-board import (added 2026-05-11)
+ * ============================================================ */
+
+export type DuplicateClassOptions = {
+  newTitle?: string;
+  copyLearningBoard?: boolean;
+  copyActivities?: boolean;
+  copyMembers?: boolean;
+  copyEducators?: boolean;
+  asTemplate?: boolean;
+  asDraft?: boolean;
+};
+
+export async function duplicateClass(classId: string, opts: DuplicateClassOptions): Promise<{ classId: string; name: string; copied: any }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token; if (!token) throw new Error('not authed');
+  const r = await fetch(`/api/classes/${classId}/duplicate`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify(opts),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.error || 'Failed to duplicate class');
+  return data;
+}
+
+export async function importLearningBoardFromClass(
+  destinationClassId: string,
+  sourceClassId: string,
+  mode: 'replace' | 'append',
+): Promise<{ ok: true; mode: string; columns: number; cards: number }> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token; if (!token) throw new Error('not authed');
+  const r = await fetch(`/api/learning-boards/${destinationClassId}/import`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+    body: JSON.stringify({ sourceClassId, mode }),
+  });
+  const data = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(data?.error || 'Failed to import learning board');
+  return data;
+}

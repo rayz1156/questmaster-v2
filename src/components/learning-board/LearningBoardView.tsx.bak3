@@ -5,8 +5,6 @@ import VideoLightbox from './VideoLightbox';
 import ImageLightbox from './ImageLightbox';
 import { supabase } from '@/lib/supabase';
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
-import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
-import { FolderInput } from 'lucide-react';
 
 
 /** Wrap fetch() to attach the Supabase access token from localStorage so
@@ -35,36 +33,6 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null);
   // Drag-and-drop state (editor only)
   const [dragCardId, setDragCardId] = useState<string | null>(null);
-  // --- Import learning board from another class ---
-  const [impOpen, setImpOpen] = useState(false);
-  const [impClasses, setImpClasses] = useState<any[]>([]);
-  const [impLoading, setImpLoading] = useState(false);
-  const [impSourceId, setImpSourceId] = useState('');
-  const [impMode, setImpMode] = useState<'replace'|'append'>('append');
-  const [impBusy, setImpBusy] = useState(false);
-  const [impErr, setImpErr] = useState<string | null>(null);
-  const openImport = async () => {
-    setImpOpen(true); setImpErr(null); setImpSourceId(''); setImpMode('append');
-    setImpLoading(true);
-    try {
-      const rows = await listMyEducatorClasses();
-      setImpClasses((rows || []).filter((r: any) => r.id !== classId));
-    } catch (e: any) { setImpErr(e?.message || 'Failed to load classes'); }
-    finally { setImpLoading(false); }
-  };
-  const onImport = async () => {
-    if (!impSourceId) { setImpErr('Pick a source class first'); return; }
-    if (impMode === 'replace' && !window.confirm('This will permanently delete the current learning board on this class. Continue?')) return;
-    setImpBusy(true); setImpErr(null);
-    try {
-      const res = await importLearningBoardFromClass(classId, impSourceId, impMode);
-      setImpOpen(false);
-      alert(`Imported ${res.columns} columns and ${res.cards} cards (${res.mode}).`);
-      if (typeof window !== 'undefined') window.location.reload();
-    } catch (e: any) { setImpErr(e?.message || 'Failed to import'); }
-    finally { setImpBusy(false); }
-  };
-
   const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ columnId: string; index: number } | null>(null);
   const [dragColId, setDragColId] = useState<string | null>(null);
@@ -146,10 +114,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
             title="Display items in a visual mood-board grid"
           >Mood Board</button>
           {isEditor && (
-            <>
-              <button type="button" onClick={openImport} disabled={impBusy} title="Import learning board from another class" className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow disabled:opacity-60"><FolderInput className="w-3.5 h-3.5"/>Import from class</button>
-              <AiThumbnailBatchButton classId={classId} onDone={refresh} />
-            </>
+            <AiThumbnailBatchButton classId={classId} onDone={refresh} />
           )}
         </div>
       </div>
@@ -249,38 +214,6 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
           onCreated={() => { setAddCardTarget(null); refresh(); setTimeout(() => refresh(), 15000); }}
         />
       )}
-    {impOpen && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={()=>!impBusy && setImpOpen(false)}>
-        <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-gray-900">Import learning board</h3>
-            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="text-gray-500 hover:text-gray-900">✕</button>
-          </div>
-          <p className="text-xs text-gray-600 mb-3">Copy columns and cards from another class you own or co-educate. File references are reused (no re-upload).</p>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Source class</label>
-          <select value={impSourceId} onChange={(e)=>setImpSourceId(e.target.value)} disabled={impLoading || impBusy} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 bg-white">
-            <option value="">{impLoading ? 'Loading…' : '— Select a class —'}</option>
-            {impClasses.map((c:any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-          </select>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Mode</label>
-          <div className="space-y-1.5 mb-4">
-            <label className="flex items-start gap-2 text-sm cursor-pointer">
-              <input type="radio" name="impmode" value="append" checked={impMode==='append'} onChange={()=>setImpMode('append')} className="mt-1"/>
-              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">— add source columns after existing ones (safe)</span></span>
-            </label>
-            <label className="flex items-start gap-2 text-sm cursor-pointer">
-              <input type="radio" name="impmode" value="replace" checked={impMode==='replace'} onChange={()=>setImpMode('replace')} className="mt-1"/>
-              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">— delete the current board on this class first</span></span>
-            </label>
-          </div>
-          {impErr && <div className="text-xs text-red-600 mb-2">{impErr}</div>}
-          <div className="flex items-center justify-end gap-2">
-            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-700">Cancel</button>
-            <button onClick={onImport} disabled={impBusy || !impSourceId} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm disabled:opacity-60">{impBusy ? 'Importing…' : 'Import'}</button>
-          </div>
-        </div>
-      </div>
-    )}
     </div>
   );
 }

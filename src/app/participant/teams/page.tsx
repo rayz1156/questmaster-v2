@@ -3,8 +3,7 @@
 import Shell from "@/components/Shell";
 import Link from "next/link";
 import { useEffect, useState, Suspense, useMemo } from "react";
-import {
-  Home,
+import { Home,
   Compass,
   Trophy,
   User as UserIcon,
@@ -17,8 +16,7 @@ import {
   LogOut,
   Check,
   Pencil,
-  X,
-} from "lucide-react";
+  X, BookOpen } from "lucide-react";
 import {
   listTeamsByClass,
   listEnrolledClasses,
@@ -33,7 +31,8 @@ import { useSession } from "@/lib/session";
 
 const navTabs = [
   { href: "/participant/home", label: "Home", icon: <Home className="w-5 h-5" /> },
-  { href: "/participant/activities", label: "Activities", icon: <Compass className="w-5 h-5" /> },
+      { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
+      { href: "/participant/activities", label: "Activities", icon: <Compass className="w-5 h-5" /> },
   { href: "/participant/teams", label: "Teams", icon: <Users className="w-5 h-5" /> },
   { href: "/participant/leaderboard", label: "Ranking", icon: <Trophy className="w-5 h-5" /> },
   { href: "/participant/profile", label: "Profile", icon: <UserIcon className="w-5 h-5" /> },

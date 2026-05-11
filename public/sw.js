@@ -1,6 +1,6 @@
-// Cendekia PWA service worker
+// Kuizen PWA service worker
 // Minimal network-first SW with offline fallback for navigations.
-const CACHE = 'cendekia-shell-v1';
+const CACHE = 'kuizen-shell-v2';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [OFFLINE_URL, '/manifest.json'];
 

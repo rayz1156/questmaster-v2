@@ -5,8 +5,6 @@ import VideoLightbox from './VideoLightbox';
 import ImageLightbox from './ImageLightbox';
 import { supabase } from '@/lib/supabase';
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
-import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
-import { FolderInput } from 'lucide-react';
 
 
 /** Wrap fetch() to attach the Supabase access token from localStorage so
@@ -35,36 +33,6 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null);
   // Drag-and-drop state (editor only)
   const [dragCardId, setDragCardId] = useState<string | null>(null);
-  // --- Import learning board from another class ---
-  const [impOpen, setImpOpen] = useState(false);
-  const [impClasses, setImpClasses] = useState<any[]>([]);
-  const [impLoading, setImpLoading] = useState(false);
-  const [impSourceId, setImpSourceId] = useState('');
-  const [impMode, setImpMode] = useState<'replace'|'append'>('append');
-  const [impBusy, setImpBusy] = useState(false);
-  const [impErr, setImpErr] = useState<string | null>(null);
-  const openImport = async () => {
-    setImpOpen(true); setImpErr(null); setImpSourceId(''); setImpMode('append');
-    setImpLoading(true);
-    try {
-      const rows = await listMyEducatorClasses();
-      setImpClasses((rows || []).filter((r: any) => r.id !== classId));
-    } catch (e: any) { setImpErr(e?.message || 'Failed to load classes'); }
-    finally { setImpLoading(false); }
-  };
-  const onImport = async () => {
-    if (!impSourceId) { setImpErr('Pick a source class first'); return; }
-    if (impMode === 'replace' && !window.confirm('This will permanently delete the current learning board on this class. Continue?')) return;
-    setImpBusy(true); setImpErr(null);
-    try {
-      const res = await importLearningBoardFromClass(classId, impSourceId, impMode);
-      setImpOpen(false);
-      alert(`Imported ${res.columns} columns and ${res.cards} cards (${res.mode}).`);
-      if (typeof window !== 'undefined') window.location.reload();
-    } catch (e: any) { setImpErr(e?.message || 'Failed to import'); }
-    finally { setImpBusy(false); }
-  };
-
   const [dragColumnId, setDragColumnId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<{ columnId: string; index: number } | null>(null);
   const [dragColId, setDragColId] = useState<string | null>(null);
@@ -132,24 +100,21 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   return (
     <div className="h-full">
       <div className="px-4 pt-3 flex items-center justify-end">
-        <div className="inline-flex rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
+        <div className="inline-flex rounded-lg border border-white/10 bg-slate-900/70 shadow-sm overflow-hidden text-sm">
           <button
             type="button"
             onClick={() => changeLayout('columns')}
-            className={`px-3 py-1.5 transition ${layoutMode === 'columns' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-3 py-1.5 transition ${layoutMode === 'columns' ? 'bg-indigo-600 text-white' : 'text-slate-200 hover:bg-white/10'}`}
             title="Display items side by side in columns"
           >Columns</button>
           <button
             type="button"
             onClick={() => changeLayout('mood')}
-            className={`px-3 py-1.5 transition border-l border-gray-200 ${layoutMode === 'mood' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-3 py-1.5 transition border-l border-white/10 ${layoutMode === 'mood' ? 'bg-indigo-600 text-white' : 'text-slate-200 hover:bg-white/10'}`}
             title="Display items in a visual mood-board grid"
           >Mood Board</button>
           {isEditor && (
-            <>
-              <button type="button" onClick={openImport} disabled={impBusy} title="Import learning board from another class" className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow disabled:opacity-60"><FolderInput className="w-3.5 h-3.5"/>Import from class</button>
-              <AiThumbnailBatchButton classId={classId} onDone={refresh} />
-            </>
+            <AiThumbnailBatchButton classId={classId} onDone={refresh} />
           )}
         </div>
       </div>
@@ -249,38 +214,6 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
           onCreated={() => { setAddCardTarget(null); refresh(); setTimeout(() => refresh(), 15000); }}
         />
       )}
-    {impOpen && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={()=>!impBusy && setImpOpen(false)}>
-        <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
-          <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-gray-900">Import learning board</h3>
-            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="text-gray-500 hover:text-gray-900">✕</button>
-          </div>
-          <p className="text-xs text-gray-600 mb-3">Copy columns and cards from another class you own or co-educate. File references are reused (no re-upload).</p>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Source class</label>
-          <select value={impSourceId} onChange={(e)=>setImpSourceId(e.target.value)} disabled={impLoading || impBusy} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 bg-white">
-            <option value="">{impLoading ? 'Loading…' : '— Select a class —'}</option>
-            {impClasses.map((c:any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-          </select>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Mode</label>
-          <div className="space-y-1.5 mb-4">
-            <label className="flex items-start gap-2 text-sm cursor-pointer">
-              <input type="radio" name="impmode" value="append" checked={impMode==='append'} onChange={()=>setImpMode('append')} className="mt-1"/>
-              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">— add source columns after existing ones (safe)</span></span>
-            </label>
-            <label className="flex items-start gap-2 text-sm cursor-pointer">
-              <input type="radio" name="impmode" value="replace" checked={impMode==='replace'} onChange={()=>setImpMode('replace')} className="mt-1"/>
-              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">— delete the current board on this class first</span></span>
-            </label>
-          </div>
-          {impErr && <div className="text-xs text-red-600 mb-2">{impErr}</div>}
-          <div className="flex items-center justify-end gap-2">
-            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-700">Cancel</button>
-            <button onClick={onImport} disabled={impBusy || !impSourceId} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm disabled:opacity-60">{impBusy ? 'Importing…' : 'Import'}</button>
-          </div>
-        </div>
-      </div>
-    )}
     </div>
   );
 }
@@ -1503,7 +1436,7 @@ function MoodBoardGrid({
             const grad = cardGradient(columnTitle || columnId);
             return (
               <div key={card.id} className="mb-4 break-inside-avoid group">
-                <div className="mood-card relative rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_18px_40px_-14px_rgba(0,0,0,0.8)]">
+                <div className="mood-card relative rounded-2xl overflow-hidden bg-slate-900/70 backdrop-blur-sm border border-white/5 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_18px_40px_-14px_rgba(0,0,0,0.8)]">
                   <div
                     className="absolute top-2 left-2 z-10 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide backdrop-blur-md"
                     style={{
@@ -1545,11 +1478,11 @@ function MoodBoardGrid({
         >
           <div
             onClick={(e) => e.stopPropagation()}
-            className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-5 text-gray-900"
+            className="w-full max-w-md rounded-2xl bg-slate-900 border border-white/10 shadow-2xl p-5 text-slate-100"
           >
             <div className="flex items-center justify-between mb-3">
               <h3 className="text-base font-semibold">Add resource to…</h3>
-              <button onClick={() => setPickerOpen(false)} className="text-gray-500 hover:text-gray-900">×</button>
+              <button onClick={() => setPickerOpen(false)} className="text-slate-400 hover:text-white">×</button>
             </div>
             <p className="text-xs text-slate-400 mb-3">Pick a topic for the new card. Choose “No topic” to add it without a category.</p>
             <div className="max-h-[55vh] overflow-y-auto pr-1 -mr-1 space-y-1.5">
@@ -1687,13 +1620,13 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
       )}
 
       {running && progress && (
-        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl bg-white text-gray-900 border border-gray-200 shadow-2xl p-4">
+        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl bg-slate-900 text-slate-100 border border-white/10 shadow-2xl p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold">✨ Generating AI thumbnails</div>
-            <button onClick={() => abortRef.current?.abort()} className="text-xs text-gray-500 hover:text-gray-900">Cancel</button>
+            <button onClick={() => abortRef.current?.abort()} className="text-xs text-slate-400 hover:text-white">Cancel</button>
           </div>
-          <div className="text-xs text-gray-500 mb-2">{progress.processed} / {progress.total} · {progress.succeeded} ok · {progress.failed} failed</div>
-          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+          <div className="text-xs text-slate-400 mb-2">{progress.processed} / {progress.total} · {progress.succeeded} ok · {progress.failed} failed</div>
+          <div className="h-2 bg-white/10 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-indigo-400 to-fuchsia-400 transition-all" style={{ width: `${progress.total ? (progress.processed / progress.total) * 100 : 0}%` }} />
           </div>
         </div>

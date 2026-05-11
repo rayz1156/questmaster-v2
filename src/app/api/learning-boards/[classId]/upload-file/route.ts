@@ -72,9 +72,12 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
 
+  // Stable URL that streams the file through our server (sets correct content-type so <img>/<video> can render).
+  const fileluFileUrl = `/api/learning-boards/${params.classId}/file-redirect/${uploaded.fileCode}`;
   return NextResponse.json({
     fileCode: uploaded.fileCode,
     fileUrl: fileluShareUrl(uploaded.fileCode),
+    fileluFileUrl,
     fileName: uploaded.fileName,
     fileMimeType: uploaded.mimeType,
     fileSizeBytes: uploaded.sizeBytes,

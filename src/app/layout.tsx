@@ -3,6 +3,8 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
+import TranslateWidget from "@/components/TranslateWidget";
+import AnalyticsTracker from "@/components/AnalyticsTracker";
 
 const poppins = Poppins({ subsets: ["latin"], weight: ["300","400","500","600","700"] });
 
@@ -38,6 +40,8 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={poppins.className}>
         {children}
         <InstallPrompt />
+        <TranslateWidget />
+        <AnalyticsTracker />
         <RegisterSW />
       </body>
     </html>

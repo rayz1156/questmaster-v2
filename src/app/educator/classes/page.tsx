@@ -2,8 +2,8 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { useEffect, useState } from "react";
-import { ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check } from "lucide-react";
-import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode } from "@/lib/data";
+import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus} from "lucide-react";
+import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass } from "@/lib/data";
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 
 const tabs = [
@@ -58,6 +58,46 @@ export default function EduClasses() {
     } catch (e: any) {
       setErr(e.message || "Failed to create class");
     } finally { setBusy(false); }
+  };
+
+
+  // --- Duplicate class state ---
+  const [dupTarget, setDupTarget] = useState<EducatorClassRow | null>(null);
+  const [dupTitle, setDupTitle] = useState('');
+  const [dupLB, setDupLB] = useState(true);
+  const [dupAct, setDupAct] = useState(true);
+  const [dupMem, setDupMem] = useState(false);
+  const [dupEdu, setDupEdu] = useState(true);
+  const [dupTpl, setDupTpl] = useState(false);
+  const [dupDraft, setDupDraft] = useState(true);
+  const [dupBusy, setDupBusy] = useState(false);
+  const [dupErr, setDupErr] = useState<string | null>(null);
+  const openDuplicate = (k: EducatorClassRow) => {
+    setDupTarget(k);
+    setDupTitle(`Copy of ${k.name}`);
+    setDupLB(true); setDupAct(true); setDupMem(false); setDupEdu(true);
+    setDupTpl(false); setDupDraft(true);
+    setDupErr(null);
+  };
+  const onDuplicate = async () => {
+    if (!dupTarget) return;
+    setDupErr(null); setDupBusy(true);
+    try {
+      const res = await duplicateClass(dupTarget.id, {
+        newTitle: dupTitle.trim() || undefined,
+        copyLearningBoard: dupLB,
+        copyActivities: dupAct,
+        copyMembers: dupMem,
+        copyEducators: dupEdu,
+        asTemplate: dupTpl,
+        asDraft: dupDraft,
+      });
+      setDupTarget(null);
+      await reload();
+      alert(`Created "${res.name}". Copied: ${res.copied.columns} columns, ${res.copied.cards} cards, ${res.copied.hunts} activities, ${res.copied.members} members, ${res.copied.educators} educators.`);
+    } catch (e: any) {
+      setDupErr(e?.message || 'Failed to duplicate');
+    } finally { setDupBusy(false); }
   };
 
   const onDelete = async (k: EducatorClassRow) => {
@@ -148,7 +188,7 @@ export default function EduClasses() {
                   </div>
                 </div>
                 {k.role === "owner" ? (
-                  <button onClick={() => onDelete(k)} className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4"/></button>
+                  <><button onClick={() => openDuplicate(k)} title="Duplicate class" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><CopyPlus className="w-4 h-4"/></button><button onClick={() => onDelete(k)} title="Delete class" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4"/></button></>
                 ) : (
                   <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 shrink-0">{roleLabel(k.role)}</span>
                 )}
@@ -162,6 +202,37 @@ export default function EduClasses() {
           ))}
         </div>
       )}
+      {dupTarget && (
+        <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !dupBusy && setDupTarget(null)}>
+          <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold">Duplicate class</h3>
+              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="text-gray-500 hover:text-gray-900">✕</button>
+            </div>
+            <label className="block text-xs font-medium text-gray-700 mb-1">New class title</label>
+            <input value={dupTitle} onChange={(e)=>setDupTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder={`Copy of ${dupTarget.name}`} />
+            <div className="space-y-2 mb-4">
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupLB} onChange={(e)=>setDupLB(e.target.checked)} className="rounded"/> Copy learning board</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupAct} onChange={(e)=>setDupAct(e.target.checked)} className="rounded"/> Copy activities</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupMem} onChange={(e)=>setDupMem(e.target.checked)} className="rounded"/> Copy members</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupEdu} onChange={(e)=>setDupEdu(e.target.checked)} className="rounded"/> Copy educators</label>
+            </div>
+            <details className="mb-4">
+              <summary className="text-xs font-medium text-gray-700 cursor-pointer select-none">Advanced / Template options</summary>
+              <div className="mt-2 space-y-2 pl-1">
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupTpl} onChange={(e)=>setDupTpl(e.target.checked)} className="rounded"/> Save as reusable template <span className="text-xs text-gray-500">(strips content, keeps structure)</span></label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupDraft} onChange={(e)=>setDupDraft(e.target.checked)} className="rounded"/> Save as draft <span className="text-xs text-gray-500">(don't publish until reviewed)</span></label>
+              </div>
+            </details>
+            {dupErr && <div className="text-xs text-red-600 mb-2">{dupErr}</div>}
+            <div className="flex items-center justify-end gap-2">
+              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
+              <button onClick={onDuplicate} disabled={dupBusy} className="btn-primary py-1.5 px-3 text-sm">{dupBusy ? 'Duplicating…' : 'Duplicate'}</button>
+            </div>
+          </div>
+        </div>
+      )}
+
     </Shell>
   );
 }
