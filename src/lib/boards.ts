@@ -126,53 +126,60 @@ export interface IntroPostWithAuthor extends IntroPost {
 }
 
 export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
-  const { data, error } = await supabase
-    .from('qm_intro_posts')
-    .select('*')
-    .eq('board_id', boardId)
-    .eq('is_hidden', false)
-    .order('created_at', { ascending: false });
-  if (error) throw error;
-  const posts = (data || []) as IntroPost[];
-  if (posts.length === 0) return posts;
-  // Fetch live author profiles (bio + avatar) so the intro board
-  // always reflects the user's current profile, not the stale per-post copy.
-  const authorIds = Array.from(new Set(posts.map(p => p.author_id))).filter(Boolean);
-  if (authorIds.length === 0) return posts;
-  const { data: profs } = await supabase
+  // Auto-populate: every class member shows up automatically using their current profile.
+  // 1. Find the board's class_id.
+  const { data: board, error: bErr } = await supabase
+    .from('qm_boards').select('id, class_id, created_at').eq('id', boardId).maybeSingle();
+  if (bErr) throw bErr;
+  if (!board?.class_id) return [];
+  // 2. Find all members of that class.
+  const { data: members, error: mErr } = await supabase
+    .from('qm_class_members').select('user_id').eq('class_id', board.class_id);
+  if (mErr) throw mErr;
+  const memberIds = (members || []).map((m: any) => m.user_id as string).filter(Boolean);
+  if (memberIds.length === 0) return [];
+  // 3. Fetch their profiles.
+  const { data: profs, error: pErr } = await supabase
     .from('qm_profiles')
-    .select('id, display_name, bio, avatar_url, intro_display_name, intro_media_type, intro_image_file_code, intro_video_adilo_file_id, intro_video_adilo_project_id, intro_video_thumbnail_url, intro_video_duration_seconds')
-    .in('id', authorIds);
-  type ProfRow = { display_name: string | null; bio: string | null; avatar_url: string | null; intro_display_name: string | null; intro_media_type: 'image' | 'video' | null; intro_image_file_code: string | null; intro_video_adilo_file_id: string | null; intro_video_adilo_project_id: string | null; intro_video_thumbnail_url: string | null; intro_video_duration_seconds: number | null; };
-  const byId = new Map<string, ProfRow>();
-  (profs || []).forEach((r: any) => byId.set(r.id, {
-    display_name: r.display_name ?? null,
-    bio: r.bio ?? null,
-    avatar_url: r.avatar_url ?? null,
-    intro_display_name: r.intro_display_name ?? null,
-    intro_media_type: r.intro_media_type ?? null,
-    intro_image_file_code: r.intro_image_file_code ?? null,
-    intro_video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
-    intro_video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
-    intro_video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
-    intro_video_duration_seconds: r.intro_video_duration_seconds ?? null,
-  }));
-  return posts.map(p => {
-    const prof = byId.get(p.author_id);
-    return {
-      ...p,
-      author_bio: prof?.bio ?? null,
-      author_display_name: prof?.display_name ?? null,
-      author_avatar_url: prof?.avatar_url ?? null,
-      author_intro_display_name: prof?.intro_display_name ?? null,
-      author_intro_media_type: prof?.intro_media_type ?? null,
-      author_intro_image_file_code: prof?.intro_image_file_code ?? null,
-      author_intro_video_adilo_file_id: prof?.intro_video_adilo_file_id ?? null,
-      author_intro_video_adilo_project_id: prof?.intro_video_adilo_project_id ?? null,
-      author_intro_video_thumbnail_url: prof?.intro_video_thumbnail_url ?? null,
-      author_intro_video_duration_seconds: prof?.intro_video_duration_seconds ?? null,
-    };
+    .select('id, display_name, bio, avatar_url, intro_display_name, intro_media_type, intro_image_file_code, intro_video_adilo_file_id, intro_video_adilo_project_id, intro_video_thumbnail_url, intro_video_duration_seconds, intro_media_updated_at')
+    .in('id', memberIds);
+  if (pErr) throw pErr;
+  // 4. Build IntroPost rows from each member's profile.
+  const items: IntroPost[] = (profs || []).map((r: any) => ({
+    id: `auto-${r.id}`,
+    board_id: boardId,
+    author_id: r.id,
+    display_name: r.intro_display_name || r.display_name || null,
+    description: r.bio || null,
+    image_url: null,
+    image_path: null,
+    media_type: (r.intro_video_adilo_file_id ? 'video' : 'image'),
+    video_adilo_file_id: r.intro_video_adilo_file_id || null,
+    video_adilo_project_id: r.intro_video_adilo_project_id || null,
+    video_thumbnail_url: r.intro_video_thumbnail_url || null,
+    video_duration_seconds: r.intro_video_duration_seconds || null,
+    is_hidden: false,
+    created_at: r.intro_media_updated_at || board.created_at || new Date().toISOString(),
+    updated_at: r.intro_media_updated_at || board.created_at || new Date().toISOString(),
+    // Author fields used by IntroBoardView rendering
+    author_bio: r.bio ?? null,
+    author_display_name: r.display_name ?? null,
+    author_avatar_url: r.avatar_url ?? null,
+    author_intro_display_name: r.intro_display_name ?? null,
+    author_intro_media_type: r.intro_media_type ?? null,
+    author_intro_image_file_code: r.intro_image_file_code ?? null,
+    author_intro_video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
+    author_intro_video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
+    author_intro_video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
+    author_intro_video_duration_seconds: r.intro_video_duration_seconds ?? null,
+  } as any));
+  items.sort((a, b) => {
+    const am = (a as any).updated_at || '';
+    const bm = (b as any).updated_at || '';
+    if (am && bm && am !== bm) return bm.localeCompare(am);
+    return ((a as any).author_display_name || '').localeCompare((b as any).author_display_name || '');
   });
+  return items;
 }
 
 export async function getMyIntroPost(boardId: string): Promise<IntroPost | null> {

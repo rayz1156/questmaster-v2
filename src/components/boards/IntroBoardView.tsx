@@ -57,17 +57,9 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">{board.title}</h2>
-          {board.description && <p className="text-sm text-gray-600">{board.description}</p>}
+          <p className="text-sm text-gray-600">Ice-breaking board: introduce yourself with a photo and short bio in your profile page)</p>
         </div>
-        {(
-          <button
-            onClick={() => setShowModal(true)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700"
-          >
-            <Plus className="w-4 h-4" />
-            {mine ? "Edit My Introduction" : "Add My Introduction"}
-          </button>
-        )}
+        {/* Auto-populated from class members’ profiles */}
       </div>
 
       {err && <div className="p-3 rounded bg-red-50 text-red-700 text-sm">{err}</div>}
@@ -76,7 +68,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
       {!loading && posts.length === 0 && (
         <div className="p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
           <ImageIcon className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-600">No introductions yet. Be the first!</p>
+          <p className="text-gray-600">No class members yet. Once members join, their introductions will appear here automatically.</p>
         </div>
       )}
 
