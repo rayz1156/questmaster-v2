@@ -116,7 +116,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
             <LogOut className="w-5 h-5" /> Sign out
           </button>
           <div className="text-[11px] text-white/60 text-center mt-3">
-            <span className="font-semibold">UPSI · AFK · Airiz</span>
+            <span className="font-semibold">UPSI · AFK · Veltrix</span>
           </div>
         </div>
       </aside>
@@ -136,7 +136,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
         </main>
 
         <footer className="hidden lg:block text-center text-xs text-gray-400 py-4">
-          <span className="font-semibold text-gray-500">UPSI · AFK · Airiz</span>
+          <span className="font-semibold text-gray-500">UPSI · AFK · Veltrix</span>
         </footer>
 
         {/* ---- Mobile bottom tab bar (hidden on lg+) ---- */}

@@ -75,8 +75,8 @@ export default function Register() {
     
       <div className="text-center mt-8 space-y-1">
         <div className="text-[11px] text-white/60 uppercase tracking-widest">In collaboration with</div>
-        <div className="text-sm text-white/90 font-medium">UPSI · AFK · Airiz</div>
-        <div className="text-[11px] text-white/60 mt-2">Powered by <span className="font-semibold text-white/80">Airiz Intelligence</span></div>
+        <div className="text-sm text-white/90 font-medium">UPSI · AFK · Veltrix</div>
+        <div className="text-[11px] text-white/60 mt-2">Powered by <span className="font-semibold text-white/80">Veltrix Technology</span></div>
       </div>
 </div>
   );
