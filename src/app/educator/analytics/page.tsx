@@ -2,6 +2,7 @@
 import { useEffect, useState, useMemo } from "react";
 import ActivityStatsPanel from "@/components/analytics/ActivityStatsPanel";
 import AtRiskPanel from "@/components/analytics/AtRiskPanel";
+import GamificationPanel from "@/components/analytics/GamificationPanel";
 import TeamStatsPanel from "@/components/analytics/TeamStatsPanel";
 import Shell from "@/components/Shell";
 import { supabase } from "@/lib/supabaseClient";
@@ -172,8 +173,9 @@ export default function EducatorAnalyticsPage() {
           <ActivityStatsPanel classId={classId} />
         <TeamStatsPanel classId={classId} />
         <AtRiskPanel classId={classId} />
+        <GamificationPanel classId={classId} />
         <p className="mt-6 text-xs text-gray-500">
-            More tiers (learning outcomes & mastery) are on the roadmap.
+            More tiers (learning outcomes & mastery) are on the roadmap. Tier 6 (gamification) is now live.
             Submit ideas via <a className="text-purple-600 underline" href="/help">Help → Send Feedback</a>.
           </p>
         </>
