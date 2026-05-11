@@ -1,5 +1,6 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
+import ActivityStatsPanel from "@/components/analytics/ActivityStatsPanel";
 import Shell from "@/components/Shell";
 import { supabase } from "@/lib/supabaseClient";
 import { listMyEducatorClasses } from "@/lib/data";
@@ -166,8 +167,9 @@ export default function EducatorAnalyticsPage() {
             </div>
           </div>
 
-          <p className="mt-6 text-xs text-gray-500">
-            More tiers (per-quest performance, team contribution, mastery, predictive risk) are on the roadmap.
+          <ActivityStatsPanel classId={classId} />
+        <p className="mt-6 text-xs text-gray-500">
+            More tiers (team contribution, mastery, predictive risk) are on the roadmap.
             Submit ideas via <a className="text-purple-600 underline" href="/help">Help → Send Feedback</a>.
           </p>
         </>
