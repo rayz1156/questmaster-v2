@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { supabase } from '@/lib/supabaseClient';
 import { ListChecks } from 'lucide-react';
 
 type Quest = {
@@ -29,14 +30,21 @@ export default function ActivityStatsPanel({ classId }: { classId: string | null
     let cancelled = false;
     setLoading(true);
     setError(null);
-    fetch(`/api/analytics/activity-stats?classId=${encodeURIComponent(classId)}`, { credentials: 'include' })
-      .then(async r => {
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        const headers: Record<string, string> = {};
+        if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
+        const r = await fetch(`/api/analytics/activity-stats?classId=${encodeURIComponent(classId)}`, { headers });
         const j = await r.json();
         if (!r.ok) throw new Error(j.error ?? 'Failed to load');
         if (!cancelled) setData(j as Resp);
-      })
-      .catch(e => { if (!cancelled) setError(e instanceof Error ? e.message : 'Failed'); })
-      .finally(() => { if (!cancelled) setLoading(false); });
+      } catch (e: unknown) {
+        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
     return () => { cancelled = true; };
   }, [classId]);
 
