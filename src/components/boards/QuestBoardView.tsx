@@ -10,6 +10,7 @@ import {
   createOrUpdateGroupSubmission, gradeSubmission, deleteGroupSubmission,
   listTeamsForHunt, getHuntSubmissionLink, HuntSubmissionLink,
 } from "@/lib/boards";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 interface Team { id: string; name: string; score: number; }
 
@@ -32,6 +33,7 @@ const STATUS_COLOR: Record<SubmissionStatus, string> = {
 
 export default function QuestBoardView({ board, canManage, currentUserId }: Props) {
   const [teams, setTeams] = useState<Team[]>([]);
+  const confirm = useConfirm();
   const [subs, setSubs] = useState<GroupSubmission[]>([]);
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -208,7 +210,7 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                         </button>
                       )}
                       {(canManage || isMyTeam) && (
-                        <button onClick={async () => { if (confirm('Delete this submission?')) { await deleteGroupSubmission(sub.id); reload(); } }}
+                        <button onClick={async () => { if ((await confirm({ title: 'Delete this submission?', tone: 'danger' }))) { await deleteGroupSubmission(sub.id); reload(); } }}
                           className="text-xs px-2.5 py-1 rounded border text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1"
                           title="Delete submission">
                           <Trash2 className="w-3.5 h-3.5" />

@@ -6,6 +6,7 @@ import { useSession } from '@/lib/session';
 import Shell from '@/components/Shell';
 import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, Activity } from "lucide-react";
 import { listMyHunts, deleteHunt, listMyClasses, type Hunt, type Klass } from '@/lib/data';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const tabs = [
   { href: "/educator/classes",    label: "Classes",    icon: <GraduationCap className="w-5 h-5"/> },
@@ -19,6 +20,7 @@ const tabs = [
 function PageInner() {
   const { user } = useSession('educator');
   const [hunts, setHunts] = useState<Hunt[]>([]);
+  const confirm = useConfirm();
   const [classMap, setClassMap] = useState<Record<string,string>>({});
   const [busy, setBusy] = useState(false);
   const sp = useSearchParams();
@@ -26,7 +28,7 @@ function PageInner() {
   async function refresh() { setHunts(await listMyHunts()); listMyClasses().then((cls: Klass[]) => { const m: Record<string,string> = {}; cls.forEach(k => m[k.id] = k.name); setClassMap(m); }).catch(() => {}); }
   useEffect(() => { if (!user) return; (async () => { setBusy(true); try { await refresh(); } finally { setBusy(false); } })(); }, [user]);
   async function onDelete(id: string) {
-    if (!confirm('Delete this quest? This cannot be undone.')) return;
+    if (!(await confirm({ title: 'Delete this quest? This cannot be undone.', tone: 'danger' }))) return;
     await deleteHunt(id); await refresh();
   }
   return (

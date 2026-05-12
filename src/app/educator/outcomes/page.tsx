@@ -4,6 +4,7 @@ import Shell from "@/components/Shell";
 import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, Activity, Target, Plus, Trash2, Save, X, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useSearchParams } from "next/navigation";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const tabs = [
   { href: "/educator/classes",    label: "Classes",    icon: <GraduationCap className="w-5 h-5"/> },
@@ -31,6 +32,7 @@ function OutcomesPageInner() {
   const sp = useSearchParams();
   const initialClassId = sp.get("class_id");
   const [classes, setClasses] = useState<Klass[]>([]);
+  const confirm = useConfirm();
   const [classId, setClassId] = useState<string | null>(initialClassId);
   const [outcomes, setOutcomes] = useState<Outcome[]>([]);
   const [hunts, setHunts] = useState<Hunt[]>([]);
@@ -140,7 +142,7 @@ function OutcomesPageInner() {
   }
 
   async function deleteOutcome(id: string) {
-    if (!confirm("Delete this outcome and all its tags?")) return;
+    if (!(await confirm({ title: "Delete this outcome and all its tags?", tone: 'danger' }))) return;
     const r = await authedFetch(`/api/outcomes/${id}`, { method: "DELETE" });
     if (!r.ok) { const j = await r.json(); setError(j.error || "Delete failed"); return; }
     void loadData();

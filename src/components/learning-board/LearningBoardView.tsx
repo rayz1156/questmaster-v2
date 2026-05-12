@@ -7,6 +7,7 @@ import { supabase } from '@/lib/supabase';
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
 import { FolderInput } from 'lucide-react';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 
 /** Wrap fetch() to attach the Supabase access token from localStorage so
@@ -26,6 +27,7 @@ type Snapshot = {
 
 export default function LearningBoardView({ classId, isEditor }: { classId: string; isEditor: boolean }) {
   const [snap, setSnap] = useState<Snapshot | null>(null);
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [playingFileId, setPlayingFileId] = useState<{ fileId: string; title: string | null } | null>(null);
@@ -54,7 +56,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   };
   const onImport = async () => {
     if (!impSourceId) { setImpErr('Pick a source class first'); return; }
-    if (impMode === 'replace' && !window.confirm('This will permanently delete the current learning board on this class. Continue?')) return;
+    if (impMode === 'replace' && !(await confirm({ title: 'This will permanently delete the current learning board on this class. Continue?', tone: 'danger' }))) return;
     setImpBusy(true); setImpErr(null);
     try {
       const res = await importLearningBoardFromClass(classId, impSourceId, impMode);

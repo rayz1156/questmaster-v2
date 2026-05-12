@@ -4,15 +4,17 @@ import { adminTabs } from "@/lib/adminTabs";
 import { useEffect, useState } from "react";
 import { adminListAllClasses, adminUpdateClass, adminDeleteClass, logAudit } from "@/lib/data";
 import { Search, Pencil, Trash2, X, Save } from "lucide-react";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 export default function Page() {
   const [rows, setRows] = useState<any[]>([]);
+  const confirm = useConfirm();
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<any | null>(null);
   const reload = async () => setRows(await adminListAllClasses());
   useEffect(() => { reload(); }, []);
   const filtered = rows.filter(r => !q || (r.name||'').toLowerCase().includes(q.toLowerCase()) || (r.code||'').toLowerCase().includes(q.toLowerCase()));
   async function save() { if (!edit) return; await adminUpdateClass(edit.id, { name: edit.name, code: edit.code }); await logAudit('class_edit','class',edit.id,{}); setEdit(null); reload(); }
-  async function remove(c: any) { if (!confirm(`Delete class "${c.name}"?`)) return; await adminDeleteClass(c.id); await logAudit('class_delete','class',c.id,{ name: c.name }); reload(); }
+  async function remove(c: any) { if (!(await confirm({ title: `Delete class "${c.name}"?`, tone: 'danger' }))) return; await adminDeleteClass(c.id); await logAudit('class_delete','class',c.id,{ name: c.name }); reload(); }
   return (
     <Shell tabs={adminTabs}>
       <h2 className="font-bold text-lg mb-3">Classes</h2>

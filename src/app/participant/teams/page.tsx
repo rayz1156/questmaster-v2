@@ -28,6 +28,7 @@ import {
 } from "@/lib/data";
 import { getBoardForClass } from "@/lib/boards";
 import { useSession } from "@/lib/session";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const navTabs = [
   { href: "/participant/home", label: "Home", icon: <Home className="w-5 h-5" /> },
@@ -54,6 +55,7 @@ const AVATAR_PALETTE = [
 function Inner() {
   const { session, loading: authLoading } = useSession();
   const [classes, setClasses] = useState<Klass[]>([]);
+  const confirm = useConfirm();
   const [activeClassId, setActiveClassId] = useState<string>("");
   const [teams, setTeams] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -170,7 +172,7 @@ function Inner() {
   }
 
   async function handleLeave(team: any) {
-    if (!window.confirm("Leave this team?")) return;
+    if (!(await confirm({ title: "Leave this team?", tone: 'danger' }))) return;
     try {
       await leaveTeam(team.id);
       setMembersByTeam((p) => {

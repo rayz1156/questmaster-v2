@@ -9,6 +9,7 @@ import {
 import { supabase } from "@/lib/supabase";
 // VideoLightbox not used here - intro videos use IntroVideoLightbox below
 import ImageLightbox from "@/components/learning-board/ImageLightbox";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 interface Props {
   board: Board;
@@ -25,6 +26,7 @@ async function authedFetch(input: RequestInfo, init?: RequestInit): Promise<Resp
 
 export default function IntroBoardView({ board, canManage, currentUserId }: Props) {
   const [posts, setPosts] = useState<IntroPost[]>([]);
+  const confirm = useConfirm();
   const [mine, setMine] = useState<IntroPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -47,7 +49,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [board.id]);
 
   const handleDelete = async (p: IntroPost) => {
-    if (!confirm("Delete this post?")) return;
+    if (!(await confirm({ title: "Delete this post?", tone: 'danger' }))) return;
     try { await deleteIntroPost(p.id); await reload(); }
     catch (e: any) { alert(e.message || String(e)); }
   };

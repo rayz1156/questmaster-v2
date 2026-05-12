@@ -12,6 +12,7 @@ import {
 } from "@/lib/data";
 import type { ClassEducator, ClassEducatorInvite } from "@/lib/types";
 import { Copy, Trash2, Crown, UserPlus, ShieldCheck, RefreshCw } from "lucide-react";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 type Props = { classId: string };
 
@@ -19,6 +20,7 @@ export default function EducatorsCard({ classId }: Props) {
   const { user } = useSession();
   const meId = user?.id || null;
   const [educators, setEducators] = useState<ClassEducator[]>([]);
+  const confirm = useConfirm();
   const [invites, setInvites] = useState<ClassEducatorInvite[]>([]);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -88,7 +90,7 @@ export default function EducatorsCard({ classId }: Props) {
   }
 
   async function handleRevoke(inviteId: string) {
-    if (!confirm("Revoke this invite?")) return;
+    if (!(await confirm({ title: "Revoke this invite?", tone: 'danger' }))) return;
     try {
       await revokeClassEducatorInvite(inviteId);
       await reload();
@@ -98,7 +100,7 @@ export default function EducatorsCard({ classId }: Props) {
   }
 
   async function handleRemove(educatorId: string, name: string) {
-    if (!confirm(`Remove ${name} from this class? They will lose access immediately.`)) return;
+    if (!(await confirm({ title: `Remove ${name} from this class? They will lose access immediately.`, tone: 'danger' }))) return;
     try {
       await removeClassEducator(classId, educatorId);
       await reload();
@@ -109,9 +111,12 @@ export default function EducatorsCard({ classId }: Props) {
 
   async function handleTransfer(targetId: string, targetName: string) {
     if (
-      !confirm(
-        `Transfer ownership of this class to ${targetName}?\n\nYou will become a co-creator and lose the ability to delete the class, remove other educators, or transfer ownership again.`
-      )
+      !(await confirm({
+        title: `Transfer ownership of this class to ${targetName}?`,
+        description: 'You will become a co-creator and lose the ability to delete the class, remove other educators, or transfer ownership again.',
+        confirmLabel: 'Transfer',
+        tone: 'danger',
+      }))
     )
       return;
     try {

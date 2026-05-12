@@ -5,6 +5,7 @@ import { useEffect, useState } from "react";
 import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus, Activity} from "lucide-react";
 import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass } from "@/lib/data";
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const tabs = [
   { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
@@ -24,6 +25,7 @@ function roleLabel(role: string): string {
 
 export default function EduClasses() {
   const [classes, setClasses] = useState<EducatorClassRow[]>([]);
+  const confirm = useConfirm();
   const [invites, setInvites] = useState<MyClassEducatorInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -103,7 +105,7 @@ export default function EduClasses() {
 
   const onDelete = async (k: EducatorClassRow) => {
     if (k.role !== "owner") return;
-    if (!confirm(`Delete class "${k.name}"? All its activities will be deleted too.`)) return;
+    if (!(await confirm({ title: `Delete class "${k.name}"? All its activities will be deleted too.`, tone: 'danger' }))) return;
     try {
       await deleteClass(k.id);
       await reload();

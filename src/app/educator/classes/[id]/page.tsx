@@ -6,6 +6,7 @@ import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, 
 import Shell from "@/components/Shell";
 import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, Klass, ClassInvite } from "@/lib/data";
 import EducatorsCard from "@/components/EducatorsCard";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const tabs = [
   { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
@@ -68,6 +69,7 @@ export default function ClassDetail() {
   const params = useParams<{ id: string }>();
   const id = params.id;
   const [klass, setKlass] = useState<Klass | null>(null);
+  const confirm = useConfirm();
   const [members, setMembers] = useState<any[]>([]);
   const [educators, setEducators] = useState<any[]>([]);
   const [invites, setInvites] = useState<ClassInvite[]>([]);
@@ -273,7 +275,7 @@ export default function ClassDetail() {
                       <td className="px-5 py-3 text-gray-700">{formatJoined(m.joined_at)}</td>
                       <td className="px-5 py-3 text-gray-700">{formatLastActive(m.qm_profiles?.last_active_at || m.joined_at)}</td>
                       <td className="px-5 py-3 text-right">
-                        <button onClick={async()=>{ if(confirm('Remove this member?')){ await removeClassMember(id, m.user_id); reload(); } }} title="Remove member" className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><MoreHorizontal className="w-4 h-4"/></button>
+                        <button onClick={async()=>{ if((await confirm({ title: 'Remove this member?', tone: 'danger' }))){ await removeClassMember(id, m.user_id); reload(); } }} title="Remove member" className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><MoreHorizontal className="w-4 h-4"/></button>
                       </td>
                     </tr>
                   );

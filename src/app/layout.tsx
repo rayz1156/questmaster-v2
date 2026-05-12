@@ -5,6 +5,7 @@ import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
 import TranslateWidget from "@/components/TranslateWidget";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
+import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 
 const poppins = Poppins({ subsets: ["latin"], weight: ["300","400","500","600","700"] });
 
@@ -48,7 +49,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
   return (
     <html lang="en">
       <body className={poppins.className}>
-        {children}
+        <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <TranslateWidget />
         <AnalyticsTracker />

@@ -4,15 +4,17 @@ import { adminTabs } from "@/lib/adminTabs";
 import { useEffect, useState } from "react";
 import { adminListAllTeams, adminUpdateTeam, adminDeleteTeam, logAudit, type Team } from "@/lib/data";
 import { Search, Pencil, Trash2, X, Save } from "lucide-react";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 export default function Page() {
   const [rows, setRows] = useState<Team[]>([]);
+  const confirm = useConfirm();
   const [q, setQ] = useState("");
   const [edit, setEdit] = useState<Team | null>(null);
   const reload = async () => setRows(await adminListAllTeams());
   useEffect(() => { reload(); }, []);
   const filtered = rows.filter(r => !q || (r.name||'').toLowerCase().includes(q.toLowerCase()));
   async function save() { if (!edit) return; await adminUpdateTeam(edit.id, { name: edit.name }); await logAudit('team_edit','team',edit.id,{}); setEdit(null); reload(); }
-  async function remove(t: Team) { if (!confirm(`Delete team "${t.name}"?`)) return; await adminDeleteTeam(t.id); await logAudit('team_delete','team',t.id,{ name: t.name }); reload(); }
+  async function remove(t: Team) { if (!(await confirm({ title: `Delete team "${t.name}"?`, tone: 'danger' }))) return; await adminDeleteTeam(t.id); await logAudit('team_delete','team',t.id,{ name: t.name }); reload(); }
   return (
     <Shell tabs={adminTabs}>
       <h2 className="font-bold text-lg mb-3">Teams</h2>

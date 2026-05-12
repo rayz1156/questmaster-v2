@@ -4,6 +4,7 @@ import { adminTabs } from "@/lib/adminTabs";
 import { useEffect, useState } from "react";
 import { adminListProfiles, adminUpdateProfile, adminListUsersMeta, adminDeleteUser, logAudit, type Profile, type UserMeta } from "@/lib/data";
 import { Search } from "lucide-react";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 function fmt(d: string | null | undefined) {
   if (!d) return "Never";
@@ -12,6 +13,7 @@ function fmt(d: string | null | undefined) {
 
 export default function Page() {
   const [users, setUsers] = useState<Profile[]>([]);
+  const confirm = useConfirm();
   const [meta, setMeta] = useState<Record<string, UserMeta>>({});
   const [q, setQ] = useState("");
   const reload = async () => {
@@ -32,7 +34,7 @@ export default function Page() {
     await logAudit(u.approved ? 'unapprove' : 'approve', 'profile', u.id); reload();
   };
   const removeUser = async (u: Profile) => {
-    if (!confirm(`Permanently delete user "${u.display_name || u.id.slice(0,8)}"? This cannot be undone.`)) return;
+    if (!(await confirm({ title: `Permanently delete user "${u.display_name || u.id.slice(0,8)}"? This cannot be undone.`, tone: 'danger' }))) return;
     try {
       await adminDeleteUser(u.id);
       await logAudit('delete_user', 'profile', u.id);

@@ -7,6 +7,7 @@ import { useSearchParams } from "next/navigation";
 import { ListChecks, Users, BarChart3, GraduationCap, Plus, Pencil, Trash2, User as UserIcon, Search, Copy, RefreshCw, ChevronRight, X, Settings, Link2, Activity } from "lucide-react";
 import { listMyHunts, listTeams, createTeam, bulkCreateTeams, renameTeam, deleteTeam, setTeamMaxMembers, listMyClasses, listMyHuntsByClass, type Hunt, type Team, type Klass } from "@/lib/data";
 import { regenerateTeamCode, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, addScoreAdjustment, type QuestCompletion, listTeamsByClass, createTeamForClass, bulkCreateTeamsForClass, listClassTeamScores, listTeamMembers } from '@/lib/data';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const navTabs = [
   { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
@@ -23,6 +24,7 @@ function TeamsInner() {
   const sp = useSearchParams();
   const classIdParam = sp.get('classId');
   const [classes, setClasses] = useState<Klass[]>([]);
+  const confirm = useConfirm();
   const [activeClassId, setActiveClassId] = useState<string>(classIdParam || '');
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [activeId, setActiveId] = useState<string>('');
@@ -242,7 +244,7 @@ function TeamsInner() {
                           return (
                             <div key={h.id} className={`flex items-center gap-3 p-3 rounded-lg border transition ${done ? 'bg-green-50 border-green-200' : 'bg-gray-50 border-gray-100'}`}>
                               <input type="checkbox" checked={!!done} onChange={async()=>{
-                                try { if(done){if(!window.confirm('Unmark completion for '+h.title+'?'))return;await unmarkTeamCompletion(h.id,sel.id);}else{await markTeamCompletion(h.id,sel.id);} await reloadCompletions(activeId); await reloadClassTeams(activeClassId); }catch(e:any){if(!String(e?.message||'').toLowerCase().includes('duplicate'))alert(e.message);await reloadCompletions(activeId);}
+                                try { if(done){if(!(await confirm({ title: `Unmark completion for ${h.title}?`, tone: 'danger' })))return;await unmarkTeamCompletion(h.id,sel.id);}else{await markTeamCompletion(h.id,sel.id);} await reloadCompletions(activeId); await reloadClassTeams(activeClassId); }catch(e:any){if(!String(e?.message||'').toLowerCase().includes('duplicate'))alert(e.message);await reloadCompletions(activeId);}
                               }} className="w-5 h-5 accent-purple-600 shrink-0"/>
                               <div className="flex-1 min-w-0">
                                 <div className="text-sm font-medium">{h.title}</div>
@@ -286,7 +288,7 @@ function TeamsInner() {
                           <div className="flex items-center gap-3 mt-1">
                             <span className="font-mono font-bold text-2xl tracking-widest text-gray-800">{code||'-'}</span>
                             <button onClick={()=>navigator.clipboard.writeText(code)} className="text-purple-600 hover:text-purple-800 text-xs flex items-center gap-1"><Copy className="w-3.5 h-3.5"/>Copy</button>
-                            <button onClick={async()=>{if(!confirm('Regenerate code? Old code stops working.'))return;await regenerateTeamCode(sel.id);await reloadClassTeams(activeClassId);}} className="text-purple-600 hover:text-purple-800 text-xs flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5"/>New code</button>
+                            <button onClick={async()=>{if(!(await confirm({ title: 'Regenerate code? Old code stops working.', tone: 'danger' })))return;await regenerateTeamCode(sel.id);await reloadClassTeams(activeClassId);}} className="text-purple-600 hover:text-purple-800 text-xs flex items-center gap-1"><RefreshCw className="w-3.5 h-3.5"/>New code</button>
                           </div>
                         </div>
                       </div>

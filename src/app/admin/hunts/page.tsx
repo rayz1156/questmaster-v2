@@ -4,9 +4,11 @@ import { adminTabs } from "@/lib/adminTabs";
 import { useEffect, useState } from "react";
 import { adminListAllHunts, adminUpdateHunt, deleteHunt, logAudit, type Hunt, adminListAllTeams, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, type QuestCompletion } from "@/lib/data";
 import { ChevronDown, ChevronRight, CheckCircle, Circle } from "lucide-react";
+import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 export default function Page() {
   const [hunts, setHunts] = useState<Hunt[]>([]);
+  const confirm = useConfirm();
   const [expandedHunt, setExpandedHunt] = useState<string | null>(null);
   const [teams, setTeams] = useState<any[]>([]);
   const [completions, setCompletions] = useState<QuestCompletion[]>([]);
@@ -18,7 +20,7 @@ export default function Page() {
     await adminUpdateHunt(h.id, { status }); await logAudit("hunt_status", "hunt", h.id, { status }); reload();
   };
   const remove = async (h: Hunt) => {
-    if (!confirm(`Delete "${h.title}"? This cannot be undone.`)) return;
+    if (!(await confirm({ title: `Delete "${h.title}"? This cannot be undone.`, tone: 'danger' }))) return;
     await deleteHunt(h.id); await logAudit("hunt_delete", "hunt", h.id, { title: h.title }); reload();
   };
 
