@@ -315,7 +315,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
               'radial-gradient(1200px 600px at 20% -10%, rgba(124,58,237,0.18), transparent 60%), radial-gradient(900px 500px at 90% 10%, rgba(14,165,233,0.18), transparent 55%), linear-gradient(180deg, #0f172a 0%, #111827 100%)',
           }}
         >
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
             {items.map((it) => (
               <div
                 key={it.id}
@@ -572,7 +572,7 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete }: { item: Submissi
       {item.description && <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">{item.description}</p>}
 
       <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100 text-xs text-gray-500">
-        <span>{new Date(item.created_at).toLocaleDateString()}</span>
+        <span title={new Date(item.created_at).toLocaleString()}>{new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
         <div className="flex items-center gap-2">
           {(item.item_type === 'file' || item.item_type === 'image') && (item.file_url || item.image_url) && (
             <a href={item.file_url || item.image_url!} download className="hover:text-gray-900" title="Download"><Download className="w-4 h-4" /></a>
