@@ -8,6 +8,7 @@ import { buildAdiloEmbedUrl } from '@/lib/adilo';
 import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem, SubmissionItemType, SubmissionVisibility } from '@/lib/submission-boards';
 
 import { supabase } from '@/lib/supabase';
+import { ConfirmDialog } from '@/components/ui/PromptDialog';
 
 /** Wrap fetch() to attach the Supabase access token so /api/* routes can auth. */
 async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -57,6 +58,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   const [editingItem, setEditingItem] = useState<SubmissionBoardItem | null>(null);
   const [savingBoard, setSavingBoard] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [confirmState, setConfirmState] = useState<{ title: string; description?: string; confirmLabel?: string; tone?: 'danger' | 'default'; onConfirm: () => void } | null>(null);
 
   const apiBase = `/api/submission-boards/${huntId}/${classId}`;
   const isEducator = myRole === 'educator' || myRole === 'admin';
@@ -150,21 +152,30 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
       setErr('Column has ' + itemsHere.length + ' item' + (itemsHere.length === 1 ? '' : 's') + '. Move them first, or ask your educator to delete.');
       return;
     }
-    if (!confirm('Delete column "' + col.title + '"?' + (itemsHere.length > 0 ? ' (' + itemsHere.length + ' item(s) inside will be detached)' : ''))) return;
-    const prevCols = columns;
-    setColumns(columns.filter((c) => c.id !== columnId));
-    try {
-      const r = await authedFetch(apiBase + '/columns/' + columnId, { method: 'DELETE' });
-      if (!r.ok) {
-        const j = await r.json().catch(() => ({}));
-        throw new Error(j.error || 'Failed to delete column');
-      }
-      // Items in this column had column_id set to NULL via ON DELETE SET NULL
-      setItems(items.map((i) => i.column_id === columnId ? { ...i, column_id: null } : i));
-    } catch (e: any) {
-      setErr(e.message || String(e));
-      setColumns(prevCols);
-    }
+    const desc = itemsHere.length > 0 ? `${itemsHere.length} item(s) inside will be detached.` : 'This action cannot be undone.';
+    setConfirmState({
+      title: `Delete column "${col.title}"?`,
+      description: desc,
+      confirmLabel: 'Delete',
+      tone: 'danger',
+      onConfirm: async () => {
+        setConfirmState(null);
+        const prevCols = columns;
+        setColumns(columns.filter((c) => c.id !== columnId));
+        try {
+          const r = await authedFetch(apiBase + '/columns/' + columnId, { method: 'DELETE' });
+          if (!r.ok) {
+            const j = await r.json().catch(() => ({}));
+            throw new Error(j.error || 'Failed to delete column');
+          }
+          // Items in this column had column_id set to NULL via ON DELETE SET NULL
+          setItems(items.map((i) => i.column_id === columnId ? { ...i, column_id: null } : i));
+        } catch (e: any) {
+          setErr(e.message || String(e));
+          setColumns(prevCols);
+        }
+      },
+    });
   }
 
   async function moveItemToColumn(itemId: string, columnId: string | null) {
@@ -190,10 +201,18 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   }
 
   async function deleteItem(id: string) {
-    if (!confirm('Delete this submission? This cannot be undone.')) return;
-    const r = await authedFetch(`${apiBase}/items/${id}`, { method: 'DELETE' });
-    if (r.ok) setItems(items.filter((i) => i.id !== id));
-    else alert((await r.json()).error || 'Delete failed');
+    setConfirmState({
+      title: 'Delete this submission?',
+      description: 'This action cannot be undone.',
+      confirmLabel: 'Delete',
+      tone: 'danger',
+      onConfirm: async () => {
+        setConfirmState(null);
+        const r = await authedFetch(`${apiBase}/items/${id}`, { method: 'DELETE' });
+        if (r.ok) setItems(items.filter((i) => i.id !== id));
+        else setErr((await r.json()).error || 'Delete failed');
+      },
+    });
   }
 
   if (!board) {
@@ -353,6 +372,15 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
           }}
         />
       )}
+      <ConfirmDialog
+        open={!!confirmState}
+        title={confirmState?.title ?? ''}
+        description={confirmState?.description}
+        confirmLabel={confirmState?.confirmLabel ?? 'Confirm'}
+        tone={confirmState?.tone ?? 'default'}
+        onConfirm={() => confirmState?.onConfirm()}
+        onCancel={() => setConfirmState(null)}
+      />
     </div>
   );
 }
