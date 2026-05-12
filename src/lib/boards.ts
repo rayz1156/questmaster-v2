@@ -140,11 +140,22 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
     const { data: eds } = await supabase.rpc('qm_list_class_educators', { p_class: board.class_id });
     educatorIds = ((eds || []) as any[]).map((e: any) => (e.educator_id || e.id) as string).filter(Boolean);
   } catch { /* RPC may not be available in some envs; ignore */ }
-  // 2b. Students enrolled via qm_class_members.
-  const { data: members, error: mErr } = await supabase
-    .from('qm_class_members').select('user_id').eq('class_id', board.class_id);
-  if (mErr) throw mErr;
-  const memberIds = (members || []).map((m: any) => m.user_id as string).filter(Boolean);
+  // 2b. ALL class members (educators + students) via SECURITY DEFINER RPC.
+  //     Direct SELECT on qm_class_members is restricted by RLS to caller's own row,
+  //     so we use qm_list_class_members which returns every member if the caller
+  //     is themselves a member/educator/admin.
+  let memberIds: string[] = [];
+  try {
+    const { data: members, error: mErr } = await supabase.rpc('qm_list_class_members', { p_class: board.class_id });
+    if (mErr) throw mErr;
+    memberIds = ((members || []) as any[]).map((m: any) => m.user_id as string).filter(Boolean);
+  } catch {
+    // RPC unavailable on older envs: fall back to direct SELECT (will only return caller's row under RLS).
+    const { data: members, error: mErr } = await supabase
+      .from('qm_class_members').select('user_id').eq('class_id', board.class_id);
+    if (mErr) throw mErr;
+    memberIds = (members || []).map((m: any) => m.user_id as string).filter(Boolean);
+  }
   // 3. Combine + dedupe (educator wins).
   const educatorSet = new Set(educatorIds);
   const allIds = [...educatorIds, ...memberIds.filter(id => !educatorSet.has(id))];

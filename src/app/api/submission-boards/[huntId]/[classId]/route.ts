@@ -24,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { huntId: stri
   if (!board) {
     const educator = await isEducator(supa, params.classId, user!.id, klass!.owner_id);
     const myRole: 'educator' | 'student' = educator ? 'educator' : 'student';
-    return NextResponse.json({ board: null, items: [], myRole, myId: user!.id });
+    return NextResponse.json({ board: null, items: [], columns: [], myRole, myId: user!.id });
   }
 
   const { data: items } = await supa
@@ -46,7 +46,14 @@ export async function GET(req: NextRequest, { params }: { params: { huntId: stri
   const educator = await isEducator(supa, params.classId, user!.id, klass!.owner_id);
   const myRole: 'educator' | 'student' = educator ? 'educator' : 'student';
 
-  return NextResponse.json({ board, items: enriched, myRole, myId: user!.id });
+  // Load columns for this board (RLS enforces class membership).
+  const { data: cols } = await supa
+    .from('qm_submission_board_columns')
+    .select('*')
+    .eq('board_id', board.id)
+    .order('position', { ascending: true })
+    .order('created_at', { ascending: true });
+  return NextResponse.json({ board, items: enriched, columns: cols || [], myRole, myId: user!.id });
 }
 
 export async function POST(req: NextRequest, { params }: { params: { huntId: string; classId: string } }) {
@@ -91,6 +98,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
   if (typeof body.description === 'string') updates.description = body.description;
   if (['public', 'private', 'class_scoped'].includes(body.visibility)) updates.visibility = body.visibility;
   if (typeof body.is_open === 'boolean') updates.is_open = body.is_open;
+  if (typeof body.view_mode === 'string' && ['columns','mood'].includes(body.view_mode)) updates.view_mode = body.view_mode;
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
   const { data, error } = await supa

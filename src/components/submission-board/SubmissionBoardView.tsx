@@ -5,7 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Edit2, Trash2, Plus, Lock, Unlock, Eye, EyeOff, Users, X, FileText, Image as ImageIcon, Video, Link as LinkIcon, Paperclip } from 'lucide-react';
 import { buildAdiloEmbedUrl } from '@/lib/adilo';
-import type { SubmissionBoard, SubmissionBoardItem, SubmissionItemType, SubmissionVisibility } from '@/lib/submission-boards';
+import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem, SubmissionItemType, SubmissionVisibility } from '@/lib/submission-boards';
 
 import { supabase } from '@/lib/supabase';
 
@@ -24,6 +24,7 @@ interface Props {
   classId: string;
   initialBoard: SubmissionBoard | null;
   initialItems: SubmissionBoardItem[];
+  initialColumns?: SubmissionBoardColumn[];
   myRole: 'educator' | 'student' | 'admin';
   myId: string;
 }
@@ -43,9 +44,15 @@ function visibilityLabel(v: SubmissionVisibility) {
   return 'Class-scoped';
 }
 
-export default function SubmissionBoardView({ huntId, classId, initialBoard, initialItems, myRole, myId }: Props) {
+export default function SubmissionBoardView({ huntId, classId, initialBoard, initialItems, myRole, myId, initialColumns = []}: Props) {
   const [board, setBoard] = useState<SubmissionBoard | null>(initialBoard);
   const [items, setItems] = useState<SubmissionBoardItem[]>(initialItems);
+  const [columns, setColumns] = useState<SubmissionBoardColumn[]>(initialColumns);
+  const [newColTitle, setNewColTitle] = useState<string>('');
+  const [addingCol, setAddingCol] = useState<boolean>(false);
+  const [draggingItemId, setDraggingItemId] = useState<string | null>(null);
+  const [editingColId, setEditingColId] = useState<string | null>(null);
+  const [editingColTitle, setEditingColTitle] = useState<string>('');
   const [showSubmit, setShowSubmit] = useState(false);
   const [editingItem, setEditingItem] = useState<SubmissionBoardItem | null>(null);
   const [savingBoard, setSavingBoard] = useState(false);
@@ -60,6 +67,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
       const j = await r.json();
       setBoard(j.board);
       setItems(j.items || []);
+      setColumns(j.columns || []);
     }
   }
 
@@ -77,6 +85,108 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
     const r = await authedFetch(apiBase, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
     if (r.ok) { const j = await r.json(); setBoard(j.board); }
     setSavingBoard(false);
+  }
+
+  // ============================================================
+  // Columns + layout
+  // ============================================================
+  const layoutMode: 'columns' | 'mood' = (board?.view_mode === 'mood') ? 'mood' : 'columns';
+
+  async function changeLayout(mode: 'columns' | 'mood') {
+    if (!board || layoutMode === mode) return;
+    setBoard({ ...board, view_mode: mode });
+    await updateBoard({ view_mode: mode } as any);
+  }
+
+  async function createColumn() {
+    const t = newColTitle.trim();
+    if (!t) return;
+    setAddingCol(true);
+    setErr(null);
+    try {
+      const r = await authedFetch(apiBase + '/columns', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: t })
+      });
+      const j = await r.json();
+      if (!r.ok) throw new Error(j.error || 'Failed to create column');
+      setColumns([...columns, j.column]);
+      setNewColTitle('');
+    } catch (e: any) {
+      setErr(e.message || String(e));
+    } finally {
+      setAddingCol(false);
+    }
+  }
+
+  async function renameColumn(columnId: string, title: string) {
+    const t = title.trim();
+    if (!t) return;
+    const prev = columns;
+    setColumns(columns.map((c) => c.id === columnId ? { ...c, title: t } : c));
+    setEditingColId(null);
+    try {
+      const r = await authedFetch(apiBase + '/columns/' + columnId, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ title: t })
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || 'Failed to rename');
+      }
+    } catch (e: any) {
+      setErr(e.message || String(e));
+      setColumns(prev);
+    }
+  }
+
+  async function deleteColumn(columnId: string) {
+    const col = columns.find((c) => c.id === columnId);
+    if (!col) return;
+    const itemsHere = items.filter((i) => i.column_id === columnId);
+    if (itemsHere.length > 0 && !isEducator) {
+      setErr('Column has ' + itemsHere.length + ' item' + (itemsHere.length === 1 ? '' : 's') + '. Move them first, or ask your educator to delete.');
+      return;
+    }
+    if (!confirm('Delete column "' + col.title + '"?' + (itemsHere.length > 0 ? ' (' + itemsHere.length + ' item(s) inside will be detached)' : ''))) return;
+    const prevCols = columns;
+    setColumns(columns.filter((c) => c.id !== columnId));
+    try {
+      const r = await authedFetch(apiBase + '/columns/' + columnId, { method: 'DELETE' });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || 'Failed to delete column');
+      }
+      // Items in this column had column_id set to NULL via ON DELETE SET NULL
+      setItems(items.map((i) => i.column_id === columnId ? { ...i, column_id: null } : i));
+    } catch (e: any) {
+      setErr(e.message || String(e));
+      setColumns(prevCols);
+    }
+  }
+
+  async function moveItemToColumn(itemId: string, columnId: string | null) {
+    const item = items.find((i) => i.id === itemId);
+    if (!item) return;
+    if (item.column_id === columnId) return;
+    const prev = items;
+    setItems(items.map((i) => i.id === itemId ? { ...i, column_id: columnId } : i));
+    try {
+      const r = await authedFetch(apiBase + '/items/' + itemId, {
+        method: 'PATCH',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ columnId })
+      });
+      if (!r.ok) {
+        const j = await r.json().catch(() => ({}));
+        throw new Error(j.error || 'Failed to move card');
+      }
+    } catch (e: any) {
+      setErr(e.message || String(e));
+      setItems(prev);
+    }
   }
 
   async function deleteItem(id: string) {
@@ -148,22 +258,69 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
         </div>
       </div>
 
-      {/* Items grid */}
-      {items.length === 0 ? (
-        <div className="card p-6 text-center text-sm text-gray-500">No submissions yet.</div>
-      ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-          {items.map((it) => (
-            <ItemCard
-              key={it.id}
-              item={it}
-              myId={myId}
-              isEducator={isEducator}
-              onEdit={() => setEditingItem(it)}
-              onDelete={() => deleteItem(it.id)}
-            />
-          ))}
+      {/* Layout toolbar */}
+      <div className="flex flex-wrap items-center gap-2 text-xs">
+        <span className="text-gray-600">View:</span>
+        <div className="inline-flex rounded-md overflow-hidden border border-gray-200">
+          <button
+            type="button"
+            onClick={() => changeLayout('columns')}
+            disabled={savingBoard}
+            className={`px-3 py-1.5 transition ${layoutMode === 'columns' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            title="Display submissions side by side in columns"
+          >Columns</button>
+          <button
+            type="button"
+            onClick={() => changeLayout('mood')}
+            disabled={savingBoard}
+            className={`px-3 py-1.5 transition ${layoutMode === 'mood' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            title="Display submissions as a free mood-board grid"
+          >Mood board</button>
         </div>
+        <span className="text-gray-400">·</span>
+        <span className="text-gray-500">{items.length} item{items.length === 1 ? '' : 's'} in {Math.max(1, columns.length)} column{columns.length === 1 ? '' : 's'}</span>
+      </div>
+
+      {/* Items renderer */}
+      {layoutMode === 'columns' ? (
+        <ColumnsView
+          items={items}
+          columns={columns}
+          myId={myId}
+          isEducator={isEducator}
+          draggingItemId={draggingItemId}
+          editingColId={editingColId}
+          editingColTitle={editingColTitle}
+          newColTitle={newColTitle}
+          addingCol={addingCol}
+          onSetEditingCol={(id, t) => { setEditingColId(id); setEditingColTitle(t); }}
+          onSetEditingColTitle={setEditingColTitle}
+          onCommitColTitle={renameColumn}
+          onDeleteColumn={deleteColumn}
+          onSetNewColTitle={setNewColTitle}
+          onCreateColumn={createColumn}
+          onSetDraggingItem={setDraggingItemId}
+          onMoveItem={moveItemToColumn}
+          onEditItem={(it) => setEditingItem(it)}
+          onDeleteItem={(id) => deleteItem(id)}
+        />
+      ) : (
+        items.length === 0 ? (
+          <div className="card p-6 text-center text-sm text-gray-500">No submissions yet.</div>
+        ) : (
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+            {items.map((it) => (
+              <ItemCard
+                key={it.id}
+                item={it}
+                myId={myId}
+                isEducator={isEducator}
+                onEdit={() => setEditingItem(it)}
+                onDelete={() => deleteItem(it.id)}
+              />
+            ))}
+          </div>
+        )
       )}
 
       {showSubmit && (
@@ -191,6 +348,171 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
 // ============================================================
 // Item card
 // ============================================================
+// ===================================================================
+// Columns view (Kanban-like)
+// ===================================================================
+interface ColumnsViewProps {
+  items: SubmissionBoardItem[];
+  columns: SubmissionBoardColumn[];
+  myId: string;
+  isEducator: boolean;
+  draggingItemId: string | null;
+  editingColId: string | null;
+  editingColTitle: string;
+  newColTitle: string;
+  addingCol: boolean;
+  onSetEditingCol: (id: string | null, title: string) => void;
+  onSetEditingColTitle: (s: string) => void;
+  onCommitColTitle: (id: string, title: string) => void;
+  onDeleteColumn: (id: string) => void;
+  onSetNewColTitle: (s: string) => void;
+  onCreateColumn: () => void;
+  onSetDraggingItem: (id: string | null) => void;
+  onMoveItem: (itemId: string, columnId: string | null) => void;
+  onEditItem: (it: SubmissionBoardItem) => void;
+  onDeleteItem: (id: string) => void;
+}
+
+function ColumnsView(props: ColumnsViewProps) {
+  const { items, columns, myId, isEducator, draggingItemId, editingColId, editingColTitle, newColTitle, addingCol,
+          onSetEditingCol, onSetEditingColTitle, onCommitColTitle, onDeleteColumn, onSetNewColTitle, onCreateColumn,
+          onSetDraggingItem, onMoveItem, onEditItem, onDeleteItem } = props;
+
+  const orphanItems = items.filter((i) => !i.column_id || !columns.find((c) => c.id === i.column_id));
+
+  return (
+    <div className="flex gap-3 overflow-x-auto pb-2 items-start">
+      {columns.map((col) => {
+        const colItems = items.filter((i) => i.column_id === col.id);
+        return (
+          <div
+            key={col.id}
+            className="flex-shrink-0 w-72 bg-gray-50 rounded-lg p-2 flex flex-col gap-2"
+            onDragOver={(e) => { e.preventDefault(); }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (draggingItemId) {
+                onMoveItem(draggingItemId, col.id);
+                onSetDraggingItem(null);
+              }
+            }}
+          >
+            <div className="flex items-center justify-between gap-2 px-1">
+              {editingColId === col.id ? (
+                <input
+                  value={editingColTitle}
+                  onChange={(e) => onSetEditingColTitle(e.target.value)}
+                  onBlur={() => onCommitColTitle(col.id, editingColTitle)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') onCommitColTitle(col.id, editingColTitle);
+                    if (e.key === 'Escape') onSetEditingCol(null, '');
+                  }}
+                  autoFocus
+                  className="flex-1 min-w-0 px-2 py-1 text-sm font-semibold rounded border border-indigo-400 outline-none"
+                />
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => onSetEditingCol(col.id, col.title)}
+                  className="flex-1 min-w-0 truncate text-left text-sm font-semibold text-gray-800 hover:text-indigo-700"
+                  title="Click to rename"
+                >{col.title}</button>
+              )}
+              <span className="text-xs text-gray-500">{colItems.length}</span>
+              <button
+                type="button"
+                onClick={() => onDeleteColumn(col.id)}
+                className="text-xs text-gray-400 hover:text-red-600 px-1"
+                title={colItems.length > 0 && !isEducator ? 'Column not empty (educator can still delete)' : 'Delete column'}
+              >✕</button>
+            </div>
+            <div className="flex flex-col gap-2 min-h-[40px]">
+              {colItems.length === 0 ? (
+                <div className="text-xs text-gray-400 text-center py-3 border border-dashed border-gray-200 rounded">Drop here</div>
+              ) : colItems.map((it) => (
+                <div
+                  key={it.id}
+                  draggable
+                  onDragStart={() => onSetDraggingItem(it.id)}
+                  onDragEnd={() => onSetDraggingItem(null)}
+                  className={`cursor-grab active:cursor-grabbing ${draggingItemId === it.id ? 'opacity-50' : ''}`}
+                >
+                  <ItemCard
+                    item={it}
+                    myId={myId}
+                    isEducator={isEducator}
+                    onEdit={() => onEditItem(it)}
+                    onDelete={() => onDeleteItem(it.id)}
+                  />
+                </div>
+              ))}
+            </div>
+          </div>
+        );
+      })}
+
+      {/* Orphan items (no column) */}
+      {orphanItems.length > 0 && (
+        <div
+          className="flex-shrink-0 w-72 bg-yellow-50 rounded-lg p-2 flex flex-col gap-2 border border-yellow-200"
+          onDragOver={(e) => { e.preventDefault(); }}
+          onDrop={(e) => {
+            e.preventDefault();
+            if (draggingItemId) {
+              onMoveItem(draggingItemId, null);
+              onSetDraggingItem(null);
+            }
+          }}
+        >
+          <div className="text-sm font-semibold text-yellow-800 px-1">Uncategorised ({orphanItems.length})</div>
+          <div className="flex flex-col gap-2">
+            {orphanItems.map((it) => (
+              <div
+                key={it.id}
+                draggable
+                onDragStart={() => onSetDraggingItem(it.id)}
+                onDragEnd={() => onSetDraggingItem(null)}
+                className={`cursor-grab active:cursor-grabbing ${draggingItemId === it.id ? 'opacity-50' : ''}`}
+              >
+                <ItemCard
+                  item={it}
+                  myId={myId}
+                  isEducator={isEducator}
+                  onEdit={() => onEditItem(it)}
+                  onDelete={() => onDeleteItem(it.id)}
+                />
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Add column */}
+      <div className="flex-shrink-0 w-72">
+        <div className="bg-white rounded-lg p-2 border border-dashed border-gray-300">
+          <div className="flex items-center gap-1">
+            <input
+              type="text"
+              placeholder="+ New column title…"
+              value={newColTitle}
+              onChange={(e) => onSetNewColTitle(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') onCreateColumn(); }}
+              maxLength={80}
+              className="flex-1 min-w-0 px-2 py-1.5 text-sm border border-gray-200 rounded outline-none focus:border-indigo-400"
+            />
+            <button
+              type="button"
+              onClick={onCreateColumn}
+              disabled={addingCol || !newColTitle.trim()}
+              className="px-2 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
+            >Add</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 function ItemCard({ item, myId, isEducator, onEdit, onDelete }: { item: SubmissionBoardItem; myId: string; isEducator: boolean; onEdit: () => void; onDelete: () => void }) {
   const isOwner = item.submitted_by === myId;
   const canEdit = isOwner || isEducator;

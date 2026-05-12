@@ -7,7 +7,7 @@ import { ArrowLeft } from 'lucide-react';
 import Shell from '@/components/Shell';
 import SubmissionBoardView from '@/components/submission-board/SubmissionBoardView';
 import { supabase } from '@/lib/supabase';
-import type { SubmissionBoard, SubmissionBoardItem } from '@/lib/submission-boards';
+import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem } from '@/lib/submission-boards';
 
 
 /** Wrap fetch() to attach the Supabase access token. */
@@ -24,7 +24,7 @@ export default function ParticipantSubmissionsPage() {
   const params = useParams<{ id: string }>();
   const huntId = params.id;
   const [classId, setClassId] = useState<string | null>(null);
-  const [data, setData] = useState<{ board: SubmissionBoard | null; items: SubmissionBoardItem[]; myRole: 'educator' | 'student' | 'admin'; myId: string } | null>(null);
+  const [data, setData] = useState<{ board: SubmissionBoard | null; items: SubmissionBoardItem[]; columns: SubmissionBoardColumn[]; myRole: 'educator' | 'student' | 'admin'; myId: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -37,7 +37,7 @@ export default function ParticipantSubmissionsPage() {
         const r = await authedFetch(`/api/submission-boards/${huntId}/${hunt.class_id}`, { cache: 'no-store' });
         if (!r.ok) throw new Error((await r.json()).error || 'Failed to load');
         const j = await r.json();
-        setData({ board: j.board, items: j.items || [], myRole: j.myRole || 'student', myId: j.myId });
+        setData({ board: j.board, items: j.items || [], columns: j.columns || [], myRole: j.myRole || 'student', myId: j.myId });
       } catch (e: any) { setErr(e.message); }
     })();
   }, [huntId]);
@@ -54,6 +54,7 @@ export default function ParticipantSubmissionsPage() {
           classId={classId}
           initialBoard={data.board}
           initialItems={data.items}
+            initialColumns={data.columns}
           myRole={data.myRole}
           myId={data.myId}
         />

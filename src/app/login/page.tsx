@@ -1,4 +1,5 @@
 'use client';
+import Image from 'next/image';
 import { useState, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
@@ -43,7 +44,7 @@ function LoginInner() {
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
       <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg mb-3 text-3xl" aria-hidden="true">📚</div>
+          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg mb-3" aria-hidden="true"><Image src="/logo-mark.svg" alt="Kuizen" width={64} height={64} priority /></div>
           <h1 className="text-4xl font-bold text-white tracking-tight">Kuizen</h1>
           <p className="text-white/90 mt-2 text-base font-medium tracking-wide">Learn. Compete. Conquer.</p>
           <p className="text-white/75 mt-1 text-sm">Where classrooms become arenas and learners become champions.</p>

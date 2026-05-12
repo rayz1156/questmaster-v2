@@ -6,7 +6,7 @@ import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import Shell from '@/components/Shell';
 import SubmissionBoardView from '@/components/submission-board/SubmissionBoardView';
-import type { SubmissionBoard, SubmissionBoardItem } from '@/lib/submission-boards';
+import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem } from '@/lib/submission-boards';
 
 import { supabase } from '@/lib/supabase';
 
@@ -22,7 +22,7 @@ async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Pr
 
 export default function EducatorSubmissionBoardPage() {
   const params = useParams<{ id: string; classId: string }>();
-  const [data, setData] = useState<{ board: SubmissionBoard | null; items: SubmissionBoardItem[]; myRole: 'educator' | 'student' | 'admin'; myId: string } | null>(null);
+  const [data, setData] = useState<{ board: SubmissionBoard | null; items: SubmissionBoardItem[]; columns: SubmissionBoardColumn[]; myRole: 'educator' | 'student' | 'admin'; myId: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => {
@@ -31,7 +31,7 @@ export default function EducatorSubmissionBoardPage() {
         const r = await authedFetch(`/api/submission-boards/${params.id}/${params.classId}`, { cache: 'no-store' });
         if (!r.ok) throw new Error((await r.json()).error || 'Failed to load');
         const j = await r.json();
-        setData({ board: j.board, items: j.items || [], myRole: j.myRole || 'student', myId: j.myId });
+        setData({ board: j.board, items: j.items || [], columns: j.columns || [], myRole: j.myRole || 'student', myId: j.myId });
       } catch (e: any) { setErr(e.message); }
     })();
   }, [params.id, params.classId]);
@@ -48,6 +48,7 @@ export default function EducatorSubmissionBoardPage() {
           classId={params.classId}
           initialBoard={data.board}
           initialItems={data.items}
+            initialColumns={data.columns}
           myRole={data.myRole}
           myId={data.myId}
         />

@@ -12,6 +12,7 @@ export interface SubmissionBoard {
   visibility: SubmissionVisibility;
   is_open: boolean;
   adilo_project_id: string | null;
+  view_mode: 'columns' | 'mood';
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -45,12 +46,31 @@ export interface SubmissionBoardItem {
   filelu_file_code: string | null;
   created_at: string;
   updated_at: string;
+  // Layout (columns + mood board)
+  column_id: string | null;
+  position: number;
+  mood_x: number | null;
+  mood_y: number | null;
+  mood_w: number | null;
+  mood_h: number | null;
+  mood_z: number;
   submitter?: { id: string; display_name: string | null; avatar_url: string | null } | null;
+}
+
+export interface SubmissionBoardColumn {
+  id: string;
+  board_id: string;
+  title: string;
+  position: number;
+  created_by: string | null;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface SubmissionBoardSnapshot {
   board: SubmissionBoard;
   items: SubmissionBoardItem[];
+  columns: SubmissionBoardColumn[];
   classMembers: { id: string; display_name: string | null }[];
   myRole: 'educator' | 'student' | 'admin';
   myId: string;

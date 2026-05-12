@@ -26,6 +26,8 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
 
   const insert: any = {
     board_id: board.id,
+    // Optional: place into a specific column.
+    column_id: (typeof body.columnId === 'string' ? body.columnId : null),
     submitted_by: user!.id,
     item_type: itemType,
     title: typeof body.title === 'string' ? body.title : null,
