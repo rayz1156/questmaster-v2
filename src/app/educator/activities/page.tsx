@@ -60,6 +60,7 @@ function PageInner() {
             </div>
             <div className="flex flex-col gap-1 items-end shrink-0">
               <Link href={`/educator/activities/${h.id}`} className="btn-primary px-3 py-1 text-xs">Manage</Link>
+              <Link href={`/educator/activities/${h.id}/submissions`} className="btn-secondary px-3 py-1 text-xs">Submissions</Link>
             {h.submission_link && (<a href={h.submission_link} target="_blank" rel="noopener noreferrer" className="text-xs px-3 py-1 rounded bg-indigo-50 text-indigo-700 hover:bg-indigo-100 text-center">Submission Link ↗</a>)}
               <button onClick={() => onDelete(h.id)} className="text-xs text-red-600 hover:underline">Delete</button>
             </div>
