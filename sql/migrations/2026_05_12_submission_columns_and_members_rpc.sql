@@ -149,19 +149,23 @@ CREATE POLICY sbc_mem_delete_empty ON public.qm_submission_board_columns
 --    Caller is only allowed to enumerate if they are themselves
 --    a class member (or class educator, or admin).
 -- ------------------------------------------------------------
+DROP FUNCTION IF EXISTS public.qm_list_class_members(uuid);
 CREATE OR REPLACE FUNCTION public.qm_list_class_members(p_class uuid)
-RETURNS TABLE (user_id uuid, role text)
+RETURNS TABLE(user_id uuid)
 LANGUAGE plpgsql
 SECURITY DEFINER
 SET search_path = public
 AS $$
 BEGIN
-  -- Only members / educators / admins may list
-  IF NOT (qm_is_admin() OR qm_is_class_educator(p_class) OR qm_is_class_member(p_class)) THEN
+  IF NOT (
+    public.qm_is_admin()
+    OR public.qm_is_class_educator(p_class)
+    OR public.qm_is_class_member(p_class)
+  ) THEN
     RETURN;
   END IF;
   RETURN QUERY
-    SELECT cm.user_id, COALESCE(cm.role, 'student')::text
+    SELECT cm.user_id
     FROM public.qm_class_members cm
     WHERE cm.class_id = p_class;
 END;

@@ -116,18 +116,15 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
           <span className={pathname === "/help" ? "text-brand-purple" : "text-white"}><HelpCircle className="w-5 h-5" /></span>
           <span>Help</span>
         </Link>
-</nav>
-        <div className="p-3 border-t border-white/10">
           <button
             onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-white/90 hover:bg-white/10 transition"
+            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-white/90 hover:bg-white/10 transition mt-1"
           >
-            <LogOut className="w-5 h-5" /> Sign out
+            <LogOut className="w-5 h-5" />
+            <span>Sign out</span>
           </button>
-          <div className="text-[11px] text-white/60 text-center mt-3">
-            <span className="font-semibold">UPSI · AFK · Veltrix</span>
-          </div>
-        </div>
+        </nav>
+
       </aside>
 
       {/* ============ MAIN COLUMN ============ */}
