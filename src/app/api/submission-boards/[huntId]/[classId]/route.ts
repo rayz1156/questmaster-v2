@@ -21,7 +21,11 @@ export async function GET(req: NextRequest, { params }: { params: { huntId: stri
     .eq('class_id', params.classId)
     .maybeSingle();
 
-  if (!board) return NextResponse.json({ board: null, items: [], myId: user!.id });
+  if (!board) {
+    const educator = await isEducator(supa, params.classId, user!.id, klass!.owner_id);
+    const myRole: 'educator' | 'student' = educator ? 'educator' : 'student';
+    return NextResponse.json({ board: null, items: [], myRole, myId: user!.id });
+  }
 
   const { data: items } = await supa
     .from('qm_submission_board_items')

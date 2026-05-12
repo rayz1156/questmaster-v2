@@ -156,7 +156,19 @@ function Inner() {
               </div>
             )}
 
-            {((active as any).link1 || (active as any).link2) && (
+            {(active as any) && (
+          <div className="mt-5">
+            <div className="text-xs font-semibold text-slate-500 tracking-widest mb-2">SUBMISSION BOARD</div>
+            <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-purple-200 bg-purple-50/40">
+              <div className="text-sm text-slate-700 min-w-0 truncate">Share your work and see your classmates' submissions.</div>
+              <Link href={`/participant/activities/${(active as any).id}/submissions`} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition">
+                <ClipboardList className="w-4 h-4" /> Open board
+              </Link>
+            </div>
+          </div>
+        )}
+
+        {((active as any).link1 || (active as any).link2) && (
               <div className="mt-5">
                 <div className="text-xs font-semibold text-slate-500 tracking-widest mb-2">RESOURCES</div>
                 <div className="space-y-2">

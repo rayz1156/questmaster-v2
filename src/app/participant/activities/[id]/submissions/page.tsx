@@ -9,6 +9,17 @@ import SubmissionBoardView from '@/components/submission-board/SubmissionBoardVi
 import { supabase } from '@/lib/supabase';
 import type { SubmissionBoard, SubmissionBoardItem } from '@/lib/submission-boards';
 
+
+/** Wrap fetch() to attach the Supabase access token. */
+async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const headers = new Headers(init.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
+
+
 export default function ParticipantSubmissionsPage() {
   const params = useParams<{ id: string }>();
   const huntId = params.id;
@@ -23,7 +34,7 @@ export default function ParticipantSubmissionsPage() {
         const { data: hunt } = await supabase.from('qm_hunts').select('class_id').eq('id', huntId).maybeSingle();
         if (!hunt) throw new Error('Activity not found');
         setClassId(hunt.class_id);
-        const r = await fetch(`/api/submission-boards/${huntId}/${hunt.class_id}`, { cache: 'no-store' });
+        const r = await authedFetch(`/api/submission-boards/${huntId}/${hunt.class_id}`, { cache: 'no-store' });
         if (!r.ok) throw new Error((await r.json()).error || 'Failed to load');
         const j = await r.json();
         setData({ board: j.board, items: j.items || [], myRole: j.myRole || 'student', myId: j.myId });

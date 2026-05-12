@@ -7,6 +7,18 @@ import { Download, Edit2, Trash2, Plus, Lock, Unlock, Eye, EyeOff, Users, X, Fil
 import { buildAdiloEmbedUrl } from '@/lib/adilo';
 import type { SubmissionBoard, SubmissionBoardItem, SubmissionItemType, SubmissionVisibility } from '@/lib/submission-boards';
 
+import { supabase } from '@/lib/supabase';
+
+/** Wrap fetch() to attach the Supabase access token so /api/* routes can auth. */
+async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const headers = new Headers(init.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
+
+
 interface Props {
   huntId: string;
   classId: string;
@@ -43,7 +55,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   const isEducator = myRole === 'educator' || myRole === 'admin';
 
   async function refresh() {
-    const r = await fetch(apiBase, { cache: 'no-store' });
+    const r = await authedFetch(apiBase, { cache: 'no-store' });
     if (r.ok) {
       const j = await r.json();
       setBoard(j.board);
@@ -54,7 +66,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   async function createBoard() {
     setSavingBoard(true);
     setErr(null);
-    const r = await fetch(apiBase, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Submission Board' }) });
+    const r = await authedFetch(apiBase, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Submission Board' }) });
     if (!r.ok) { setErr((await r.json()).error || 'Failed to create board'); }
     else { await refresh(); }
     setSavingBoard(false);
@@ -62,14 +74,14 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
 
   async function updateBoard(patch: Partial<SubmissionBoard>) {
     setSavingBoard(true);
-    const r = await fetch(apiBase, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
+    const r = await authedFetch(apiBase, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
     if (r.ok) { const j = await r.json(); setBoard(j.board); }
     setSavingBoard(false);
   }
 
   async function deleteItem(id: string) {
     if (!confirm('Delete this submission? This cannot be undone.')) return;
-    const r = await fetch(`${apiBase}/items/${id}`, { method: 'DELETE' });
+    const r = await authedFetch(`${apiBase}/items/${id}`, { method: 'DELETE' });
     if (r.ok) setItems(items.filter((i) => i.id !== id));
     else alert((await r.json()).error || 'Delete failed');
   }
@@ -275,11 +287,21 @@ function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose
       } else if (tab === 'link') {
         if (!linkUrl) throw new Error('Link URL required');
         baseBody.linkUrl = linkUrl;
+      // Try to unfurl OpenGraph metadata (best-effort; failures are non-fatal)
+      try {
+        const pr = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(linkUrl)}`);
+        if (pr.ok) {
+          const pj = await pr.json();
+          if (pj.title) baseBody.linkTitle = pj.title;
+          if (pj.description) baseBody.linkDescription = pj.description;
+          if (pj.image) baseBody.linkImageUrl = pj.image;
+        }
+      } catch { /* non-fatal */ }
       } else if (tab === 'image' || tab === 'file') {
         if (!file) throw new Error('Please choose a file');
         const fd = new FormData();
         fd.append('file', file);
-        const ur = await fetch(`${apiBase}/upload-file`, { method: 'POST', body: fd });
+        const ur = await authedFetch(`${apiBase}/upload-file`, { method: 'POST', body: fd });
         if (!ur.ok) throw new Error((await ur.json()).error || 'Upload failed');
         const uj = await ur.json();
         if (tab === 'image') {
@@ -299,7 +321,7 @@ function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose
         if (!file) throw new Error('Please choose a video');
         if (!file.type.startsWith('video/')) throw new Error('Only video files allowed');
         // 1) start Adilo upload
-        const startRes = await fetch(`${apiBase}/video/start`, {
+        const startRes = await authedFetch(`${apiBase}/video/start`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
@@ -311,7 +333,7 @@ function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose
         if (!putRes.ok) throw new Error('Direct upload to Adilo failed');
         const etag = putRes.headers.get('etag') || putRes.headers.get('ETag') || '';
         // 3) complete
-        const compRes = await fetch(`${apiBase}/video/complete`, {
+        const compRes = await authedFetch(`${apiBase}/video/complete`, {
           method: 'POST',
           headers: { 'content-type': 'application/json' },
           body: JSON.stringify({
@@ -332,7 +354,7 @@ function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose
         baseBody.videoDurationSeconds = compJ.videoDurationSeconds;
       }
 
-      const r = await fetch(`${apiBase}/items`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(baseBody) });
+      const r = await authedFetch(`${apiBase}/items`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(baseBody) });
       if (!r.ok) throw new Error((await r.json()).error || 'Create failed');
       const j = await r.json();
       onCreated(j.item);
@@ -373,31 +395,113 @@ function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose
   );
 }
 
-// ============================================================
-// Edit modal (title + description only)
-// ============================================================
+// EDIT_MODAL_V2 ============================================
+// Type-aware edit modal: edits title/description always, and
+// allows replacing the content of file/image/video/link items.
+// =============================================================
 function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item: SubmissionBoardItem; onClose: () => void; onSaved: (it: SubmissionBoardItem) => void }) {
-  const [title, setTitle] = useState(item.title || '');
-  const [description, setDescription] = useState(item.description || '');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const [title, setTitle] = useState(item.title || '');
+  const [description, setDescription] = useState(item.description || '');
+  // Link-type editable state
+  const [linkUrl, setLinkUrl] = useState(item.link_url || '');
+  // Replacement file (for file/image/video)
+  const [newFile, setNewFile] = useState<File | null>(null);
+
+  const isLink = item.item_type === 'link';
+  const isNote = item.item_type === 'text';
+  const isFile = item.item_type === 'file';
+  const isImage = item.item_type === 'image';
+  const isVideo = item.item_type === 'video';
 
   async function save() {
     setBusy(true); setErr(null);
-    const r = await fetch(`${apiBase}/items/${item.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title, description }) });
-    setBusy(false);
-    if (!r.ok) { setErr((await r.json()).error || 'Save failed'); return; }
-    const j = await r.json();
-    onSaved(j.item);
+    try {
+      const patch: any = { title: title || null, description: description || null };
+      if (isLink) {
+        if (!linkUrl) throw new Error('Link URL required');
+        patch.linkUrl = linkUrl;
+        // If link changed, re-unfurl OpenGraph metadata
+        if (linkUrl !== item.link_url) {
+          try {
+            const pr = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(linkUrl)}`);
+            if (pr.ok) {
+              const pj = await pr.json();
+              patch.linkTitle = pj.title || '';
+              patch.linkDescription = pj.description || '';
+              patch.linkImageUrl = pj.image || '';
+            }
+          } catch { /* non-fatal */ }
+        }
+      }
+
+      // If user picked a replacement file, upload it and merge URL/IDs into patch.
+      if ((isFile || isImage) && newFile) {
+        const fd = new FormData();
+        fd.append('file', newFile);
+        const ur = await authedFetch(`${apiBase}/upload-file`, { method: 'POST', body: fd });
+        if (!ur.ok) throw new Error((await ur.json()).error || 'Upload failed');
+        const uj = await ur.json();
+        if (isImage) {
+          patch.imageUrl = uj.fileluFileUrl;
+        } else {
+          // For files we cannot fully replace via PATCH (need to re-create the row).
+          // Strategy: send fileluFileCode + size via the dedicated POST + DELETE flow.
+          // Simpler approach: delete current, post a new item, return early.
+          const delRes = await authedFetch(`${apiBase}/items/${item.id}`, { method: 'DELETE' });
+          if (!delRes.ok) throw new Error('Delete during replace failed');
+          const newRes = await authedFetch(`${apiBase}/items`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({
+              itemType: 'file', title: title || null, description: description || null,
+              fileluFileCode: uj.fileCode, fileName: uj.fileName, fileSizeBytes: uj.sizeBytes, mimeType: uj.mimeType,
+            }),
+          });
+          if (!newRes.ok) throw new Error((await newRes.json()).error || 'Replace failed');
+          const nj = await newRes.json();
+          onSaved(nj.item);
+          return;
+        }
+      }
+      if (isVideo && newFile) {
+        // Video replace: delete then re-add via SubmitModal-like flow is complex.
+        // For now require the user to delete + resubmit videos manually.
+        throw new Error('To replace a video, please delete this submission and submit a new one.');
+      }
+
+      const r = await authedFetch(`${apiBase}/items/${item.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
+      if (!r.ok) { setErr((await r.json()).error || 'Save failed'); return; }
+      const j = await r.json();
+      onSaved(j.item);
+    } catch (e: any) {
+      setErr(e.message || String(e));
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
-      <div className="bg-white rounded-lg max-w-md w-full" onClick={(e) => e.stopPropagation()}>
+      <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <div className="p-4 border-b flex items-center justify-between"><h3 className="font-bold">Edit Submission</h3><button onClick={onClose}><X className="w-5 h-5" /></button></div>
         <div className="p-4 space-y-3">
+          <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{item.item_type}</div>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="input w-full" />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="input w-full" rows={4} />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="input w-full" rows={3} />
+          {isLink && (
+            <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." className="input w-full" />
+          )}
+          {(isFile || isImage) && (
+            <div>
+              <label className="text-xs text-slate-600 block mb-1">Replace {item.item_type} (optional)</label>
+              <input type="file" accept={isImage ? 'image/*' : '*/*'} onChange={(e) => setNewFile(e.target.files?.[0] || null)} className="input w-full" />
+            </div>
+          )}
+          {isVideo && (
+            <p className="text-xs text-slate-500">To replace the video, please delete this submission and submit a new one.</p>
+          )}
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
         <div className="p-4 border-t flex justify-end gap-2">

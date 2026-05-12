@@ -14,6 +14,9 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
   if (typeof body.description === 'string') updates.description = body.description;
   if (typeof body.linkTitle === 'string') updates.link_title = body.linkTitle;
   if (typeof body.linkDescription === 'string') updates.link_description = body.linkDescription;
+  if (typeof body.linkUrl === 'string') updates.link_url = body.linkUrl;
+  if (typeof body.linkImageUrl === 'string') updates.link_image_url = body.linkImageUrl;
+  if (typeof body.imageUrl === 'string') updates.image_url = body.imageUrl;
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
   // RLS: owner can update own; educator can update any. We just attempt the update.
