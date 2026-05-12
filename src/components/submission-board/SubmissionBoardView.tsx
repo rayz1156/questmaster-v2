@@ -308,18 +308,30 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
         items.length === 0 ? (
           <div className="card p-6 text-center text-sm text-gray-500">No submissions yet.</div>
         ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
+        <div
+          className="mx-0 mt-2 mb-8 rounded-3xl px-4 sm:px-6 pt-6 pb-10 min-h-[60vh] shadow-inner relative"
+          style={{
+            background:
+              'radial-gradient(1200px 600px at 20% -10%, rgba(124,58,237,0.18), transparent 60%), radial-gradient(900px 500px at 90% 10%, rgba(14,165,233,0.18), transparent 55%), linear-gradient(180deg, #0f172a 0%, #111827 100%)',
+          }}
+        >
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
             {items.map((it) => (
-              <ItemCard
+              <div
                 key={it.id}
-                item={it}
-                myId={myId}
-                isEducator={isEducator}
-                onEdit={() => setEditingItem(it)}
-                onDelete={() => deleteItem(it.id)}
-              />
+                className="group transition-transform duration-200 hover:-translate-y-0.5 rounded-2xl overflow-hidden shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] hover:shadow-[0_18px_40px_-14px_rgba(0,0,0,0.8)] bg-white"
+              >
+                <ItemCard
+                  item={it}
+                  myId={myId}
+                  isEducator={isEducator}
+                  onEdit={() => setEditingItem(it)}
+                  onDelete={() => deleteItem(it.id)}
+                />
+              </div>
             ))}
           </div>
+        </div>
         )
       )}
 
