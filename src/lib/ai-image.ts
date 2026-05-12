@@ -245,7 +245,7 @@ async function generatePollinations(prompt: string, opts: GenOpts): Promise<AiIm
     safe: 'true',
     enhance: 'false',
     private: 'true',
-    referrer: 'kuizen.veltrix.technology',
+    referrer: 'kuizen.fun',
   });
   const url = `${POLLINATIONS_BASE}/${encodeURIComponent(prompt)}?${qs.toString()}`;
   const headers: Record<string, string> = {};

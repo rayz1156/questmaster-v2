@@ -29,7 +29,7 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Bad protocol' }, { status: 400 });
     }
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'KuizenBot/1.0 (+https://kuizen.veltrix.technology)' },
+      headers: { 'User-Agent': 'KuizenBot/1.0 (+https://kuizen.fun)' },
       signal: AbortSignal.timeout(8000),
     });
     if (!res.ok) return NextResponse.json({ error: `Fetch failed ${res.status}` }, { status: 502 });

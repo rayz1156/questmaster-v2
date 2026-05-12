@@ -22,7 +22,7 @@ export async function POST(req: NextRequest) {
     }
 
     const transporter = nodemailer.createTransport({ host, port, secure: false, auth: { user, pass } });
-    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://kuizen.veltrix.technology';
+    const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://kuizen.fun';
     const approveUrl = `${siteUrl}/admin/users`;
 
     const subject = `[Kuizen] New educator pending approval: ${name || email}`;
