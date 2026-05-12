@@ -37,3 +37,22 @@ pm2 start ecosystem.config.js
 - Supabase (self-hosted on Hostinger KVM 2)
 - Lucide React icons
 - PM2 process manager
+
+## TODO: PWA icon rasterization
+
+The brand mark lives at `public/logo-mark.svg` (icon) and `public/logo.svg`
+(wordmark lockup). The Next.js App Router favicon is `src/app/icon.svg`.
+
+Before production launch, regenerate these raster PWA icons from
+`public/logo-mark.svg` (use `librsvg` / `rsvg-convert` or `imagemagick`):
+
+- `public/icons/icon-192.png` (192x192)
+- `public/icons/icon-512.png` (512x512)
+- `public/icons/icon-maskable-512.png` (512x512, safe zone padding)
+- `public/apple-touch-icon.png` (180x180)
+
+Example:
+```
+rsvg-convert -w 192 -h 192 public/logo-mark.svg > public/icons/icon-192.png
+rsvg-convert -w 512 -h 512 public/logo-mark.svg > public/icons/icon-512.png
+```

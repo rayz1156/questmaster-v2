@@ -2,7 +2,7 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, Trophy, HelpCircle } from "lucide-react";
+import { LogOut, HelpCircle } from "lucide-react";
 import { getSession, clearSession } from "@/lib/session";
 import type { User, Profile } from "@/lib/types";
 import { getMyProfile } from "@/lib/data";
@@ -69,9 +69,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
       {logoUrl ? (
         <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white/90 p-1" />
       ) : (
-        <div className="w-10 h-10 rounded-lg bg-white/15 flex items-center justify-center">
-          <Trophy className="w-6 h-6" />
-        </div>
+        <img src="/logo-mark.svg" alt="Kuizen" className="w-10 h-10 rounded-lg" />
       )}
       <div className="min-w-0">
         <div className="font-bold text-lg leading-tight truncate">Kuizen</div>

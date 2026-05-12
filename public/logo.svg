@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 960 256" width="960" height="256" role="img" aria-label="Kuizen">
+  <title>Kuizen</title>
+  <defs>
+    <linearGradient id="k-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+    <linearGradient id="k-text" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <!-- Mark -->
+  <g>
+    <rect x="0" y="0" width="256" height="256" rx="56" ry="56" fill="url(#k-bg)"/>
+    <g fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M 80 64 L 80 192"/>
+      <path d="M 80 128 L 152 64"/>
+      <path d="M 80 128 L 140 188 L 192 132"/>
+    </g>
+    <circle cx="196" cy="68" r="12" fill="#ffffff"/>
+  </g>
+  <!-- Wordmark: "kuizen" in geometric sans, gradient-filled -->
+  <text x="300" y="184" font-family="'Inter','Helvetica Neue',Arial,sans-serif" font-size="168" font-weight="800" letter-spacing="-6" fill="url(#k-text)">kuizen</text>
+  <!-- Recolor the dot of the "i" to solid purple for accent -->
+  <circle cx="506" cy="50" r="14" fill="#7c3aed"/>
+</svg>

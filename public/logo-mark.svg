@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Kuizen">
+  <title>Kuizen</title>
+  <defs>
+    <linearGradient id="kuizen-bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#7c3aed"/>
+      <stop offset="100%" stop-color="#3b82f6"/>
+    </linearGradient>
+  </defs>
+  <!-- Rounded square tile -->
+  <rect x="0" y="0" width="256" height="256" rx="56" ry="56" fill="url(#kuizen-bg)"/>
+  <!-- Stylized K with checkmark hook on the lower-right diagonal -->
+  <g fill="none" stroke="#ffffff" stroke-width="22" stroke-linecap="round" stroke-linejoin="round">
+    <!-- Vertical stem of K -->
+    <path d="M 80 64 L 80 192"/>
+    <!-- Upper diagonal of K -->
+    <path d="M 80 128 L 152 64"/>
+    <!-- Lower diagonal extending into a checkmark hook -->
+    <path d="M 80 128 L 140 188 L 192 132"/>
+  </g>
+  <!-- Quiz dot (the "i" of a question mark) -->
+  <circle cx="196" cy="68" r="12" fill="#ffffff"/>
+</svg>
