@@ -1,6 +1,6 @@
 // Kuizen PWA service worker
 // Minimal network-first SW with offline fallback for navigations.
-const CACHE = 'kuizen-shell-v2';
+const CACHE = 'kuizen-shell-v3-kuizenfun';
 const OFFLINE_URL = '/offline.html';
 const PRECACHE_URLS = [OFFLINE_URL, '/manifest.json'];
 

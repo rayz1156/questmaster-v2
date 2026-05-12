@@ -9,11 +9,21 @@ import AnalyticsTracker from "@/components/AnalyticsTracker";
 const poppins = Poppins({ subsets: ["latin"], weight: ["300","400","500","600","700"] });
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://kuizen.fun"),
   title: "Kuizen",
   description:
     "Kuizen — Learn. Compete. Conquer. Where classrooms become arenas and learners become champions.",
   applicationName: "Kuizen",
   manifest: "/manifest.json",
+  openGraph: {
+    title: "Kuizen",
+    description: "Learn. Compete. Conquer.",
+    url: "https://kuizen.fun",
+    siteName: "Kuizen",
+    images: [{ url: "/icons/icon-512.png", width: 512, height: 512 }],
+    type: "website",
+  },
+  twitter: { card: "summary", title: "Kuizen", description: "Learn. Compete. Conquer.", images: ["/icons/icon-512.png"] },
   appleWebApp: {
     capable: true,
     title: "Kuizen",

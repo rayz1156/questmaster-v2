@@ -1,8 +1,8 @@
 {
   "name": "Kuizen",
   "short_name": "Kuizen",
-  "description": "Kuizen \u2014 Learn. Compete. Conquer. Where classrooms become arenas and learners become champions.",
-  "start_url": "/",
+  "description": "Kuizen — Learn. Compete. Conquer. Where classrooms become arenas and learners become champions.",
+  "start_url": "/?utm_source=pwa",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait",
@@ -27,5 +27,10 @@
       "type": "image/png",
       "purpose": "maskable"
     }
+  ],
+  "id": "/?source=pwa-kuizen-fun-v3",
+  "categories": [
+    "education",
+    "productivity"
   ]
 }
