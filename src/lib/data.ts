@@ -520,7 +520,7 @@ export async function adminUpdateChallenge(id: string, patch: Partial<Challenge>
   const { error } = await supabase.from('qm_challenges').update(patch).eq('id', id); if (error) throw error;
 }
 
-export type UserMeta = { id: string; email: string | null; created_at: string; last_sign_in_at: string | null };
+export type UserMeta = { id: string; email: string | null; created_at: string; last_sign_in_at: string | null; email_confirmed_at?: string | null };
 export async function adminListUsersMeta(): Promise<Record<string, UserMeta>> {
   const { data, error } = await supabase.rpc('qm_admin_list_users_meta');
   if (error) { console.error(error); return {}; }
@@ -652,4 +652,45 @@ export async function importLearningBoardFromClass(
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data?.error || 'Failed to import learning board');
   return data;
+}
+
+
+// === ADMIN: class limits & visibility ===
+export async function adminSetClassLimits(id: string, maxOwned: number | null, maxCoEducator: number | null): Promise<void> {
+  const { error } = await supabase.from('qm_profiles')
+    .update({ max_classes_owned: maxOwned, max_classes_as_coeducator: maxCoEducator })
+    .eq('id', id);
+  if (error) throw error;
+}
+
+// Classes an educator owns plus classes they belong to as a co-educator.
+export async function adminListEducatorClasses(userId: string): Promise<{ owned: any[]; coEducator: any[] }> {
+  const ownedRes = await supabase.from('qm_classes')
+    .select('id,name,color,join_code,is_archived,ended_at,created_at')
+    .eq('owner_id', userId)
+    .order('created_at', { ascending: false });
+  if (ownedRes.error) throw ownedRes.error;
+
+  const ceRes = await supabase.from('qm_class_educators')
+    .select('role,accepted_at,qm_classes(id,name,color,join_code,is_archived,ended_at,created_at,owner_id)')
+    .eq('educator_id', userId)
+    .not('accepted_at', 'is', null);
+  if (ceRes.error) throw ceRes.error;
+  const coEducator = (ceRes.data || [])
+    .map((r: any) => r.qm_classes ? { ...r.qm_classes, member_role: r.role, accepted_at: r.accepted_at } : null)
+    .filter(Boolean);
+
+  return { owned: ownedRes.data || [], coEducator };
+}
+
+// Classes a participant has joined.
+export async function adminListParticipantClasses(userId: string): Promise<any[]> {
+  const { data, error } = await supabase.from('qm_class_members')
+    .select('joined_at,qm_classes(id,name,color,join_code,is_archived,ended_at,created_at,owner_id)')
+    .eq('user_id', userId)
+    .order('joined_at', { ascending: false });
+  if (error) throw error;
+  return (data || [])
+    .map((r: any) => r.qm_classes ? { ...r.qm_classes, joined_at: r.joined_at } : null)
+    .filter(Boolean);
 }
