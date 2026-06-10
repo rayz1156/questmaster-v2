@@ -1,12 +1,20 @@
 "use client";
 import Link from "next/link";
 import Shell from "@/components/Shell";
-import { EDU_TABS } from '@/lib/eduTabs';
 import { useEffect, useState } from "react";
 import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus, Activity} from "lucide-react";
-import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass, leaveClassAsEducator } from "@/lib/data";
+import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass } from "@/lib/data";
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+
+const tabs = [
+  { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
+  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
+  { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
+  { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
+  { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
+];
 
 function roleLabel(role: string): string {
   if (role === "owner") return "Owner";
@@ -95,17 +103,6 @@ export default function EduClasses() {
     } finally { setDupBusy(false); }
   };
 
-  const onLeave = async (k: EducatorClassRow) => {
-    if (k.role === "owner") return;
-    if (!(await confirm({ title: `Leave "${k.name}"?`, description: "You will lose your co-educator access to this class. The owner can re-invite you later.", tone: "danger", confirmLabel: "Leave class" }))) return;
-    try {
-      await leaveClassAsEducator(k.id);
-      await reload();
-    } catch (e: any) {
-      alert(e?.message || "Failed to leave class");
-    }
-  };
-
   const onDelete = async (k: EducatorClassRow) => {
     if (k.role !== "owner") return;
     if (!(await confirm({ title: `Delete class "${k.name}"? All its activities will be deleted too.`, tone: 'danger' }))) return;
@@ -132,7 +129,7 @@ export default function EduClasses() {
   };
 
   return (
-    <Shell tabs={EDU_TABS}>
+    <Shell tabs={tabs}>
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
         <h2 className="page-title">My Classes</h2>
         <button onClick={() => setShowNew(s => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1"><Plus className="w-4 h-4"/> New Class</button>
@@ -189,17 +186,14 @@ export default function EduClasses() {
                 <div className="flex items-center gap-2 flex-1 min-w-0">
                   <div className="w-8 h-8 rounded-lg shrink-0" style={{ background: k.color || "#6366f1" }}/>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 min-w-0"><Link href={`/educator/classes/${k.id}`} className="font-semibold truncate block">{k.name}</Link>{k.ended_at && <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Ended</span>}</div>
+                    <Link href={`/educator/classes/${k.id}`} className="font-semibold truncate block">{k.name}</Link>
                     {k.description && <div className="text-xs text-gray-500 truncate">{k.description}</div>}
                   </div>
                 </div>
                 {k.role === "owner" ? (
                   <><button onClick={() => openDuplicate(k)} title="Duplicate class" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><CopyPlus className="w-4 h-4"/></button><button onClick={() => onDelete(k)} title="Delete class" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4"/></button></>
                 ) : (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">{roleLabel(k.role)}</span>
-                    <button onClick={() => onLeave(k)} title="Leave class" className="text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded-lg px-2 py-1 text-xs font-medium transition">Leave</button>
-                  </div>
+                  <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700 shrink-0">{roleLabel(k.role)}</span>
                 )}
               </div>
               <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">

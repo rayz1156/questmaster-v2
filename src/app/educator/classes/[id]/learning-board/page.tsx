@@ -1,23 +1,16 @@
 'use client';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, ListChecks, Users, BarChart3, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, GraduationCap, ListChecks, Users, BarChart3, Activity, User as UserIcon } from 'lucide-react';
 import Shell from '@/components/Shell';
+import { EDU_TABS } from '@/lib/eduTabs';
 import LearningBoardView from '@/components/learning-board/LearningBoardView';
-
-const tabs = [
-  { href: '/educator/classes', label: 'Classes', icon: <GraduationCap className="w-5 h-5" /> },
-  { href: '/educator/activities', label: 'Activities', icon: <ListChecks className="w-5 h-5" /> },
-  { href: '/educator/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
-  { href: '/educator/rankings', label: 'Rankings', icon: <BarChart3 className="w-5 h-5" /> },
-  { href: '/educator/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
-];
 
 export default function EducatorLearningBoardPage() {
   const params = useParams<{ id: string }>();
   const classId = params.id;
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={EDU_TABS}>
       <div className="min-h-screen bg-gray-50 text-gray-900">
 <div className="px-4 md:px-6 py-4 flex items-center gap-3 border-b border-gray-200 bg-white">
           <Link href={`/educator/classes/${classId}`} className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1 text-sm">

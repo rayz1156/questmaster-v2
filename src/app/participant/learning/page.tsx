@@ -1,4 +1,5 @@
 'use client';
+import { PARTICIPANT_TABS } from "@/lib/participantTabs";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -7,14 +8,6 @@ import Shell from '@/components/Shell';
 import { listEnrolledClasses } from '@/lib/data';
 import { useSession } from '@/lib/session';
 
-const tabs = [
-  { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
-      { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
-      { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
-  { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
-    { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
-  { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
-];
 
 export default function ParticipantLearningHome() {
   const { user } = useSession('participant');
@@ -42,7 +35,7 @@ export default function ParticipantLearningHome() {
   }, [loading, classes, router]);
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={PARTICIPANT_TABS}>
       <div className="max-w-3xl mx-auto p-6">
         <div className="flex items-center gap-3 mb-6">
           <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700"><BookOpen className="w-6 h-6" /></span>

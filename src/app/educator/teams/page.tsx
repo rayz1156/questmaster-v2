@@ -1,6 +1,7 @@
 "use client";
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import Shell from "@/components/Shell";
+import { EDU_TABS } from '@/lib/eduTabs';
 import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -8,15 +9,6 @@ import { ListChecks, Users, BarChart3, GraduationCap, Plus, Pencil, Trash2, User
 import { listMyHunts, listTeams, createTeam, bulkCreateTeams, renameTeam, deleteTeam, setTeamMaxMembers, listMyClasses, listMyHuntsByClass, type Hunt, type Team, type Klass } from "@/lib/data";
 import { regenerateTeamCode, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, addScoreAdjustment, type QuestCompletion, listTeamsByClass, createTeamForClass, bulkCreateTeamsForClass, listClassTeamScores, listTeamMembers } from '@/lib/data';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
-
-const navTabs = [
-  { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
-  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
-  { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
-  { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
-];
 
 type DTab = 'members' | 'scores' | 'joinlink' | 'settings';
 
@@ -49,6 +41,7 @@ function TeamsInner() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name'|'members'|'score'>('name');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMarkHuntId, setBulkMarkHuntId] = useState<string>("");
   const [memberCountByTeam, setMemberCountByTeam] = useState<Record<string,number>>({});
 
   const reloadClassTeams = useCallback(async (classId: string) => {
@@ -113,6 +106,7 @@ function TeamsInner() {
   const toggleOne = (id:string) => setSelected(p=>{ const s=new Set(p); if(s.has(id)) s.delete(id); else s.add(id); return s; });
   const toggleAll = () => setSelected(p=>p.size===teams.length?new Set():new Set(teams.map(t=>t.id)));
   const onBulkDelete = async () => { if(!selected.size) return; const ok = await showConfirm({ title: `Delete ${selected.size} team(s)?`, description: 'This action cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }); if(!ok) return; await Promise.all(Array.from(selected).map(id=>deleteTeam(id))); await reloadClassTeams(activeClassId); };
+  const onBulkMarkComplete = async () => { if(!selected.size || !bulkMarkHuntId) return; const h = hunts.find(x=>x.id===bulkMarkHuntId); if(!h) return; const ok = await showConfirm({ title: `Mark "${h.title}" complete for ${selected.size} team(s)?`, description: 'Each team will receive the activity points. Already-completed teams are skipped.', confirmLabel: 'Mark Complete' }); if(!ok) return; const ids = Array.from(selected); let okN=0, skipN=0, failN=0; for (const tid of ids) { const exists = completions.find(c=>c.hunt_id===bulkMarkHuntId && c.team_id===tid); if(exists){skipN++; continue;} try { await markTeamCompletion(bulkMarkHuntId, tid); okN++; } catch(e:any){ if(String(e?.message||'').toLowerCase().includes('duplicate')) skipN++; else failN++; } } await reloadCompletions(activeId); await reloadClassTeams(activeClassId); alert(`Bulk mark: ${okN} marked, ${skipN} already done, ${failN} failed.`); };
 
   const sel = teams.find(t=>t.id===selectedTeamId);
   const filtered = teams.filter(t=>!search||t.name?.toLowerCase().includes(search.toLowerCase())).sort((a:any,b:any)=>{
@@ -122,7 +116,7 @@ function TeamsInner() {
   });
 
   return (
-    <Shell tabs={navTabs}>
+    <Shell tabs={EDU_TABS}>
       {activeClassId && (
         <Link href={`/educator/classes/${activeClassId}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
       )}
@@ -137,10 +131,10 @@ function TeamsInner() {
       </div>
 
       {loading ? <p className="text-center py-12 text-gray-400">Loading teams...</p> : (
-        <div className="grid gap-4 lg:[grid-template-columns:minmax(280px,320px)_1fr]">
+        <div className="grid gap-4">
 
           {/* ── LEFT: Team list ── */}
-          <div className={`flex flex-col ${sel ? "hidden lg:flex" : ""}`}>
+          <div className={`flex flex-col ${sel ? "hidden" : ""}`}>
             <div className="flex gap-2 mb-2">
               <div className="relative flex-1">
                 <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"/>
@@ -151,10 +145,14 @@ function TeamsInner() {
             <div className="flex items-center gap-2 mb-2">
               <label className="text-xs text-gray-500">Sort by:</label>
               <select value={sortBy} onChange={e=>setSortBy(e.target.value as any)} className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white"><option value="name">Name</option><option value="members">Members</option><option value="score">Score</option></select>
-              {selected.size>0 && <button onClick={onBulkDelete} className="ml-auto text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded-md"><Trash2 className="w-3 h-3 inline mr-0.5"/>{selected.size}</button>}
+              {selected.size>0 && hunts.length>0 && (<>
+              <select value={bulkMarkHuntId} onChange={e=>setBulkMarkHuntId(e.target.value)} className="text-xs border border-gray-300 rounded px-2 py-1 ml-2" data-testid="bulk-hunt-select"><option value="">— Activity —</option>{hunts.map(h=>(<option key={h.id} value={h.id}>{h.title}</option>))}</select>
+              <button onClick={onBulkMarkComplete} disabled={!bulkMarkHuntId} className="text-xs text-green-700 hover:bg-green-50 disabled:opacity-40 px-2 py-1 rounded-md border border-green-300" data-testid="bulk-mark-btn">✓ Mark complete ({selected.size})</button>
+            </>)}
+            {selected.size>0 && <button onClick={onBulkDelete} className="ml-auto text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded-md"><Trash2 className="w-3 h-3 inline mr-0.5"/>{selected.size}</button>}
             </div>
 
-            <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pb-2">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
               {filtered.length===0 && <p className="text-sm text-gray-300 text-center py-8">No teams</p>}
               {filtered.map(t=>{
                 const act = selectedTeamId===t.id;
@@ -162,7 +160,7 @@ function TeamsInner() {
                 const bon = bonusMap[t.id]?.bonus ?? 0;
                 const mc = (typeof memberCountByTeam[t.id]==="number")?memberCountByTeam[t.id]:((membersByTeam[t.id]||[]).length||t.member_count||0);
                 return (
-                  <div key={t.id} onClick={()=>{setSelectedTeamId(t.id);setDetailTab('members');}} className={`group flex items-center gap-2 p-2.5 rounded-lg cursor-pointer border transition-all shrink-0 w-full lg:w-56 ${act?'border-purple-400 bg-purple-50 shadow':'border-gray-100 hover:border-purple-200 hover:bg-gray-50 bg-white'}`}>
+                  <div key={t.id} onClick={()=>{setSelectedTeamId(t.id);setDetailTab('members');}} className={`group flex items-center gap-2 p-2.5 rounded-lg cursor-pointer border transition-all w-full ${act?'border-purple-400 bg-purple-50 shadow':'border-gray-100 hover:border-purple-200 hover:bg-gray-50 bg-white'}`}>
                     <input type="checkbox" checked={selected.has(t.id)} onChange={()=>toggleOne(t.id)} onClick={e=>e.stopPropagation()} className="w-3.5 h-3.5 accent-purple-600 shrink-0"/>
                     <div className="flex-1 min-w-0">
                       <div className="font-medium text-sm truncate">{t.name}</div>
@@ -183,7 +181,7 @@ function TeamsInner() {
           </div>
 
           {/* ── RIGHT: Detail panel ── */}
-          <div className={`flex-1 min-w-0 overflow-hidden ${sel ? "block" : "hidden lg:block"}`}>
+          <div className={`flex-1 min-w-0 overflow-hidden ${sel ? "block" : "hidden"}`}>
             {!sel ? (
               <div className="h-full flex flex-col items-center justify-center text-gray-300">
                 <Users className="w-12 h-12 mb-3"/>
@@ -193,7 +191,7 @@ function TeamsInner() {
               <div className="bg-white border rounded-xl shadow-sm flex flex-col overflow-hidden">
                 {/* Header */}
                 <div className="px-6 py-4 border-b bg-gray-50/50">
-                  <button onClick={()=>{setSelectedTeamId(null);}} className="lg:hidden inline-flex items-center gap-1 text-sm text-purple-700 hover:text-purple-900 mb-3">← Back to teams</button>
+                  <button onClick={()=>{setSelectedTeamId(null);}} className="inline-flex items-center gap-1 text-sm text-purple-700 hover:text-purple-900 mb-3">← Back to teams</button>
                   <div className="flex items-center justify-between">
                     <div className="min-w-0">
                       <h2 className="text-xl font-bold truncate">{sel.name}</h2>

@@ -14,13 +14,16 @@ function LoginInner() {
   const [show, setShow] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [needsVerify, setNeedsVerify] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState('');
 
   async function signIn(e: React.FormEvent | undefined, override?: { email: string; password: string }) {
     e?.preventDefault();
     setBusy(true); setErr('');
     const creds = override ?? { email, password };
     const { data, error } = await supabase.auth.signInWithPassword(creds);
-    if (error || !data.user) { setBusy(false); setErr(error?.message || 'Sign-in failed'); return; }
+    if (error || !data.user) { setBusy(false); const m = error?.message || 'Sign-in failed'; setErr(m); setNeedsVerify(/confirm|verif/i.test(m)); return; }
     // Read role + approved from qm_profiles (RLS allows self select)
     const { data: prof } = await supabase.from('qm_profiles').select('role, approved').eq('id', data.user.id).maybeSingle();
     const role = (prof?.role as string) || (data.user.user_metadata?.role as string) || 'participant';
@@ -39,6 +42,15 @@ function LoginInner() {
     window.location.href = dest;
   }
 
+
+  async function resendVerification(){
+    if(!email){ setResendMsg('Please enter your email above first.'); return; }
+    setResending(true); setResendMsg('');
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
+    setResending(false);
+    setResendMsg(error ? (error.message || 'Could not resend. Try again later.') : 'Verification email sent. Please check your inbox (and spam folder).');
+  }
 
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
@@ -63,6 +75,12 @@ function LoginInner() {
             </label>
           </div>
           {err && <p className="text-sm text-red-600">{err}</p>}
+            {needsVerify && (
+              <div className="text-sm">
+                <button type="button" onClick={resendVerification} disabled={resending} className="text-purple-600 font-medium disabled:opacity-60">{resending ? 'Sending…' : 'Resend verification email'}</button>
+                {resendMsg && <p className="text-gray-600 mt-1">{resendMsg}</p>}
+              </div>
+            )}
           <button disabled={busy} className="w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600 disabled:opacity-60">{busy ? 'Signing in…' : 'Sign In'}</button>
           <div className="flex justify-between text-sm">
             <Link href="/forgot-password" className="text-purple-600 font-medium">Forgot password?</Link>

@@ -1,4 +1,5 @@
 "use client";
+import { PARTICIPANT_TABS } from "@/lib/participantTabs";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
@@ -8,14 +9,6 @@ import { supabase } from "@/lib/supabase";
 import { Board, getBoardForHunt } from "@/lib/boards";
 import QuestBoardView from "@/components/boards/QuestBoardView";
 
-const tabs = [
-  { href: "/participant/home", label: "Home", icon: <Home className="w-5 h-5"/> },
-      { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
-      { href: "/participant/activities", label: "Activities", icon: <Compass className="w-5 h-5"/> },
-  { href: "/participant/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
-  { href: "/participant/leaderboard", label: "Ranking", icon: <Trophy className="w-5 h-5"/> },
-  { href: "/participant/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
-];
 
 export default function PartActivityBoardPage() {
   const params = useParams<{ id: string }>();
@@ -38,7 +31,7 @@ export default function PartActivityBoardPage() {
   }, [huntId]);
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={PARTICIPANT_TABS}>
       <div className="mb-3">
         <Link href={`/participant/activities`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> Back to Activities

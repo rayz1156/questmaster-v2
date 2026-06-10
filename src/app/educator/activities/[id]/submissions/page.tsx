@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight, GraduationCap, ListChecks, Users, BarChart3, Activity, User as UserIcon } from 'lucide-react';
 import Shell from '@/components/Shell';
+import { EDU_TABS } from '@/lib/eduTabs';
 import { supabase } from '@/lib/supabase';
 
 export default function ActivitySubmissionsIndex() {
   const params = useParams<{ id: string }>();
   const huntId = params.id;
+  const router = useRouter();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -25,14 +27,19 @@ export default function ActivitySubmissionsIndex() {
         if (!hunt) throw new Error('Activity not found');
         // Get the class name (and any other classes the user manages where this hunt is used).
         const { data: kls } = await supabase.from('qm_classes').select('id, name').eq('id', hunt.class_id);
-        setClasses(kls || []);
+        const list = kls || [];
+        if (list.length === 1) {
+          router.replace(`/educator/activities/${huntId}/submissions/${list[0].id}`);
+          return;
+        }
+        setClasses(list);
       } catch (e: any) { setErr(e.message); }
       finally { setLoading(false); }
     })();
-  }, [huntId]);
+  }, [huntId, router]);
 
   return (
-    <Shell tabs={[]}>
+    <Shell tabs={EDU_TABS}>
       <div className="mb-3">
         <Link href={`/educator/activities/${huntId}`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Back to Activity</Link>
       </div>

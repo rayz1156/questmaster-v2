@@ -4,18 +4,10 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, User as UserIcon, ArrowLeft, Activity } from "lucide-react";
 import Shell from "@/components/Shell";
+import { EDU_TABS } from '@/lib/eduTabs';
 import { supabase } from "@/lib/supabase";
 import { Board, getBoardForHunt } from "@/lib/boards";
 import QuestBoardView from "@/components/boards/QuestBoardView";
-
-const tabs = [
-  { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
-  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
-  { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
-  { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
-];
 
 export default function ActivityBoardPage() {
   const params = useParams<{ id: string }>();
@@ -38,7 +30,7 @@ export default function ActivityBoardPage() {
   }, [huntId]);
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={EDU_TABS}>
       <div className="mb-3">
         <Link href={`/educator/activities`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> Back to Activities

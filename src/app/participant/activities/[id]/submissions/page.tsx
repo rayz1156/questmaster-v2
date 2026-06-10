@@ -1,4 +1,5 @@
 'use client';
+import { PARTICIPANT_TABS } from "@/lib/participantTabs";
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
@@ -43,7 +44,7 @@ export default function ParticipantSubmissionsPage() {
   }, [huntId]);
 
   return (
-    <Shell tabs={[]}>
+    <Shell tabs={PARTICIPANT_TABS}>
       <div className="mb-3"><Link href={`/participant/home`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Back</Link></div>
       <h1 className="text-xl font-bold mb-3">My Submissions</h1>
       {err && <p className="text-sm text-red-600">{err}</p>}

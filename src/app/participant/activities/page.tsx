@@ -1,4 +1,5 @@
 "use client";
+import { PARTICIPANT_TABS } from "@/lib/participantTabs";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
@@ -8,14 +9,6 @@ import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listQuestCompletions, listEnrolledClasses, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
 
-const tabs = [
-  { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
-      { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
-      { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
-  { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
-  { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
-  { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
-];
 
 function questIcon(title: string) {
   const t = (title || '').toLowerCase();
@@ -67,7 +60,7 @@ function Inner() {
   const statusLower = String(status).toLowerCase();
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={PARTICIPANT_TABS}>
       <div className="space-y-5">
         {/* Hero header */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-50 via-white to-purple-50 border border-purple-100 shadow-sm p-5 sm:p-6">

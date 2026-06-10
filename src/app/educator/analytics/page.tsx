@@ -6,6 +6,7 @@ import GamificationPanel from "@/components/analytics/GamificationPanel";
 import MasteryPanel from "@/components/analytics/MasteryPanel";
 import TeamStatsPanel from "@/components/analytics/TeamStatsPanel";
 import Shell from "@/components/Shell";
+import { EDU_TABS } from '@/lib/eduTabs';
 import { supabase } from "@/lib/supabaseClient";
 import { listMyEducatorClasses } from "@/lib/data";
 import type { EducatorClassRow } from "@/lib/types";
@@ -13,15 +14,6 @@ import {
   GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, BookOpen,
   Activity, TrendingUp, AlertTriangle, Eye, LogIn, Target, CheckCircle2, HelpCircle,
 } from "lucide-react";
-
-const tabs = [
-  { href: "/educator/classes",   label: "Classes",   icon: <GraduationCap className="w-5 h-5"/> },
-  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  { href: "/educator/teams",     label: "Teams",     icon: <Users className="w-5 h-5"/> },
-  { href: "/educator/rankings",  label: "Rankings",  icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
-  { href: "/educator/profile",   label: "Profile",   icon: <UserIcon className="w-5 h-5"/> },
-];
 
 type Summary = {
   class_id: string | null;
@@ -121,7 +113,7 @@ export default function EducatorAnalyticsPage() {
   const inact = summary?.inactivity;
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={EDU_TABS}>
       <div className="flex items-start justify-between gap-4 flex-wrap">
         <div>
           <h1 className="text-3xl font-bold flex items-center gap-2"><Activity className="w-7 h-7 text-purple-600"/> Analytics</h1>

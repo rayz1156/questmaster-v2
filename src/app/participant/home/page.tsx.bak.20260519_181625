@@ -1,13 +1,20 @@
 "use client";
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound, BookOpen } from "lucide-react";
 import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
-import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
+import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
 
+const tabs = [
+  { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5" /> },
+      { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
+      { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5" /> },
+  { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5" /> },
+    { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5" /> },
+  { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5" /> },
+];
 
 function initials(s: string) {
   const parts = (s || '').trim().split(/\s+/).slice(0,2);
@@ -92,7 +99,7 @@ export default function Page() {
   const teamPalette = ['bg-emerald-100 text-emerald-700','bg-purple-100 text-purple-700','bg-pink-100 text-pink-700','bg-sky-100 text-sky-700','bg-amber-100 text-amber-700'];
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <Shell tabs={tabs}>
       <div className="space-y-5">
         {/* Welcome hero */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-50 via-white to-purple-50 border border-purple-100 shadow-sm p-6 sm:p-8">
@@ -127,36 +134,6 @@ export default function Page() {
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
                 <span>Active class</span>
               </div>
-                {activeClass?.ended_at && (
-                  <div data-class-banner="ended" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold">This class has ended.</div>
-                      <div className="text-amber-700 mt-0.5">You can still review the Learning Board, Activities and final Ranking. New submissions are closed.</div>
-                    </div>
-                  </div>
-                )}
-              {activeClassId && (
-                <button
-                  type="button"
-                  onClick={async () => {
-                    const target = classes.find((c: any) => c.id === activeClassId);
-                    if (!target) return;
-                    if (!confirm(`Leave "${target.name}"? You will lose access to its activities and rankings.`)) return;
-                    try {
-                      await leaveClassAsStudent(activeClassId);
-                      const remaining = classes.filter((c: any) => c.id !== activeClassId);
-                      setClasses(remaining);
-                      setActiveClassId(remaining[0]?.id || "");
-                    } catch (err: any) {
-                      alert(err?.message || "Failed to leave class");
-                    }
-                  }}
-                  className="mt-3 w-full text-xs font-medium text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded-lg px-3 py-2 transition"
-                >
-                  Leave this class
-                </button>
-              )}
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">

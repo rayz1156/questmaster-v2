@@ -1,19 +1,11 @@
 "use client";
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Shell from "@/components/Shell";
+import { EDU_TABS } from '@/lib/eduTabs';
 import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, Activity, Target, Plus, Trash2, Save, X, Tag } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useSearchParams } from "next/navigation";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
-
-const tabs = [
-  { href: "/educator/classes",    label: "Classes",    icon: <GraduationCap className="w-5 h-5"/> },
-  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  { href: "/educator/teams",      label: "Teams",      icon: <Users className="w-5 h-5"/> },
-  { href: "/educator/rankings",   label: "Rankings",   icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/analytics",  label: "Analytics",  icon: <Activity className="w-5 h-5"/> },
-  { href: "/educator/profile",    label: "Profile",    icon: <UserIcon className="w-5 h-5"/> },
-];
 
 type Outcome = { id: string; class_id: string; code: string | null; label: string; description: string | null };
 type Hunt = { id: string; title: string };
@@ -169,7 +161,7 @@ function OutcomesPageInner() {
   }
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={EDU_TABS}>
       <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
         <div className="flex items-center gap-3">
           <Target className="w-6 h-6 text-indigo-500" />

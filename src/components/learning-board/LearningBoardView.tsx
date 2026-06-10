@@ -252,7 +252,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
         />
       )}
     {impOpen && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={()=>!impBusy && setImpOpen(false)}>
+   <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" >
         <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold text-gray-900">Import learning board</h3>
@@ -701,6 +701,9 @@ function CardRenderer({
       </button>
     );
   }
+  if (card.card_type === 'chatbot' && card.chatbot_url) {
+    return <ChatbotCardBody url={card.chatbot_url} title={card.title} />;
+  }
     if (card.card_type === 'file' && card.file_url) {
       const ext = (card.file_extension || '').toLowerCase();
       const sizeKb = card.file_size_bytes ? Math.round(card.file_size_bytes / 1024) : null;
@@ -827,7 +830,7 @@ function AddCardModal({
 }) {
   const [tab, setTab] = useState<LearningCardType | 'qr'>('link');
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+  <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div
         className="bg-white border border-gray-200 rounded-xl w-full max-w-lg p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
@@ -837,7 +840,7 @@ function AddCardModal({
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
         <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
-          {(['link', 'qr', 'text', 'file', 'image', 'video'] as Array<LearningCardType | 'qr'>).map((t) => (
+          {(['link', 'qr', 'text', 'file', 'image', 'video', 'chatbot'] as Array<LearningCardType | 'qr'>).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -851,6 +854,7 @@ function AddCardModal({
         {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'file'  && <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+      {tab === 'chatbot' && <ChatbotForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       </div>
     </div>
   );
@@ -1676,7 +1680,7 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
       </button>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setConfirmOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" >
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-5" onClick={(e)=>e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Generate AI thumbnails?</h3>
             <p className="text-sm text-gray-600">This will create AI-generated images for every card that is still using the default gradient tile. It uses free AI providers (AI Horde &rarr; Cloudflare &rarr; Hugging Face &rarr; Pollinations) in parallel and may take several minutes depending on queue load. Existing custom thumbnails are not touched.</p>
@@ -1769,7 +1773,7 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+  <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Edit card</h3>
@@ -1828,6 +1832,77 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChatbotCardBody({ url, title }: { url: string; title: string | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="w-full">
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-3 rounded-md bg-white p-3 hover:bg-slate-50 transition-colors w-full text-left"
+      >
+        <div className="w-12 h-12 rounded-md flex items-center justify-center bg-indigo-100 text-indigo-600 text-xs font-bold">
+          AI
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-900 truncate">{title || 'Learning Assistant'}</div>
+          <div className="text-xs text-indigo-600">Chat with assistant</div>
+        </div>
+      </button>
+      {open && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+              <div className="text-sm font-semibold text-gray-900">{title || 'Learning Assistant'}</div>
+              <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-900 text-lg leading-none px-2">{'\u00D7'}</button>
+            </div>
+            <iframe src={url} title={title || 'Assistant'} className="flex-1 w-full border-0" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatbotForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [title, setTitle] = useState('');
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url) { setErr('Enter the assistant embed URL'); return; }
+    let finalUrl = url.trim();
+    if (/landrr/i.test(finalUrl) && !/^https?:\/\//i.test(finalUrl)) {
+      const m = finalUrl.match(/source\s*[:=]\s*['\"]([A-Za-z0-9+/=_-]+)['\"]/);
+      if (m && m[1]) { finalUrl = '/embeds/landrr-chat.html?source=' + encodeURIComponent(m[1]); }
+      else { setErr('Could not find the chatbot token in that embed code.'); return; }
+    }
+    let valid = false;
+    if (finalUrl.startsWith('/embeds/')) { valid = true; }
+    else { try { valid = new URL(finalUrl).protocol === 'https:'; } catch { valid = false; } }
+    if (!valid) { setErr('Paste an https:// iframe URL or a chatbot script embed (e.g. Landrr).'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId, cardType: 'chatbot', title: title || null, chatbotUrl: finalUrl, insertIndex }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Assistant embed URL (https://...)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <p className="text-xs text-gray-500">Paste the embed URL from any chatbot platform (the src URL from its iframe embed code).</p>
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button onClick={submit} disabled={busy} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm">{busy ? 'Adding...' : 'Add assistant'}</button>
     </div>
   );
 }

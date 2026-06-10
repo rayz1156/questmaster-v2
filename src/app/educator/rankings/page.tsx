@@ -1,19 +1,11 @@
 "use client";
 import Shell from "@/components/Shell";
+import { EDU_TABS } from '@/lib/eduTabs';
 import Link from 'next/link';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { ListChecks, Users, BarChart3, GraduationCap, Plus, Minus, Trash2, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight, Activity, ClipboardList, Crown, Medal } from "lucide-react";
 import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listMyClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type Klass } from "@/lib/data";
-
-const tabs = [
-  { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
-  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
-  { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
-  { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
-];
 
 type AggScore = { team_id: string; team_name: string; total_score: number; quest_count: number };
 
@@ -142,7 +134,7 @@ function RankingsInner() {
   const leaderboard = activeId ? scores.sort((a, b) => b.total_score - a.total_score) : aggScores;
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={EDU_TABS}>
       {classId && (
         <Link href={`/educator/classes/${classId}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
       )}

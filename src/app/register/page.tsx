@@ -11,6 +11,8 @@ export default function Register() {
   const [busy,setBusy]=useState(false);
   const [err,setErr]=useState('');
   const [done,setDone]=useState(false);
+  const [resending,setResending]=useState(false);
+  const [resendMsg,setResendMsg]=useState('');
 
   async function submit(e: React.FormEvent){
     e.preventDefault();
@@ -29,6 +31,15 @@ export default function Register() {
     setDone(true);
   }
 
+  async function resendVerification(){
+    if(!email){ setResendMsg('Please enter your email above first.'); return; }
+    setResending(true); setResendMsg('');
+    const redirectTo = `${window.location.origin}/auth/callback`;
+    const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
+    setResending(false);
+    setResendMsg(error ? (error.message || 'Could not resend. Try again later.') : 'Verification email sent again. Please check your inbox (and spam folder).');
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
       <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
@@ -42,7 +53,9 @@ export default function Register() {
             <h2 className="text-xl font-bold text-gray-900">Check your email ✉️</h2>
             <p className="text-sm text-gray-600">We sent a verification link to <b>{email}</b>. Click it to confirm your account, then sign in.</p>
             {role==='educator' && <p className="text-sm text-amber-700 bg-amber-50 rounded-xl p-3">After verifying, an admin will need to approve your educator account before you can create hunts.</p>}
-            <Link className="block text-center w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600" href="/login">Back to sign in</Link>
+            <button type="button" onClick={resendVerification} disabled={resending} className="block w-full text-center text-sm text-purple-600 font-medium mb-3 disabled:opacity-60">{resending ? 'Sending…' : "Didn't get the email? Resend verification"}</button>
+                {resendMsg && <p className="text-sm text-center text-gray-600 mb-3">{resendMsg}</p>}
+                <Link className="block text-center w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600" href="/login">Back to sign in</Link>
           </div>
         ) : (
           <form onSubmit={submit} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">

@@ -37,5 +37,6 @@ export type MyClassEducatorInvite = ClassEducatorInvite & {
 export type EducatorClassRow = {
   id: string; name: string; description: string | null; color: string | null;
   join_code: string; is_archived: boolean; created_at: string;
+  ended_at: string | null;
   role: ClassEducatorRole;
 };

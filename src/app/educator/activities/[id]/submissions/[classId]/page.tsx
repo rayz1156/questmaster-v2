@@ -3,8 +3,9 @@
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, GraduationCap, ListChecks, Users, BarChart3, Activity, User as UserIcon } from 'lucide-react';
 import Shell from '@/components/Shell';
+import { EDU_TABS } from '@/lib/eduTabs';
 import SubmissionBoardView from '@/components/submission-board/SubmissionBoardView';
 import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem } from '@/lib/submission-boards';
 
@@ -18,7 +19,6 @@ async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Pr
   if (token) headers.set('Authorization', `Bearer ${token}`);
   return fetch(input, { ...init, headers });
 }
-
 
 export default function EducatorSubmissionBoardPage() {
   const params = useParams<{ id: string; classId: string }>();
@@ -37,8 +37,8 @@ export default function EducatorSubmissionBoardPage() {
   }, [params.id, params.classId]);
 
   return (
-    <Shell tabs={[]}>
-      <div className="mb-3"><Link href={`/educator/activities/${params.id}/submissions`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Back</Link></div>
+    <Shell tabs={EDU_TABS}>
+      <div className="mb-3"><Link href={`/educator/activities/${params.id}`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Back</Link></div>
       <h1 className="text-xl font-bold mb-3">Submission Board</h1>
       {err && <p className="text-sm text-red-600">{err}</p>}
       {!data && !err && <p className="text-sm text-gray-500">Loading...</p>}

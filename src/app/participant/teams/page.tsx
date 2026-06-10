@@ -1,4 +1,5 @@
 "use client";
+import { PARTICIPANT_TABS } from "@/lib/participantTabs";
 
 import Shell from "@/components/Shell";
 import Link from "next/link";
@@ -30,14 +31,6 @@ import { getBoardForClass } from "@/lib/boards";
 import { useSession } from "@/lib/session";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
-const navTabs = [
-  { href: "/participant/home", label: "Home", icon: <Home className="w-5 h-5" /> },
-      { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5" /> },
-      { href: "/participant/activities", label: "Activities", icon: <Compass className="w-5 h-5" /> },
-  { href: "/participant/teams", label: "Teams", icon: <Users className="w-5 h-5" /> },
-  { href: "/participant/leaderboard", label: "Ranking", icon: <Trophy className="w-5 h-5" /> },
-  { href: "/participant/profile", label: "Profile", icon: <UserIcon className="w-5 h-5" /> },
-];
 
 // Soft pastel palette used to colorize team avatars (cycled deterministically by index)
 const AVATAR_PALETTE = [
@@ -190,7 +183,7 @@ function Inner() {
   }
 
   return (
-    <Shell tabs={navTabs}>
+    <Shell tabs={PARTICIPANT_TABS}>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-5">
         {/* Hero header */}
         <section className="relative overflow-hidden rounded-2xl bg-white ring-1 ring-gray-100 shadow-sm">

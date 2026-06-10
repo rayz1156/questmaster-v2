@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
 
   const body = await req.json().catch(() => ({}));
   const itemType: string = body.itemType;
-  if (!['text', 'image', 'video', 'link', 'file'].includes(itemType)) {
+  if (!['text', 'image', 'video', 'link', 'file', 'chatbot'].includes(itemType)) {
     return NextResponse.json({ error: 'Invalid itemType' }, { status: 400 });
   }
 
@@ -33,6 +33,12 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     title: typeof body.title === 'string' ? body.title : null,
     description: typeof body.description === 'string' ? body.description : null,
   };
+  if (itemType === 'chatbot') {
+    if (!body.chatbotUrl || typeof body.chatbotUrl !== 'string') return NextResponse.json({ error: 'chatbotUrl required' }, { status: 400 });
+    try { const u = new URL(body.chatbotUrl); if (u.protocol !== 'https:') return NextResponse.json({ error: 'chatbotUrl must be https' }, { status: 400 }); } catch { return NextResponse.json({ error: 'chatbotUrl invalid' }, { status: 400 }); }
+    insert.chatbot_url = body.chatbotUrl;
+    insert.chatbot_provider = typeof body.chatbotProvider === 'string' ? body.chatbotProvider : null;
+  }
 
   if (itemType === 'link') {
     if (!body.linkUrl) return NextResponse.json({ error: 'linkUrl required' }, { status: 400 });

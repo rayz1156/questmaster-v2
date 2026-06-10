@@ -150,7 +150,7 @@ export async function removeMyLogo(): Promise<void> {
 }
 
 // === CLASSES ===
-export type Klass = { id: string; owner_id: string; name: string; description: string | null; color: string | null; join_code: string; is_archived: boolean; ended_at: string | null; created_at: string };
+export type Klass = { id: string; owner_id: string; name: string; description: string | null; color: string | null; join_code: string; is_archived: boolean; created_at: string };
 export type ClassMember = { class_id: string; user_id: string; joined_at: string };
 export type ClassInvite = { id: string; class_id: string; email: string | null; token: string; invited_by: string | null; accepted_at: string | null; expires_at: string | null; created_at: string };
 
@@ -165,7 +165,6 @@ export async function listMyClasses(): Promise<Klass[]> {
     color: r.color ?? null,
     join_code: r.join_code,
     is_archived: r.is_archived ?? false,
-    ended_at: r.ended_at ?? null,
     created_at: r.created_at,
   })) as Klass[];
 }
@@ -187,16 +186,6 @@ export async function createClass(name: string, description?: string, color?: st
 }
 export async function updateClass(id: string, patch: Partial<Klass>): Promise<void> {
   const { error } = await supabase.from('qm_classes').update(patch).eq('id', id); if (error) throw error;
-}
-
-export async function endClass(id: string): Promise<void> {
-  const { error } = await supabase.from('qm_classes').update({ ended_at: new Date().toISOString() }).eq('id', id);
-  if (error) throw error;
-}
-
-export async function reopenClass(id: string): Promise<void> {
-  const { error } = await supabase.from('qm_classes').update({ ended_at: null }).eq('id', id);
-  if (error) throw error;
 }
 export async function deleteClass(id: string): Promise<void> {
   const { error } = await supabase.from('qm_classes').delete().eq('id', id); if (error) throw error;
@@ -531,7 +520,7 @@ export async function adminUpdateChallenge(id: string, patch: Partial<Challenge>
   const { error } = await supabase.from('qm_challenges').update(patch).eq('id', id); if (error) throw error;
 }
 
-export type UserMeta = { id: string; email: string | null; created_at: string; last_sign_in_at: string | null; email_confirmed_at?: string | null };
+export type UserMeta = { id: string; email: string | null; created_at: string; last_sign_in_at: string | null };
 export async function adminListUsersMeta(): Promise<Record<string, UserMeta>> {
   const { data, error } = await supabase.rpc('qm_admin_list_users_meta');
   if (error) { console.error(error); return {}; }
@@ -541,10 +530,6 @@ export async function adminListUsersMeta(): Promise<Record<string, UserMeta>> {
 }
 export async function adminDeleteUser(id: string): Promise<void> {
   const { error } = await supabase.rpc('qm_admin_delete_user', { target: id });
-  if (error) throw error;
-}
-export async function adminVerifyEmail(id: string): Promise<void> {
-  const { error } = await supabase.rpc('qm_admin_verify_email', { target: id });
   if (error) throw error;
 }
 
@@ -667,58 +652,4 @@ export async function importLearningBoardFromClass(
   const data = await r.json().catch(() => ({}));
   if (!r.ok) throw new Error(data?.error || 'Failed to import learning board');
   return data;
-}
-
-/* =========================================================
- * Leave class (student & co-educator)
- * Added 2026-05-19
- * ========================================================= */
-export async function leaveClassAsStudent(classId: string): Promise<void> {
-  const { error } = await supabase.rpc('qm_leave_class_as_student', { p_class: classId });
-  if (error) throw error;
-}
-
-export async function leaveClassAsEducator(classId: string): Promise<void> {
-  const { error } = await supabase.rpc('qm_leave_class_as_educator', { p_class: classId });
-  if (error) throw error;
-}
-
-// === ADMIN: class limits & visibility ===
-export async function adminSetClassLimits(id: string, maxOwned: number | null, maxCoEducator: number | null): Promise<void> {
-  const { error } = await supabase.from('qm_profiles')
-    .update({ max_classes_owned: maxOwned, max_classes_as_coeducator: maxCoEducator })
-    .eq('id', id);
-  if (error) throw error;
-}
-
-// Classes an educator owns plus classes they belong to as a co-educator.
-export async function adminListEducatorClasses(userId: string): Promise<{ owned: any[]; coEducator: any[] }> {
-  const ownedRes = await supabase.from('qm_classes')
-    .select('id,name,color,join_code,is_archived,ended_at,created_at')
-    .eq('owner_id', userId)
-    .order('created_at', { ascending: false });
-  if (ownedRes.error) throw ownedRes.error;
-
-  const ceRes = await supabase.from('qm_class_educators')
-    .select('role,accepted_at,qm_classes(id,name,color,join_code,is_archived,ended_at,created_at,owner_id)')
-    .eq('educator_id', userId)
-    .not('accepted_at', 'is', null);
-  if (ceRes.error) throw ceRes.error;
-  const coEducator = (ceRes.data || [])
-    .map((r: any) => r.qm_classes ? { ...r.qm_classes, member_role: r.role, accepted_at: r.accepted_at } : null)
-    .filter(Boolean);
-
-  return { owned: ownedRes.data || [], coEducator };
-}
-
-// Classes a participant has joined.
-export async function adminListParticipantClasses(userId: string): Promise<any[]> {
-  const { data, error } = await supabase.from('qm_class_members')
-    .select('joined_at,qm_classes(id,name,color,join_code,is_archived,ended_at,created_at,owner_id)')
-    .eq('user_id', userId)
-    .order('joined_at', { ascending: false });
-  if (error) throw error;
-  return (data || [])
-    .map((r: any) => r.qm_classes ? { ...r.qm_classes, joined_at: r.joined_at } : null)
-    .filter(Boolean);
 }

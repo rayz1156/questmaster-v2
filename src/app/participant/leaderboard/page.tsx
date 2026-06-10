@@ -1,4 +1,5 @@
 "use client";
+import { PARTICIPANT_TABS } from "@/lib/participantTabs";
 import Shell from "@/components/Shell";
 import Link from 'next/link';
 import { useEffect, useState, Suspense } from "react";
@@ -6,14 +7,6 @@ import { useSearchParams } from "next/navigation";
 import { Users, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight, Activity, ClipboardList, Crown, Medal, Home, Compass, BookOpen } from "lucide-react";
 import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listEnrolledClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type Klass } from "@/lib/data";
 
-const tabs = [
-  { href: '/participant/home', label: 'Home', icon: <Home className="w-5 h-5"/> },
-  { href: '/participant/learning', label: 'Learning', icon: <BookOpen className="w-5 h-5"/> },
-  { href: '/participant/activities', label: 'Activities', icon: <Compass className="w-5 h-5"/> },
-  { href: '/participant/teams', label: 'Teams', icon: <Users className="w-5 h-5"/> },
-  { href: '/participant/leaderboard', label: 'Ranking', icon: <Trophy className="w-5 h-5"/> },
-  { href: '/participant/profile', label: 'Profile', icon: <UserIcon className="w-5 h-5"/> },
-];
 
 type AggScore = { team_id: string; team_name: string; total_score: number; quest_count: number };
 
@@ -129,7 +122,7 @@ function LeaderboardInner() {
   const leaderboard = activeId ? scores.sort((a, b) => b.total_score - a.total_score) : aggScores;
 
   return (
-    <Shell tabs={tabs}>
+    <Shell tabs={PARTICIPANT_TABS}>
       {classId && (
         <Link href={`/participant/classes/${classId}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
       )}

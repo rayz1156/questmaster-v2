@@ -56,6 +56,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   const [editingColTitle, setEditingColTitle] = useState<string>('');
   const [showSubmit, setShowSubmit] = useState(false);
   const [editingItem, setEditingItem] = useState<SubmissionBoardItem | null>(null);
+  const [pendingColumnId, setPendingColumnId] = useState<string | null>(null);
   const [savingBoard, setSavingBoard] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [confirmState, setConfirmState] = useState<{ title: string; description?: string; confirmLabel?: string; tone?: 'danger' | 'default'; onConfirm: () => void } | null>(null);
@@ -317,6 +318,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
           onCommitColTitle={renameColumn}
           onDeleteColumn={deleteColumn}
           onSetNewColTitle={setNewColTitle}
+          onRequestAddToColumn={(cid) => { setPendingColumnId(cid); setShowSubmit(true); }}
           onCreateColumn={createColumn}
           onSetDraggingItem={setDraggingItemId}
           onMoveItem={moveItemToColumn}
@@ -346,6 +348,8 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
                   isEducator={isEducator}
                   onEdit={() => setEditingItem(it)}
                   onDelete={() => deleteItem(it.id)}
+              columns={columns}
+              onMoveCol={(cid) => moveItemToColumn(it.id, cid)}
                 />
               </div>
             ))}
@@ -357,8 +361,9 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
       {showSubmit && (
         <SubmitModal
           apiBase={apiBase}
+          columnId={pendingColumnId}
           onClose={() => setShowSubmit(false)}
-          onCreated={(item) => { setItems([item, ...items]); setShowSubmit(false); }}
+          onCreated={(item) => { setItems([item, ...items]); setShowSubmit(false); setPendingColumnId(null); }}
         />
       )}
       {editingItem && (
@@ -406,6 +411,7 @@ interface ColumnsViewProps {
   onCommitColTitle: (id: string, title: string) => void;
   onDeleteColumn: (id: string) => void;
   onSetNewColTitle: (s: string) => void;
+  onRequestAddToColumn: (columnId: string | null) => void;
   onCreateColumn: () => void;
   onSetDraggingItem: (id: string | null) => void;
   onMoveItem: (itemId: string, columnId: string | null) => void;
@@ -415,7 +421,7 @@ interface ColumnsViewProps {
 
 function ColumnsView(props: ColumnsViewProps) {
   const { items, columns, myId, isEducator, draggingItemId, editingColId, editingColTitle, newColTitle, addingCol,
-          onSetEditingCol, onSetEditingColTitle, onCommitColTitle, onDeleteColumn, onSetNewColTitle, onCreateColumn,
+          onSetEditingCol, onSetEditingColTitle, onCommitColTitle, onDeleteColumn, onSetNewColTitle, onCreateColumn, onRequestAddToColumn,
           onSetDraggingItem, onMoveItem, onEditItem, onDeleteItem } = props;
 
   const orphanItems = items.filter((i) => !i.column_id || !columns.find((c) => c.id === i.column_id));
@@ -466,7 +472,7 @@ function ColumnsView(props: ColumnsViewProps) {
                 title={colItems.length > 0 && !isEducator ? 'Column not empty (educator can still delete)' : 'Delete column'}
               >✕</button>
             </div>
-            <div className="flex flex-col gap-2 min-h-[40px]">
+            <div className="flex flex-col gap-2 min-h-[40px] max-h-[60vh] overflow-y-auto pr-1 -mr-1">
               {colItems.length === 0 ? (
                 <div className="text-xs text-gray-400 text-center py-3 border border-dashed border-gray-200 rounded">Drop here</div>
               ) : colItems.map((it) => (
@@ -475,7 +481,7 @@ function ColumnsView(props: ColumnsViewProps) {
                   draggable
                   onDragStart={() => onSetDraggingItem(it.id)}
                   onDragEnd={() => onSetDraggingItem(null)}
-                  className={`cursor-grab active:cursor-grabbing ${draggingItemId === it.id ? 'opacity-50' : ''}`}
+                  className={`cursor-grab active:cursor-grabbing select-none ${draggingItemId === it.id ? 'opacity-50' : ''}`}
                 >
                   <ItemCard
                     item={it}
@@ -483,9 +489,12 @@ function ColumnsView(props: ColumnsViewProps) {
                     isEducator={isEducator}
                     onEdit={() => onEditItem(it)}
                     onDelete={() => onDeleteItem(it.id)}
+              columns={columns}
+              onMoveCol={(cid) => onMoveItem(it.id, cid)}
                   />
                 </div>
               ))}
+          <button type="button" onClick={() => onRequestAddToColumn(col.id)} className="text-xs text-gray-500 hover:text-indigo-700 border border-dashed border-gray-300 hover:border-indigo-400 rounded py-1.5 mt-1" title="Add submission to this column">+ Upload here</button>
             </div>
           </div>
         );
@@ -505,14 +514,14 @@ function ColumnsView(props: ColumnsViewProps) {
           }}
         >
           <div className="text-sm font-semibold text-yellow-800 px-1">Uncategorised ({orphanItems.length})</div>
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
             {orphanItems.map((it) => (
               <div
                 key={it.id}
                 draggable
                 onDragStart={() => onSetDraggingItem(it.id)}
                 onDragEnd={() => onSetDraggingItem(null)}
-                className={`cursor-grab active:cursor-grabbing ${draggingItemId === it.id ? 'opacity-50' : ''}`}
+                className={`cursor-grab active:cursor-grabbing select-none ${draggingItemId === it.id ? 'opacity-50' : ''}`}
               >
                 <ItemCard
                   item={it}
@@ -520,9 +529,12 @@ function ColumnsView(props: ColumnsViewProps) {
                   isEducator={isEducator}
                   onEdit={() => onEditItem(it)}
                   onDelete={() => onDeleteItem(it.id)}
+              columns={columns}
+              onMoveCol={(cid) => onMoveItem(it.id, cid)}
                 />
               </div>
             ))}
+        <button type="button" onClick={() => onRequestAddToColumn(null)} className="text-xs text-yellow-700 hover:text-yellow-900 border border-dashed border-yellow-300 hover:border-yellow-500 rounded py-1.5 mt-1" title="Add new submission (uncategorised)">+ Upload</button>
           </div>
         </div>
       )}
@@ -553,7 +565,7 @@ function ColumnsView(props: ColumnsViewProps) {
   );
 }
 
-function ItemCard({ item, myId, isEducator, onEdit, onDelete }: { item: SubmissionBoardItem; myId: string; isEducator: boolean; onEdit: () => void; onDelete: () => void }) {
+function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol }: { item: SubmissionBoardItem; myId: string; isEducator: boolean; onEdit: () => void; onDelete: () => void; columns: SubmissionBoardColumn[]; onMoveCol: (colId: string | null) => void }) {
   const isOwner = item.submitted_by === myId;
   const canEdit = isOwner || isEducator;
 
@@ -573,8 +585,9 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete }: { item: Submissi
         </a>
       )}
       {item.item_type === 'video' && item.adilo_file_id && (
-        <div className="relative w-full aspect-video bg-black rounded overflow-hidden">
+        <div className="relative w-full bg-black rounded overflow-hidden group" style={{aspectRatio: '16/9'}}>
           <iframe src={buildAdiloEmbedUrl(item.adilo_file_id)} className="absolute inset-0 w-full h-full" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
+          <a href={buildAdiloEmbedUrl(item.adilo_file_id)} target="_blank" rel="noopener noreferrer" title="Open video in new tab (better for portrait videos)" className="absolute top-1 right-1 z-10 bg-black/70 hover:bg-black/90 text-white text-[10px] font-semibold px-2 py-1 rounded shadow-md transition">⤢ Enlarge</a>
         </div>
       )}
       {item.item_type === 'link' && item.link_url && (
@@ -597,7 +610,16 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete }: { item: Submissi
           <Download className="w-4 h-4" />
         </a>
       )}
-      {item.description && <p className="text-xs text-gray-700 whitespace-pre-wrap break-words">{item.description}</p>}
+      {item.item_type === 'chatbot' && item.chatbot_url && (
+        <a href={item.chatbot_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded bg-indigo-50 hover:bg-indigo-100 text-xs">
+          <span className="w-8 h-8 rounded flex items-center justify-center bg-indigo-100 text-indigo-600 font-bold">AI</span>
+          <span className="min-w-0 flex-1">
+            <span className="block font-semibold truncate text-indigo-700">{item.title || 'Learning Assistant'}</span>
+            <span className="block text-indigo-500">Open assistant</span>
+          </span>
+        </a>
+      )}
+      {item.description && <p className="text-xs text-gray-700 whitespace-pre-wrap break-words line-clamp-4 max-h-24 overflow-hidden">{item.description}</p>}
 
       <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100 text-xs text-gray-500">
         <span title={new Date(item.created_at).toLocaleString()}>{new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
@@ -605,7 +627,8 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete }: { item: Submissi
           {(item.item_type === 'file' || item.item_type === 'image') && (item.file_url || item.image_url) && (
             <a href={item.file_url || item.image_url!} download className="hover:text-gray-900" title="Download"><Download className="w-4 h-4" /></a>
           )}
-          {canEdit && <button onClick={onEdit} className="hover:text-gray-900" title="Edit"><Edit2 className="w-4 h-4" /></button>}
+          {(canEdit || isEducator) && columns.length > 0 && (() => { const idx = columns.findIndex(c => c.id === item.column_id); const prev = idx > 0 ? columns[idx-1] : null; const next = idx >= 0 && idx < columns.length-1 ? columns[idx+1] : null; return (<><button type="button" onClick={() => onMoveCol(prev ? prev.id : null)} disabled={idx === 0 && !item.column_id} className="hover:text-indigo-700 disabled:opacity-30 px-1" title={prev ? `Move to ${prev.title}` : "Move to Uncategorised"}>←</button><button type="button" onClick={() => onMoveCol(next ? next.id : (columns[0]?.id || null))} className="hover:text-indigo-700 px-1" title={next ? `Move to ${next.title}` : (columns[0] ? `Move to ${columns[0].title}` : "Move")}>→</button></>); })()}
+        {canEdit && <button onClick={onEdit} className="hover:text-gray-900" title="Edit"><Edit2 className="w-4 h-4" /></button>}
           {canEdit && <button onClick={onDelete} className="hover:text-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>}
         </div>
       </div>
@@ -620,6 +643,7 @@ function ItemTypeBadge({ type }: { type: SubmissionItemType }) {
     video: { icon: <Video className="w-4 h-4" />, color: 'bg-purple-100 text-purple-700' },
     link: { icon: <LinkIcon className="w-4 h-4" />, color: 'bg-emerald-100 text-emerald-700' },
     file: { icon: <Paperclip className="w-4 h-4" />, color: 'bg-amber-100 text-amber-700' },
+    chatbot: { icon: <LinkIcon className="w-4 h-4" />, color: 'bg-indigo-100 text-indigo-700' },
   } as const;
   const m = map[type];
   return <span className={`p-1.5 rounded ${m.color}`}>{m.icon}</span>;
@@ -628,7 +652,7 @@ function ItemTypeBadge({ type }: { type: SubmissionItemType }) {
 // ============================================================
 // Submit modal
 // ============================================================
-function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
+function SubmitModal({ apiBase, columnId, onClose, onCreated }: { apiBase: string; columnId: string | null; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
   const [tab, setTab] = useState<TabType>('text');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -642,10 +666,14 @@ function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose
     setBusy(true);
     setErr(null);
     try {
-      const baseBody: any = { itemType: tab, title: title || null, description: description || null };
+      const baseBody: any = { itemType: tab, title: title || null, description: description || null, columnId: columnId || null };
 
       if (tab === 'text') {
         if (!title && !description) throw new Error('Title or description required');
+    } else if (tab === 'chatbot') {
+      if (!linkUrl) throw new Error('Assistant embed URL required');
+      try { if (new URL(linkUrl).protocol !== 'https:') throw 0; } catch { throw new Error('URL must be a valid https link'); }
+      baseBody.chatbotUrl = linkUrl;
       } else if (tab === 'link') {
         if (!linkUrl) throw new Error('Link URL required');
         baseBody.linkUrl = linkUrl;
@@ -736,13 +764,13 @@ function SubmitModal({ apiBase, onClose, onCreated }: { apiBase: string; onClose
         </div>
         <div className="p-4 space-y-3">
           <div className="flex gap-1 flex-wrap">
-            {(['text', 'image', 'video', 'link', 'file'] as TabType[]).map((t) => (
+            {(['text', 'image', 'video', 'link', 'file', 'chatbot'] as TabType[]).map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 rounded text-xs ${tab === t ? 'bg-purple-600 text-white' : 'bg-gray-100'}`}>{t}</button>
             ))}
           </div>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="input w-full" />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="input w-full" rows={3} />
-          {tab === 'link' && <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." className="input w-full" />}
+          {(tab === 'link' || tab === 'chatbot') && <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." className="input w-full" />}
           {(tab === 'image' || tab === 'file' || tab === 'video') && (
             <input type="file" accept={tab === 'image' ? 'image/*' : tab === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files?.[0] || null)} className="input w-full" />
           )}
