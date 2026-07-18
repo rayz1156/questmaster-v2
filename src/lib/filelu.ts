@@ -16,6 +16,7 @@
 
 const API_KEY = process.env.FILELU_API_KEY || '';
 const BASE = 'https://filelu.com';
+import { s5PutObject } from '@/lib/s5';
 
 function requireKey() {
   if (!API_KEY) throw new Error('FILELU_API_KEY is not configured');
@@ -41,6 +42,24 @@ export async function fileluUpload(
   filename: string,
   mimeType: string,
 ): Promise<FileluUploadResult> {
+  // --- S5 path (preferred): store to FileLu S5 bucket, bypassing the direct-upload node ---
+  try {
+    const rand = (globalThis.crypto?.randomUUID?.() || Math.random().toString(36).slice(2) + Date.now().toString(36));
+    const safeName = filename.replace(/[^A-Za-z0-9._-]/g, '_');
+    const s5key = `qm/${rand}-${safeName}`;
+    await s5PutObject({ key: s5key, body: bytes, contentType: mimeType || 'application/octet-stream', cacheControl: 'public, max-age=31536000' });
+    const marked = 's5__' + Buffer.from(s5key, 'utf8').toString('base64').replace(/\+/g,'-').replace(/\//g,'_').replace(/=+$/,'');
+    return {
+      fileCode: marked,
+      fileName: filename,
+      sizeBytes: bytes.byteLength,
+      mimeType: mimeType || 'application/octet-stream',
+      shareUrl: `/api/learning-boards/_/file-redirect/${marked}`,
+    };
+  } catch (s5err) {
+    console.error('[fileluUpload] S5 upload failed, falling back to FileLu direct upload:', (s5err as any)?.message || s5err);
+  }
+
   const key = requireKey();
 
   // Step 1: get upload server
@@ -79,6 +98,7 @@ export async function fileluUpload(
     throw new Error(`FileLu upload bad response: ${JSON.stringify(upJson).slice(0, 200)}`);
   }
 
+  await fileluSetShareable(fileCode);
   return {
     fileCode,
     fileName: filename,
@@ -86,6 +106,20 @@ export async function fileluUpload(
     mimeType: mimeType || 'application/octet-stream',
     shareUrl: `${BASE}/${fileCode}`,
   };
+}
+
+/** Make a file shareable (only_me=0) so direct_link resolves. Best-effort. */
+export async function fileluSetShareable(fileCode: string): Promise<boolean> {
+  try {
+    const key = requireKey();
+    const u = `${BASE}/api/file/only_me?file_code=${encodeURIComponent(fileCode)}&only_me=0&key=${encodeURIComponent(key)}`;
+    const res = await fetch(u, { cache: 'no-store' });
+    if (!res.ok) return false;
+    const j: any = await res.json().catch(() => null);
+    return !!j && j.status === 200;
+  } catch {
+    return false;
+  }
 }
 
 /** Returns a temporary direct/CDN download URL for a file. */

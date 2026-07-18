@@ -1,0 +1,1901 @@
+'use client';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { formatDuration, hostnameFromUrl, type LearningCard, type LearningCardType, type LearningColumn } from '@/lib/learning-boards';
+import VideoLightbox from './VideoLightbox';
+import ImageLightbox from './ImageLightbox';
+import { supabase } from '@/lib/supabase';
+import { showPrompt, showConfirm } from '@/components/ui/promptModal';
+import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
+import { FolderInput } from 'lucide-react';
+import { useConfirm } from '@/components/ui/ConfirmProvider';
+
+
+/** Wrap fetch() to attach the Supabase access token from localStorage so
+ *  our /api/learning-boards/* routes can authenticate the request. */
+async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
+  const { data: { session } } = await supabase.auth.getSession();
+  const token = session?.access_token;
+  const headers = new Headers(init.headers || {});
+  if (token) headers.set('Authorization', `Bearer ${token}`);
+  return fetch(input, { ...init, headers });
+}
+
+type Snapshot = {
+  board: { id: string; title: string; description: string | null; adilo_project_id: string | null } | null;
+  columns: Array<LearningColumn & { cards: LearningCard[] }>;
+};
+
+export default function LearningBoardView({ classId, isEditor }: { classId: string; isEditor: boolean }) {
+  const [snap, setSnap] = useState<Snapshot | null>(null);
+  const confirm = useConfirm();
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [playingFileId, setPlayingFileId] = useState<{ fileId: string; title: string | null } | null>(null);
+  const [openImage, setOpenImage] = useState<{ src: string; title: string | null } | null>(null);
+  const [addCardTarget, setAddCardTarget] = useState<{ columnId: string; insertIndex: number | null } | null>(null);
+  const [editCardTarget, setEditCardTarget] = useState<LearningCard | null>(null);
+  const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null);
+  // Drag-and-drop state (editor only)
+  const [dragCardId, setDragCardId] = useState<string | null>(null);
+  // --- Import learning board from another class ---
+  const [impOpen, setImpOpen] = useState(false);
+  const [impClasses, setImpClasses] = useState<any[]>([]);
+  const [impLoading, setImpLoading] = useState(false);
+  const [impSourceId, setImpSourceId] = useState('');
+  const [impMode, setImpMode] = useState<'replace'|'append'>('append');
+  const [impBusy, setImpBusy] = useState(false);
+  const [impErr, setImpErr] = useState<string | null>(null);
+  const openImport = async () => {
+    setImpOpen(true); setImpErr(null); setImpSourceId(''); setImpMode('append');
+    setImpLoading(true);
+    try {
+      const rows = await listMyEducatorClasses();
+      setImpClasses((rows || []).filter((r: any) => r.id !== classId));
+    } catch (e: any) { setImpErr(e?.message || 'Failed to load classes'); }
+    finally { setImpLoading(false); }
+  };
+  const onImport = async () => {
+    if (!impSourceId) { setImpErr('Pick a source class first'); return; }
+    if (impMode === 'replace' && !(await confirm({ title: 'This will permanently delete the current learning board on this class. Continue?', tone: 'danger' }))) return;
+    setImpBusy(true); setImpErr(null);
+    try {
+      const res = await importLearningBoardFromClass(classId, impSourceId, impMode);
+      setImpOpen(false);
+      alert(`Imported ${res.columns} columns and ${res.cards} cards (${res.mode}).`);
+      if (typeof window !== 'undefined') window.location.reload();
+    } catch (e: any) { setImpErr(e?.message || 'Failed to import'); }
+    finally { setImpBusy(false); }
+  };
+
+  const [dragColumnId, setDragColumnId] = useState<string | null>(null);
+  const [dropTarget, setDropTarget] = useState<{ columnId: string; index: number } | null>(null);
+  const [dragColId, setDragColId] = useState<string | null>(null);
+  const [colDropIdx, setColDropIdx] = useState<number | null>(null);
+
+  const refresh = useCallback(async () => {
+    setLoading(true);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}`);
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed to load');
+      setSnap(data);
+      setError(null);
+    } catch (e: any) {
+      setError(e.message || String(e));
+    } finally {
+      setLoading(false);
+    }
+  }, [classId]);
+
+  useEffect(() => { refresh(); }, [refresh]);
+
+  const layoutStorageKey = `lb_layout_${classId}`;
+  const [layoutMode, setLayoutMode] = useState<'columns' | 'mood'>('columns');
+  useEffect(() => {
+    try {
+      const saved = typeof window !== 'undefined' ? window.localStorage.getItem(layoutStorageKey) : null;
+      if (saved === 'mood' || saved === 'columns') setLayoutMode(saved);
+    } catch {}
+  }, [layoutStorageKey]);
+  const changeLayout = (m: 'columns' | 'mood') => {
+    setLayoutMode(m);
+    try { window.localStorage.setItem(layoutStorageKey, m); } catch {}
+  };
+
+  const moveCard = useCallback(async (cardId: string, payload: any) => {
+    try {
+      await authedFetch(`/api/learning-boards/${classId}/cards/${cardId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } finally { refresh(); }
+  }, [classId, refresh]);
+  const moveColumn = useCallback(async (columnId: string, payload: any) => {
+    try {
+      await authedFetch(`/api/learning-boards/${classId}/columns/${columnId}/move`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+    } finally { refresh(); }
+  }, [classId, refresh]);
+
+  if (loading && !snap) return <div className="text-gray-600 p-8">Loadingâ¦</div>;
+  if (error) return <div className="text-red-400 p-8">Error: {error}</div>;
+  if (!snap || !snap.board) {
+    return (
+      <div className="text-gray-600 p-8">
+        {isEditor ? 'No learning board yet. It will be created automatically.' : 'No learning board has been set up for this class yet.'}
+      </div>
+    );
+  }
+
+  return (
+    <div className="h-full">
+      <div className="px-4 pt-3 flex items-center justify-end">
+        <div className="inline-flex rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
+          <button
+            type="button"
+            onClick={() => changeLayout('columns')}
+            className={`px-3 py-1.5 transition ${layoutMode === 'columns' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            title="Display items side by side in columns"
+          >Columns</button>
+          <button
+            type="button"
+            onClick={() => changeLayout('mood')}
+            className={`px-3 py-1.5 transition border-l border-gray-200 ${layoutMode === 'mood' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            title="Display items in a visual mood-board grid"
+          >Mood Board</button>
+          {isEditor && (
+            <>
+              <button type="button" onClick={openImport} disabled={impBusy} title="Import learning board from another class" className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow disabled:opacity-60"><FolderInput className="w-3.5 h-3.5"/>Import from class</button>
+              <AiThumbnailBatchButton classId={classId} onDone={refresh} />
+            </>
+          )}
+        </div>
+      </div>
+      {playingFileId && (
+        <VideoLightbox
+          classId={classId}
+          fileId={playingFileId.fileId}
+          title={playingFileId.title}
+          onClose={() => setPlayingFileId(null)}
+        />
+      )}
+      {openImage && (
+        <ImageLightbox
+          src={openImage.src}
+          title={openImage.title}
+          onClose={() => setOpenImage(null)}
+        />
+      )}
+
+      {layoutMode === 'mood' ? (
+        <MoodBoardGrid
+          classId={classId}
+          snap={snap}
+          isEditor={isEditor}
+          onPlayVideo={(fileId, title) => setPlayingFileId({ fileId, title })}
+          onOpenImage={(src, title) => setOpenImage({ src, title })}
+          onChanged={refresh}
+          onEdit={setEditCardTarget}
+          moveCard={moveCard}
+        onAddCard={async (columnId: string, insertIndex?: number | null) => {
+          try { await refresh(); } catch {}
+          setAddCardTarget({ columnId, insertIndex: typeof insertIndex === 'number' ? insertIndex : null });
+        }}
+        />
+      ) : (
+      <div
+        className="flex gap-4 overflow-x-auto px-4 pt-4 pb-4 h-[calc(100vh-180px)] min-h-[520px]"
+        onClick={() => setOpenMenuColumnId(null)}
+      >
+        {snap.columns.map((col, ci) => (
+          <ColumnCard
+            key={col.id}
+            classId={classId}
+            column={col}
+            columnIndex={ci}
+            totalColumns={snap.columns.length}
+            isEditor={isEditor}
+            onPlayVideo={(fileId, title) => setPlayingFileId({ fileId, title })}
+            onOpenImage={(src, title) => setOpenImage({ src, title })}
+            onAddCard={async (insertIndex?: number | null) => {
+                  // Refresh first to ensure column still exists (avoid 'Column not found' from stale UI)
+                  try { await refresh(); } catch {}
+                  setAddCardTarget({ columnId: col.id, insertIndex: typeof insertIndex === 'number' ? insertIndex : null });
+                }}
+            onChanged={refresh}
+          onEdit={setEditCardTarget}
+            menuOpen={openMenuColumnId === col.id}
+            onToggleMenu={(open) => setOpenMenuColumnId(open ? col.id : null)}
+            dragCardId={dragCardId}
+            dragColumnId={dragColumnId}
+            dropTarget={dropTarget}
+            onCardDragStart={(cId, colId) => { setDragCardId(cId); setDragColumnId(colId); }}
+            onCardDragEnd={() => { setDragCardId(null); setDragColumnId(null); setDropTarget(null); }}
+            onCardDragOver={(colId, idx) => setDropTarget({ columnId: colId, index: idx })}
+            onCardDrop={(colId, idx) => { if (dragCardId) moveCard(dragCardId, { action: 'to', columnId: colId, position: idx }); setDragCardId(null); setDragColumnId(null); setDropTarget(null); }}
+            moveCard={moveCard}
+            moveColumn={moveColumn}
+            dragColId={dragColId}
+            colDropIdx={colDropIdx}
+            onColumnDragStart={(id) => setDragColId(id)}
+            onColumnDragEnd={() => { setDragColId(null); setColDropIdx(null); }}
+            onColumnDragOverIndex={(i) => setColDropIdx(i)}
+            onColumnDrop={(i) => { if (dragColId) moveColumn(dragColId, { action: 'to', position: i }); setDragColId(null); setColDropIdx(null); }}
+          />
+        ))}
+
+        {isEditor && (
+          <NewColumnButton classId={classId} onCreated={refresh} />
+        )}
+      </div>
+      )}
+
+      {editCardTarget && (
+        <EditCardModal
+          classId={classId}
+          card={editCardTarget}
+          onClose={() => setEditCardTarget(null)}
+          onSaved={() => { setEditCardTarget(null); refresh(); }}
+        />
+      )}
+      {addCardTarget && (
+        <AddCardModal
+          classId={classId}
+          columnId={addCardTarget.columnId}
+          insertIndex={addCardTarget.insertIndex}
+          onClose={() => setAddCardTarget(null)}
+          onCreated={() => { setAddCardTarget(null); refresh(); setTimeout(() => refresh(), 15000); }}
+        />
+      )}
+    {impOpen && (
+      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={()=>!impBusy && setImpOpen(false)}>
+        <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <div className="flex items-center justify-between mb-3">
+            <h3 className="text-base font-semibold text-gray-900">Import learning board</h3>
+            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="text-gray-500 hover:text-gray-900">â</button>
+          </div>
+          <p className="text-xs text-gray-600 mb-3">Copy columns and cards from another class you own or co-educate. File references are reused (no re-upload).</p>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Source class</label>
+          <select value={impSourceId} onChange={(e)=>setImpSourceId(e.target.value)} disabled={impLoading || impBusy} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 bg-white">
+            <option value="">{impLoading ? 'Loadingâ¦' : 'â Select a class â'}</option>
+            {impClasses.map((c:any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+          </select>
+          <label className="block text-xs font-medium text-gray-700 mb-1">Mode</label>
+          <div className="space-y-1.5 mb-4">
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input type="radio" name="impmode" value="append" checked={impMode==='append'} onChange={()=>setImpMode('append')} className="mt-1"/>
+              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">â add source columns after existing ones (safe)</span></span>
+            </label>
+            <label className="flex items-start gap-2 text-sm cursor-pointer">
+              <input type="radio" name="impmode" value="replace" checked={impMode==='replace'} onChange={()=>setImpMode('replace')} className="mt-1"/>
+              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">â delete the current board on this class first</span></span>
+            </label>
+          </div>
+          {impErr && <div className="text-xs text-red-600 mb-2">{impErr}</div>}
+          <div className="flex items-center justify-end gap-2">
+            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-700">Cancel</button>
+            <button onClick={onImport} disabled={impBusy || !impSourceId} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm disabled:opacity-60">{impBusy ? 'Importingâ¦' : 'Import'}</button>
+          </div>
+        </div>
+      </div>
+    )}
+    </div>
+  );
+}
+
+function ColumnCard({
+  classId,
+  column,
+  columnIndex,
+  totalColumns,
+  isEditor,
+  onPlayVideo,
+  onOpenImage,
+  onAddCard,
+  onChanged,
+  onEdit,
+  menuOpen,
+  onToggleMenu,
+  dragCardId,
+  dragColumnId,
+  dropTarget,
+  onCardDragStart,
+  onCardDragEnd,
+  onCardDragOver,
+  onCardDrop,
+  moveCard,
+  moveColumn,
+  dragColId,
+  colDropIdx,
+  onColumnDragStart,
+  onColumnDragEnd,
+  onColumnDragOverIndex,
+  onColumnDrop,
+}: {
+  classId: string;
+  column: LearningColumn & { cards: LearningCard[] };
+  columnIndex: number;
+  totalColumns: number;
+  isEditor: boolean;
+  onPlayVideo: (fileId: string, title: string | null) => void;
+  onOpenImage: (src: string, title: string | null) => void;
+  onAddCard: (insertIndex?: number | null) => void;
+  onChanged: () => void;
+  onEdit: (card: LearningCard) => void;
+  menuOpen: boolean;
+  onToggleMenu: (open: boolean) => void;
+  dragCardId: string | null;
+  dragColumnId: string | null;
+  dropTarget: { columnId: string; index: number } | null;
+  onCardDragStart: (cardId: string, columnId: string) => void;
+  onCardDragEnd: () => void;
+  onCardDragOver: (columnId: string, index: number) => void;
+  onCardDrop: (columnId: string, index: number) => void;
+  moveCard: (cardId: string, payload: any) => Promise<void>;
+  moveColumn: (columnId: string, payload: any) => Promise<void>;
+  dragColId: string | null;
+  colDropIdx: number | null;
+  onColumnDragStart: (columnId: string) => void;
+  onColumnDragEnd: () => void;
+  onColumnDragOverIndex: (index: number) => void;
+  onColumnDrop: (index: number) => void;
+}) {
+  const renameColumn = async () => {
+    const next = await showPrompt({ title: 'Rename column', initialValue: column.title, confirmLabel: 'Save' });
+    if (!next || next === column.title) return;
+    await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title: next }),
+    });
+    onToggleMenu(false);
+    onChanged();
+  };
+  const deleteColumn = async () => {
+    const ok = await showConfirm({ title: `Delete column "${column.title}"?`, description: "All cards in this column will be permanently removed. This cannot be undone.", confirmLabel: "Delete", tone: "danger" }); if (!ok) return;
+    await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, { method: 'DELETE' });
+    onToggleMenu(false);
+    onChanged();
+  };
+
+  const isColDragging = dragColId === column.id;
+  const isColDropAfter = !!(isEditor && dragColId && dragColId !== column.id && colDropIdx === columnIndex);
+  return (
+    <div
+      className={`flex-shrink-0 w-80 bg-white rounded-2xl border ${isColDragging ? 'opacity-40 border-indigo-400' : isColDropAfter ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200'} shadow-[0_1px_3px_rgba(15,23,42,0.05)] hover:shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition-shadow flex flex-col self-start max-h-full overflow-hidden`}
+      onDragOver={(e) => {
+        if (!isEditor) return;
+        if (dragColId && dragColId !== column.id) {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+          onColumnDragOverIndex(columnIndex);
+        }
+      }}
+      onDrop={(e) => {
+        if (!isEditor) return;
+        if (dragColId && dragColId !== column.id) {
+          e.preventDefault();
+          onColumnDrop(columnIndex);
+        }
+      }}
+    >
+      <div
+        className="flex items-center gap-2 px-3 py-2 border-b border-gray-200"
+        draggable={isEditor}
+        onDragStart={(e) => {
+          if (!isEditor) return;
+          e.dataTransfer.effectAllowed = 'move';
+          try { e.dataTransfer.setData('text/plain', `col:${column.id}`); } catch {}
+          onColumnDragStart(column.id);
+        }}
+        onDragEnd={() => onColumnDragEnd()}
+      >
+        <span className={`select-none ${isEditor ? 'text-gray-600 cursor-grab active:cursor-grabbing' : 'text-gray-400'}`} aria-hidden title={isEditor ? 'Drag column to reorder' : ''}>â¡</span>
+        <div className="flex-1 flex items-center gap-2 min-w-0">
+        <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${cardGradient(column.title || column.id).from}, ${cardGradient(column.title || column.id).to})` }}>
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
+        </div>
+        <h3 className="flex-1 text-slate-900 font-semibold truncate text-sm">{column.title}</h3>
+      </div>
+        {isEditor && (
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="text-gray-600 hover:text-gray-900 px-1"
+              aria-label="Column menu"
+              onClick={() => onToggleMenu(!menuOpen)}
+            >â¦</button>
+            {menuOpen && (
+              <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
+                <button onClick={renameColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">Rename</button>
+                <div className="h-px bg-gray-100" />
+                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'first' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to first</button>
+                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'left' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move left</button>
+                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'right' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move right</button>
+                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'last' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to last</button>
+                <div className="h-px bg-gray-100" />
+                <button onClick={deleteColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+
+      {isEditor && (
+        <button
+          onClick={() => onAddCard()}
+          className="mx-3 my-3 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed text-sm font-medium transition group"
+          style={{ borderColor: cardGradient(column.title || column.id).from + '40', color: cardGradient(column.title || column.id).from, background: cardGradient(column.title || column.id).from + '0d' }}
+          aria-label="Add resource"
+        >
+          <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs" style={{ background: `linear-gradient(135deg, ${cardGradient(column.title || column.id).from}, ${cardGradient(column.title || column.id).to})` }}>+</span>
+          <span>Add resource</span>
+        </button>
+      )}
+
+      <div
+        className="px-3 pb-3 space-y-3 overflow-y-auto flex-1 min-h-0 custom-scroll"
+        onDragOver={(e) => {
+          if (!isEditor || !dragCardId) return;
+          e.preventDefault();
+          e.dataTransfer.dropEffect = 'move';
+        }}
+        onDrop={(e) => {
+          if (!isEditor || !dragCardId) return;
+          // Drop at end if dropping on empty area
+          e.preventDefault();
+          onCardDrop(column.id, column.cards.length);
+        }}
+      >
+        {column.cards.length === 0 && !isEditor && (
+          <div className="text-gray-500 text-xs text-center py-6">No items yet.</div>
+        )}
+        {column.cards.length === 0 && isEditor && dragCardId && (
+          <div
+            className={`h-16 rounded-md border-2 border-dashed ${dropTarget && dropTarget.columnId === column.id ? 'border-indigo-500 bg-indigo-50' : 'border-gray-200'}`}
+            onDragOver={(e) => { e.preventDefault(); e.dataTransfer.dropEffect = 'move'; onCardDragOver(column.id, 0); }}
+            onDrop={(e) => { e.preventDefault(); onCardDrop(column.id, 0); }}
+          />
+        )}
+        {column.cards.map((card, idx) => {
+          const isDragging = dragCardId === card.id;
+          const showIndicatorBefore = isEditor && dragCardId && dropTarget && dropTarget.columnId === column.id && dropTarget.index === idx && dragCardId !== card.id;
+          return (
+            <div key={card.id}>
+              {showIndicatorBefore && (
+                <div className="h-1.5 bg-indigo-500 rounded-full mb-2" aria-hidden />
+              )}
+              {isEditor && (
+                <InsertCardStrip onClick={() => onAddCard(idx)} />
+              )}
+              <div
+                className={isDragging ? 'opacity-40' : ''}
+                draggable={isEditor}
+                onDragStart={(e) => {
+                  if (!isEditor) return;
+                  e.dataTransfer.effectAllowed = 'move';
+                  try { e.dataTransfer.setData('text/plain', `card:${card.id}`); } catch {}
+                  onCardDragStart(card.id, column.id);
+                }}
+                onDragEnd={() => onCardDragEnd()}
+                onDragOver={(e) => {
+                  if (!isEditor || !dragCardId) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  e.dataTransfer.dropEffect = 'move';
+                  // Decide drop position: above or below this card based on cursor Y
+                  const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                  const before = (e.clientY - rect.top) < rect.height / 2;
+                  onCardDragOver(column.id, before ? idx : idx + 1);
+                }}
+                onDrop={(e) => {
+                  if (!isEditor || !dragCardId) return;
+                  e.preventDefault();
+                  e.stopPropagation();
+                  const rect = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                  const before = (e.clientY - rect.top) < rect.height / 2;
+                  onCardDrop(column.id, before ? idx : idx + 1);
+                }}
+              >
+                <CardRenderer
+                  classId={classId}
+                  card={card}
+                  cardIndex={idx}
+                  totalCards={column.cards.length}
+                  isEditor={isEditor}
+                  onPlayVideo={onPlayVideo}
+                  onOpenImage={onOpenImage}
+                  onChanged={onChanged}
+              onEdit={onEdit}
+                  moveCard={moveCard}
+                />
+              </div>
+            </div>
+          );
+        })}
+        {isEditor && dragCardId && dropTarget && dropTarget.columnId === column.id && dropTarget.index === column.cards.length && (
+          <div className="h-1.5 bg-indigo-500 rounded-full" aria-hidden />
+        )}
+        {isEditor && column.cards.length > 0 && (
+          <InsertCardStrip onClick={() => onAddCard(column.cards.length)} />
+        )}
+      </div>
+    </div>
+  );
+}
+
+function InsertCardStrip({ onClick }: { onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-label="Insert card here"
+      className="group block w-full my-1 py-1 flex items-center justify-center text-slate-300 hover:text-indigo-500 transition-colors"
+    >
+      <span className="flex-1 h-px bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
+      <span className="mx-2 w-5 h-5 rounded-full border border-current flex items-center justify-center text-xs leading-none">+</span>
+      <span className="flex-1 h-px bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
+    </button>
+  );
+}
+
+function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const create = async () => {
+    const title = await showPrompt({ title: 'New column', placeholder: 'e.g. Modul 4', confirmLabel: 'Create' });
+    if (!title) return;
+    setBusy(true);
+    try {
+      await authedFetch(`/api/learning-boards/${classId}/columns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title }),
+      });
+      onCreated();
+    } finally { setBusy(false); }
+  };
+  return (
+    <button
+      onClick={create}
+      disabled={busy}
+      className="flex-shrink-0 w-72 bg-white hover:bg-slate-50 border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl text-slate-600 hover:text-indigo-600 text-sm py-3 self-start transition shadow-sm hover:shadow-md"
+    >+ Add column</button>
+  );
+}
+
+
+// Wakelet-style deterministic gradient palette derived from a string (hostname).
+function cardGradient(seed: string): { from: string; to: string } {
+  const palettes: Array<{ from: string; to: string }> = [
+    { from: "#a78bfa", to: "#ec4899" },
+    { from: "#6366f1", to: "#8b5cf6" },
+    { from: "#10b981", to: "#34d399" },
+    { from: "#f59e0b", to: "#ef4444" },
+    { from: "#fb923c", to: "#f97316" },
+    { from: "#06b6d4", to: "#3b82f6" },
+    { from: "#ef4444", to: "#f43f5e" },
+    { from: "#84cc16", to: "#10b981" },
+  ];
+  let h = 0; for (let i = 0; i < seed.length; i++) h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  return palettes[h % palettes.length];
+}
+
+function CardRenderer({
+  classId,
+  card,
+  cardIndex,
+  totalCards,
+  isEditor,
+  onPlayVideo,
+  onOpenImage,
+  onChanged,
+  onEdit,
+  moveCard,
+}: {
+  classId: string;
+  card: LearningCard;
+  cardIndex: number;
+  totalCards: number;
+  isEditor: boolean;
+  onPlayVideo: (fileId: string, title: string | null) => void;
+  onOpenImage: (src: string, title: string | null) => void;
+  onChanged: () => void;
+  onEdit: (card: LearningCard) => void;
+  moveCard: (cardId: string, payload: any) => Promise<void>;
+}) {
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const handleDelete = async () => {
+    const ok = await showConfirm({ title: "Delete this card?", description: "This action cannot be undone.", confirmLabel: "Delete", tone: "danger" }); if (!ok) return;
+    await authedFetch(`/api/learning-boards/${classId}/cards/${card.id}`, { method: 'DELETE' });
+    onChanged();
+  };
+
+  const Body = () => {
+    if (card.card_type === 'video') {
+      return (
+        <button
+          className="block w-full text-left"
+          onClick={() => card.adilo_file_id && onPlayVideo(card.adilo_file_id, card.title)}
+        >
+          <div className="relative aspect-video bg-white rounded-md overflow-hidden">
+            {card.video_thumbnail_url ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={card.video_thumbnail_url} alt={card.title || ''} className="w-full h-full object-cover" />
+            ) : (
+              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Processingâ¦</div>
+            )}
+            <div className="absolute inset-0 flex items-center justify-center">
+              <div className="bg-black/60 rounded-full w-12 h-12 flex items-center justify-center text-white">â¶</div>
+            </div>
+            {card.video_duration_seconds ? (
+              <div className="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">
+                {formatDuration(card.video_duration_seconds)}
+              </div>
+            ) : null}
+          </div>
+        </button>
+      );
+    }
+    if (card.card_type === 'link' && card.link_url) {
+      if ((card as any).is_qr && card.link_image_url) {
+        return (
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => onOpenImage(card.link_image_url!, card.title || 'QR code')}
+              className="block w-full bg-white rounded-md overflow-hidden cursor-zoom-in group"
+              aria-label="View QR code full screen"
+            >
+              <div className="aspect-square bg-white p-2">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={card.link_image_url} alt={card.title || 'QR code'} className="w-full h-full object-contain transition-opacity group-hover:opacity-90" />
+              </div>
+            </button>
+            <a
+              href={card.link_url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="absolute bottom-1 right-1 inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded-md hover:bg-indigo-500"
+              title="Open link"
+            >Open â</a>
+          </div>
+        );
+      }
+      // Thumbnail block: real image, OR a deterministic Wakelet-style gradient with the hostname letter.
+      const host = card.link_url ? hostnameFromUrl(card.link_url) : '';
+      const grad = cardGradient(host || card.id);
+      const letter = (host || '?').replace(/^www\./, '').charAt(0).toUpperCase();
+      return (
+        <a href={card.link_url} target="_blank" rel="noopener noreferrer" className="block group relative">
+          {card.link_image_url ? (
+            <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img src={card.link_image_url} alt={card.link_title || ''} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200" />
+            </div>
+          ) : (
+            <div className="aspect-video rounded-lg overflow-hidden flex items-center justify-center relative"
+                 style={{ background: `linear-gradient(135deg, ${grad.from} 0%, ${grad.to} 100%)` }}>
+              <div className="w-14 h-14 rounded-xl bg-white/95 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                <span className="text-2xl font-bold tracking-tight" style={{ color: grad.from }}>{letter}</span>
+              </div>
+              <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 text-slate-700 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm" title="Open link">Open â</div>
+            </div>
+          )}
+        </a>
+      );
+    }
+  if (card.card_type === 'image' && card.image_url) {
+    return (
+      <button
+        type="button"
+        onClick={() => onOpenImage(card.image_url!, card.title || null)}
+        className="block w-full rounded-md overflow-hidden bg-white cursor-zoom-in group"
+        aria-label="View image full screen"
+      >
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={card.image_url} alt={card.title || ''} className="w-full object-cover transition-opacity group-hover:opacity-90" />
+      </button>
+    );
+  }
+  if (card.card_type === 'chatbot' && card.chatbot_url) {
+    return <ChatbotCardBody url={card.chatbot_url} title={card.title} />;
+  }
+    if (card.card_type === 'file' && card.file_url) {
+      const ext = (card.file_extension || '').toLowerCase();
+      const sizeKb = card.file_size_bytes ? Math.round(card.file_size_bytes / 1024) : null;
+      const sizeLabel = sizeKb == null ? '' : sizeKb >= 1024 ? `${(sizeKb / 1024).toFixed(1)} MB` : `${sizeKb} KB`;
+      const iconBg =
+        ext === 'pdf' ? 'bg-red-100 text-red-700' :
+        ext === 'doc' || ext === 'docx' ? 'bg-blue-100 text-blue-700' :
+        ext === 'xls' || ext === 'xlsx' || ext === 'csv' ? 'bg-emerald-100 text-emerald-700' :
+        ext === 'ppt' || ext === 'pptx' ? 'bg-orange-100 text-orange-700' :
+        ext === 'zip' || ext === 'rar' || ext === '7z' ? 'bg-amber-100 text-amber-800' :
+        'bg-slate-100 text-slate-700';
+      return (
+        <a
+          href={card.file_url}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-3 rounded-md bg-white p-2 hover:bg-slate-50 transition-colors"
+          title={card.file_name || ''}
+        >
+          <div className={`w-12 h-14 rounded-md flex items-center justify-center text-[10px] font-bold ${iconBg}`}>
+            {ext ? ext.toUpperCase().slice(0, 4) : 'FILE'}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="text-sm font-medium text-gray-900 truncate">{card.file_name || card.title || 'File'}</div>
+            <div className="text-xs text-gray-500">{sizeLabel}</div>
+          </div>
+        </a>
+      );
+    }
+    return null;
+  };
+
+  const SiteHeader = () => {
+    if (card.card_type !== 'link') return null;
+    const host = card.link_site_name || (card.link_url ? hostnameFromUrl(card.link_url) : '');
+    if (!host) return null;
+    return (
+      <div className="flex items-center gap-1.5 mb-2 text-xs text-slate-500">
+        {card.link_favicon_url ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={card.link_favicon_url} alt="" className="w-4 h-4 rounded" />
+        ) : (
+          <span aria-hidden>ð</span>
+        )}
+        <span className="truncate">{host}</span>
+      </div>
+    );
+  };
+
+  const title = card.card_type === 'link' ? (card.link_title || card.title) : (card.card_type === 'file' ? (card.title || card.file_name) : card.title);
+  const desc = card.card_type === 'link' ? (card.link_description || card.description) : card.description;
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-xl p-3 relative shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_4px_16px_rgba(15,23,42,0.08)] hover:border-slate-300 transition-all duration-150">
+      <div className="flex items-center gap-2 mb-2">
+        <span className="text-gray-500 select-none flex-shrink-0" aria-hidden>â¡</span>
+        <div className="flex-1" />
+        {isEditor && (
+          <div className="relative" onClick={(e) => e.stopPropagation()}>
+            <button
+              className="text-gray-600 hover:text-gray-900 px-1"
+              onClick={() => setMenuOpen((v) => !v)}
+              aria-label="Card menu"
+            >â¦</button>
+            {menuOpen && (
+              <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
+                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'top' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to top</button>
+                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'up' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move up</button>
+                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'down' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move down</button>
+                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'bottom' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to bottom</button>
+                <div className="h-px bg-gray-100" />
+                <button onClick={() => { setMenuOpen(false); onEdit(card); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">Edit</button>
+              <button onClick={async () => {
+                  setMenuOpen(false);
+                  try {
+                    const r = await authedFetch(`/api/learning-boards/${classId}/cards/${card.id}/ai-thumbnail`, { method: 'POST' });
+                    if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.error || 'Failed'); }
+                    onChanged();
+                  } catch (e: any) {
+                    alert('AI thumbnail failed: ' + (e?.message || 'unknown error'));
+                  }
+                }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-indigo-600">â¨ Generate AI thumbnail</button>
+              <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+      <SiteHeader />
+      <Body />
+      {(title || desc) && (
+        card.card_type === 'link' && card.link_url ? (
+          <a href={card.link_url} target="_blank" rel="noopener noreferrer" className="block mt-2 group">
+            {title && <div className="text-gray-900 text-sm font-semibold leading-snug mb-1 group-hover:text-indigo-600 transition-colors">{title}</div>}
+            {desc && <div className="text-gray-600 text-xs leading-snug whitespace-pre-wrap break-words">{desc}</div>}
+          </a>
+        ) : (
+          <div className="mt-2">
+            {title && <div className="text-gray-900 text-sm font-semibold leading-snug mb-1">{title}</div>}
+            {desc && <div className="text-gray-600 text-xs leading-snug whitespace-pre-wrap break-words">{desc}</div>}
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Add Card Modal
+// ---------------------------------------------------------------------------
+
+function AddCardModal({
+  classId,
+  columnId,
+  insertIndex,
+  onClose,
+  onCreated,
+}: {
+  classId: string;
+  columnId: string;
+  insertIndex?: number | null;
+  onClose: () => void;
+  onCreated: () => void;
+}) {
+  const [tab, setTab] = useState<LearningCardType | 'qr'>('link');
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div
+        className="bg-white border border-gray-200 rounded-xl w-full max-w-lg p-5 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-xl font-semibold">Add card</h3>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-900">â</button>
+        </div>
+        <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
+          {(['link', 'qr', 'text', 'file', 'image', 'video', 'chatbot'] as Array<LearningCardType | 'qr'>).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              className={`flex-1 px-3 py-1.5 rounded-md text-sm capitalize ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+            >{t}</button>
+          ))}
+        </div>
+        {tab === 'video' && <VideoForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'link'  && <LinkForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+          {tab === 'qr'    && <QRForm    classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'file'  && <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+      {tab === 'chatbot' && <ChatbotForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+      </div>
+    </div>
+  );
+}
+
+function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [progress, setProgress] = useState(0);
+  const [stage, setStage] = useState<'idle' | 'init' | 'uploading' | 'finalizing' | 'done' | 'error'>('idle');
+  const [errMsg, setErrMsg] = useState<string | null>(null);
+  const xhrRef = useRef<XMLHttpRequest | null>(null);
+
+  const probeDuration = (f: File): Promise<number | undefined> =>
+    new Promise((resolve) => {
+      try {
+        const v = document.createElement('video');
+        v.preload = 'metadata';
+        v.onloadedmetadata = () => resolve(Math.round(v.duration || 0));
+        v.onerror = () => resolve(undefined);
+        v.src = URL.createObjectURL(f);
+      } catch { resolve(undefined); }
+    });
+
+  const upload = async () => {
+    if (!file) return;
+    setErrMsg(null);
+    setStage('init');
+    setProgress(0);
+    const durationSeconds = await probeDuration(file);
+
+    let initData: any;
+    try {
+      const initRes = await authedFetch(`/api/learning-boards/${classId}/upload/start`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          columnId,
+          filename: file.name,
+          mimeType: file.type || 'video/mp4',
+          sizeBytes: file.size,
+          durationSeconds,
+          insertIndex,
+        }),
+      });
+      initData = await initRes.json();
+      if (!initRes.ok) throw new Error(initData.error || 'Init failed');
+    } catch (e: any) {
+      setStage('error'); setErrMsg(e.message); return;
+    }
+
+    setStage('uploading');
+    let eTag = '';
+    try {
+      eTag = await new Promise<string>((resolve, reject) => {
+        const xhr = new XMLHttpRequest();
+        xhrRef.current = xhr;
+        xhr.open('PUT', initData.signedUrl);
+        xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
+        xhr.upload.onprogress = (e) => {
+          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
+        };
+        xhr.onload = () => {
+          if (xhr.status >= 200 && xhr.status < 300) {
+            const tag = xhr.getResponseHeader('ETag') || xhr.getResponseHeader('etag') || '';
+            resolve(tag.replace(/"/g, ''));
+          } else reject(new Error(`Upload failed: HTTP ${xhr.status}`));
+        };
+        xhr.onerror = () => reject(new Error('Network error during upload'));
+        xhr.send(file);
+      });
+    } catch (e: any) {
+      setStage('error'); setErrMsg(e.message); return;
+    }
+
+    setStage('finalizing');
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/upload/complete`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          columnId,
+          uploadId: initData.uploadId,
+          key: initData.key,
+          eTag,
+          projectId: initData.projectId,
+          filename: file.name,
+          mimeType: file.type || 'video/mp4',
+          sizeBytes: file.size,
+          durationSeconds,
+          title: title || file.name,
+          description,
+          insertIndex,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Finalize failed');
+      setStage('done');
+      onCreated();
+    } catch (e: any) {
+      setStage('error'); setErrMsg(e.message);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="file"
+        accept="video/*"
+        onChange={(e) => setFile(e.target.files?.[0] || null)}
+        className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500"
+      />
+      <input
+        value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title (optional)"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      <textarea
+        value={description} onChange={(e) => setDescription(e.target.value)}
+        placeholder="Description (optional)"
+        rows={2}
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      {stage !== 'idle' && stage !== 'done' && stage !== 'error' && (
+        <div>
+          <div className="text-xs text-gray-600 mb-1 capitalize">{stage}â¦ {progress > 0 && `${progress}%`}</div>
+          <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
+            <div className="bg-indigo-500 h-full transition-all" style={{ width: `${progress}%` }} />
+          </div>
+        </div>
+      )}
+      {errMsg && <div className="text-red-400 text-xs">{errMsg}</div>}
+      <button
+        onClick={upload}
+        disabled={!file || (stage !== 'idle' && stage !== 'error')}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-md py-2 text-sm"
+      >Upload video</button>
+    </div>
+  );
+}
+
+function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [autoMeta, setAutoMeta] = useState<{ title?: string; description?: string; image?: string; siteName?: string; favicon?: string } | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const [previewLoading, setPreviewLoading] = useState(false);
+
+  // Fetch preview when URL is committed (debounced via blur or button)
+  const fetchPreview = async () => {
+    if (!url) return;
+    setPreviewLoading(true); setErr(null);
+    try {
+      const pres = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(url)}`);
+      const meta = await pres.json();
+      if (!pres.ok) throw new Error(meta.error || 'Preview failed');
+      setAutoMeta(meta);
+      if (!title && meta.title) setTitle(meta.title);
+      if (!description && meta.description) setDescription(meta.description);
+      if (!imageUrl && meta.image) setImageUrl(meta.image);
+    } catch (e: any) { setErr(e.message || 'Preview failed'); }
+    finally { setPreviewLoading(false); }
+  };
+
+  const uploadCustomThumb = async (file: File) => {
+    if (!file) return;
+    setUploading(true); setErr(null);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const r = await authedFetch(`/api/learning-boards/${classId}/upload-file`, { method: 'POST', body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Upload failed');
+      setImageUrl(data.fileluFileUrl || data.fileUrl);
+    } catch (e: any) { setErr(e.message || 'Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const submit = async () => {
+    if (!url) return;
+    setBusy(true); setErr(null);
+    try {
+      // If preview hasn't been fetched yet, try it once silently.
+      let meta = autoMeta;
+      if (!meta) {
+        try {
+          const pres = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(url)}`);
+          if (pres.ok) meta = await pres.json();
+        } catch {}
+      }
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          columnId,
+          cardType: 'link',
+          linkUrl: url,
+          title: title || meta?.title || null,
+          description: description || meta?.description || null,
+          linkTitle: title || meta?.title || null,
+          linkDescription: description || meta?.description || null,
+          linkImageUrl: imageUrl || meta?.image || null,
+          linkSiteName: meta?.siteName || null,
+          linkFaviconUrl: meta?.favicon || null,
+          insertIndex,
+        }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <div className="flex gap-2">
+        <input
+          value={url} onChange={(e) => setUrl(e.target.value)}
+          onBlur={() => { if (url && !autoMeta) fetchPreview(); }}
+          placeholder="https://..."
+          className="flex-1 bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+        />
+        <button
+          type="button"
+          onClick={fetchPreview}
+          disabled={!url || previewLoading}
+          className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 rounded-md disabled:opacity-50"
+        >{previewLoading ? '...' : 'Preview'}</button>
+      </div>
+
+      {(imageUrl || autoMeta) && (
+        <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
+          <div className="text-xs text-gray-500 mb-2">Preview</div>
+          {imageUrl ? (
+            /* eslint-disable-next-line @next/next/no-img-element */
+            <img src={imageUrl} alt="" className="w-full aspect-video object-cover rounded-md mb-2 bg-white" />
+          ) : (
+            <div className="w-full aspect-video rounded-md bg-gradient-to-br from-indigo-500 to-purple-500 mb-2" />
+          )}
+          <input
+            value={title} onChange={(e) => setTitle(e.target.value)}
+            placeholder="Title"
+            className="w-full bg-white border border-gray-200 rounded-md px-2 py-1.5 text-sm text-gray-900 mb-2"
+          />
+          <textarea
+            value={description} onChange={(e) => setDescription(e.target.value)}
+            placeholder="Description (optional)"
+            rows={2}
+            className="w-full bg-white border border-gray-200 rounded-md px-2 py-1.5 text-sm text-gray-900"
+          />
+        </div>
+      )}
+
+      <div>
+        <label className="block text-xs text-gray-600 mb-1">Custom thumbnail (optional)</label>
+        <input
+          type="file" accept="image/*"
+          onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCustomThumb(f); }}
+          disabled={uploading}
+          className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500"
+        />
+        {uploading && <div className="text-xs text-gray-500 mt-1">Uploading thumbnailâ¦</div>}
+      </div>
+
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button
+        onClick={submit}
+        disabled={!url || busy || uploading}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
+      >{busy ? 'Addingâ¦' : 'Add link'}</button>
+    </div>
+  );
+}
+
+function QRForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url.trim()) { setErr('Please enter a URL.'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/qr-card`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId, url: url.trim(), title: title.trim() || null, insertIndex }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <input
+        value={url} onChange={(e) => setUrl(e.target.value)}
+        placeholder="https://..."
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      <input
+        value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title (optional)"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      <p className="text-xs text-gray-500">A QR code image will be generated for this URL. Tapping the card opens the URL; the QR enlarges when clicked.</p>
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button
+        onClick={submit}
+        disabled={!url.trim() || busy}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
+      >{busy ? 'Creating QR...' : 'Add QR card'}</button>
+    </div>
+  );
+}
+
+function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!file) { setErr('Choose an image'); return; }
+    setBusy(true); setErr(null); setProgress(0);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const upRes = await authedFetch(`/api/learning-boards/${classId}/upload-file`, {
+        method: 'POST',
+        body: fd,
+      });
+      const upData = await upRes.json();
+      if (!upRes.ok) throw new Error(upData.error || 'Upload failed');
+      setProgress(70);
+
+      // Image card stores the FileLu redirect endpoint as image_url so <img src> works.
+      const imageUrl = `/api/learning-boards/${classId}/file-redirect/${upData.fileCode}`;
+
+      const cardRes = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          columnId,
+          cardType: 'image',
+          title: title || null,
+          imageUrl,
+          fileluFileCode: upData.fileCode,
+          insertIndex,
+        }),
+      });
+      const cardData = await cardRes.json();
+      if (!cardRes.ok) throw new Error(cardData.error || 'Failed to create card');
+      setProgress(100);
+      onCreated();
+    } catch (e: any) {
+      setErr(e.message || 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="file"
+        accept="image/*"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        disabled={busy}
+        className="w-full text-sm text-gray-900 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:text-sm file:font-medium hover:file:bg-indigo-500 file:cursor-pointer disabled:opacity-50"
+      />
+      {file && (
+        <div className="text-xs text-gray-600">
+          {file.name} Â· {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
+        </div>
+      )}
+      <input
+        value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="Caption (optional)"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      {busy && (
+        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button
+        onClick={submit}
+        disabled={!file || busy}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
+      >{busy ? 'Uploadingâ¦' : 'Add image'}</button>
+    </div>
+  );
+}
+function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    if (!title && !description) { setErr('Add a title or description'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId, cardType: 'text', title: title || null, description: description || null, insertIndex }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <input
+        value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      <textarea
+        value={description} onChange={(e) => setDescription(e.target.value)}
+        placeholder="Note text"
+        rows={5}
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button
+        onClick={submit}
+        disabled={busy}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
+      >{busy ? 'Addingâ¦' : 'Add note'}</button>
+    </div>
+  );
+}
+
+function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [file, setFile] = useState<File | null>(null);
+  const [title, setTitle] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [progress, setProgress] = useState(0);
+  const [err, setErr] = useState<string | null>(null);
+
+  const submit = async () => {
+    if (!file) { setErr('Choose a file'); return; }
+    setBusy(true); setErr(null); setProgress(0);
+    try {
+      // 1) Upload to Supabase Storage via our API route
+      const fd = new FormData();
+      fd.append('file', file);
+      const upRes = await authedFetch(`/api/learning-boards/${classId}/upload-file`, {
+        method: 'POST',
+        body: fd,
+      });
+      const upData = await upRes.json();
+      if (!upRes.ok) throw new Error(upData.error || 'Upload failed');
+      setProgress(70);
+
+      // 2) Create the card record
+      // File card stores the FileLu redirect endpoint as file_url so it works
+      // even when FileLu has not made the share link public.
+      const fileUrl = `/api/learning-boards/${classId}/file-redirect/${upData.fileCode}`;
+      const cardRes = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          columnId,
+          cardType: 'file',
+          title: title || null,
+          fileUrl,
+          filePath: upData.filePath,
+          fileName: upData.fileName,
+          fileMimeType: upData.fileMimeType,
+          fileSizeBytes: upData.fileSizeBytes,
+          fileExtension: upData.fileExtension,
+          fileluFileCode: upData.fileCode,
+          insertIndex,
+        }),
+      });
+      const cardData = await cardRes.json();
+      if (!cardRes.ok) throw new Error(cardData.error || 'Failed to create card');
+      setProgress(100);
+      onCreated();
+    } catch (e: any) {
+      setErr(e.message || 'Upload failed');
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="space-y-3">
+      <input
+        type="file"
+        accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.csv,.txt,.rtf,.odt,.ods,.odp,.zip,.rar,.7z,application/pdf,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-powerpoint,application/vnd.openxmlformats-officedocument.presentationml.presentation,text/plain,text/csv"
+        onChange={(e) => setFile(e.target.files?.[0] ?? null)}
+        disabled={busy}
+        className="w-full text-sm text-gray-900 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:text-sm file:font-medium hover:file:bg-indigo-500 file:cursor-pointer disabled:opacity-50"
+      />
+      {file && (
+        <div className="text-xs text-gray-600">
+          {file.name} Â· {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
+        </div>
+      )}
+      <input
+        value={title} onChange={(e) => setTitle(e.target.value)}
+        placeholder="Title (optional)"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
+      />
+      {busy && (
+        <div className="w-full h-1.5 bg-slate-100 rounded-full overflow-hidden">
+          <div className="h-full bg-indigo-600 transition-all" style={{ width: `${progress}%` }} />
+        </div>
+      )}
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button
+        onClick={submit}
+        disabled={!file || busy}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
+      >{busy ? 'Uploadingâ¦' : 'Upload file'}</button>
+      <div className="text-[11px] text-gray-500">Supports PDF, Word, Excel, PowerPoint, text, archives, and more (up to 50 MB).</div>
+    </div>
+  );
+}
+
+function MoodBoardGrid({
+  classId,
+  snap,
+  isEditor,
+  onPlayVideo,
+  onOpenImage,
+  onChanged,
+  onEdit,
+  moveCard,
+  onAddCard,
+}: {
+  classId: string;
+  snap: Snapshot;
+  isEditor: boolean;
+  onPlayVideo: (fileId: string, title: string | null) => void;
+  onOpenImage: (src: string, title: string | null) => void;
+  onChanged: () => void;
+  onEdit: (card: LearningCard) => void;
+  moveCard: (cardId: string, payload: any) => Promise<void>;
+  onAddCard?: (columnId: string, insertIndex?: number | null) => void;
+}) {
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [creatingUncat, setCreatingUncat] = useState(false);
+
+  const allCards = snap.columns.flatMap((col) =>
+    (col.cards || []).map((c: LearningCard) => ({ card: c, columnTitle: col.title, columnId: col.id }))
+  );
+
+  const ensureUncategorizedColumn = async (): Promise<string | null> => {
+    const existing = snap.columns.find(
+      (c) => (c.title || '').trim().toLowerCase() === 'uncategorized'
+    );
+    if (existing) return existing.id;
+    setCreatingUncat(true);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/columns`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ title: 'Uncategorized' }),
+      });
+      const data = await r.json();
+      if (!r.ok || !data?.column?.id) throw new Error(data?.error || 'Could not create column');
+      return data.column.id as string;
+    } catch (e) {
+      console.error(e);
+      return null;
+    } finally {
+      setCreatingUncat(false);
+    }
+  };
+
+  const handleStartAdd = async (columnId: string | null) => {
+    setPickerOpen(false);
+    let cid = columnId;
+    if (!cid) {
+      cid = await ensureUncategorizedColumn();
+      if (!cid) return;
+    }
+    onAddCard?.(cid, null);
+  };
+
+  const EmptyState = () => (
+    <div className="mx-4 my-6 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-800 p-12 text-center text-slate-300 text-sm shadow-inner">
+      {isEditor ? (
+        <div className="flex flex-col items-center gap-3">
+          <div>No items on this board yet.</div>
+          <button
+            onClick={() => setPickerOpen(true)}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-semibold"
+          >
+            <span className="text-base leading-none">+</span> Add resource
+          </button>
+        </div>
+      ) : (
+        'No items have been added to this board yet.'
+      )}
+    </div>
+  );
+
+  return (
+    <div
+      className="mx-4 mt-2 mb-8 rounded-3xl px-4 sm:px-6 pt-6 pb-10 min-h-[60vh] shadow-inner relative"
+      style={{
+        background:
+          'radial-gradient(1200px 600px at 20% -10%, rgba(124,58,237,0.18), transparent 60%), radial-gradient(900px 500px at 90% 10%, rgba(14,165,233,0.18), transparent 55%), linear-gradient(180deg, #0f172a 0%, #111827 100%)',
+      }}
+    >
+      <style>{`
+        .mood-card .line-clamp-2,
+        .mood-card .line-clamp-3,
+        .mood-card .line-clamp-4 {
+          display: block !important;
+          -webkit-line-clamp: unset !important;
+          overflow: visible !important;
+        }
+      `}</style>
+
+      <div className="mb-5 flex items-center justify-between text-slate-300 flex-wrap gap-3">
+        <div className="flex items-center gap-2">
+          <span className="inline-block w-2 h-2 rounded-full bg-fuchsia-400 shadow-[0_0_12px_2px_rgba(232,121,249,0.6)]" />
+          <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Mood Board</span>
+        </div>
+        <div className="flex items-center gap-3">
+          <span className="text-xs text-slate-500">{allCards.length} item{allCards.length === 1 ? '' : 's'} Â· {snap.columns.length} topic{snap.columns.length === 1 ? '' : 's'}</span>
+          {isEditor && (
+            <button
+              onClick={() => setPickerOpen(true)}
+              disabled={creatingUncat}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-600 hover:from-fuchsia-400 hover:to-violet-500 text-white text-xs font-semibold shadow-lg shadow-fuchsia-900/30 disabled:opacity-60"
+            >
+              <span className="text-base leading-none">+</span> Add resource
+            </button>
+          )}
+        </div>
+      </div>
+
+      {allCards.length === 0 ? (
+        <EmptyState />
+      ) : (
+        <div className="[column-fill:_balance] columns-1 sm:columns-2 lg:columns-3 xl:columns-4 gap-4">
+          {allCards.map(({ card, columnTitle, columnId }, idx) => {
+            const grad = cardGradient(columnTitle || columnId);
+            return (
+              <div key={card.id} className="mb-4 break-inside-avoid group">
+                <div className="mood-card relative rounded-2xl overflow-hidden bg-white border border-gray-200 shadow-[0_10px_30px_-12px_rgba(0,0,0,0.6)] transition-transform duration-200 group-hover:-translate-y-0.5 group-hover:shadow-[0_18px_40px_-14px_rgba(0,0,0,0.8)]">
+                  <div
+                    className="absolute top-2 left-2 z-10 inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase tracking-wide backdrop-blur-md"
+                    style={{
+                      background: `linear-gradient(135deg, ${grad.from}cc, ${grad.to}cc)`,
+                      color: 'white',
+                      boxShadow: '0 2px 8px rgba(0,0,0,0.35)',
+                    }}
+                    title={columnTitle}
+                  >
+                    <span className="inline-block w-1.5 h-1.5 rounded-full bg-white/90" />
+                    <span className="max-w-[160px] truncate">{columnTitle || 'Uncategorized'}</span>
+                  </div>
+
+                  <div className="text-slate-100">
+                    <CardRenderer
+                      classId={classId}
+                      card={card}
+                      cardIndex={idx}
+                      totalCards={allCards.length}
+                      isEditor={isEditor}
+                      onPlayVideo={onPlayVideo}
+                      onOpenImage={onOpenImage}
+                      onChanged={onChanged}
+                      onEdit={onEdit}
+                      moveCard={moveCard}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      )}
+
+      {pickerOpen && (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setPickerOpen(false)}
+        >
+          <div
+            onClick={(e) => e.stopPropagation()}
+            className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-5 text-gray-900"
+          >
+            <div className="flex items-center justify-between mb-3">
+              <h3 className="text-base font-semibold">Add resource toâ¦</h3>
+              <button onClick={() => setPickerOpen(false)} className="text-gray-500 hover:text-gray-900">Ã</button>
+            </div>
+            <p className="text-xs text-slate-400 mb-3">Pick a topic for the new card. Choose âNo topicâ to add it without a category.</p>
+            <div className="max-h-[55vh] overflow-y-auto pr-1 -mr-1 space-y-1.5">
+              <button
+                onClick={() => handleStartAdd(null)}
+                disabled={creatingUncat}
+                className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-dashed border-white/15 text-left disabled:opacity-60"
+              >
+                <span className="inline-flex w-6 h-6 rounded-md items-center justify-center bg-slate-800 text-slate-300 text-xs">â</span>
+                <span className="text-sm">No topic <span className="text-slate-500">(Uncategorized)</span></span>
+              </button>
+              {snap.columns.map((c) => {
+                const g = cardGradient(c.title || c.id);
+                return (
+                  <button
+                    key={c.id}
+                    onClick={() => handleStartAdd(c.id)}
+                    className="w-full flex items-center gap-2 px-3 py-2 rounded-lg hover:bg-white/10 text-left"
+                  >
+                    <span
+                      className="inline-flex w-6 h-6 rounded-md items-center justify-center text-[10px] font-bold text-white"
+                      style={{ background: `linear-gradient(135deg, ${g.from}, ${g.to})` }}
+                    >
+                      {(c.title || '?').slice(0, 1).toUpperCase()}
+                    </span>
+                    <span className="text-sm truncate flex-1">{c.title || 'Untitled'}</span>
+                    <span className="text-xs text-slate-500">{(c.cards || []).length}</span>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+
+// -----------------------------------------------------------------------------
+// AI Thumbnail Batch Button â drives the SSE stream from /ai-thumbnail-all.
+// -----------------------------------------------------------------------------
+function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: () => void }) {
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const [running, setRunning] = useState(false);
+  const [progress, setProgress] = useState<{ processed: number; total: number; succeeded: number; failed: number } | null>(null);
+  const abortRef = useRef<AbortController | null>(null);
+
+  const start = async () => {
+    setConfirmOpen(false);
+    setRunning(true);
+    setProgress({ processed: 0, total: 0, succeeded: 0, failed: 0 });
+    const ac = new AbortController();
+    abortRef.current = ac;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const token = session?.access_token || '';
+      const r = await fetch(`/api/learning-boards/${classId}/ai-thumbnail-all`, {
+        method: 'POST',
+        headers: token ? { Authorization: `Bearer ${token}` } : {},
+        signal: ac.signal,
+      });
+      if (!r.ok || !r.body) {
+        const t = await r.text().catch(()=>'');
+        throw new Error(`Stream failed (${r.status}): ${t.slice(0,160)}`);
+      }
+      const reader = r.body.getReader();
+      const dec = new TextDecoder();
+      let buf = '';
+      let succeeded = 0, failed = 0;
+      let lastRefreshAt = 0;
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buf += dec.decode(value, { stream: true });
+        const events = buf.split('\n\n');
+        buf = events.pop() || '';
+        for (const ev of events) {
+          const lines = ev.split('\n');
+          let evt = 'message', data = '';
+          for (const ln of lines) {
+            if (ln.startsWith('event:')) evt = ln.slice(6).trim();
+            else if (ln.startsWith('data:')) data += ln.slice(5).trim();
+          }
+          if (!data) continue;
+          let payload: any = {};
+          try { payload = JSON.parse(data); } catch {}
+          if (evt === 'start') {
+            setProgress({ processed: 0, total: payload.total || 0, succeeded: 0, failed: 0 });
+          } else if (evt === 'progress') {
+            if (payload.ok) succeeded++; else failed++;
+            setProgress((p) => p ? { ...p, processed: payload.processed || p.processed, total: payload.total || p.total, succeeded, failed } : p);
+            // Refresh the board every few completions so users see thumbnails appear live.
+            const now = Date.now();
+            if (now - lastRefreshAt > 4000) {
+              lastRefreshAt = now;
+              try { onDone(); } catch {}
+            }
+          } else if (evt === 'done') {
+            setProgress((p) => p ? { ...p, processed: payload.processed, total: payload.total, succeeded: payload.succeeded ?? succeeded, failed: payload.failed ?? failed } : p);
+          }
+        }
+      }
+      try { onDone(); } catch {}
+    } catch (e: any) {
+      if (e?.name !== 'AbortError') alert('Batch failed: ' + (e?.message || 'unknown error'));
+    } finally {
+      setRunning(false);
+      abortRef.current = null;
+    }
+  };
+
+  return (
+    <>
+      <button
+        onClick={() => setConfirmOpen(true)}
+        disabled={running}
+        title="Generate AI thumbnails for cards without a real image"
+        className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-400 hover:to-fuchsia-400 text-white shadow disabled:opacity-60"
+      >
+        â¨ {running ? `${progress?.processed ?? 0}/${progress?.total ?? 'â¦'}` : 'AI thumbnails'}
+      </button>
+
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setConfirmOpen(false)}>
+          <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-5" onClick={(e)=>e.stopPropagation()}>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">Generate AI thumbnails?</h3>
+            <p className="text-sm text-gray-600">This will create AI-generated images for every card that is still using the default gradient tile. It uses free AI providers (AI Horde &rarr; Cloudflare &rarr; Hugging Face &rarr; Pollinations) in parallel and may take several minutes depending on queue load. Existing custom thumbnails are not touched.</p>
+            <div className="mt-5 flex justify-end gap-2">
+              <button onClick={() => setConfirmOpen(false)} className="px-3 py-1.5 rounded-md text-sm bg-gray-100 hover:bg-gray-200 text-gray-700">Cancel</button>
+              <button onClick={start} className="px-3 py-1.5 rounded-md text-sm bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white font-semibold">Generate</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {running && progress && (
+        <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl bg-white text-gray-900 border border-gray-200 shadow-2xl p-4">
+          <div className="flex items-center justify-between mb-2">
+            <div className="text-sm font-semibold">â¨ Generating AI thumbnails</div>
+            <button onClick={() => abortRef.current?.abort()} className="text-xs text-gray-500 hover:text-gray-900">Cancel</button>
+          </div>
+          <div className="text-xs text-gray-500 mb-2">{progress.processed} / {progress.total} Â· {progress.succeeded} ok Â· {progress.failed} failed</div>
+          <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
+            <div className="h-full bg-gradient-to-r from-indigo-400 to-fuchsia-400 transition-all" style={{ width: `${progress.total ? (progress.processed / progress.total) * 100 : 0}%` }} />
+          </div>
+        </div>
+      )}
+    </>
+  );
+}
+
+// ----------------------------------------------------------------------------
+// Edit Card Modal
+// ----------------------------------------------------------------------------
+function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; card: LearningCard; onClose: () => void; onSaved: () => void }) {
+  const [title, setTitle] = useState(card.title || '');
+  const [description, setDescription] = useState(card.description || '');
+  const [linkUrl, setLinkUrl] = useState((card as any).link_url || '');
+  const [linkTitle, setLinkTitle] = useState((card as any).link_title || '');
+  const [linkDescription, setLinkDescription] = useState((card as any).link_description || '');
+  const [linkImageUrl, setLinkImageUrl] = useState<string | null>((card as any).link_image_url || null);
+  const [busy, setBusy] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const isLink = card.card_type === 'link';
+
+  const uploadThumb = async (file: File) => {
+    if (!file) return;
+    setUploading(true); setErr(null);
+    try {
+      const fd = new FormData(); fd.append('file', file);
+      const r = await authedFetch(`/api/learning-boards/${classId}/upload-file`, { method: 'POST', body: fd });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Upload failed');
+      setLinkImageUrl(data.fileUrl);
+    } catch (e: any) { setErr(e.message || 'Upload failed'); }
+    finally { setUploading(false); }
+  };
+
+  const refetchPreview = async () => {
+    if (!linkUrl) return;
+    setUploading(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(linkUrl)}`);
+      const m = await r.json();
+      if (!r.ok) throw new Error(m.error || 'Preview failed');
+      if (m.title) setLinkTitle(m.title);
+      if (m.description) setLinkDescription(m.description);
+      if (m.image) setLinkImageUrl(m.image);
+    } catch (e: any) { setErr(e.message || 'Preview failed'); }
+    finally { setUploading(false); }
+  };
+
+  const save = async () => {
+    setBusy(true); setErr(null);
+    try {
+      const body: any = { title: title || null, description: description || null };
+      if (isLink) {
+        body.link_url = linkUrl || null;
+        body.link_title = linkTitle || null;
+        body.link_description = linkDescription || null;
+        body.link_image_url = linkImageUrl || null;
+      }
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards/${card.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Save failed');
+      onSaved();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+      <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-gray-900">Edit card</h3>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">â</button>
+        </div>
+
+        <div className="space-y-3">
+          {isLink && (
+            <>
+              <div>
+                <label className="block text-xs text-gray-600 mb-1">URL</label>
+                <div className="flex gap-2">
+                  <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
+                    className="flex-1 bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900" />
+                  <button type="button" onClick={refetchPreview} disabled={!linkUrl || uploading}
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 rounded-md disabled:opacity-50">Refresh</button>
+                </div>
+              </div>
+            </>
+          )}
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Title</label>
+            <input value={title} onChange={(e) => { setTitle(e.target.value); if (isLink) setLinkTitle(e.target.value); }}
+              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900" />
+          </div>
+          <div>
+            <label className="block text-xs text-gray-600 mb-1">Description</label>
+            <textarea value={description} onChange={(e) => { setDescription(e.target.value); if (isLink) setLinkDescription(e.target.value); }}
+              rows={3}
+              className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900" />
+          </div>
+          {isLink && (
+            <div>
+              <label className="block text-xs text-gray-600 mb-1">Thumbnail</label>
+              {linkImageUrl ? (
+                <div className="relative mb-2">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={linkImageUrl} alt="" className="w-full aspect-video object-cover rounded-md bg-gray-50" />
+                  <button type="button" onClick={() => setLinkImageUrl(null)} className="absolute top-2 right-2 bg-white/90 hover:bg-white text-red-500 text-xs px-2 py-1 rounded-md shadow">Remove</button>
+                </div>
+              ) : (
+                <div className="w-full aspect-video rounded-md bg-gray-100 flex items-center justify-center text-xs text-gray-500 mb-2">No thumbnail</div>
+              )}
+              <input type="file" accept="image/*"
+                onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadThumb(f); }}
+                disabled={uploading}
+                className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500" />
+              {uploading && <div className="text-xs text-gray-500 mt-1">Workingâ¦</div>}
+            </div>
+          )}
+          {err && <div className="text-red-500 text-xs">{err}</div>}
+          <div className="flex justify-end gap-2 pt-2">
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">Cancel</button>
+            <button onClick={save} disabled={busy || uploading}
+              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-md">{busy ? 'Savingâ¦' : 'Save'}</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ChatbotCardBody({ url, title }: { url: string; title: string | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="w-full">
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-3 rounded-md bg-white p-3 hover:bg-slate-50 transition-colors w-full text-left"
+      >
+        <div className="w-12 h-12 rounded-md flex items-center justify-center bg-indigo-100 text-indigo-600 text-xs font-bold">
+          AI
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-900 truncate">{title || 'Learning Assistant'}</div>
+          <div className="text-xs text-indigo-600">Chat with assistant</div>
+        </div>
+      </button>
+      {open && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setOpen(false)}>
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+              <div className="text-sm font-semibold text-gray-900">{title || 'Learning Assistant'}</div>
+              <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-900 text-lg leading-none px-2">{'\u00D7'}</button>
+            </div>
+            <iframe src={url} title={title || 'Assistant'} className="flex-1 w-full border-0" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatbotForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [title, setTitle] = useState('');
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url) { setErr('Enter the assistant embed URL'); return; }
+    let valid = false;
+    try { valid = new URL(url).protocol === 'https:'; } catch { valid = false; }
+    if (!valid) { setErr('URL must be a valid https link'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId, cardType: 'chatbot', title: title || null, chatbotUrl: url, insertIndex }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Assistant embed URL (https://...)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <p className="text-xs text-gray-500">Paste a chatbot iframe URL. For Landrr use /embeds/landrr-chat.html?source=YOUR_TOKEN</p>
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button onClick={submit} disabled={busy} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm">{busy ? 'Adding...' : 'Add assistant'}</button>
+    </div>
+  );
+}

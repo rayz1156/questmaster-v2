@@ -1,0 +1,22 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Assistant</title>
+<style>html,body{margin:0;padding:0;height:100%;font-family:system-ui,sans-serif;background:#fff}#ldrr_chatbot{height:100vh}</style>
+</head>
+<body>
+<div id="ldrr_chatbot"></div>
+<script src="https://api.landrrapp.io/landrr_liveChat.js"></script>
+<script>
+(function(){
+  function getParam(n){try{return new URLSearchParams(window.location.search).get(n)||'';}catch(e){return '';}}
+  var src=getParam('source');
+  if(!src){document.getElementById('ldrr_chatbot').innerHTML='<p style="padding:16px">Missing chatbot source.</p>';return;}
+  try{ new Landrr({ source: src }); }
+  catch(e){ document.getElementById('ldrr_chatbot').innerHTML='<p style="padding:16px;color:#b00">Unable to load assistant.</p>'; }
+})();
+</script>
+</body>
+</html>
