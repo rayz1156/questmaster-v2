@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { assertCapability } from '@/lib/capabilities';
 import { createBunnyCollection, createBunnyVideo, getBunnyTusUpload } from '@/lib/bunny';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,9 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
       { status: 403 },
     );
   }
+
+  const cap = await assertCapability(admin, auth.user!.id, 'videos');
+  if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
 
   // get/create a Bunny collection for this board (mirrors the old adilo_project_id)
   let collectionId = (board.bunny_collection_id || '').trim() || null;

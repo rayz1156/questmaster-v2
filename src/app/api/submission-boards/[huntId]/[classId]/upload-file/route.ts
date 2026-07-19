@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
+import { assertCapability } from '@/lib/capabilities';
 import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
 
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,9 @@ function extOf(name: string): string {
 export async function POST(req: NextRequest, { params }: { params: { huntId: string; classId: string } }) {
   const auth = await requireClassMember(req, params.classId);
   if (auth.response) return auth.response;
+
+  const cap = await assertCapability(auth.supa, auth.user!.id, 'files');
+  if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
 
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: 'multipart/form-data expected' }, { status: 400 });

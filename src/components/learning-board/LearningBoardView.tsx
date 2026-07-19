@@ -5,6 +5,7 @@ import VideoLightbox from './VideoLightbox';
 import ImageLightbox from './ImageLightbox';
 import { supabase } from '@/lib/supabase';
 import { uploadToBunny } from '@/lib/bunny-upload';
+import { useCapabilities } from '@/lib/useCapabilities';
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
 import { FolderInput } from 'lucide-react';
@@ -829,7 +830,8 @@ function AddCardModal({
   onClose: () => void;
   onCreated: () => void;
 }) {
-  const [tab, setTab] = useState<LearningCardType | 'qr'>('link');
+  const [tab, setTab] = useState<LearningCardType | 'qr' | 'youtube'>('link');
+  const caps = useCapabilities();
   return (
   <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div
@@ -841,7 +843,7 @@ function AddCardModal({
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
         <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
-          {(['link', 'qr', 'text', 'file', 'image', 'video', 'chatbot'] as Array<LearningCardType | 'qr'>).map((t) => (
+          {(['link', 'qr', 'text', 'file', 'image', 'youtube', 'video', 'chatbot'] as Array<LearningCardType | 'qr' | 'youtube'>).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -849,11 +851,16 @@ function AddCardModal({
             >{t}</button>
           ))}
         </div>
-        {tab === 'video' && <VideoForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'youtube' && <YouTubeForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'video' && (caps.canUploadVideos
+          ? <VideoForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />
+          : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">Video upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or use the <button type="button" className="underline font-semibold" onClick={() => setTab('youtube')}>YouTube</button> tab instead.</div>)}
         {tab === 'link'  && <LinkForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
           {tab === 'qr'    && <QRForm    classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
-        {tab === 'file'  && <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+        {tab === 'file'  && (caps.canUploadFiles
+          ? <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />
+          : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">File upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or use a Link instead.</div>)}
         {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       {tab === 'chatbot' && <ChatbotForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       </div>
@@ -970,6 +977,42 @@ function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: str
         disabled={!file || (stage !== 'idle' && stage !== 'error')}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-md py-2 text-sm"
       >Upload video</button>
+    </div>
+  );
+}
+
+function YouTubeForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [url, setUrl] = useState('');
+  const [title, setTitle] = useState('');
+  const [description, setDescription] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url.trim()) { setErr('Please paste a YouTube link'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId, cardType: 'youtube', youtubeUrl: url.trim(), title: title || null, description: description || null, insertIndex }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..."
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <p className="text-xs text-gray-500">Paste any YouTube link (unlisted is fine). It will play right on the board.</p>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2}
+        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button onClick={submit} disabled={busy || !url.trim()}
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm">{busy ? 'Adding…' : 'Add YouTube video'}</button>
     </div>
   );
 }

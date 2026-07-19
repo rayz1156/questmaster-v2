@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
+import { parseYouTubeId, youtubeThumbnail } from '@/lib/video-embed';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -16,8 +17,8 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const body = await req.json().catch(() => ({}));
   const { columnId, cardType } = body;
   if (!columnId || !cardType) return NextResponse.json({ error: 'columnId and cardType required' }, { status: 400 });
-  if (!['link', 'image', 'text', 'file', 'chatbot'].includes(cardType)) {
-    return NextResponse.json({ error: 'Use upload/complete for video cards' }, { status: 400 });
+  if (!['link', 'image', 'text', 'file', 'chatbot', 'youtube'].includes(cardType)) {
+    return NextResponse.json({ error: 'Use upload/complete for uploaded video cards' }, { status: 400 });
   }
   const { data: col } = await admin.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
   if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     column_id: columnId,
     board_id: col.board_id,
     position: nextPos,
-    card_type: cardType,
+    card_type: cardType === 'youtube' ? 'video' : cardType,
     created_by: owner.user!.id,
     title: typeof body.title === 'string' ? body.title : null,
     description: typeof body.description === 'string' ? body.description : null,
@@ -80,6 +81,13 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     if (!body.chatbotUrl.startsWith('/embeds/')) { try { const u = new URL(body.chatbotUrl); if (u.protocol !== 'https:') return NextResponse.json({ error: 'chatbotUrl must be https' }, { status: 400 }); } catch { return NextResponse.json({ error: 'chatbotUrl invalid' }, { status: 400 }); } }
     insert.chatbot_url = body.chatbotUrl;
     insert.chatbot_provider = typeof body.chatbotProvider === 'string' ? body.chatbotProvider : null;
+  }
+  if (cardType === 'youtube') {
+    const ytId = parseYouTubeId(String(body.youtubeUrl || ''));
+    if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
+    insert.video_provider = 'youtube';
+    insert.video_provider_id = ytId;
+    insert.video_thumbnail_url = youtubeThumbnail(ytId);
   }
   // 'text' card just uses title + description.
 

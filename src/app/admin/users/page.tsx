@@ -63,6 +63,12 @@ export default function Page() {
     await adminUpdateProfile(u.id, { approved: !u.approved });
     await logAudit(u.approved ? 'unapprove' : 'approve', 'profile', u.id); reload();
   };
+  const toggleCapability = async (u: Profile, key: 'can_upload_files' | 'can_upload_videos') => {
+    const next = !((u as any)[key]);
+    await adminUpdateProfile(u.id, { [key]: next } as any);
+    await logAudit(next ? 'enable_capability' : 'disable_capability', 'profile', u.id, { capability: key });
+    reload();
+  };
   const removeUser = async (u: Profile) => {
     if (!(await confirm({ title: `Permanently delete user "${u.display_name || u.id.slice(0,8)}"? This cannot be undone.`, tone: 'danger' }))) return;
     try {
@@ -177,6 +183,24 @@ export default function Page() {
                   onChange={e=>setLimitDraft(d=>({ ...d, [u.id]: { coed: e.target.value, owned: d[u.id]?.owned ?? String(u.max_classes_owned ?? '') } }))}/>
               </label>
               <button onClick={()=>saveLimits(u)} className="px-2 py-1 rounded bg-blue-100 text-blue-700">Save limits</button>
+            </div>
+          )}
+          {(u.role === 'educator' || u.role === 'admin' || u.role === 'superadmin') && (
+            <div className="mt-2 flex items-center gap-4 flex-wrap text-xs bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
+              <span className="font-semibold text-violet-800">Upload permissions</span>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" className="accent-violet-600 w-4 h-4"
+                  checked={!!(u as any).can_upload_files}
+                  onChange={()=>toggleCapability(u, 'can_upload_files')} />
+                Files (FileLu)
+              </label>
+              <label className="flex items-center gap-1.5 cursor-pointer">
+                <input type="checkbox" className="accent-violet-600 w-4 h-4"
+                  checked={!!(u as any).can_upload_videos}
+                  onChange={()=>toggleCapability(u, 'can_upload_videos')} />
+                Videos (Bunny Stream)
+              </label>
+              {(u.role === 'admin' || u.role === 'superadmin') && <span className="text-violet-500">Admins always allowed</span>}
             </div>
           )}
           <button onClick={()=>toggleExpand(u)} className="text-xs px-2 py-1 rounded bg-gray-100 mt-2">

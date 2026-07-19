@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { assertCapability } from '@/lib/capabilities';
 import { requireClassMember } from '@/lib/supabase-route';
 import { createBunnyCollection, createBunnyVideo, getBunnyTusUpload } from '@/lib/bunny';
 export const runtime = 'nodejs';
@@ -21,6 +22,9 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
       { status: 403 },
     );
   }
+
+  const cap = await assertCapability(owner.supa, owner.user!.id, 'videos');
+  if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
   const body = await req.json().catch(() => ({}));
   const { filename, mimeType, sizeBytes } = body;
   if (!filename || !mimeType || !sizeBytes) {

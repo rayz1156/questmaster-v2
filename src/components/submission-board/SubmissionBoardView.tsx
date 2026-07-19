@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react';
 import { Download, Edit2, Trash2, Plus, Lock, Unlock, Eye, EyeOff, Users, X, FileText, Image as ImageIcon, Video, Link as LinkIcon, Paperclip } from 'lucide-react';
 import { buildVideoEmbedUrl, parseYouTubeId, type VideoProvider } from '@/lib/video-embed';
+import { useCapabilities } from '@/lib/useCapabilities';
 import { uploadToBunny } from '@/lib/bunny-upload';
 import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem, SubmissionItemType, SubmissionVisibility } from '@/lib/submission-boards';
 
@@ -31,7 +32,7 @@ interface Props {
   myId: string;
 }
 
-type TabType = SubmissionItemType;
+type TabType = SubmissionItemType | 'youtube';
 
 function formatBytes(n?: number | null) {
   if (!n) return '';
@@ -662,6 +663,7 @@ function ItemTypeBadge({ type }: { type: SubmissionItemType }) {
 // ============================================================
 function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { apiBase: string; isEducator: boolean; columnId: string | null; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
   const [tab, setTab] = useState<TabType>('text');
+  const caps = useCapabilities();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [title, setTitle] = useState('');
@@ -676,7 +678,7 @@ function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { ap
     setBusy(true);
     setErr(null);
     try {
-      const baseBody: any = { itemType: tab, title: title || null, description: description || null, columnId: columnId || null };
+      const baseBody: any = { itemType: tab === 'youtube' ? 'video' : tab, title: title || null, description: description || null, columnId: columnId || null };
 
       if (tab === 'text') {
         if (!title && !description) throw new Error('Title or description required');
@@ -717,39 +719,38 @@ function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { ap
           baseBody.fileExtension = uj.fileExtension;
           baseBody.fileluFileCode = uj.fileCode;
         }
+      } else if (tab === 'youtube') {
+        const raw = ytUrl.trim();
+        if (!raw) throw new Error('Please paste a YouTube link');
+        if (!parseYouTubeId(raw)) throw new Error("That doesn't look like a valid YouTube link");
+        baseBody.videoProvider = 'youtube';
+        baseBody.youtubeUrl = raw;
       } else if (tab === 'video') {
-        if (!isEducator) {
-          const raw = ytUrl.trim();
-          if (!raw) throw new Error('Please paste a YouTube link');
-          if (!parseYouTubeId(raw)) throw new Error("That doesn't look like a valid YouTube link");
-          baseBody.videoProvider = 'youtube';
-          baseBody.youtubeUrl = raw;
-        } else {
-          if (!file) throw new Error('Please choose a video');
-          if (!file.type.startsWith('video/')) throw new Error('Only video files allowed');
-          // 1) start Bunny upload (mints video + presigned TUS auth)
-          const startRes = await authedFetch(`${apiBase}/video/start`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
-          });
-          if (!startRes.ok) throw new Error((await startRes.json()).error || 'Video upload start failed');
-          const startJ = await startRes.json();
-          // 2) resumable direct upload to Bunny
-          await uploadToBunny(file, startJ.tus, { onProgress: setVideoPct });
-          // 3) complete
-          const compRes = await authedFetch(`${apiBase}/video/complete`, {
-            method: 'POST',
-            headers: { 'content-type': 'application/json' },
-            body: JSON.stringify({ videoGuid: startJ.videoGuid }),
-          });
-          if (!compRes.ok) throw new Error((await compRes.json()).error || 'Video complete failed');
-          const compJ = await compRes.json();
-          baseBody.videoProvider = compJ.videoProvider;
-          baseBody.videoProviderId = compJ.videoProviderId;
-          baseBody.videoThumbnailUrl = compJ.videoThumbnailUrl;
-          baseBody.videoDurationSeconds = compJ.videoDurationSeconds;
-        }
+        if (!caps.canUploadVideos) throw new Error('Video upload is not enabled for your account by the admin. Use the YouTube tab instead.');
+        if (!file) throw new Error('Please choose a video');
+        if (!file.type.startsWith('video/')) throw new Error('Only video files allowed');
+        // 1) start Bunny upload (mints video + presigned TUS auth)
+        const startRes = await authedFetch(`${apiBase}/video/start`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
+        });
+        if (!startRes.ok) throw new Error((await startRes.json()).error || 'Video upload start failed');
+        const startJ = await startRes.json();
+        // 2) resumable direct upload to Bunny
+        await uploadToBunny(file, startJ.tus, { onProgress: setVideoPct });
+        // 3) complete
+        const compRes = await authedFetch(`${apiBase}/video/complete`, {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ videoGuid: startJ.videoGuid }),
+        });
+        if (!compRes.ok) throw new Error((await compRes.json()).error || 'Video complete failed');
+        const compJ = await compRes.json();
+        baseBody.videoProvider = compJ.videoProvider;
+        baseBody.videoProviderId = compJ.videoProviderId;
+        baseBody.videoThumbnailUrl = compJ.videoThumbnailUrl;
+        baseBody.videoDurationSeconds = compJ.videoDurationSeconds;
       }
 
       const r = await authedFetch(`${apiBase}/items`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(baseBody) });
@@ -772,24 +773,36 @@ function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { ap
         </div>
         <div className="p-4 space-y-3">
           <div className="flex gap-1 flex-wrap">
-            {(['text', 'image', 'video', 'link', 'file', 'chatbot'] as TabType[]).map((t) => (
+            {(['text', 'image', 'youtube', 'video', 'link', 'file', 'chatbot'] as TabType[]).map((t) => (
               <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 rounded text-xs ${tab === t ? 'bg-purple-600 text-white' : 'bg-gray-100'}`}>{t}</button>
             ))}
           </div>
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="input w-full" />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="input w-full" rows={3} />
           {(tab === 'link' || tab === 'chatbot') && <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." className="input w-full" />}
-          {(tab === 'image' || tab === 'file' || (tab === 'video' && isEducator)) && (
-            <input type="file" accept={tab === 'image' ? 'image/*' : tab === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files?.[0] || null)} className="input w-full" />
-          )}
-          {tab === 'video' && isEducator && busy && videoPct > 0 && (
-            <div className="w-full bg-gray-200 rounded h-1.5 overflow-hidden"><div className="bg-purple-500 h-full transition-all" style={{ width: `${videoPct}%` }} /></div>
-          )}
-          {tab === 'video' && !isEducator && (
+          {tab === 'youtube' && (
             <div className="space-y-1">
               <input value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="input w-full" />
-              <p className="text-xs text-gray-500">Direct video upload requires educator permission. Upload your video to YouTube (unlisted is fine) and paste the link here — it will play right on the board.</p>
+              <p className="text-xs text-gray-500">Paste any YouTube link (unlisted is fine). It will play right on the board.</p>
             </div>
+          )}
+          {tab === 'image' && (
+            <input type="file" accept="image/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="input w-full" />
+          )}
+          {tab === 'file' && (
+            caps.canUploadFiles
+              ? <input type="file" accept="*/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="input w-full" />
+              : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">File upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or share a Link instead.</div>
+          )}
+          {tab === 'video' && (
+            caps.canUploadVideos
+              ? <>
+                  <input type="file" accept="video/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="input w-full" />
+                  {busy && videoPct > 0 && (
+                    <div className="w-full bg-gray-200 rounded h-1.5 overflow-hidden mt-2"><div className="bg-purple-500 h-full transition-all" style={{ width: `${videoPct}%` }} /></div>
+                  )}
+                </>
+              : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">Video upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or use the <button type="button" className="underline font-semibold" onClick={() => setTab('youtube')}>YouTube</button> tab instead.</div>
           )}
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
