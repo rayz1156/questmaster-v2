@@ -570,6 +570,42 @@ function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: (
 
 
 // Wakelet-style deterministic gradient palette derived from a string (hostname).
+/**
+ * Link-card thumbnail with graceful fallback.
+ * Some sources (Google Drive, Wakelet, etc.) block cross-origin hotlinking of
+ * their preview images, so an OG image URL can 404 or be refused. Rather than
+ * show a broken-image glyph, we fall back to the same tasteful gradient tile
+ * used for links that have no image at all.
+ */
+function LinkThumb({ src, alt, grad, letter }: { src: string | null | undefined; alt: string; grad: { from: string; to: string }; letter: string }) {
+  const [failed, setFailed] = useState(false);
+  const showImage = !!src && !failed;
+  if (showImage) {
+    return (
+      <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img
+          src={src as string}
+          alt={alt}
+          referrerPolicy="no-referrer"
+          loading="lazy"
+          onError={() => setFailed(true)}
+          className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200"
+        />
+      </div>
+    );
+  }
+  return (
+    <div className="aspect-video rounded-lg overflow-hidden flex items-center justify-center relative"
+         style={{ background: `linear-gradient(135deg, ${grad.from} 0%, ${grad.to} 100%)` }}>
+      <div className="w-14 h-14 rounded-xl bg-white/95 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+        <span className="text-2xl font-bold tracking-tight" style={{ color: grad.from }}>{letter}</span>
+      </div>
+      <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 text-slate-700 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm" title="Open link">Open ↗</div>
+    </div>
+  );
+}
+
 function cardGradient(seed: string): { from: string; to: string } {
   const palettes: Array<{ from: string; to: string }> = [
     { from: "#a78bfa", to: "#ec4899" },
@@ -673,20 +709,7 @@ function CardRenderer({
       const letter = (host || '?').replace(/^www\./, '').charAt(0).toUpperCase();
       return (
         <a href={card.link_url} target="_blank" rel="noopener noreferrer" className="block group relative">
-          {card.link_image_url ? (
-            <div className="aspect-video bg-slate-100 rounded-lg overflow-hidden">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img src={card.link_image_url} alt={card.link_title || ''} className="w-full h-full object-cover group-hover:scale-[1.02] transition-transform duration-200" />
-            </div>
-          ) : (
-            <div className="aspect-video rounded-lg overflow-hidden flex items-center justify-center relative"
-                 style={{ background: `linear-gradient(135deg, ${grad.from} 0%, ${grad.to} 100%)` }}>
-              <div className="w-14 h-14 rounded-xl bg-white/95 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
-                <span className="text-2xl font-bold tracking-tight" style={{ color: grad.from }}>{letter}</span>
-              </div>
-              <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 text-slate-700 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm" title="Open link">Open ↗</div>
-            </div>
-          )}
+          <LinkThumb src={card.link_image_url} alt={card.link_title || ''} grad={grad} letter={letter} />
         </a>
       );
     }
@@ -699,7 +722,7 @@ function CardRenderer({
         aria-label="View image full screen"
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
-        <img src={card.image_url} alt={card.title || ''} className="w-full object-cover transition-opacity group-hover:opacity-90" />
+        <img src={card.image_url} alt={card.title || ''} referrerPolicy="no-referrer" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} className="w-full object-cover transition-opacity group-hover:opacity-90" />
       </button>
     );
   }
@@ -746,7 +769,7 @@ function CardRenderer({
       <div className="flex items-center gap-1.5 mb-2 text-xs text-slate-500">
         {card.link_favicon_url ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={card.link_favicon_url} alt="" className="w-4 h-4 rounded" />
+          <img src={card.link_favicon_url} alt="" referrerPolicy="no-referrer" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} className="w-4 h-4 rounded" />
         ) : (
           <span aria-hidden>🔗</span>
         )}
@@ -835,19 +858,19 @@ function AddCardModal({
   return (
   <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div
-        className="bg-white border border-gray-200 rounded-xl w-full max-w-lg p-5 shadow-2xl"
+        className="bg-white border border-gray-200 rounded-xl w-full max-w-xl p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-semibold">Add card</h3>
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
-        <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
+        <div className="flex flex-wrap gap-1 mb-5 bg-white p-1 rounded-lg">
           {(['link', 'qr', 'text', 'file', 'image', 'youtube', 'video', 'chatbot'] as Array<LearningCardType | 'qr' | 'youtube'>).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
-              className={`flex-1 px-3 py-1.5 rounded-md text-sm capitalize ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+              className={`px-3 py-1.5 rounded-md text-sm capitalize ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
             >{t}</button>
           ))}
         </div>
@@ -1005,7 +1028,7 @@ function YouTubeForm({ classId, columnId, insertIndex, onCreated }: { classId: s
     <div className="space-y-3">
       <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..."
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
-      <p className="text-xs text-gray-500">Paste any YouTube link (unlisted is fine). It will play right on the board.</p>
+      <p className="text-xs text-gray-500">Paste a YouTube link or its embed code (unlisted is fine). It will play right on the board.</p>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2}

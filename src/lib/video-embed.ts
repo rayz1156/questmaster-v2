@@ -26,6 +26,21 @@ export function parseYouTubeId(input: string): string | null {
       if (m) return m[1];
     }
   } catch { /* not a URL */ }
+  // Accept a pasted <iframe ... src="...ID..."> embed snippet: pull the src and re-parse.
+  const srcMatch = raw.match(/src\s*=\s*["']([^"']+)["']/i);
+  if (srcMatch) {
+    const inner = srcMatch[1];
+    try {
+      const u = new URL(inner, 'https://youtube.com');
+      const m = u.pathname.match(/\/(?:embed|shorts|live|v)\/([A-Za-z0-9_-]{11})/);
+      if (m) return m[1];
+      const v = u.searchParams.get('v');
+      if (v && /^[A-Za-z0-9_-]{11}$/.test(v)) return v;
+    } catch { /* ignore */ }
+  }
+  // Last resort: a bare 11-char id embedded anywhere in a youtube-ish string.
+  const loose = raw.match(/(?:youtu\.be\/|youtube(?:-nocookie)?\.com\/(?:embed\/|shorts\/|live\/|watch\?v=))([A-Za-z0-9_-]{11})/);
+  if (loose) return loose[1];
   return null;
 }
 
@@ -35,7 +50,7 @@ export function youtubeThumbnail(id: string): string {
 
 /** Build the iframe src for a stored (provider, id) pair. */
 export function buildVideoEmbedUrl(provider: VideoProvider, id: string): string {
-  if (provider === 'youtube') return `https://www.youtube.com/embed/${id}`;
+  if (provider === 'youtube') return `https://www.youtube-nocookie.com/embed/${id}`;
   if (provider === 'bunny') {
     const lib = process.env.NEXT_PUBLIC_BUNNY_STREAM_LIBRARY_ID || '';
     return `https://iframe.mediadelivery.net/embed/${lib}/${id}`;

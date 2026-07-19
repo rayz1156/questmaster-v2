@@ -584,7 +584,7 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol
 
       {item.item_type === 'image' && item.image_url && (
         <a href={item.image_url} target="_blank" rel="noopener noreferrer" className="block">
-          <img src={item.image_url} alt={item.title || 'Submission image'} className="w-full h-40 object-cover rounded" />
+          <img src={item.image_url} alt={item.title || 'Submission image'} referrerPolicy="no-referrer" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} className="w-full h-40 object-cover rounded" />
         </a>
       )}
       {item.item_type === 'video' && (() => {
@@ -601,7 +601,7 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol
       })()}
       {item.item_type === 'link' && item.link_url && (
         <a href={item.link_url} target="_blank" rel="noopener noreferrer" className="flex gap-2 p-2 rounded bg-gray-50 hover:bg-gray-100 text-xs">
-          {item.link_image_url && <img src={item.link_image_url} alt="" className="w-16 h-16 object-cover rounded" />}
+          {item.link_image_url && <img src={item.link_image_url} alt="" referrerPolicy="no-referrer" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} className="w-16 h-16 object-cover rounded" />}
           <div className="min-w-0">
             <p className="font-semibold truncate">{item.link_title || item.link_url}</p>
             {item.link_description && <p className="text-gray-600 line-clamp-2">{item.link_description}</p>}
@@ -783,7 +783,7 @@ function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { ap
           {tab === 'youtube' && (
             <div className="space-y-1">
               <input value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="input w-full" />
-              <p className="text-xs text-gray-500">Paste any YouTube link (unlisted is fine). It will play right on the board.</p>
+              <p className="text-xs text-gray-500">Paste a YouTube link or its embed code (unlisted is fine). It will play right on the board.</p>
             </div>
           )}
           {tab === 'image' && (
