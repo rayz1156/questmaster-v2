@@ -1,9 +1,9 @@
 'use client';
 import Image from 'next/image';
-import { useState, Suspense } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabase';
+import { supabase, setRememberMe } from '@/lib/supabase';
 
 
 function LoginInner() {
@@ -17,11 +17,28 @@ function LoginInner() {
   const [needsVerify, setNeedsVerify] = useState(false);
   const [resending, setResending] = useState(false);
   const [resendMsg, setResendMsg] = useState('');
+  const [remember, setRemember] = useState(true);
+
+  // Prefill the last remembered email + restore the checkbox preference.
+  useEffect(() => {
+    try {
+      const savedEmail = window.localStorage.getItem('qm-remembered-email');
+      if (savedEmail) setEmail(savedEmail);
+      if (window.localStorage.getItem('qm-remember') === '0') setRemember(false);
+    } catch { /* ignore */ }
+  }, []);
 
   async function signIn(e: React.FormEvent | undefined, override?: { email: string; password: string }) {
     e?.preventDefault();
     setBusy(true); setErr('');
     const creds = override ?? { email, password };
+    // Route the session to localStorage (remember) or sessionStorage (forget on close),
+    // and keep the email handy for next time when remembering.
+    setRememberMe(remember);
+    try {
+      if (remember) window.localStorage.setItem('qm-remembered-email', creds.email);
+      else window.localStorage.removeItem('qm-remembered-email');
+    } catch { /* ignore */ }
     const { data, error } = await supabase.auth.signInWithPassword(creds);
     if (error || !data.user) { setBusy(false); const m = error?.message || 'Sign-in failed'; setErr(m); setNeedsVerify(/confirm|verif/i.test(m)); return; }
     // Read role + approved from qm_profiles (RLS allows self select)
@@ -74,6 +91,9 @@ function LoginInner() {
               <input type="checkbox" checked={show} onChange={e=>setShow(e.target.checked)} /> Show password
             </label>
           </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
+            <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} className="accent-purple-600 w-4 h-4" /> Remember me on this device
+          </label>
           {err && <p className="text-sm text-red-600">{err}</p>}
             {needsVerify && (
               <div className="text-sm">
