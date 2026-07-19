@@ -2,7 +2,6 @@
 import React, { useEffect, useState, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import { IntroVideoLightbox } from "@/components/boards/IntroBoardView";
 import {
   getMyProfile,
   updateMyBio,
@@ -14,7 +13,7 @@ import {
   softDeleteMyAccount,
 } from "@/lib/data";
 import type { Profile } from "@/lib/types";
-import { Save, Eye, AlertTriangle, Trash2, Image as ImageIcon, Video, User as UserIcon, Play, Lock, Mail } from "lucide-react";
+import { Save, Eye, AlertTriangle, Trash2, Image as ImageIcon, User as UserIcon, Lock, Mail } from "lucide-react";
 
 async function authHeaders(extra: Record<string, string> = {}): Promise<Record<string, string>> {
   const { data } = await supabase.auth.getSession();
@@ -46,9 +45,8 @@ function PrimaryButton({ children, onClick, disabled, type = "button", variant =
   );
 }
 
-function IntroCardPreview({ name, bio, imageUrl, videoThumb, hasVideo, onPlay }: { name: string; bio: string; imageUrl: string | null; videoThumb: string | null; hasVideo: boolean; onPlay: () => void; }) {
-  // Picture: prefer the uploaded photo. If only video uploaded, use the video thumbnail. Else default avatar.
-  const pic = imageUrl || videoThumb;
+function IntroCardPreview({ name, bio, imageUrl }: { name: string; bio: string; imageUrl: string | null; }) {
+  const pic = imageUrl;
   return (
     <div className="rounded-2xl border border-gray-200 overflow-hidden bg-white">
       <div className="h-44 bg-gradient-to-br from-indigo-500 to-blue-500 flex items-center justify-center relative">
@@ -60,18 +58,11 @@ function IntroCardPreview({ name, bio, imageUrl, videoThumb, hasVideo, onPlay }:
             <UserIcon className="w-16 h-16 text-white" />
           </div>
         )}
-        {hasVideo && (
-          <button type="button" onClick={onPlay} aria-label="Play intro video" className="absolute inset-0 flex items-center justify-center group">
-            <span className="bg-black/60 group-hover:bg-black/75 rounded-full p-4 transition shadow-lg">
-              <Play className="w-7 h-7 text-white fill-white" />
-            </span>
-          </button>
-        )}
       </div>
       <div className="px-5 pt-4 pb-5 text-center">
         <div className="font-semibold text-gray-900">{name}</div>
         {bio && <div className="text-sm text-gray-600 mt-3 whitespace-pre-wrap">{bio}</div>}
-        {!imageUrl && !videoThumb && (
+        {!imageUrl && (
           <div className="flex items-center justify-center gap-1.5 text-xs text-gray-400 mt-4 pt-3 border-t border-gray-100">
             <UserIcon className="w-3.5 h-3.5" /> Using default avatar
           </div>
@@ -92,13 +83,9 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
   const [introSaving, setIntroSaving] = useState(false);
   const [mediaType, setMediaType] = useState<"image" | "video" | null>(null);
   const [imageUrl, setImageUrl] = useState<string | null>(null);
-  const [videoThumb, setVideoThumb] = useState<string | null>(null);
-  const [videoFileId, setVideoFileId] = useState<string | null>(null);
-  const [videoOpen, setVideoOpen] = useState(false);
   const [mediaBusy, setMediaBusy] = useState(false);
   const [mediaProgress, setMediaProgress] = useState(0);
   const imgInputRef = useRef<HTMLInputElement>(null);
-  const vidInputRef = useRef<HTMLInputElement>(null);
   // Account local state
   const [username, setUsername] = useState("");
   const [usernameSaving, setUsernameSaving] = useState(false);
@@ -124,11 +111,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     const mt = (pr as any).intro_media_type as "image" | "video" | null;
     setMediaType(mt || null);
     const imgCode = (pr as any).intro_image_file_code as string | null;
-    const vidThumb = (pr as any).intro_video_thumbnail_url as string | null;
-    const vidFileId = (pr as any).intro_video_adilo_file_id as string | null;
     setImageUrl(imgCode ? `/api/profile/image/${imgCode}` : null);
-    setVideoThumb(vidThumb || null);
-    setVideoFileId(vidFileId || null);
     setUsername((pr as any).username || "");
   }
 
@@ -183,41 +166,6 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     } finally {
       setMediaBusy(false); setMediaProgress(0);
       if (imgInputRef.current) imgInputRef.current.value = "";
-    }
-  }
-
-  async function onPickVideo(e: React.ChangeEvent<HTMLInputElement>) {
-    const f = e.target.files?.[0];
-    if (!f) return;
-    if (f.size > 200 * 1024 * 1024) { flash("err", "Video must be ≤ 200 MB"); return; }
-    const filename = f.name;
-    const mimeType = f.type || "video/mp4";
-    const sizeBytes = f.size;
-    setMediaBusy(true); setMediaProgress(0);
-    try {
-      const startRes = await fetch("/api/profile/intro/video/start", {
-        method: "POST",
-        headers: await authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ filename, mimeType, sizeBytes }),
-      });
-      if (!startRes.ok) throw new Error(await startRes.text());
-      const { signedUrl, uploadId, key, projectId } = await startRes.json();
-      const putRes = await fetch(signedUrl, { method: "PUT", headers: { "Content-Type": mimeType }, body: f });
-      if (!putRes.ok) throw new Error("Adilo upload failed");
-      const eTag = (putRes.headers.get("ETag") || "").replace(/"/g, "");
-      const completeRes = await fetch("/api/profile/intro/video/complete", {
-        method: "POST",
-        headers: await authHeaders({ "Content-Type": "application/json" }),
-        body: JSON.stringify({ uploadId, key, eTag, projectId, filename, mimeType, sizeBytes }),
-      });
-      if (!completeRes.ok) throw new Error(await completeRes.text());
-      await reloadProfile();
-      flash("ok", "Video uploaded");
-    } catch (e: any) {
-      flash("err", e?.message || "Video upload failed");
-    } finally {
-      setMediaBusy(false); setMediaProgress(0);
-      if (vidInputRef.current) vidInputRef.current.value = "";
     }
   }
 
@@ -288,7 +236,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
         <div className="text-xs text-gray-400 -mt-3 mb-5">(this is what others see)</div>
         <div className="grid md:grid-cols-2 gap-8">
           <div className="flex items-start justify-center md:justify-start">
-            <IntroCardPreview name={introName || (p as any)?.display_name || "Your name"} bio={bio} imageUrl={imageUrl} videoThumb={videoThumb} hasVideo={!!videoFileId} onPlay={() => setVideoOpen(true)} />
+            <IntroCardPreview name={introName || (p as any)?.display_name || "Your name"} bio={bio} imageUrl={imageUrl} />
           </div>
           <div className="space-y-5">
             <div>
@@ -305,24 +253,17 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
               <div className="text-xs text-gray-400 mt-1">{bio.length}/500</div>
             </div>
             <div>
-              <label className="text-sm font-medium text-gray-700">Photo or video</label>
-              <p className="text-xs text-gray-500 mb-2">Add a photo or short video to personalize your intro card.</p>
+              <label className="text-sm font-medium text-gray-700">Photo</label>
+              <p className="text-xs text-gray-500 mb-2">Add a photo to personalize your intro card.</p>
               <div className="flex gap-2">
                 <input ref={imgInputRef} type="file" accept="image/*" hidden onChange={onPickImage} />
-                <input ref={vidInputRef} type="file" accept="video/*" hidden onChange={onPickVideo} />
                 <button onClick={() => imgInputRef.current?.click()} disabled={mediaBusy}
                   className="px-3 py-2 rounded-lg border border-gray-300 text-sm flex items-center gap-2 hover:bg-gray-50 disabled:opacity-50">
                   <ImageIcon className="w-4 h-4" /> Upload photo
                 </button>
-                <button onClick={() => vidInputRef.current?.click()} disabled={mediaBusy}
-                  className="px-3 py-2 rounded-lg border border-gray-300 text-sm flex items-center gap-2 hover:bg-gray-50 disabled:opacity-50">
-                  <Video className="w-4 h-4" /> Upload video
-                </button>
               </div>
               <p className="text-xs text-gray-400 mt-2 leading-relaxed">
-                Photos up to 15 MB.<br />
-                Videos up to 200 MB.<br />
-                One photo OR one video at a time.
+                Photos up to 15 MB.
               </p>
               {mediaBusy && <div className="mt-2 text-xs text-indigo-600">Uploading…</div>}
             </div>
@@ -408,9 +349,6 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
           </div>
         )}
       </div>
-    {videoOpen && videoFileId && (
-      <IntroVideoLightbox boardId="" fileId={videoFileId} title={introName || (p as any)?.display_name || null} scope="profile" onClose={() => setVideoOpen(false)} />
-    )}
     </div>
   );
 }

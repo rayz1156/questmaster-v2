@@ -12,6 +12,7 @@ export interface SubmissionBoard {
   visibility: SubmissionVisibility;
   is_open: boolean;
   adilo_project_id: string | null;
+  bunny_collection_id?: string | null;
   view_mode: 'columns' | 'mood';
   created_by: string;
   created_at: string;
@@ -25,6 +26,8 @@ export interface SubmissionBoardItem {
   item_type: SubmissionItemType;
   title: string | null;
   description: string | null;
+  video_provider?: string | null;
+  video_provider_id?: string | null;
   adilo_file_id: string | null;
   adilo_project_id: string | null;
   video_thumbnail_url: string | null;

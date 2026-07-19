@@ -43,6 +43,8 @@ export interface IntroPost {
   updated_at: string;
   // Media-type extension (image OR video)
   media_type?: 'image' | 'video';
+  video_provider?: string | null;
+  video_provider_id?: string | null;
   video_adilo_file_id?: string | null;
   video_adilo_project_id?: string | null;
   video_thumbnail_url?: string | null;
@@ -183,21 +185,23 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
       hidden_at: null,
       created_at: (board as any).created_at ?? new Date().toISOString(),
       updated_at: r.intro_media_updated_at ?? (board as any).created_at ?? new Date().toISOString(),
-      media_type: r.intro_video_adilo_file_id ? 'video' : 'image',
-      video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
-      video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
-      video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
-      video_duration_seconds: r.intro_video_duration_seconds ?? null,
+      media_type: 'image',
+      video_provider: null,
+      video_provider_id: null,
+      video_adilo_file_id: null,
+      video_adilo_project_id: null,
+      video_thumbnail_url: null,
+      video_duration_seconds: null,
       author_bio: r.bio ?? null,
       author_display_name: r.display_name ?? null,
       author_avatar_url: r.avatar_url ?? null,
       author_intro_display_name: r.intro_display_name ?? null,
-      author_intro_media_type: r.intro_media_type ?? null,
+      author_intro_media_type: r.intro_image_file_code ? 'image' : null,
       author_intro_image_file_code: r.intro_image_file_code ?? null,
-      author_intro_video_adilo_file_id: r.intro_video_adilo_file_id ?? null,
-      author_intro_video_adilo_project_id: r.intro_video_adilo_project_id ?? null,
-      author_intro_video_thumbnail_url: r.intro_video_thumbnail_url ?? null,
-      author_intro_video_duration_seconds: r.intro_video_duration_seconds ?? null,
+      author_intro_video_adilo_file_id: null,
+      author_intro_video_adilo_project_id: null,
+      author_intro_video_thumbnail_url: null,
+      author_intro_video_duration_seconds: null,
       is_educator: educatorSet.has(uid),
     } as any;
   });

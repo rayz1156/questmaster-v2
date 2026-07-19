@@ -1,23 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
-import { createAdiloProject, getAdiloSignedUrl, startAdiloUpload } from '@/lib/adilo';
+import { requireClassMember } from '@/lib/supabase-route';
+import { createBunnyCollection, createBunnyVideo, getBunnyTusUpload } from '@/lib/bunny';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 /**
- * Initiates an Adilo upload. Returns the signed PUT URL the browser should
- * upload to directly (bypassing our VPS bandwidth).
- *
- * Body: { columnId, filename, mimeType, sizeBytes, durationSeconds? }
- * Response: { uploadId, signedUrl, partNumber: 1, projectId }
+ * Initiates a Bunny Stream upload for a submission-board video.
+ * Direct upload is EDUCATOR-ONLY (class owner); students submit a Link
+ * item with a YouTube URL instead.
+ * Body: { filename, mimeType, sizeBytes, durationSeconds? }
+ * Response: { provider: 'bunny', videoGuid, tus }
  */
 export async function POST(req: NextRequest, { params }: { params: { huntId: string; classId: string } }) {
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
-  const admin = getServiceSupabase();
+  if (owner.klass!.owner_id !== owner.user!.id) {
+    return NextResponse.json(
+      { error: 'Video upload requires educator permission. Please submit a YouTube link instead.' },
+      { status: 403 },
+    );
+  }
   const body = await req.json().catch(() => ({}));
-  const { filename, mimeType, sizeBytes, durationSeconds } = body;
+  const { filename, mimeType, sizeBytes } = body;
   if (!filename || !mimeType || !sizeBytes) {
     return NextResponse.json({ error: 'filename, mimeType, sizeBytes required' }, { status: 400 });
   }
@@ -25,40 +30,27 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     return NextResponse.json({ error: 'Only video files allowed' }, { status: 415 });
   }
 
-  // Ensure board exists and get/create Adilo project
   const { data: board } = await owner.supa
-    .from('qm_submission_boards').select('id, adilo_project_id').eq('activity_id', params.huntId).eq('class_id', params.classId).single();
+    .from('qm_submission_boards').select('id, bunny_collection_id').eq('activity_id', params.huntId).eq('class_id', params.classId).single();
   if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
 
-  let projectId = (board.adilo_project_id || '').trim() || null;
-  if (!projectId) {
+  let collectionId = (board.bunny_collection_id || '').trim() || null;
+  if (!collectionId) {
     try {
-      const proj = await createAdiloProject(`Kuizen · ${owner.klass!.name}`);
-      projectId = proj.id;
+      const col = await createBunnyCollection(`Kuizen · ${owner.klass!.name}`);
+      collectionId = col.id;
       await owner.supa
-        .from('qm_submission_boards').update({ adilo_project_id: projectId }).eq('id', board.id);
+        .from('qm_submission_boards').update({ bunny_collection_id: collectionId }).eq('id', board.id);
     } catch (e: any) {
-      return NextResponse.json({ error: `Adilo project create failed: ${e.message}` }, { status: 502 });
+      return NextResponse.json({ error: `Bunny collection create failed: ${e.message}` }, { status: 502 });
     }
   }
 
   try {
-    const start = await startAdiloUpload({
-      projectId: projectId!,
-      filename,
-      mimeType,
-      sizeBytes,
-      durationSeconds,
-    });
-    const signedUrl = await getAdiloSignedUrl(start.uploadId, start.key, 1);
-    return NextResponse.json({
-      uploadId: start.uploadId,
-      key: start.key,
-      signedUrl,
-      partNumber: 1,
-      projectId,
-    });
+    const { guid } = await createBunnyVideo({ title: String(filename), collectionId });
+    const tus = getBunnyTusUpload(guid);
+    return NextResponse.json({ provider: 'bunny', videoGuid: guid, tus });
   } catch (e: any) {
-    return NextResponse.json({ error: `Adilo upload start failed: ${e.message}` }, { status: 502 });
+    return NextResponse.json({ error: `Bunny upload start failed: ${e.message}` }, { status: 502 });
   }
 }

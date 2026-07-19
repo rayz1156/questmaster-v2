@@ -1,52 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
-import { completeAdiloUpload, getAdiloFile } from '@/lib/adilo';
+import { getBunnyVideo } from '@/lib/bunny';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 30;
 
 /**
- * Completes an Adilo upload + creates the video learning_card row.
- * Body: { columnId, uploadId, eTag, projectId, filename, mimeType, sizeBytes,
- *         durationSeconds?, title?, description? }
+ * Completes a Bunny upload + creates the video learning_card row.
+ * Educator/class-owner only.
+ * Body: { columnId, videoGuid, filename?, durationSeconds?, title?, description?, insertIndex? }
  */
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
+  if (owner.klass!.owner_id !== owner.user!.id) {
+    return NextResponse.json({ error: 'Video upload requires educator permission.' }, { status: 403 });
+  }
   const admin = getServiceSupabase();
   const body = await req.json().catch(() => ({}));
-  const { columnId, uploadId, key, eTag, projectId, filename, mimeType, sizeBytes, durationSeconds, title, description, insertIndex } = body;
-  if (!columnId || !uploadId || !key || !eTag || !projectId || !filename || !mimeType || !sizeBytes) {
-    return NextResponse.json({ error: 'Missing required fields' }, { status: 400 });
+  const { columnId, videoGuid, filename, durationSeconds, title, description, insertIndex } = body;
+  if (!columnId || !videoGuid) {
+    return NextResponse.json({ error: 'columnId and videoGuid required' }, { status: 400 });
   }
 
-  let fileId: string;
-  let thumbnailUrl: string | undefined;
-  let realDuration: number | undefined;
+  let thumbnailUrl: string | null = null;
+  let realDuration: number | null = null;
   try {
-    const completed = await completeAdiloUpload({
-      uploadId,
-      key,
-      parts: [{ ETag: eTag, PartNumber: 1 }],
-      projectId,
-      filename,
-      mimeType,
-      sizeBytes,
-      durationSeconds,
-    });
-    fileId = completed.fileId;
-    thumbnailUrl = completed.thumbnailUrl;
-    realDuration = completed.durationSeconds;
-    if (!thumbnailUrl) {
-      try {
-        const info = await getAdiloFile(fileId);
-        thumbnailUrl = info.thumbnailUrl;
-        realDuration = realDuration ?? info.durationSeconds;
-      } catch { /* ignore - thumbnail may take time to generate */ }
-    }
-  } catch (e: any) {
-    return NextResponse.json({ error: `Adilo complete failed: ${e.message}` }, { status: 502 });
-  }
+    const info = await getBunnyVideo(String(videoGuid));
+    thumbnailUrl = info.thumbnailUrl ?? null;
+    realDuration = typeof info.durationSeconds === 'number' && info.durationSeconds > 0 ? info.durationSeconds : null;
+  } catch { /* Bunny may still be processing; thumbnail arrives later */ }
 
   const { data: col } = await owner.supa
     .from('qm_learning_columns')
@@ -80,12 +63,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       board_id: col.board_id,
       position: nextPos,
       card_type: 'video',
-      title: typeof title === 'string' && title ? title : filename,
+      title: typeof title === 'string' && title ? title : (typeof filename === 'string' ? filename : 'Video'),
       description: typeof description === 'string' ? description : null,
-      adilo_file_id: fileId,
-      adilo_project_id: projectId,
-      video_thumbnail_url: thumbnailUrl ?? null,
-      video_duration_seconds: realDuration ?? durationSeconds ?? null,
+      video_provider: 'bunny',
+      video_provider_id: String(videoGuid),
+      adilo_file_id: null,
+      adilo_project_id: null,
+      video_thumbnail_url: thumbnailUrl,
+      video_duration_seconds: realDuration ?? (typeof durationSeconds === 'number' ? durationSeconds : null),
       created_by: owner.user!.id,
     })
     .select('*')

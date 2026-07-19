@@ -1,43 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
-import { completeAdiloUpload, fetchAdiloWatchThumbnail, getAdiloFile } from '@/lib/adilo';
+import { getBunnyVideo } from '@/lib/bunny';
 
 export const dynamic = 'force-dynamic';
 
+/**
+ * Finalizes a Bunny submission-board upload (educator/class-owner only).
+ * Body: { videoGuid, durationSeconds? }
+ * Response: { videoProvider: 'bunny', videoProviderId, videoThumbnailUrl, videoDurationSeconds }
+ * The client passes these straight into POST /items.
+ */
 export async function POST(req: NextRequest, { params }: { params: { huntId: string; classId: string } }) {
   const auth = await requireClassMember(req, params.classId);
   if (auth.response) return auth.response;
+  if (auth.klass!.owner_id !== auth.user!.id) {
+    return NextResponse.json({ error: 'Video upload requires educator permission.' }, { status: 403 });
+  }
 
   const body = await req.json().catch(() => ({}));
-  const { uploadId, key, projectId, parts, filename, mimeType, sizeBytes, durationSeconds } = body || {};
-  if (!uploadId || !key || !projectId || !Array.isArray(parts) || !parts.length || !filename || !mimeType || !sizeBytes) {
-    return NextResponse.json({ error: 'uploadId, key, projectId, parts[], filename, mimeType, sizeBytes required' }, { status: 400 });
+  const videoGuid = String(body?.videoGuid || '').trim();
+  if (!videoGuid) {
+    return NextResponse.json({ error: 'videoGuid required' }, { status: 400 });
   }
 
-  let completed;
-  try {
-    completed = await completeAdiloUpload({ uploadId, key, projectId, parts, filename, mimeType, sizeBytes, durationSeconds });
-  } catch (e: any) {
-    return NextResponse.json({ error: `Adilo upload complete failed: ${e.message}` }, { status: 502 });
-  }
-
-  const fileId: string = completed.fileId;
   let thumbnailUrl: string | null = null;
   let realDuration: number | null = null;
-
   try {
-    thumbnailUrl = (await fetchAdiloWatchThumbnail(fileId)) || null;
-  } catch { /* Adilo still processing */ }
-  try {
-    const info = await getAdiloFile(fileId);
-    if (typeof info?.durationSeconds === 'number') realDuration = info.durationSeconds;
-    if (info?.thumbnailUrl && !thumbnailUrl) thumbnailUrl = info.thumbnailUrl;
+    const info = await getBunnyVideo(videoGuid);
+    thumbnailUrl = info.thumbnailUrl ?? null;
+    if (typeof info.durationSeconds === 'number' && info.durationSeconds > 0) realDuration = info.durationSeconds;
   } catch { /* still processing */ }
 
   return NextResponse.json({
-    adiloFileId: fileId,
-    adiloProjectId: projectId,
+    videoProvider: 'bunny',
+    videoProviderId: videoGuid,
     videoThumbnailUrl: thumbnailUrl,
-    videoDurationSeconds: realDuration ?? (typeof durationSeconds === 'number' ? durationSeconds : null),
+    videoDurationSeconds: realDuration ?? (typeof body?.durationSeconds === 'number' ? body.durationSeconds : null),
   });
 }

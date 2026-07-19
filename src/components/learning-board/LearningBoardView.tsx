@@ -4,6 +4,7 @@ import { formatDuration, hostnameFromUrl, type LearningCard, type LearningCardTy
 import VideoLightbox from './VideoLightbox';
 import ImageLightbox from './ImageLightbox';
 import { supabase } from '@/lib/supabase';
+import { uploadToBunny } from '@/lib/bunny-upload';
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
 import { FolderInput } from 'lucide-react';
@@ -619,7 +620,7 @@ function CardRenderer({
       return (
         <button
           className="block w-full text-left"
-          onClick={() => card.adilo_file_id && onPlayVideo(card.adilo_file_id, card.title)}
+          onClick={() => { const vid = (card as any).video_provider_id || card.adilo_file_id; if (vid) onPlayVideo(vid, card.title); }}
         >
           <div className="relative aspect-video bg-white rounded-md overflow-hidden">
             {card.video_thumbnail_url ? (
@@ -867,8 +868,6 @@ function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: str
   const [progress, setProgress] = useState(0);
   const [stage, setStage] = useState<'idle' | 'init' | 'uploading' | 'finalizing' | 'done' | 'error'>('idle');
   const [errMsg, setErrMsg] = useState<string | null>(null);
-  const xhrRef = useRef<XMLHttpRequest | null>(null);
-
   const probeDuration = (f: File): Promise<number | undefined> =>
     new Promise((resolve) => {
       try {
@@ -908,25 +907,8 @@ function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: str
     }
 
     setStage('uploading');
-    let eTag = '';
     try {
-      eTag = await new Promise<string>((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhrRef.current = xhr;
-        xhr.open('PUT', initData.signedUrl);
-        xhr.setRequestHeader('Content-Type', file.type || 'video/mp4');
-        xhr.upload.onprogress = (e) => {
-          if (e.lengthComputable) setProgress(Math.round((e.loaded / e.total) * 100));
-        };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const tag = xhr.getResponseHeader('ETag') || xhr.getResponseHeader('etag') || '';
-            resolve(tag.replace(/"/g, ''));
-          } else reject(new Error(`Upload failed: HTTP ${xhr.status}`));
-        };
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.send(file);
-      });
+      await uploadToBunny(file, initData.tus, { onProgress: (pct) => setProgress(pct) });
     } catch (e: any) {
       setStage('error'); setErrMsg(e.message); return;
     }
@@ -938,13 +920,8 @@ function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: str
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           columnId,
-          uploadId: initData.uploadId,
-          key: initData.key,
-          eTag,
-          projectId: initData.projectId,
+          videoGuid: initData.videoGuid,
           filename: file.name,
-          mimeType: file.type || 'video/mp4',
-          sizeBytes: file.size,
           durationSeconds,
           title: title || file.name,
           description,

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
+import { parseYouTubeId, youtubeThumbnail } from '@/lib/video-embed';
 
 export const dynamic = 'force-dynamic';
 
@@ -63,11 +64,30 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     insert.file_extension = body.fileExtension ?? null;
     if (typeof body.fileluFileCode === 'string') insert.filelu_file_code = body.fileluFileCode;
   } else if (itemType === 'video') {
-    if (!body.adiloFileId) return NextResponse.json({ error: 'adiloFileId required' }, { status: 400 });
-    insert.adilo_file_id = body.adiloFileId;
-    insert.adilo_project_id = body.adiloProjectId ?? board.adilo_project_id ?? null;
-    insert.video_thumbnail_url = body.videoThumbnailUrl ?? null;
-    insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
+    const provider = typeof body.videoProvider === 'string' ? body.videoProvider : (body.adiloFileId ? 'adilo' : null);
+    if (provider === 'bunny') {
+      if (!body.videoProviderId) return NextResponse.json({ error: 'videoProviderId required' }, { status: 400 });
+      insert.video_provider = 'bunny';
+      insert.video_provider_id = String(body.videoProviderId);
+      insert.video_thumbnail_url = body.videoThumbnailUrl ?? null;
+      insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
+    } else if (provider === 'youtube') {
+      const ytId = parseYouTubeId(String(body.youtubeUrl || body.videoProviderId || ''));
+      if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
+      insert.video_provider = 'youtube';
+      insert.video_provider_id = ytId;
+      insert.video_thumbnail_url = youtubeThumbnail(ytId);
+      insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
+    } else if (provider === 'adilo') {
+      insert.video_provider = 'adilo';
+      insert.video_provider_id = String(body.adiloFileId);
+      insert.adilo_file_id = body.adiloFileId;
+      insert.adilo_project_id = body.adiloProjectId ?? board.adilo_project_id ?? null;
+      insert.video_thumbnail_url = body.videoThumbnailUrl ?? null;
+      insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
+    } else {
+      return NextResponse.json({ error: 'videoProvider required' }, { status: 400 });
+    }
   }
 
   const { data, error } = await supa.from('qm_submission_board_items').insert(insert).select('*').single();

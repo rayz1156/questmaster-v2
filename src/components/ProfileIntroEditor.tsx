@@ -1,22 +1,9 @@
 "use client";
 import { useEffect, useRef, useState } from 'react';
-import { Save, Image as ImageIcon, Video as VideoIcon, Trash2, Loader2 } from 'lucide-react';
+import { Save, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
 import { getMyProfile, updateMyIntroDisplayName, type Profile } from '@/lib/data';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15 MB
-const MAX_VIDEO_BYTES = 200 * 1024 * 1024; // 200 MB
-
-async function readVideoDurationSeconds(file: File): Promise<number | undefined> {
-  return new Promise((resolve) => {
-    try {
-      const v = document.createElement('video');
-      v.preload = 'metadata';
-      v.onloadedmetadata = () => { resolve(Math.round(v.duration || 0) || undefined); URL.revokeObjectURL(v.src); };
-      v.onerror = () => resolve(undefined);
-      v.src = URL.createObjectURL(file);
-    } catch { resolve(undefined); }
-  });
-}
 
 export default function ProfileIntroEditor() {
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -26,7 +13,6 @@ export default function ProfileIntroEditor() {
   const [progress, setProgress] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const imageRef = useRef<HTMLInputElement | null>(null);
-  const videoRef = useRef<HTMLInputElement | null>(null);
 
   async function reload() {
     const p = await getMyProfile();
@@ -38,10 +24,8 @@ export default function ProfileIntroEditor() {
   const cardName = (profile as any)?.intro_display_name || profile?.display_name || '';
   const mediaType = (profile as any)?.intro_media_type as ('image'|'video'|null);
   const imageCode = (profile as any)?.intro_image_file_code as (string|null);
-  const videoThumb = (profile as any)?.intro_video_thumbnail_url as (string|null);
   const previewUrl =
     mediaType === 'image' && imageCode ? `/api/profile/image/${imageCode}` :
-    mediaType === 'video' && videoThumb ? videoThumb :
     '/default-intro-avatar.svg';
   const usingDefault = !mediaType;
 
@@ -63,38 +47,6 @@ export default function ProfileIntroEditor() {
       setProgress('Done.');
       setTimeout(() => setProgress(null), 1500);
     } catch (e: any) { setErr(e?.message || 'Upload failed'); setProgress(null); }
-    finally { setBusy(false); }
-  }
-
-  async function uploadVideo(file: File) {
-    if (file.size > MAX_VIDEO_BYTES) { setErr(`Video too large. Max ${MAX_VIDEO_BYTES/1024/1024} MB`); return; }
-    setBusy(true); setErr(null); setProgress('Preparing upload...');
-    try {
-      const durationSeconds = await readVideoDurationSeconds(file);
-      const startRes = await fetch('/api/profile/intro/video/start', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size, durationSeconds }),
-      });
-      if (!startRes.ok) throw new Error((await startRes.json().catch(()=>({}))).error || `Start ${startRes.status}`);
-      const start = await startRes.json();
-      setProgress('Uploading video...');
-      const put = await fetch(start.signedUrl, { method: 'PUT', body: file, headers: { 'content-type': file.type } });
-      if (!put.ok) throw new Error(`Upload ${put.status}`);
-      const eTag = (put.headers.get('etag') || put.headers.get('ETag') || '').replace(/"/g, '');
-      if (!eTag) throw new Error('Missing ETag from upload');
-      setProgress('Finalizing...');
-      const cmp = await fetch('/api/profile/intro/video/complete', {
-        method: 'POST', headers: { 'content-type': 'application/json' }, credentials: 'include',
-        body: JSON.stringify({
-          uploadId: start.uploadId, key: start.key, eTag, projectId: start.projectId,
-          filename: file.name, mimeType: file.type, sizeBytes: file.size, durationSeconds,
-        }),
-      });
-      if (!cmp.ok) throw new Error((await cmp.json().catch(()=>({}))).error || `Complete ${cmp.status}`);
-      await reload();
-      setProgress('Done.');
-      setTimeout(() => setProgress(null), 1500);
-    } catch (e: any) { setErr(e?.message || 'Video upload failed'); setProgress(null); }
     finally { setBusy(false); }
   }
 
@@ -146,7 +98,7 @@ export default function ProfileIntroEditor() {
       </div>
 
       <div className="border-t mt-4 pt-3">
-        <div className="text-xs text-gray-500 mb-2">Photo or video</div>
+        <div className="text-xs text-gray-500 mb-2">Photo</div>
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
@@ -155,14 +107,6 @@ export default function ProfileIntroEditor() {
             className="px-3 py-2 rounded-xl bg-white border text-sm flex items-center gap-1 disabled:opacity-50"
           ><ImageIcon className="w-4 h-4" />Upload photo</button>
           <input ref={imageRef} type="file" accept="image/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadImage(f); e.currentTarget.value = ''; }} />
-
-          <button
-            type="button"
-            disabled={busy}
-            onClick={() => videoRef.current?.click()}
-            className="px-3 py-2 rounded-xl bg-white border text-sm flex items-center gap-1 disabled:opacity-50"
-          ><VideoIcon className="w-4 h-4" />Upload video</button>
-          <input ref={videoRef} type="file" accept="video/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadVideo(f); e.currentTarget.value = ''; }} />
 
           {!usingDefault && (
             <button
@@ -179,7 +123,7 @@ export default function ProfileIntroEditor() {
           </div>
         )}
         {err && <div className="text-xs text-red-600 mt-2">{err}</div>}
-        <div className="text-[11px] text-gray-400 mt-2">Photos are stored on FileLu (≤ 15 MB). Videos are streamed via Adilo (≤ 200 MB). One photo OR one video at a time.</div>
+        <div className="text-[11px] text-gray-400 mt-2">Photos are stored on FileLu (≤ 15 MB).</div>
       </div>
     </div>
   );

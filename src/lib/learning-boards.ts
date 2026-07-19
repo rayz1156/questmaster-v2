@@ -11,6 +11,7 @@ export interface LearningBoard {
   title: string;
   description: string | null;
   adilo_project_id: string | null;
+  bunny_collection_id?: string | null;
   is_published: boolean;
   created_at: string;
   updated_at: string;
@@ -34,6 +35,8 @@ export interface LearningCard {
   title: string | null;
   description: string | null;
   // video
+  video_provider?: string | null;
+  video_provider_id?: string | null;
   adilo_file_id: string | null;
   adilo_project_id: string | null;
   video_thumbnail_url: string | null;

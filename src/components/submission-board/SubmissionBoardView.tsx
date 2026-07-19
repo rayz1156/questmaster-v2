@@ -4,7 +4,8 @@
 
 import { useEffect, useState } from 'react';
 import { Download, Edit2, Trash2, Plus, Lock, Unlock, Eye, EyeOff, Users, X, FileText, Image as ImageIcon, Video, Link as LinkIcon, Paperclip } from 'lucide-react';
-import { buildAdiloEmbedUrl } from '@/lib/adilo';
+import { buildVideoEmbedUrl, parseYouTubeId, type VideoProvider } from '@/lib/video-embed';
+import { uploadToBunny } from '@/lib/bunny-upload';
 import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem, SubmissionItemType, SubmissionVisibility } from '@/lib/submission-boards';
 
 import { supabase } from '@/lib/supabase';
@@ -361,6 +362,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
       {showSubmit && (
         <SubmitModal
           apiBase={apiBase}
+          isEducator={isEducator}
           columnId={pendingColumnId}
           onClose={() => setShowSubmit(false)}
           onCreated={(item) => { setItems([item, ...items]); setShowSubmit(false); setPendingColumnId(null); }}
@@ -584,12 +586,18 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol
           <img src={item.image_url} alt={item.title || 'Submission image'} className="w-full h-40 object-cover rounded" />
         </a>
       )}
-      {item.item_type === 'video' && item.adilo_file_id && (
-        <div className="relative w-full bg-black rounded overflow-hidden group" style={{aspectRatio: '16/9'}}>
-          <iframe src={buildAdiloEmbedUrl(item.adilo_file_id)} className="absolute inset-0 w-full h-full" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
-          <a href={buildAdiloEmbedUrl(item.adilo_file_id)} target="_blank" rel="noopener noreferrer" title="Open video in new tab (better for portrait videos)" className="absolute top-1 right-1 z-10 bg-black/70 hover:bg-black/90 text-white text-[10px] font-semibold px-2 py-1 rounded shadow-md transition">⤢ Enlarge</a>
-        </div>
-      )}
+      {item.item_type === 'video' && (() => {
+        const vId = (item as any).video_provider_id || item.adilo_file_id;
+        if (!vId) return null;
+        const vProv = (((item as any).video_provider as VideoProvider) || 'adilo');
+        const vSrc = buildVideoEmbedUrl(vProv, vId);
+        return (
+          <div className="relative w-full bg-black rounded overflow-hidden group" style={{aspectRatio: '16/9'}}>
+            <iframe src={vSrc} className="absolute inset-0 w-full h-full" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
+            <a href={vSrc} target="_blank" rel="noopener noreferrer" title="Open video in new tab (better for portrait videos)" className="absolute top-1 right-1 z-10 bg-black/70 hover:bg-black/90 text-white text-[10px] font-semibold px-2 py-1 rounded shadow-md transition">⤢ Enlarge</a>
+          </div>
+        );
+      })()}
       {item.item_type === 'link' && item.link_url && (
         <a href={item.link_url} target="_blank" rel="noopener noreferrer" className="flex gap-2 p-2 rounded bg-gray-50 hover:bg-gray-100 text-xs">
           {item.link_image_url && <img src={item.link_image_url} alt="" className="w-16 h-16 object-cover rounded" />}
@@ -652,7 +660,7 @@ function ItemTypeBadge({ type }: { type: SubmissionItemType }) {
 // ============================================================
 // Submit modal
 // ============================================================
-function SubmitModal({ apiBase, columnId, onClose, onCreated }: { apiBase: string; columnId: string | null; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
+function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { apiBase: string; isEducator: boolean; columnId: string | null; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
   const [tab, setTab] = useState<TabType>('text');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -660,7 +668,9 @@ function SubmitModal({ apiBase, columnId, onClose, onCreated }: { apiBase: strin
   const [description, setDescription] = useState('');
   // type-specific state
   const [linkUrl, setLinkUrl] = useState('');
+  const [ytUrl, setYtUrl] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [videoPct, setVideoPct] = useState(0);
 
   async function submit() {
     setBusy(true);
@@ -708,40 +718,38 @@ function SubmitModal({ apiBase, columnId, onClose, onCreated }: { apiBase: strin
           baseBody.fileluFileCode = uj.fileCode;
         }
       } else if (tab === 'video') {
-        if (!file) throw new Error('Please choose a video');
-        if (!file.type.startsWith('video/')) throw new Error('Only video files allowed');
-        // 1) start Adilo upload
-        const startRes = await authedFetch(`${apiBase}/video/start`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
-        });
-        if (!startRes.ok) throw new Error((await startRes.json()).error || 'Video upload start failed');
-        const startJ = await startRes.json();
-        // 2) upload to signed URL
-        const putRes = await fetch(startJ.signedUrl, { method: 'PUT', body: file, headers: { 'content-type': file.type } });
-        if (!putRes.ok) throw new Error('Direct upload to Adilo failed');
-        const etag = putRes.headers.get('etag') || putRes.headers.get('ETag') || '';
-        // 3) complete
-        const compRes = await authedFetch(`${apiBase}/video/complete`, {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
-            uploadId: startJ.uploadId,
-            key: startJ.key,
-            projectId: startJ.projectId,
-            parts: [{ ETag: etag.replace(/"/g, ''), PartNumber: 1 }],
-            filename: file.name,
-            mimeType: file.type,
-            sizeBytes: file.size,
-          }),
-        });
-        if (!compRes.ok) throw new Error((await compRes.json()).error || 'Video complete failed');
-        const compJ = await compRes.json();
-        baseBody.adiloFileId = compJ.adiloFileId;
-        baseBody.adiloProjectId = compJ.adiloProjectId;
-        baseBody.videoThumbnailUrl = compJ.videoThumbnailUrl;
-        baseBody.videoDurationSeconds = compJ.videoDurationSeconds;
+        if (!isEducator) {
+          const raw = ytUrl.trim();
+          if (!raw) throw new Error('Please paste a YouTube link');
+          if (!parseYouTubeId(raw)) throw new Error("That doesn't look like a valid YouTube link");
+          baseBody.videoProvider = 'youtube';
+          baseBody.youtubeUrl = raw;
+        } else {
+          if (!file) throw new Error('Please choose a video');
+          if (!file.type.startsWith('video/')) throw new Error('Only video files allowed');
+          // 1) start Bunny upload (mints video + presigned TUS auth)
+          const startRes = await authedFetch(`${apiBase}/video/start`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ filename: file.name, mimeType: file.type, sizeBytes: file.size }),
+          });
+          if (!startRes.ok) throw new Error((await startRes.json()).error || 'Video upload start failed');
+          const startJ = await startRes.json();
+          // 2) resumable direct upload to Bunny
+          await uploadToBunny(file, startJ.tus, { onProgress: setVideoPct });
+          // 3) complete
+          const compRes = await authedFetch(`${apiBase}/video/complete`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ videoGuid: startJ.videoGuid }),
+          });
+          if (!compRes.ok) throw new Error((await compRes.json()).error || 'Video complete failed');
+          const compJ = await compRes.json();
+          baseBody.videoProvider = compJ.videoProvider;
+          baseBody.videoProviderId = compJ.videoProviderId;
+          baseBody.videoThumbnailUrl = compJ.videoThumbnailUrl;
+          baseBody.videoDurationSeconds = compJ.videoDurationSeconds;
+        }
       }
 
       const r = await authedFetch(`${apiBase}/items`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(baseBody) });
@@ -771,8 +779,17 @@ function SubmitModal({ apiBase, columnId, onClose, onCreated }: { apiBase: strin
           <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="input w-full" />
           <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="input w-full" rows={3} />
           {(tab === 'link' || tab === 'chatbot') && <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." className="input w-full" />}
-          {(tab === 'image' || tab === 'file' || tab === 'video') && (
+          {(tab === 'image' || tab === 'file' || (tab === 'video' && isEducator)) && (
             <input type="file" accept={tab === 'image' ? 'image/*' : tab === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files?.[0] || null)} className="input w-full" />
+          )}
+          {tab === 'video' && isEducator && busy && videoPct > 0 && (
+            <div className="w-full bg-gray-200 rounded h-1.5 overflow-hidden"><div className="bg-purple-500 h-full transition-all" style={{ width: `${videoPct}%` }} /></div>
+          )}
+          {tab === 'video' && !isEducator && (
+            <div className="space-y-1">
+              <input value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="input w-full" />
+              <p className="text-xs text-gray-500">Direct video upload requires educator permission. Upload your video to YouTube (unlisted is fine) and paste the link here — it will play right on the board.</p>
+            </div>
           )}
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>

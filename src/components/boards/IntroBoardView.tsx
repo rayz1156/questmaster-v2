@@ -7,6 +7,8 @@ import {
   deleteIntroPost,
 } from "@/lib/boards";
 import { supabase } from "@/lib/supabase";
+import { uploadToBunny } from "@/lib/bunny-upload";
+import { parseYouTubeId } from "@/lib/video-embed";
 // VideoLightbox not used here - intro videos use IntroVideoLightbox below
 import ImageLightbox from "@/components/learning-board/ImageLightbox";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
@@ -32,7 +34,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
   const [showModal, setShowModal] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [openImage, setOpenImage] = useState<{ src: string; title: string | null } | null>(null);
-  const [playingFile, setPlayingFile] = useState<{ fileId: string; title: string | null; scope?: 'board' | 'profile' } | null>(null);
+  const [playingFile, setPlayingFile] = useState<{ fileId: string; title: string | null } | null>(null);
 
   const reload = async () => {
     setLoading(true);
@@ -79,17 +81,13 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
           // Profile intro media (set via /profile) wins over the per-post media.
           const profMediaType = (p as any).author_intro_media_type as ("image"|"video"|null);
           const profImageCode = (p as any).author_intro_image_file_code as (string|null);
-          const profVideoFileId = (p as any).author_intro_video_adilo_file_id as (string|null);
-          const profVideoThumb = (p as any).author_intro_video_thumbnail_url as (string|null);
-        // Image and video can coexist. Prefer image as the displayed picture; video (if any) is playable via overlay.
-        const profHasVideo = !!profVideoFileId;
-        const useProfile = !!(profMediaType && (profImageCode || profVideoFileId));
-        const postHasVideo = (p as any).media_type === "video" && !!(p as any).video_adilo_file_id;
-        const isVideo = useProfile ? profHasVideo : postHasVideo;
+        // Profile intros are image-only now; videos always come from the post itself.
+        const useProfile = !!(profMediaType === "image" && profImageCode);
+        const postVideoId = ((p as any).video_provider_id || (p as any).video_adilo_file_id) as (string|null);
+        const isVideo = (p as any).media_type === "video" && !!postVideoId;
         let thumb: string | null = null;
         if (useProfile) {
-          if (profImageCode) thumb = `/api/profile/image/${profImageCode}`;
-          else if (profVideoThumb) thumb = profVideoThumb;
+          thumb = `/api/profile/image/${profImageCode}`;
         } else {
           thumb = p.image_url || ((p as any).video_thumbnail_url || null);
         }
@@ -100,9 +98,8 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
               <button
                 type="button"
                 onClick={() => {
-                  const playFileId = useProfile && profMediaType === "video" ? profVideoFileId : (p as any).video_adilo_file_id;
-                  if (isVideo && playFileId) {
-                    setPlayingFile({ fileId: playFileId, title: cardName, scope: useProfile ? "profile" : "board" });
+                  if (isVideo && postVideoId) {
+                    setPlayingFile({ fileId: postVideoId, title: cardName });
                   } else if (thumb) {
                     setOpenImage({ src: thumb, title: cardName });
                   }
@@ -154,6 +151,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
         <IntroUploadModal
           boardId={board.id}
           existing={mine}
+          canManage={canManage}
           onClose={() => setShowModal(false)}
           onSaved={async () => { setShowModal(false); await reload(); }}
         />
@@ -167,7 +165,6 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
           boardId={board.id}
           fileId={playingFile.fileId}
           title={playingFile.title}
-          scope={playingFile.scope || "board"}
           onClose={() => setPlayingFile(null)}
           />
       )}
@@ -177,14 +174,14 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
 
 // Lightbox for intro videos: same UI as Learning Board's VideoLightbox but using the
 // /api/intro-boards/[boardId]/embed/[fileId] endpoint.
-export function IntroVideoLightbox({ boardId, fileId, title, scope, onClose }: { boardId: string; fileId: string; title: string | null; scope?: "board" | "profile"; onClose: () => void }) {
+export function IntroVideoLightbox({ boardId, fileId, title, onClose }: { boardId: string; fileId: string; title: string | null; onClose: () => void }) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const r = await authedFetch(scope === "profile" ? `/api/profile/embed/${fileId}` : `/api/intro-boards/${boardId}/embed/${fileId}`);
+        const r = await authedFetch(`/api/intro-boards/${boardId}/embed/${fileId}`);
         const data = await r.json();
         if (!alive) return;
         if (!r.ok) setError(data.error || 'Failed to load video');
@@ -219,9 +216,10 @@ export function IntroVideoLightbox({ boardId, fileId, title, scope, onClose }: {
   );
 }
 
-function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
+function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
   boardId: string;
   existing: IntroPost | null;
+  canManage: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
@@ -232,6 +230,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialMedia === 'image' ? (existing?.image_url || null) : null);
   const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [ytUrl, setYtUrl] = useState('');
   const [videoProgress, setVideoProgress] = useState(0);
   const [videoStage, setVideoStage] = useState<'idle' | 'init' | 'uploading' | 'finalizing' | 'done' | 'error'>('idle');
   const [name, setName] = useState(existing?.display_name || "");
@@ -296,11 +295,30 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
   const submitVideo = async () => {
     setErr(null);
     if (!name.trim()) { setErr("Please enter your name."); return; }
+    if (!canManage) {
+      const raw = ytUrl.trim();
+      if (!raw) { setErr("Please paste a YouTube link."); return; }
+      if (!parseYouTubeId(raw)) { setErr("That doesn't look like a valid YouTube link."); return; }
+      setBusy(true); setVideoStage('finalizing');
+      try {
+        const compRes = await authedFetch(`/api/intro-boards/${boardId}/video/complete`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ provider: 'youtube', youtubeUrl: raw, displayName: name, description: desc }),
+        });
+        const compData = await compRes.json();
+        if (!compRes.ok) throw new Error(compData.error || 'Save failed');
+        setVideoStage('done');
+        onSaved();
+      } catch (e: any) { setVideoStage('error'); setErr(e.message || String(e)); }
+      finally { setBusy(false); }
+      return;
+    }
     if (!videoFile) { setErr("Please choose a video file."); return; }
     setBusy(true); setVideoStage('init'); setVideoProgress(0);
     try {
       const dur = await probeDuration(videoFile);
-      // 1) start
+      // 1) start (mints the Bunny video + presigned TUS auth)
       const startRes = await authedFetch(`/api/intro-boards/${boardId}/video/start`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -308,32 +326,17 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
       });
       const startData = await startRes.json();
       if (!startRes.ok) throw new Error(startData.error || 'Upload init failed');
-      // 2) upload via XHR for progress
+      // 2) resumable direct upload to Bunny
       setVideoStage('uploading');
-      const eTag: string = await new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('PUT', startData.signedUrl, true);
-        xhr.upload.onprogress = e => { if (e.lengthComputable) setVideoProgress(Math.round((e.loaded / e.total) * 100)); };
-        xhr.onload = () => {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            const tag = xhr.getResponseHeader('ETag') || xhr.getResponseHeader('etag') || '';
-            resolve(tag.replace(/"/g, ''));
-          } else reject(new Error(`Upload failed (${xhr.status})`));
-        };
-        xhr.onerror = () => reject(new Error('Network error during upload'));
-        xhr.setRequestHeader('Content-Type', videoFile.type || 'video/mp4');
-        xhr.send(videoFile);
-      });
+      await uploadToBunny(videoFile, startData.tus, { onProgress: (pct) => setVideoProgress(pct) });
       // 3) complete
       setVideoStage('finalizing');
       const compRes = await authedFetch(`/api/intro-boards/${boardId}/video/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          uploadId: startData.uploadId, key: startData.key, eTag,
-          projectId: startData.projectId,
-          filename: videoFile.name, mimeType: videoFile.type || 'video/mp4',
-          sizeBytes: videoFile.size, durationSeconds: dur,
+          provider: 'bunny', videoGuid: startData.videoGuid,
+          filename: videoFile.name, durationSeconds: dur,
           displayName: name, description: desc,
         }),
       });
@@ -389,7 +392,19 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
             </div>
           )}
 
-          {mediaType === 'video' && (
+          {mediaType === 'video' && !canManage && (
+            <div className="space-y-2">
+              <input
+                value={ytUrl}
+                onChange={e => setYtUrl(e.target.value)}
+                placeholder="https://www.youtube.com/watch?v=..."
+                className="w-full px-3 py-2 border rounded-lg"
+              />
+              <p className="text-xs text-gray-500">Direct video upload requires educator permission. Upload your intro to YouTube (unlisted is fine) and paste the link here — it will play right on the board.</p>
+            </div>
+          )}
+
+          {mediaType === 'video' && canManage && (
             <div className="space-y-2">
               <div
                 onClick={() => videoInput.current?.click()}
@@ -407,7 +422,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
                   <div className="py-6 text-gray-500">
                     <Upload className="w-8 h-8 mx-auto mb-1" />
                     <p className="text-sm">Click or drop a video here</p>
-                    <p className="text-xs">MP4/MOV/WebM · Hosted on Adilo</p>
+                    <p className="text-xs">MP4/MOV/WebM · Streamed via Bunny</p>
                   </div>
                 )}
                 <input ref={videoInput} type="file" accept="video/*" className="hidden"
