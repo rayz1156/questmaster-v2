@@ -19,6 +19,7 @@ function LeaderboardInner() {
   const [scores, setScores] = useState<TeamScore[]>([]);
   const [aggScores, setAggScores] = useState<AggScore[]>([]);
   const [indivScores, setIndivScores] = useState<ClassIndividualScore[]>([]);
+  const [viewMode, setViewMode] = useState<'team' | 'individual'>('team');
   const [adj, setAdj] = useState<ScoreAdjustment[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [delta, setDelta] = useState<Record<string, number>>({});
@@ -63,14 +64,13 @@ function LeaderboardInner() {
     loadScores();
     const t = setInterval(loadScores, 8000);
     return () => clearInterval(t);
-  }, [activeId, hunts, classId]);
+  }, [activeId, hunts, classId, viewMode]);
 
   async function loadScores() {
     try {
       setErr(null);
-      // Individual-mode class: rank students by their own total (view qm_class_individual_scores).
-      const cls = classes.find(c => c.id === classId);
-      if (cls?.scoring_mode === 'individual' && !activeId) {
+      // Individual view: rank students by their own total (view qm_class_individual_scores).
+      if (viewMode === 'individual' && !activeId) {
         try {
           const is = await listClassIndividualScores(classId);
           setIndivScores(is);
@@ -131,8 +131,7 @@ function LeaderboardInner() {
   }
 
 
-  const selectedClass = classes.find(c => c.id === classId);
-  const isIndividual = selectedClass?.scoring_mode === 'individual';
+  const isIndividual = viewMode === 'individual';
   const leaderboard = activeId ? scores.sort((a, b) => b.total_score - a.total_score) : aggScores;
 
   return (
@@ -200,6 +199,12 @@ function LeaderboardInner() {
             <div className="text-xs text-gray-500">{isIndividual && !activeId ? "Students ranked by their own approved work." : "Rankings update automatically as groups complete quests."}</div>
           </div>
         </div>
+        {!activeId && (
+          <div className="flex items-center gap-1 p-1 mb-4 bg-gray-100 rounded-xl w-fit">
+            <button onClick={() => setViewMode('team')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'team' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}>Teams</button>
+            <button onClick={() => setViewMode('individual')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'individual' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}>Individuals</button>
+          </div>
+        )}
         {isIndividual && !activeId ? (
           indivScores.length === 0 ? <p className="text-xs text-gray-500">No students ranked yet.</p> : (
           <div className="space-y-2">
