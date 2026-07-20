@@ -3,7 +3,6 @@ import { Poppins } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
-import TranslateWidget from "@/components/TranslateWidget";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 
@@ -51,7 +50,6 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       <body className={poppins.className}>
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
-        <TranslateWidget />
         <AnalyticsTracker />
         <RegisterSW />
       </body>
