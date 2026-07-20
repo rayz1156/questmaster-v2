@@ -24,14 +24,13 @@ export default function Page() {
     })();
   }, []);
 
-  const activeClass = classes.find((c:any) => c.id === activeClassId);
-  const isIndividual = activeClass?.scoring_mode === 'individual';
+  const [viewMode, setViewMode] = useState<'team' | 'individual'>('team');
+  const isIndividual = viewMode === 'individual';
 
   useEffect(() => {
     if (!activeClassId) { setRankings([]); setIndivRankings([]); return; }
     setLoading(true);
-    const cls = classes.find((c:any) => c.id === activeClassId);
-    if (cls?.scoring_mode === 'individual') {
+    if (viewMode === 'individual') {
       listClassIndividualScores(activeClassId).then(scores => {
         setIndivRankings(scores);
         setRankings([]);
@@ -43,7 +42,7 @@ export default function Page() {
         setIndivRankings([]);
       }).catch(() => setRankings([])).finally(() => setLoading(false));
     }
-  }, [activeClassId, classes]);
+  }, [activeClassId, viewMode]);
 
   const toggleTeam = async (teamId: string) => {
     if (expandedTeam === teamId) { setExpandedTeam(null); return; }
@@ -58,13 +57,23 @@ export default function Page() {
 
   return (
     <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">{isIndividual ? "Individual Leaderboard" : "Leaderboard"}</h2>
-      {isIndividual && <p className="text-xs text-gray-500 mb-3 -mt-2">Students ranked by their own approved work.</p>}
+      <h2 className="font-bold text-lg mb-3">Leaderboard</h2>
       {classes.length > 1 && (
         <select className="input mb-3" value={activeClassId} onChange={e => setActiveClassId(e.target.value)}>
           {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       )}
+      <div className="flex items-center gap-1 p-1 mb-3 bg-gray-100 rounded-xl w-fit">
+        <button
+          onClick={() => setViewMode('team')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'team' ? 'bg-white shadow text-violet-700' : 'text-gray-500 hover:text-gray-700'}`}
+        >Teams</button>
+        <button
+          onClick={() => setViewMode('individual')}
+          className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'individual' ? 'bg-white shadow text-violet-700' : 'text-gray-500 hover:text-gray-700'}`}
+        >Individuals</button>
+      </div>
+      {isIndividual && <p className="text-xs text-gray-500 mb-3 -mt-1">Students ranked by their own approved work.</p>}
       {loading ? <p className="text-gray-400 text-sm text-center py-8">Loading rankings...</p> :
        isIndividual ? (
         indivRankings.length === 0 ? <p className="text-sm text-gray-400">No students ranked yet.</p> : (

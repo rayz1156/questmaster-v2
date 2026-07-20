@@ -69,7 +69,6 @@ export default function ClassDetail() {
   const [marksReason, setMarksReason] = useState('');
   const [marksSign, setMarksSign] = useState(1);
   const [marksBusy, setMarksBusy] = useState(false);
-  const isIndividual = (klass as any)?.scoring_mode === 'individual';
 
   async function openMarks(m: any) {
     const name = m.qm_profiles?.display_name || ('User ' + String(m.user_id).slice(0,8));
@@ -160,24 +159,6 @@ export default function ClassDetail() {
               </div>
             )}
             {klass.description && <div className="text-xs text-gray-500 mt-0.5">{klass.description}</div>}
-            <div className="mt-2 inline-flex items-center gap-2 rounded-xl bg-violet-50 border border-violet-200 px-3 py-1.5">
-              <span className="text-xs font-semibold text-violet-800">Leaderboard ranks by:</span>
-              <select
-                value={(klass as any).scoring_mode || 'team'}
-                onChange={async (e) => {
-                  const mode = e.target.value as 'team' | 'individual';
-                  setBusy(true); setMsg(null);
-                  try { await updateClass(klass.id, { scoring_mode: mode } as any); await reload(); setMsg(mode === 'individual' ? 'Now ranking individuals' : 'Now ranking teams'); }
-                  catch (err: any) { setMsg(err.message || 'Failed to update'); }
-                  finally { setBusy(false); }
-                }}
-                disabled={busy}
-                className="text-xs font-medium bg-white border border-violet-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300"
-              >
-                <option value="team">Team</option>
-                <option value="individual">Individual</option>
-              </select>
-            </div>
                 {/* class-end-banner */}
                 {klass.ended_at ? (
                   <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
@@ -358,9 +339,7 @@ export default function ClassDetail() {
                       <td className="px-5 py-3 text-gray-700">{formatLastActive(m.qm_profiles?.last_active_at || m.joined_at)}</td>
                       <td className="px-5 py-3 text-right">
                         <div className="inline-flex items-center gap-1">
-                          {isIndividual && (
-                            <button onClick={()=>openMarks(m)} title="Bonus & penalty marks" className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-xs font-medium hover:bg-violet-100"><Award className="w-3.5 h-3.5"/>Marks</button>
-                          )}
+                          <button onClick={()=>openMarks(m)} title="Bonus & penalty marks" className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-violet-50 border border-violet-200 text-violet-700 text-xs font-medium hover:bg-violet-100"><Award className="w-3.5 h-3.5"/>Marks</button>
                           <button onClick={async()=>{ if((await confirm({ title: 'Remove this member?', tone: 'danger' }))){ await removeClassMember(id, m.user_id); reload(); } }} title="Remove member" className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><MoreHorizontal className="w-4 h-4"/></button>
                         </div>
                       </td>
