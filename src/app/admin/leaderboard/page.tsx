@@ -2,13 +2,14 @@
 import Shell from "@/components/Shell";
 import { adminTabs } from "@/lib/adminTabs";
 import { useEffect, useState } from "react";
-import { adminListAllClasses, listClassTeamScores, listTeamMembers, type ClassTeamScore } from "@/lib/data";
+import { adminListAllClasses, listClassTeamScores, listClassIndividualScores, listTeamMembers, type ClassTeamScore, type ClassIndividualScore } from "@/lib/data";
 import { ChevronDown, ChevronRight, UserIcon } from "lucide-react";
 
 export default function Page() {
   const [classes, setClasses] = useState<any[]>([]);
   const [activeClassId, setActiveClassId] = useState("");
   const [rankings, setRankings] = useState<ClassTeamScore[]>([]);
+  const [indivRankings, setIndivRankings] = useState<ClassIndividualScore[]>([]);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
   const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({});
   const [loading, setLoading] = useState(true);
@@ -23,14 +24,26 @@ export default function Page() {
     })();
   }, []);
 
+  const activeClass = classes.find((c:any) => c.id === activeClassId);
+  const isIndividual = activeClass?.scoring_mode === 'individual';
+
   useEffect(() => {
-    if (!activeClassId) { setRankings([]); return; }
+    if (!activeClassId) { setRankings([]); setIndivRankings([]); return; }
     setLoading(true);
-    listClassTeamScores(activeClassId).then(scores => {
-      const sorted = (scores as any[]).sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0));
-      setRankings(sorted);
-    }).catch(() => setRankings([])).finally(() => setLoading(false));
-  }, [activeClassId]);
+    const cls = classes.find((c:any) => c.id === activeClassId);
+    if (cls?.scoring_mode === 'individual') {
+      listClassIndividualScores(activeClassId).then(scores => {
+        setIndivRankings(scores);
+        setRankings([]);
+      }).catch(() => setIndivRankings([])).finally(() => setLoading(false));
+    } else {
+      listClassTeamScores(activeClassId).then(scores => {
+        const sorted = (scores as any[]).sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0));
+        setRankings(sorted);
+        setIndivRankings([]);
+      }).catch(() => setRankings([])).finally(() => setLoading(false));
+    }
+  }, [activeClassId, classes]);
 
   const toggleTeam = async (teamId: string) => {
     if (expandedTeam === teamId) { setExpandedTeam(null); return; }
@@ -45,13 +58,36 @@ export default function Page() {
 
   return (
     <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">Leaderboard</h2>
+      <h2 className="font-bold text-lg mb-3">{isIndividual ? "Individual Leaderboard" : "Leaderboard"}</h2>
+      {isIndividual && <p className="text-xs text-gray-500 mb-3 -mt-2">Students ranked by their own approved work.</p>}
       {classes.length > 1 && (
         <select className="input mb-3" value={activeClassId} onChange={e => setActiveClassId(e.target.value)}>
           {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       )}
       {loading ? <p className="text-gray-400 text-sm text-center py-8">Loading rankings...</p> :
+       isIndividual ? (
+        indivRankings.length === 0 ? <p className="text-sm text-gray-400">No students ranked yet.</p> : (
+        <div className="space-y-2">
+          {indivRankings.map((r, i) => {
+            const medal = i === 0 ? '\ud83e\uddc0' : i === 1 ? '\ud83e\udd48' : i === 2 ? '\ud83e\udd49' : null;
+            return (
+              <div key={r.user_id} className={`flex items-center gap-3 p-3 rounded-xl border ${i < 3 ? 'bg-gradient-to-r from-purple-50 to-white border-purple-200' : 'bg-white border-gray-100'}`}>
+                <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-bold ${i < 3 ? 'bg-purple-600 text-white' : 'bg-gray-100 text-gray-500'}`}>{medal || (i + 1)}</div>
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <UserIcon className="w-4 h-4 text-purple-400 shrink-0"/>
+                  <div className="font-semibold text-sm truncate">{r.display_name || 'Student'}</div>
+                </div>
+                <div className="text-right shrink-0">
+                  <div className="font-bold text-purple-700">{Number(r.total_score) || 0}</div>
+                  <div className="text-xs text-gray-400">pts</div>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        )
+       ) :
        rankings.length === 0 ? <p className="text-sm text-gray-400">No team scores yet.</p> : (
         <div className="space-y-2">
           {rankings.map((r: any, i: number) => {
