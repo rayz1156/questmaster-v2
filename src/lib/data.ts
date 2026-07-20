@@ -331,6 +331,27 @@ export async function listClassIndividualScores(classId: string): Promise<ClassI
   if (error) throw error; return (data || []) as ClassIndividualScore[];
 }
 
+// Per-student manual score adjustments (bonus / penalty) within a class.
+// Backed by qm_student_score_adjustments (migration 0027). Feeds the individual leaderboard.
+export type StudentScoreAdjustment = { id: string; class_id: string; user_id: string; hunt_id: string | null; delta: number; reason: string | null; created_by: string | null; created_at: string };
+
+export async function addStudentScoreAdjustment(classId: string, userId: string, delta: number, reason?: string): Promise<StudentScoreAdjustment> {
+  const me = await uid();
+  const { data, error } = await supabase.from('qm_student_score_adjustments').insert({ class_id: classId, user_id: userId, delta, reason: reason || null, created_by: me }).select().single();
+  if (error) throw error; return data as StudentScoreAdjustment;
+}
+
+export async function listStudentScoreAdjustments(classId: string, userId?: string): Promise<StudentScoreAdjustment[]> {
+  let q = supabase.from('qm_student_score_adjustments').select('*').eq('class_id', classId);
+  if (userId) q = q.eq('user_id', userId);
+  const { data, error } = await q.order('created_at', { ascending: false });
+  if (error) throw error; return (data || []) as StudentScoreAdjustment[];
+}
+
+export async function deleteStudentScoreAdjustment(id: string): Promise<void> {
+  const { error } = await supabase.from('qm_student_score_adjustments').delete().eq('id', id); if (error) throw error;
+}
+
 // === QUEST MANAGEMENT (v2 simplified) ===
 export type QuestCompletion = { id: string; hunt_id: string; team_id: string; awarded_points: number; adjustment_id: string|null; marked_by: string|null; created_at: string };
 
