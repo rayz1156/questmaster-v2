@@ -150,7 +150,7 @@ export async function removeMyLogo(): Promise<void> {
 }
 
 // === CLASSES ===
-export type Klass = { id: string; owner_id: string; name: string; description: string | null; color: string | null; join_code: string; is_archived: boolean; ended_at: string | null; created_at: string };
+export type Klass = { id: string; owner_id: string; name: string; description: string | null; color: string | null; join_code: string; is_archived: boolean; ended_at: string | null; created_at: string; scoring_mode?: 'team' | 'individual' };
 export type ClassMember = { class_id: string; user_id: string; joined_at: string };
 export type ClassInvite = { id: string; class_id: string; email: string | null; token: string; invited_by: string | null; accepted_at: string | null; expires_at: string | null; created_at: string };
 
@@ -320,6 +320,15 @@ export type ClassTeamScore = { team_id: string; class_id: string; team_name: str
 export async function listClassTeamScores(classId: string): Promise<ClassTeamScore[]> {
   const { data, error } = await supabase.from('qm_class_team_scores').select('*').eq('class_id', classId).order('total_score', { ascending: false });
   if (error) throw error; return (data || []) as ClassTeamScore[];
+}
+
+// Individual (per-student) scores within a class. Backed by the qm_class_individual_scores
+// view (migration 0027): each student's own approved-submission points + individual adjustments.
+export type ClassIndividualScore = { class_id: string; user_id: string; display_name: string | null; total_score: number };
+
+export async function listClassIndividualScores(classId: string): Promise<ClassIndividualScore[]> {
+  const { data, error } = await supabase.from('qm_class_individual_scores').select('*').eq('class_id', classId).order('total_score', { ascending: false });
+  if (error) throw error; return (data || []) as ClassIndividualScore[];
 }
 
 // === QUEST MANAGEMENT (v2 simplified) ===

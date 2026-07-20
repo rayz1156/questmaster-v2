@@ -128,6 +128,24 @@ export default function ClassDetail() {
               </div>
             )}
             {klass.description && <div className="text-xs text-gray-500 mt-0.5">{klass.description}</div>}
+            <div className="mt-2 inline-flex items-center gap-2 rounded-xl bg-violet-50 border border-violet-200 px-3 py-1.5">
+              <span className="text-xs font-semibold text-violet-800">Leaderboard ranks by:</span>
+              <select
+                value={(klass as any).scoring_mode || 'team'}
+                onChange={async (e) => {
+                  const mode = e.target.value as 'team' | 'individual';
+                  setBusy(true); setMsg(null);
+                  try { await updateClass(klass.id, { scoring_mode: mode } as any); await reload(); setMsg(mode === 'individual' ? 'Now ranking individuals' : 'Now ranking teams'); }
+                  catch (err: any) { setMsg(err.message || 'Failed to update'); }
+                  finally { setBusy(false); }
+                }}
+                disabled={busy}
+                className="text-xs font-medium bg-white border border-violet-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-violet-300"
+              >
+                <option value="team">Team</option>
+                <option value="individual">Individual</option>
+              </select>
+            </div>
                 {/* class-end-banner */}
                 {klass.ended_at ? (
                   <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">

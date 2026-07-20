@@ -5,7 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Users, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight, Activity, ClipboardList, Crown, Medal, Home, Compass, BookOpen } from "lucide-react";
-import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listEnrolledClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type Klass } from "@/lib/data";
+import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, listClassIndividualScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listEnrolledClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type ClassIndividualScore, type Klass } from "@/lib/data";
 
 
 type AggScore = { team_id: string; team_name: string; total_score: number; quest_count: number };
@@ -18,6 +18,7 @@ function LeaderboardInner() {
   const [activeId, setActiveId] = useState(""); // "" means all quests, or a specific hunt id
   const [scores, setScores] = useState<TeamScore[]>([]);
   const [aggScores, setAggScores] = useState<AggScore[]>([]);
+  const [indivScores, setIndivScores] = useState<ClassIndividualScore[]>([]);
   const [adj, setAdj] = useState<ScoreAdjustment[]>([]);
   const [err, setErr] = useState<string | null>(null);
   const [delta, setDelta] = useState<Record<string, number>>({});
@@ -67,6 +68,18 @@ function LeaderboardInner() {
   async function loadScores() {
     try {
       setErr(null);
+      // Individual-mode class: rank students by their own total (view qm_class_individual_scores).
+      const cls = classes.find(c => c.id === classId);
+      if (cls?.scoring_mode === 'individual' && !activeId) {
+        try {
+          const is = await listClassIndividualScores(classId);
+          setIndivScores(is);
+          setScores([]); setAggScores([]); setAdj([]);
+          return;
+        } catch (e:any) { setErr(e.message); return; }
+      } else {
+        setIndivScores([]);
+      }
       if (activeId) {
         // Individual quest
         const s = await listTeamScores(activeId);
@@ -119,6 +132,7 @@ function LeaderboardInner() {
 
 
   const selectedClass = classes.find(c => c.id === classId);
+  const isIndividual = selectedClass?.scoring_mode === 'individual';
   const leaderboard = activeId ? scores.sort((a, b) => b.total_score - a.total_score) : aggScores;
 
   return (
@@ -182,11 +196,45 @@ function LeaderboardInner() {
         <div className="flex items-start gap-3 mb-4">
           <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center shrink-0 shadow-md"><Trophy className="w-5 h-5"/></div>
           <div className="min-w-0">
-            <div className="font-bold text-base sm:text-lg">{activeId ? `Activity Leaderboard` : `Class Leaderboard`}</div>
-            <div className="text-xs text-gray-500">Rankings update automatically as groups complete quests.</div>
+            <div className="font-bold text-base sm:text-lg">{isIndividual && !activeId ? `Individual Leaderboard` : activeId ? `Activity Leaderboard` : `Class Leaderboard`}</div>
+            <div className="text-xs text-gray-500">{isIndividual && !activeId ? "Students ranked by their own approved work." : "Rankings update automatically as groups complete quests."}</div>
           </div>
         </div>
-        {leaderboard.length === 0 ? <p className="text-xs text-gray-500">No teams yet.</p> : (
+        {isIndividual && !activeId ? (
+          indivScores.length === 0 ? <p className="text-xs text-gray-500">No students ranked yet.</p> : (
+          <div className="space-y-2">
+          {indivScores.map((s, i) => {
+            const tileBg = i === 0 ? 'bg-gradient-to-r from-yellow-50 via-amber-50 to-yellow-50 border-yellow-200'
+                         : i === 1 ? 'bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50 border-gray-200'
+                         : i === 2 ? 'bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 border-orange-200'
+                         : 'bg-white border-gray-100 hover:bg-gray-50';
+            const medalBg = i === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-yellow-200'
+                          : i === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-slate-200'
+                          : i === 2 ? 'bg-gradient-to-br from-orange-400 to-amber-700 text-white shadow-orange-200'
+                          : 'bg-gray-200 text-gray-600';
+            const ptsBg = i === 0 ? 'bg-yellow-100 text-amber-700'
+                        : i === 1 ? 'bg-slate-100 text-slate-700'
+                        : i === 2 ? 'bg-orange-100 text-orange-700'
+                        : 'bg-purple-50 text-purple-700';
+            return (
+              <div key={s.user_id} className={`relative flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tileBg}`}>
+                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-lg font-extrabold shadow ${medalBg}`}>{i + 1}</div>
+                <div className="flex-1 min-w-0 flex items-center gap-2">
+                  <UserIcon className="w-4 h-4 text-purple-400 shrink-0"/>
+                  <div className="font-bold text-sm sm:text-base truncate">{s.display_name || 'Student'}</div>
+                </div>
+                <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${ptsBg}`}>
+                  <div className="text-center">
+                    <div className="font-extrabold text-lg leading-none">{s.total_score}</div>
+                    <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          </div>
+          )
+        ) : leaderboard.length === 0 ? <p className="text-xs text-gray-500">No teams yet.</p> : (
           <div className="space-y-2">
           {leaderboard.map((s, i) => {
             const isExpanded = expandedTeam === s.team_id;
