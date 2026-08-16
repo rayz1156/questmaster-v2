@@ -1,10 +1,9 @@
 "use client";
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
+import ParticipantShell from "@/components/ParticipantShell";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Home, Compass, Users, Trophy, User as UserIcon, ArrowLeft, BookOpen } from "lucide-react";
-import Shell from "@/components/Shell";
 import { supabase } from "@/lib/supabase";
 import { Board, getBoardForHunt } from "@/lib/boards";
 import QuestBoardView from "@/components/boards/QuestBoardView";
@@ -31,7 +30,7 @@ export default function PartActivityBoardPage() {
   }, [huntId]);
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <ParticipantShell>
       <div className="mb-3">
         <Link href={`/participant/activities`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> Back to Activities
@@ -41,6 +40,6 @@ export default function PartActivityBoardPage() {
       {err && <p className="text-sm text-red-600">{err}</p>}
       {!loading && !board && <p className="text-sm text-gray-600">Board hantaran belum dicipta untuk aktiviti ini.</p>}
       {board && <QuestBoardView board={board} canManage={false} currentUserId={userId} />}
-    </Shell>
+    </ParticipantShell>
   );
 }

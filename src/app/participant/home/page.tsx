@@ -1,9 +1,8 @@
 "use client";
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
+import ParticipantShell from "@/components/ParticipantShell";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound, BookOpen } from "lucide-react";
-import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
@@ -92,7 +91,7 @@ export default function Page() {
   const teamPalette = ['bg-emerald-100 text-emerald-700','bg-purple-100 text-purple-700','bg-pink-100 text-pink-700','bg-sky-100 text-sky-700','bg-amber-100 text-amber-700'];
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <ParticipantShell>
       <div className="space-y-5">
         {/* Welcome hero */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-50 via-white to-purple-50 border border-purple-100 shadow-sm p-6 sm:p-8">
@@ -316,6 +315,6 @@ export default function Page() {
           <Link href="/participant/activities" className="text-sm font-semibold text-amber-600 hover:text-amber-800 inline-flex items-center gap-1 whitespace-nowrap">Go to Activities <ArrowRight className="w-4 h-4" /></Link>
         </div>
       </div>
-    </Shell>
+    </ParticipantShell>
   );
 }

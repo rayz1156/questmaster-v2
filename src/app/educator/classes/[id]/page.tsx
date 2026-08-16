@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity, Award, Plus, Minus } from "lucide-react";
+import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity, Award, Plus, Minus, Trophy, EyeOff } from "lucide-react";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from '@/lib/eduTabs';
 import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, endClass, reopenClass, addStudentScoreAdjustment, listStudentScoreAdjustments, deleteStudentScoreAdjustment, Klass, ClassInvite, StudentScoreAdjustment } from "@/lib/data";
@@ -220,6 +220,44 @@ export default function ClassDetail() {
           <Link href={`/educator/rankings?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
             <BarChart3 className="w-5 h-5"/><span>Rankings</span>
           </Link>
+        </div>
+      </div>
+
+      {/* Leaderboard visibility */}
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5 mb-4">
+        <div className="flex items-start gap-3">
+          <div className={`w-10 h-10 rounded-full flex items-center justify-center shrink-0 ${klass.leaderboard_visible === false ? "bg-gray-100" : "bg-violet-50"}`}>
+            {klass.leaderboard_visible === false
+              ? <EyeOff className="w-5 h-5 text-gray-500"/>
+              : <Trophy className="w-5 h-5 text-violet-600"/>}
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-gray-900">Participant leaderboard</div>
+            <p className="text-sm text-gray-500 mt-0.5">
+              {klass.leaderboard_visible === false
+                ? "Hidden. Participants do not see the Ranking tab for this class."
+                : "Visible. Participants can see this class ranking."}
+            </p>
+          </div>
+          <button
+            disabled={busy}
+            onClick={async () => {
+              const next = klass.leaderboard_visible === false;
+              setBusy(true); setMsg(null);
+              try {
+                await updateClass(klass.id, { leaderboard_visible: next });
+                await reload();
+                setMsg(next ? "Leaderboard is now visible to participants" : "Leaderboard is now hidden from participants");
+              } catch (err: any) {
+                setMsg(err.message || "Failed to update leaderboard visibility");
+              } finally { setBusy(false); }
+            }}
+            className={klass.leaderboard_visible === false
+              ? "shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-95 disabled:opacity-50"
+              : "shrink-0 rounded-xl border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"}
+          >
+            {klass.leaderboard_visible === false ? "Show" : "Hide"}
+          </button>
         </div>
       </div>
 

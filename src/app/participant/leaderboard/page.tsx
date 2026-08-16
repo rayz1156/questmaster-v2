@@ -1,6 +1,5 @@
 "use client";
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
-import Shell from "@/components/Shell";
+import ParticipantShell from "@/components/ParticipantShell";
 import Link from 'next/link';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
@@ -43,8 +42,11 @@ function LeaderboardInner() {
   useEffect(() => {
     (async () => {
       const cs = await listEnrolledClasses();
-      setClasses(cs);
-      if (cs[0]) { setClassId(prev => prev || cs[0].id); }
+      // Hanya kelas yang educatornya membenarkan leaderboard.
+      const visible = cs.filter(c => c.leaderboard_visible !== false);
+      setClasses(visible);
+      // URL boleh membawa ?classId= kelas yang disembunyikan; jangan hormatinya.
+      setClassId(prev => (visible.some(c => c.id === prev) ? prev : (visible[0]?.id ?? "")));
     })();
   }, []);
 
@@ -135,7 +137,7 @@ function LeaderboardInner() {
   const leaderboard = activeId ? scores.sort((a, b) => b.total_score - a.total_score) : aggScores;
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <ParticipantShell>
       {classId && (
         <Link href={`/participant/classes/${classId}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
       )}
@@ -161,7 +163,7 @@ function LeaderboardInner() {
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
             <label className="text-xs font-semibold text-gray-500 mb-1 block">Class</label>
-            {classes.length === 0 ? <p className="text-sm text-gray-500">No classes yet.</p> : (
+            {classes.length === 0 ? <p className="text-sm text-gray-500">Tiada leaderboard tersedia buat masa ini.</p> : (
               <div className="relative">
                 <span className="absolute left-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-purple-100 text-purple-600 inline-flex items-center justify-center pointer-events-none"><Users className="w-4 h-4"/></span>
                 <select className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-300" value={classId} onChange={e => setClassId(e.target.value)}>
@@ -297,7 +299,7 @@ function LeaderboardInner() {
           </div>
         )}
       </div>
-      </Shell>
+      </ParticipantShell>
   );
 }
 

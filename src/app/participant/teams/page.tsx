@@ -1,7 +1,6 @@
 "use client";
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
+import ParticipantShell from "@/components/ParticipantShell";
 
-import Shell from "@/components/Shell";
 import Link from "next/link";
 import { useEffect, useState, Suspense, useMemo } from "react";
 import { Home,
@@ -183,7 +182,7 @@ function Inner() {
   }
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <ParticipantShell>
       <div className="max-w-6xl mx-auto px-3 sm:px-4 py-4 sm:py-6 space-y-4 sm:space-y-5">
         {/* Hero header */}
         <section className="relative overflow-hidden rounded-2xl bg-white ring-1 ring-gray-100 shadow-sm">
@@ -511,7 +510,7 @@ function Inner() {
           )}
         </section>
       </div>
-    </Shell>
+    </ParticipantShell>
   );
 }
 

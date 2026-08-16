@@ -1,10 +1,9 @@
 "use client";
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
+import ParticipantShell from "@/components/ParticipantShell";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import { Home, Compass, Users, Trophy, User as UserIcon, ArrowLeft } from "lucide-react";
-import Shell from "@/components/Shell";
 import { supabase } from "@/lib/supabase";
 import { Board, getBoardForClass } from "@/lib/boards";
 import IntroBoardView from "@/components/boards/IntroBoardView";
@@ -31,7 +30,7 @@ export default function PartClassBoardPage() {
   }, [classId]);
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <ParticipantShell>
       <div className="mb-3">
         <Link href={`/participant/home`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
           <ArrowLeft className="w-4 h-4" /> Back
@@ -41,6 +40,6 @@ export default function PartClassBoardPage() {
       {err && <p className="text-sm text-red-600">{err}</p>}
       {!loading && !board && <p className="text-sm text-gray-600">Board pengenalan belum dicipta untuk kelas ini.</p>}
       {board && <IntroBoardView board={board} canManage={false} currentUserId={userId} />}
-    </Shell>
+    </ParticipantShell>
   );
 }

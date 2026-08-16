@@ -1,10 +1,9 @@
 "use client";
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
+import ParticipantShell from "@/components/ParticipantShell";
 import { Suspense, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
 import { Home, Compass, Trophy, User as UserIcon, Users, Target, ClipboardList, Calendar, ExternalLink, Info, Star, Drama, BookOpen } from "lucide-react";
-import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listQuestCompletions, listEnrolledClasses, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
@@ -60,7 +59,7 @@ function Inner() {
   const statusLower = String(status).toLowerCase();
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <ParticipantShell>
       <div className="space-y-5">
         {/* Hero header */}
         <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-50 via-white to-purple-50 border border-purple-100 shadow-sm p-5 sm:p-6">
@@ -198,7 +197,7 @@ function Inner() {
           </div>
         )}
       </div>
-    </Shell>
+    </ParticipantShell>
   );
 }
 

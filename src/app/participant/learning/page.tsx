@@ -1,5 +1,5 @@
 'use client';
-import { PARTICIPANT_TABS } from "@/lib/participantTabs";
+import ParticipantShell from "@/components/ParticipantShell";
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
@@ -35,7 +35,7 @@ export default function ParticipantLearningHome() {
   }, [loading, classes, router]);
 
   return (
-    <Shell tabs={PARTICIPANT_TABS}>
+    <ParticipantShell>
       <div className="max-w-3xl mx-auto p-6">
         <div className="flex items-center gap-3 mb-6">
           <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700"><BookOpen className="w-6 h-6" /></span>
@@ -70,6 +70,6 @@ export default function ParticipantLearningHome() {
           </div>
         )}
       </div>
-    </Shell>
+    </ParticipantShell>
   );
 }
