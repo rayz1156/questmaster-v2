@@ -18,6 +18,38 @@ function pick(html: string, attr: string, key: string): string | null {
   return m2 ? m2[1] : null;
 }
 
+/**
+ * Nyahkod entiti HTML dalam metadata yang diekstrak.
+ *
+ * Ini punca sebenar kad bertajuk "Sains &amp; Teknologi". og:title dan
+ * <title> datang sebagai HTML mentah, jadi "&amp;" tiba secara literal dan
+ * disimpan begitu oleh laluan penulisan kad. Pembetulan dibuat di sini, pada
+ * titik pengekstrakan. Laluan penulisan kad sengaja menyimpan teks mentah dan
+ * tidak diubah.
+ */
+const NAMED_ENTITIES: Record<string, string> = {
+  amp: '&', lt: '<', gt: '>', quot: '"', apos: "'", nbsp: ' ',
+  ndash: '\u2013', mdash: '\u2014', hellip: '\u2026',
+  lsquo: '\u2018', rsquo: '\u2019', ldquo: '\u201C', rdquo: '\u201D',
+};
+
+function decodeEntities(input: string | null): string | null {
+  if (!input) return input;
+  // Satu laluan sahaja. Dua laluan berasingan akan menyahkod "&amp;lt;"
+  // menjadi "<", iaitu menghidupkan semula markup yang sengaja dilepaskan.
+  return input.replace(/&(#x[0-9a-fA-F]+|#\d+|[a-zA-Z]+);/g, (match, body: string) => {
+    if (body[0] === '#') {
+      const code = body[1] === 'x' || body[1] === 'X'
+        ? parseInt(body.slice(2), 16)
+        : parseInt(body.slice(1), 10);
+      if (!Number.isFinite(code) || code < 0 || code > 0x10ffff) return match;
+      try { return String.fromCodePoint(code); } catch { return match; }
+    }
+    const named = NAMED_ENTITIES[body.toLowerCase()];
+    return named === undefined ? match : named;
+  });
+}
+
 export async function GET(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
@@ -37,10 +69,10 @@ export async function GET(req: NextRequest) {
     const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const data = {
       url,
-      title: pick(html, 'property', 'og:title') || pick(html, 'name', 'twitter:title') || (titleM ? titleM[1].trim() : null),
-      description: pick(html, 'property', 'og:description') || pick(html, 'name', 'twitter:description') || pick(html, 'name', 'description'),
-      image: pick(html, 'property', 'og:image') || pick(html, 'name', 'twitter:image'),
-      siteName: pick(html, 'property', 'og:site_name') || u.hostname.replace(/^www\./, ''),
+      title: decodeEntities(pick(html, 'property', 'og:title') || pick(html, 'name', 'twitter:title') || (titleM ? titleM[1].trim() : null)),
+      description: decodeEntities(pick(html, 'property', 'og:description') || pick(html, 'name', 'twitter:description') || pick(html, 'name', 'description')),
+      image: decodeEntities(pick(html, 'property', 'og:image') || pick(html, 'name', 'twitter:image')),
+      siteName: decodeEntities(pick(html, 'property', 'og:site_name') || u.hostname.replace(/^www\./, '')) ?? u.hostname,
       favicon: `https://www.google.com/s2/favicons?domain=${u.hostname}&sz=64`,
     };
     // Resolve relative og:image to absolute

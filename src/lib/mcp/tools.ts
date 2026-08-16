@@ -12,6 +12,7 @@
 
 import { McpSession, Role, canWrite } from "./session";
 import { TABLES, COLUMNS, LIMITS, REDACTED_COLUMNS } from "./schema";
+import { callApi, uploadFile } from "./api";
 
 export interface ToolDef {
   name: string;
@@ -65,6 +66,42 @@ async function countBy(
     .select(column, { count: "exact", head: true })
     .eq("class_id", classId);
   return count ?? 0;
+}
+
+/**
+ * Jenis kad yang diterima oleh route kad. Disalin daripada route supaya
+ * ralat ditangkap sebelum panggilan rangkaian, bukan sebagai 400 yang kabur.
+ */
+const CARD_TYPES = ["text", "link", "image", "file", "chatbot", "youtube"];
+
+/**
+ * Route board dikunci pada class_id, bukan board_id. Tool MCP menerima
+ * board_id kerana itu yang get_board pulangkan, jadi kita petakan di sini
+ * melalui klien terikat RLS: jika pengguna tidak nampak board itu, mereka
+ * tidak boleh menulis kepadanya.
+ */
+async function classIdForBoard(boardId: string, s: McpSession): Promise<string> {
+  if (!boardId) throw new Error("board_id diperlukan");
+  const board = unwrapOne<{ class_id: string }>(
+    await s.db.from(TABLES.boards).select("id, class_id").eq("id", boardId).maybeSingle(),
+    "Dapatkan board"
+  );
+  if (!board) throw new Error("Board tidak dijumpai atau anda tiada akses kepadanya");
+  return board.class_id;
+}
+
+async function classIdForCard(cardId: string, s: McpSession): Promise<string> {
+  const card = unwrapOne<{ board_id: string }>(
+    await s.db.from(TABLES.boardCards).select("id, board_id").eq("id", cardId).maybeSingle(),
+    "Dapatkan kad"
+  );
+  if (!card) throw new Error("Kad tidak dijumpai atau anda tiada akses kepadanya");
+  return await classIdForBoard(card.board_id, s);
+}
+
+/** URL yang menstrim fail FileLu melalui pelayan kita, dengan content-type betul. */
+function fileRedirectUrl(classId: string, fileCode?: string): string | null {
+  return fileCode ? `/api/learning-boards/${classId}/file-redirect/${fileCode}` : null;
 }
 
 export const TOOLS: ToolDef[] = [
@@ -358,6 +395,7 @@ export const TOOLS: ToolDef[] = [
           .select(COLUMNS.boardCardSummary)
           .eq("board_id", args.board_id)
           .order("position", { ascending: true })
+          .order("created_at", { ascending: true })
           .limit(LIMITS.max),
         "Muat kad board"
       ) as Array<Record<string, any>>;
@@ -376,38 +414,282 @@ export const TOOLS: ToolDef[] = [
   {
     name: "create_board_card",
     title: "Cipta kad board",
-    description: "Tambah kad baharu pada lajur board. Peserta juga boleh menggunakan ini.",
+    description:
+      "Tambah kad baharu pada lajur board. Peserta juga boleh menggunakan ini. " +
+      "Dilaksanakan melalui route aplikasi supaya position dikira dengan betul.",
     roles: ALL,
     write: true,
     inputSchema: {
       type: "object",
       properties: {
-        board_id: { type: "string" },
-        column_id: { type: "string" },
+        board_id: { type: "string", description: "class_id disimpulkan daripada board ini" },
+        column_id: { type: "string", description: "Lajur sasaran. Wajib." },
         title: { type: "string" },
         description: { type: "string" },
-        card_type: { type: "string", description: "Lalai: text" },
-        link_url: { type: "string" },
+        card_type: { type: "string", enum: CARD_TYPES, description: "Lalai: text" },
+        link_url: { type: "string", description: "Wajib untuk card_type link" },
+        youtube_url: { type: "string", description: "Wajib untuk card_type youtube" },
+        image_url: { type: "string", description: "Untuk card_type image, jika bukan fail yang dimuat naik" },
+        file_code: { type: "string", description: "Kod daripada upload_board_file, untuk card_type file atau image" },
+        file_url: { type: "string", description: "Alternatif kepada file_code" },
+        file_name: { type: "string" },
+        chatbot_url: { type: "string", description: "Wajib untuk card_type chatbot" },
+        insert_index: { type: "number", description: "Sisip pada kedudukan ini; jika ditinggalkan, kad diletak di hujung" },
       },
-      required: ["board_id", "title"],
+      required: ["board_id", "column_id", "title"],
     },
-    handler: async (args, s) =>
-      unwrapOne(
+    handler: async (args, s) => {
+      const cardType: string = args.card_type ?? "text";
+      if (!CARD_TYPES.includes(cardType)) {
+        throw new Error(
+          `card_type tidak sah: ${cardType}. Guna salah satu daripada ${CARD_TYPES.join(", ")}.`
+        );
+      }
+
+      const classId = await classIdForBoard(args.board_id, s);
+
+      const body: Record<string, unknown> = {
+        columnId: args.column_id,
+        cardType,
+        title: args.title,
+        description: args.description ?? null,
+      };
+      if (typeof args.insert_index === "number") body.insertIndex = args.insert_index;
+
+      // Pengesahan di sini supaya klien MCP mendapat sebab yang jelas, bukan
+      // 400 daripada route selepas perjalanan rangkaian.
+      if (cardType === "link") {
+        if (!args.link_url) throw new Error("card_type link memerlukan link_url");
+        body.linkUrl = args.link_url;
+      } else if (cardType === "youtube") {
+        const yt = args.youtube_url ?? args.link_url;
+        if (!yt) throw new Error("card_type youtube memerlukan youtube_url");
+        body.youtubeUrl = yt;
+      } else if (cardType === "image") {
+        const imageUrl = args.image_url ?? fileRedirectUrl(classId, args.file_code);
+        if (!imageUrl) throw new Error("card_type image memerlukan image_url atau file_code");
+        body.imageUrl = imageUrl;
+        if (args.file_code) body.fileluFileCode = args.file_code;
+      } else if (cardType === "file") {
+        const fileUrl = args.file_url ?? fileRedirectUrl(classId, args.file_code);
+        if (!fileUrl) throw new Error("card_type file memerlukan file_code atau file_url");
+        body.fileUrl = fileUrl;
+        if (args.file_code) body.fileluFileCode = args.file_code;
+        if (args.file_name) body.fileName = args.file_name;
+      } else if (cardType === "chatbot") {
+        if (!args.chatbot_url) throw new Error("card_type chatbot memerlukan chatbot_url");
+        body.chatbotUrl = args.chatbot_url;
+      }
+
+      const res = await callApi<{ card: Record<string, unknown> }>(
+        s.accessToken,
+        `/api/learning-boards/${classId}/cards`,
+        { method: "POST", body }
+      );
+      return res.card;
+    },
+  },
+
+  {
+    name: "create_class",
+    title: "Cipta kelas",
+    description:
+      "Cipta kelas baharu berserta board pembelajarannya. Pemanggil didaftarkan " +
+      "sebagai educator pemilik. Pulangkan id kelas dan board_id.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        name: { type: "string", description: "Nama kelas" },
+        description: { type: "string" },
+        color: { type: "string", description: "Warna hex, lalai #6366f1" },
+      },
+      required: ["name"],
+    },
+    handler: async (args, s) => {
+      if (!isStaff(s)) throw new Error("Hanya educator atau admin boleh mencipta kelas");
+
+      const klass = unwrapOne<Record<string, any>>(
         await s.db
-          .from(TABLES.boardCards)
+          .from(TABLES.classes)
           .insert({
-            board_id: args.board_id,
-            column_id: args.column_id ?? null,
-            title: args.title,
+            owner_id: s.userId,
+            name: args.name,
             description: args.description ?? null,
-            card_type: args.card_type ?? "text",
-            link_url: args.link_url ?? null,
-            created_by: s.userId,
+            color: args.color ?? "#6366f1",
           })
-          .select(COLUMNS.boardCardSummary)
+          .select(COLUMNS.classSummary)
           .single(),
-        "Cipta kad board"
-      ),
+        "Cipta kelas"
+      );
+      if (!klass) throw new Error("Kelas tidak tercipta");
+
+      // Sama seperti createClass() dalam lib/data.ts: pemilik mesti wujud dalam
+      // qm_class_educators, jika tidak kelas itu tidak muncul dalam senarai
+      // educator mereka sendiri. Ralat diabaikan kerana trigger mungkin sudah
+      // melakukannya.
+      await s.db.from(TABLES.educators).upsert(
+        {
+          class_id: klass.id,
+          [TABLES.educatorUserIdColumn]: s.userId,
+          role: "owner",
+          invited_by: s.userId,
+          accepted_at: new Date().toISOString(),
+        } as any,
+        { onConflict: `class_id,${TABLES.educatorUserIdColumn}` }
+      );
+
+      // GET board mewujudkannya secara malas, jadi kelas baharu terus
+      // mempunyai board yang boleh diisi lajur dan kad.
+      const boardRes = await callApi<{ board: { id: string } | null }>(
+        s.accessToken,
+        `/api/learning-boards/${klass.id}`
+      );
+
+      return { ...klass, board_id: boardRes?.board?.id ?? null };
+    },
+  },
+
+  {
+    name: "create_board_column",
+    title: "Cipta lajur board",
+    description: "Tambah lajur baharu pada board kelas. Position dikira oleh aplikasi.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        board_id: { type: "string", description: "Berikan board_id atau class_id" },
+        class_id: { type: "string" },
+        title: { type: "string" },
+      },
+      required: ["title"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id && !args.board_id) throw new Error("Berikan board_id atau class_id");
+      const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
+      const res = await callApi<{ column: Record<string, unknown> }>(
+        s.accessToken,
+        `/api/learning-boards/${classId}/columns`,
+        { method: "POST", body: { title: args.title } }
+      );
+      return res.column;
+    },
+  },
+
+  {
+    name: "upload_board_file",
+    title: "Muat naik fail board",
+    description:
+      "Muat naik fail untuk digunakan oleh kad file atau image. Pulangkan file_code " +
+      "yang boleh diberi terus kepada create_board_card. Keupayaan muat naik pengguna " +
+      "dikuatkuasakan oleh aplikasi.",
+    roles: ALL,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "Berikan class_id atau board_id" },
+        board_id: { type: "string" },
+        file_name: { type: "string" },
+        content_base64: { type: "string", description: "Kandungan fail dikodkan base64" },
+        mime_type: { type: "string" },
+      },
+      required: ["file_name", "content_base64"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id && !args.board_id) throw new Error("Berikan class_id atau board_id");
+      const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
+      const up = await uploadFile(
+        s.accessToken,
+        classId,
+        args.file_name,
+        args.content_base64,
+        args.mime_type
+      );
+      // Alias snake_case supaya hasilnya boleh disalurkan terus ke create_board_card.
+      return { ...up, class_id: classId, file_code: up?.fileCode ?? null };
+    },
+  },
+
+  {
+    name: "update_board",
+    title: "Kemas kini board",
+    description:
+      "Kemas kini tajuk, penerangan, atau status terbitan board kelas. Hanya medan yang diberi akan diubah.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "Berikan class_id atau board_id" },
+        board_id: { type: "string" },
+        title: { type: "string" },
+        description: { type: "string" },
+        is_published: { type: "boolean", description: "Terbitkan board kepada peserta" },
+      },
+      required: [],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id && !args.board_id) throw new Error("Berikan class_id atau board_id");
+      const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
+      const body: Record<string, unknown> = {};
+      if (typeof args.title === "string") body.title = args.title;
+      if (typeof args.description === "string") body.description = args.description;
+      if (typeof args.is_published === "boolean") body.is_published = args.is_published;
+      if (Object.keys(body).length === 0) throw new Error("Tiada medan untuk dikemas kini");
+      const res = await callApi<{ board: Record<string, unknown> }>(
+        s.accessToken,
+        `/api/learning-boards/${classId}`,
+        { method: "PATCH", body }
+      );
+      return res.board;
+    },
+  },
+
+  {
+    name: "update_board_card",
+    title: "Kemas kini kad board",
+    description: "Kemas kini medan pada kad sedia ada. Hanya medan yang diberi akan diubah.",
+    roles: ALL,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        card_id: { type: "string" },
+        class_id: { type: "string", description: "Pilihan; disimpulkan daripada kad jika ditinggalkan" },
+        board_id: { type: "string", description: "Pilihan" },
+        title: { type: "string" },
+        description: { type: "string" },
+        link_url: { type: "string" },
+        image_url: { type: "string" },
+        column_id: { type: "string", description: "Pindahkan kad ke lajur lain" },
+        position: { type: "number" },
+      },
+      required: ["card_id"],
+    },
+    handler: async (args, s) => {
+      const classId =
+        args.class_id ??
+        (args.board_id
+          ? await classIdForBoard(args.board_id, s)
+          : await classIdForCard(args.card_id, s));
+
+      const body: Record<string, unknown> = {};
+      for (const k of ["title", "description", "link_url", "image_url", "column_id"]) {
+        if (typeof args[k] === "string") body[k] = args[k];
+      }
+      if (typeof args.position === "number") body.position = args.position;
+      if (Object.keys(body).length === 0) throw new Error("Tiada medan untuk dikemas kini");
+
+      const res = await callApi<{ card: Record<string, unknown> }>(
+        s.accessToken,
+        `/api/learning-boards/${classId}/cards/${args.card_id}`,
+        { method: "PATCH", body }
+      );
+      return res.card;
+    },
   },
 
   {

@@ -16,6 +16,14 @@ export interface McpSession {
   scope: string;
   clientId: string;
   db: SupabaseClient; // terikat kepada pengguna, RLS aktif
+  /**
+   * Access token Supabase pengguna semasa.
+   *
+   * Tool MCP memerlukan ini untuk memanggil route API Kuizen sebagai
+   * pengguna itu sendiri, dan bukan menyalin semula logik perniagaan
+   * route ke dalam tool.
+   */
+  accessToken: string;
 }
 
 export class AuthError extends Error {}
@@ -94,6 +102,7 @@ export async function getSession(authHeader: string | null): Promise<McpSession>
   let db: SupabaseClient;
   let userId: string;
   let email: string | null;
+  let accessToken: string;
 
   // Jalan pantas: access token Supabase yang di-cache masih sah.
   // Ini mengelakkan pemutaran refresh token pada setiap permintaan MCP,
@@ -104,7 +113,8 @@ export async function getSession(authHeader: string | null): Promise<McpSession>
     new Date(row.sb_access_expires_at).getTime() > Date.now() + 60_000;
 
   if (cachedValid) {
-    db = clientWithToken(decrypt(row.sb_access_token));
+    accessToken = decrypt(row.sb_access_token);
+    db = clientWithToken(accessToken);
     const { data: u } = await db.auth.getUser();
     if (!u?.user) throw new AuthError("Sesi asas tidak sah");
     userId = u.user.id;
@@ -125,6 +135,7 @@ export async function getSession(authHeader: string | null): Promise<McpSession>
     db = refreshed.client;
     userId = refreshed.userId;
     email = refreshed.email;
+    accessToken = refreshed.accessToken;
 
     await admin()
       .from("tokens")
@@ -156,6 +167,7 @@ export async function getSession(authHeader: string | null): Promise<McpSession>
     scope: row.scope,
     clientId: row.client_id,
     db,
+    accessToken,
   };
 }
 
