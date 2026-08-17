@@ -32,3 +32,42 @@ export async function s5HeadObject(key: string) {
   try { const h = await s5client().send(new HeadObjectCommand({ Bucket: BUCKET, Key: key })); return { exists: true, size: h.ContentLength, contentType: h.ContentType, lastModified: h.LastModified }; } catch (e: any) { if (e.name === 'NotFound' || e['$metadata']?.httpStatusCode === 404) return { exists: false }; throw e; }
 }
 export function s5PublicUrl(key: string): string { return `${ENDPOINT.replace(/\/+$/,'')}/${BUCKET}/${key.split('/').map(encodeURIComponent).join('/')}`; }
+
+/**
+ * Muat naik daripada strim, bukan Buffer.
+ *
+ * Fail besar tidak boleh dibaca ke dalam memori dahulu. S3 memerlukan
+ * ContentLength apabila badan ialah strim, jadi pemanggil mesti tahu saiz
+ * sebenar. Untuk laluan source_url kita memperolehnya dengan menulis ke fail
+ * sementara dan mengukur cakera, bukan dengan mempercayai Content-Length.
+ */
+export async function s5PutStream(
+  key: string,
+  body: any,
+  contentLength: number,
+  contentType?: string
+) {
+  await s5client().send(
+    new PutObjectCommand({
+      Bucket: BUCKET,
+      Key: key,
+      Body: body,
+      ContentLength: contentLength,
+      ContentType: contentType || 'application/octet-stream',
+      CacheControl: 'public, max-age=31536000',
+    })
+  );
+  return { bucket: BUCKET, key };
+}
+
+/** Corak laluan objek yang sama seperti fileluUpload. Sentiasa dijana pelayan. */
+export function s5ObjectKey(fileName: string): string {
+  const rand = (globalThis.crypto?.randomUUID?.() as string) || Math.random().toString(36).slice(2) + Date.now().toString(36);
+  const safeName = fileName.replace(/[^A-Za-z0-9._-]/g, '_');
+  return `qm/${rand}-${safeName}`;
+}
+
+/** file_code yang difahami oleh route file-redirect. */
+export function s5FileCode(key: string): string {
+  return 's5__' + Buffer.from(key, 'utf8').toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+}

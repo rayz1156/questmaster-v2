@@ -72,6 +72,17 @@ async function countBy(
  * Jenis kad yang diterima oleh route kad. Disalin daripada route supaya
  * ralat ditangkap sebelum panggilan rangkaian, bukan sebagai 400 yang kabur.
  */
+/**
+ * Had base64 bukan dasar operasi, ia batasan fizikal.
+ *
+ * Base64 dijana sebagai output model, jadi fail 250 KB menelan kira-kira
+ * 89,000 token. Membuang semakan ini tidak menjadikan fail besar boleh
+ * dimuat naik melalui base64, ia hanya menukar kegagalan pantas yang jelas
+ * kepada kegagalan lambat yang mengelirukan selepas membazir sebahagian
+ * besar sesi.
+ */
+const MAX_BASE64_CHARS = 256 * 1024;
+
 const CARD_TYPES = ["text", "link", "image", "file", "chatbot", "youtube"];
 
 /**
@@ -583,8 +594,10 @@ export const TOOLS: ToolDef[] = [
     title: "Muat naik fail board",
     description:
       "Muat naik fail untuk digunakan oleh kad file atau image. Pulangkan file_code " +
-      "yang boleh diberi terus kepada create_board_card. Keupayaan muat naik pengguna " +
-      "dikuatkuasakan oleh aplikasi.",
+      "yang boleh diberi terus kepada create_board_card. Guna source_url untuk fail " +
+      "yang sudah ada di web, dan content_base64 hanya untuk fail kecil bawah 256 KB. " +
+      "Untuk fail pada komputer pengguna, guna create_upload_ticket. Keupayaan muat " +
+      "naik pengguna dikuatkuasakan oleh aplikasi.",
     roles: ALL,
     write: true,
     inputSchema: {
@@ -593,14 +606,45 @@ export const TOOLS: ToolDef[] = [
         class_id: { type: "string", description: "Berikan class_id atau board_id" },
         board_id: { type: "string" },
         file_name: { type: "string" },
-        content_base64: { type: "string", description: "Kandungan fail dikodkan base64" },
+        source_url: { type: "string", description: "URL https yang diambil oleh pelayan. Laluan utama." },
+        content_base64: { type: "string", description: "Untuk fail kecil sahaja, had 256 KB" },
         mime_type: { type: "string" },
       },
-      required: ["file_name", "content_base64"],
+      required: ["file_name"],
     },
     handler: async (args, s) => {
       if (!args.class_id && !args.board_id) throw new Error("Berikan class_id atau board_id");
       const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
+
+      const hasB64 = typeof args.content_base64 === "string" && args.content_base64.length > 0;
+      const hasUrl = typeof args.source_url === "string" && args.source_url.length > 0;
+
+      if (hasB64 && hasUrl) {
+        throw new Error("Berikan content_base64 ATAU source_url, bukan kedua-duanya");
+      }
+      if (!hasB64 && !hasUrl) {
+        throw new Error(
+          "Berikan source_url untuk fail dalam talian, content_base64 untuk fail kecil, " +
+            "atau guna create_upload_ticket untuk fail pada komputer anda"
+        );
+      }
+
+      if (hasUrl) {
+        const up = await callApi<any>(s.accessToken, `/api/learning-boards/${classId}/upload-file`, {
+          method: "POST",
+          body: { sourceUrl: args.source_url, fileName: args.file_name },
+        });
+        return { ...up, class_id: classId, file_code: up?.fileCode ?? null };
+      }
+
+      if (args.content_base64.length > MAX_BASE64_CHARS) {
+        const mb = ((args.content_base64.length * 0.75) / (1024 * 1024)).toFixed(1);
+        throw new Error(
+          `Fail ${mb} MB terlalu besar untuk content_base64. ` +
+            `Guna create_upload_ticket untuk fail tempatan, atau source_url untuk fail dalam talian.`
+        );
+      }
+
       const up = await uploadFile(
         s.accessToken,
         classId,
@@ -610,6 +654,71 @@ export const TOOLS: ToolDef[] = [
       );
       // Alias snake_case supaya hasilnya boleh disalurkan terus ke create_board_card.
       return { ...up, class_id: classId, file_code: up?.fileCode ?? null };
+    },
+  },
+
+  {
+    name: "create_upload_ticket",
+    title: "Cipta tiket muat naik",
+    description:
+      "Keluarkan URL PUT bertandatangan, sah 15 minit, supaya alat tempatan boleh menghantar " +
+      "fail terus ke storan. Ini laluan untuk fail pada komputer pengguna: tiada satu bait pun " +
+      "melalui model, jadi tiada kos token dan tiada had saiz. Selepas PUT selesai, panggil " +
+      "finalize_upload untuk mendapatkan file_code.",
+    roles: ALL,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "Berikan class_id atau board_id" },
+        board_id: { type: "string" },
+        file_name: { type: "string" },
+        mime_type: { type: "string" },
+        size: { type: "number", description: "Saiz dalam bait. Pilihan tetapi disyorkan." },
+      },
+      required: ["file_name"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id && !args.board_id) throw new Error("Berikan class_id atau board_id");
+      const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
+      const res = await callApi<any>(s.accessToken, `/api/learning-boards/${classId}/upload/ticket`, {
+        method: "POST",
+        body: {
+          fileName: args.file_name,
+          mimeType: args.mime_type,
+          size: typeof args.size === "number" ? args.size : undefined,
+          boardId: args.board_id,
+        },
+      });
+      return { ...res, class_id: classId };
+    },
+  },
+
+  {
+    name: "finalize_upload",
+    title: "Muktamadkan muat naik",
+    description:
+      "Sahkan fail benar-benar sampai ke storan, kemudian pulangkan file_code untuk " +
+      "create_board_card. Tiket hanya boleh digunakan sekali.",
+    roles: ALL,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        ticket_id: { type: "string" },
+        class_id: { type: "string", description: "Berikan class_id atau board_id" },
+        board_id: { type: "string" },
+      },
+      required: ["ticket_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id && !args.board_id) throw new Error("Berikan class_id atau board_id");
+      const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
+      const res = await callApi<any>(s.accessToken, `/api/learning-boards/${classId}/upload/finalize`, {
+        method: "POST",
+        body: { ticketId: args.ticket_id },
+      });
+      return { ...res, class_id: classId, file_code: res?.fileCode ?? null };
     },
   },
 
