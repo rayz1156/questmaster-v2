@@ -10,7 +10,19 @@ export function s5client(): S3Client {
   const ak = process.env.FILELU_S5_ACCESS_KEY;
   const sk = process.env.FILELU_S5_SECRET_KEY;
   if (!ak || !sk) throw new Error('FileLu S5 credentials missing: set FILELU_S5_ACCESS_KEY and FILELU_S5_SECRET_KEY');
-  _client = new S3Client({ endpoint: ENDPOINT, region: REGION, forcePathStyle: true, credentials: { accessKeyId: ak, secretAccessKey: sk } });
+  // FileLu S5 tidak menyokong Content-Encoding aws-chunked, yang digunakan
+  // oleh AWS SDK v3 apabila ia mengira checksum untuk badan strim. Tanpa
+  // dua tetapan ini setiap muat naik strim mati dengan
+  // "NotImplemented: Content-Encoding aws-chunked is not supported", dan
+  // URL presign membawa x-amz-checksum-crc32 bagi badan kosong.
+  _client = new S3Client({
+    endpoint: ENDPOINT,
+    region: REGION,
+    forcePathStyle: true,
+    credentials: { accessKeyId: ak, secretAccessKey: sk },
+    requestChecksumCalculation: 'WHEN_REQUIRED',
+    responseChecksumValidation: 'WHEN_REQUIRED',
+  } as any);
   return _client;
 }
 export const S5_BUCKET = BUCKET;
