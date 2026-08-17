@@ -21,12 +21,18 @@ export default function Page() {
   const [expanded, setExpanded] = useState<string | null>(null);
   const [classCache, setClassCache] = useState<Record<string, any>>({});
   const [limitDraft, setLimitDraft] = useState<Record<string, { owned: string; coed: string }>>({});
+  const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [alsoApprove, setAlsoApprove] = useState(false);
+  const [verifying, setVerifying] = useState(false);
   const reload = async () => {
     setUsers(await adminListProfiles());
     setMeta(await adminListUsersMeta());
   };
   useEffect(() => { reload(); }, []);
   const filtered = users.filter(u => (roleFilter === "all" || u.role === roleFilter)).filter(u => !q || (u.display_name || "").toLowerCase().includes(q.toLowerCase()) || u.role.includes(q.toLowerCase()) || (meta[u.id]?.email || "").toLowerCase().includes(q.toLowerCase()));
+  const unverified = filtered.filter(u => { const m = meta[u.id]; return m && m.email && !m.email_confirmed_at; });
+  const toggleSelected = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+
   const setRole = async (u: Profile, role: 'participant'|'educator'|'admin'|'superadmin') => {
     await adminUpdateProfile(u.id, { role }); await logAudit('role_change', 'profile', u.id, { from: u.role, to: role }); reload();
   };
@@ -90,6 +96,40 @@ export default function Page() {
       alert('Resend failed: ' + (e?.message || e));
     }
   };
+  /**
+   * Menandakan emel sah tanpa pengguna mengklik pautan.
+   *
+   * Kerja sebenar berlaku di /api/admin/users/verify dengan service_role.
+   * Klien sengaja tidak boleh melakukannya sendiri: memintas pengesahan emel
+   * ialah keupayaan admin, bukan keupayaan pelayar.
+   */
+  const verifyEmails = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const siapa = ids.length > 1 ? `${ids.length} pengguna` : 'pengguna ini';
+    if (!(await confirm({ title: `Tandakan emel ${siapa} sebagai sah${alsoApprove ? ', dan luluskan sekali' : ''}?` }))) return;
+    setVerifying(true);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const res = await fetch('/api/admin/users/verify', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+        body: JSON.stringify({ userIds: ids, alsoApprove }),
+      });
+      const out = await res.json().catch(() => ({} as any));
+      if (!res.ok) throw new Error(out?.error || `HTTP ${res.status}`);
+      const gagal = (out.results || []).filter((r: any) => !r.ok);
+      alert(
+        `Disahkan ${out.ok}/${out.total}.` +
+        (gagal.length ? '\nGagal:\n' + gagal.map((f: any) => `${String(f.id).slice(0, 8)}: ${f.error}`).join('\n') : '')
+      );
+      setSelected(new Set());
+      reload();
+    } catch (e: any) {
+      alert('Verify failed: ' + (e?.message || e));
+    } finally {
+      setVerifying(false);
+    }
+  };
   const exportCsv = () => {
     const esc = (v:any) => { const str = v==null?"":String(v); return /[",\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str; };
     const headers = ["Name","Username","Email","Role","Email verified","Suspended","Approved","Registered"];
@@ -144,6 +184,20 @@ export default function Page() {
           <option value="admin">Admin</option>
         </select><div>
       </div><button onClick={exportCsv} className="text-xs px-3 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 whitespace-nowrap">Export CSV</button></div>
+      {unverified.length > 0 && (
+        <div className="mb-3 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
+          <span className="font-semibold text-amber-900">{unverified.length} belum sahkan emel</span>
+          <button onClick={()=>setSelected(new Set(unverified.map(x=>x.id)))} className="px-2 py-1 rounded bg-white border">Pilih semua</button>
+          {selected.size > 0 && <button onClick={()=>setSelected(new Set())} className="px-2 py-1 rounded bg-white border">Kosongkan</button>}
+          <label className="flex items-center gap-1 cursor-pointer">
+            <input type="checkbox" checked={alsoApprove} onChange={e=>setAlsoApprove(e.target.checked)} />
+            Juga luluskan
+          </label>
+          <button disabled={selected.size === 0 || verifying} onClick={()=>verifyEmails(Array.from(selected))} className="px-3 py-1.5 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-40">
+            {verifying ? 'Sedang sahkan...' : `Sahkan yang dipilih (${selected.size})`}
+          </button>
+        </div>
+      )}
       <div className="space-y-2">{filtered.map(u => {
         const m = meta[u.id];
         return (
@@ -169,6 +223,8 @@ export default function Page() {
             {!u.approved && <button onClick={()=>toggleApprove(u)} className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Approve</button>}
             <button onClick={()=>removeUser(u)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700">Remove</button>
             {m && !m.email_confirmed_at && m.email && <button onClick={()=>resendVerification(u)} className="text-xs px-2 py-1 rounded bg-gray-100">Resend verification</button>}
+            {m && !m.email_confirmed_at && m.email && <button onClick={()=>verifyEmails([u.id])} disabled={verifying} className="text-xs px-2 py-1 rounded bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-40">Sahkan emel</button>}
+            {m && !m.email_confirmed_at && m.email && <label className="text-xs px-2 py-1 rounded bg-gray-100 flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={selected.has(u.id)} onChange={()=>toggleSelected(u.id)} />Pilih</label>}
           </div>
           {(u.role === 'educator' || u.role === 'admin') && (
             <div className="mt-2 flex items-end gap-2 flex-wrap text-xs">
