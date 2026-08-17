@@ -68,20 +68,36 @@ export function isBlockedAddress(ip: string, family: number): boolean {
   return family === 6 ? blockedV6(ip) : blockedV4(ip);
 }
 
-/** Alamat yang benar-benar disambungkan, dikumpul untuk log audit. */
+/**
+ * Alamat yang benar-benar disambungkan, dikumpul untuk log audit.
+ *
+ * net.connect memanggil lookup dengan { all: true } dan menjangka tatasusunan
+ * { address, family }. Memaksa all: false di sini memulangkan bentuk yang salah
+ * dan setiap sambungan sah mati dengan "Invalid IP address: undefined", jadi
+ * kedua-dua bentuk mesti dihormati.
+ */
 function makeGuardedLookup(seen: string[]) {
   return (hostname: string, options: any, cb: any) => {
     const callback = typeof options === 'function' ? options : cb;
-    const opts = typeof options === 'object' && options ? { ...options, all: false } : {};
-    dnsLookup(hostname, opts as any, (err: any, address: string, family: number) => {
+    const opts: any = typeof options === 'object' && options ? options : {};
+    dnsLookup(hostname, { ...opts, all: true } as any, (err: any, addresses: any) => {
       if (err) return callback(err);
-      if (isBlockedAddress(address, family)) {
+      const list: Array<{ address: string; family: number }> = Array.isArray(addresses) ? addresses : [];
+      if (list.length === 0) {
+        return callback(Object.assign(new Error(`Tiada alamat untuk ${hostname}`), { code: 'EBLOCKEDADDR' }));
+      }
+      // Jika MANA-MANA alamat disekat, tolak keseluruhan hos. Menapis dan
+      // menyambung kepada baki yang selamat membuka pintu kepada rebinding
+      // melalui rekod DNS bercampur.
+      const bad = list.find((a) => isBlockedAddress(a.address, a.family));
+      if (bad) {
         return callback(
-          Object.assign(new Error(`Alamat disekat untuk ${hostname}: ${address}`), { code: 'EBLOCKEDADDR' })
+          Object.assign(new Error(`Alamat disekat untuk ${hostname}: ${bad.address}`), { code: 'EBLOCKEDADDR' })
         );
       }
-      seen.push(address);
-      callback(null, address, family);
+      for (const a of list) seen.push(a.address);
+      if (opts.all) return callback(null, list);
+      return callback(null, list[0].address, list[0].family);
     });
   };
 }
