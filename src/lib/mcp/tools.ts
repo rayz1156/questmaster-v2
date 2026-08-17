@@ -75,13 +75,21 @@ async function countBy(
 /**
  * Had base64 bukan dasar operasi, ia batasan fizikal.
  *
- * Base64 dijana sebagai output model, jadi fail 250 KB menelan kira-kira
- * 89,000 token. Membuang semakan ini tidak menjadikan fail besar boleh
- * dimuat naik melalui base64, ia hanya menukar kegagalan pantas yang jelas
- * kepada kegagalan lambat yang mengelirukan selepas membazir sebahagian
- * besar sesi.
+ * Draf pertama menganggap 4 aksara setiap token, iaitu nisbah teks biasa.
+ * Ukuran sebenar pada fail pptx: 22,412 aksara base64 = 90,198 token, iaitu
+ * 4.02 token SETIAP AKSARA. Anggaran asal tersasar 16 kali ganda.
+ *
+ * Pada kadar itu, fail 71 KB sahaja menelan 382,862 token dan fail 245 KB
+ * menelan 1.3 juta. Base64 tidak boleh mengendalikan walau satu fail dokumen
+ * sebenar, jadi hadnya 16 KB dan bukan 256 KB: cukup untuk nota teks pendek
+ * dan ikon kecil, tidak lebih.
+ *
+ * Semakan ini tidak menjimatkan token, kerana menjelang handler dipanggil
+ * model sudah pun menjananya. Yang menjimatkan token ialah description tool
+ * di bawah. Semakan ini hanya memastikan kegagalan itu pantas dan jelas.
  */
-const MAX_BASE64_CHARS = 256 * 1024;
+const MAX_BASE64_CHARS = 16 * 1024;
+const TOKEN_PER_BASE64_CHAR = 4.02;
 
 const CARD_TYPES = ["text", "link", "image", "file", "chatbot", "youtube"];
 
@@ -594,10 +602,14 @@ export const TOOLS: ToolDef[] = [
     title: "Muat naik fail board",
     description:
       "Muat naik fail untuk digunakan oleh kad file atau image. Pulangkan file_code " +
-      "yang boleh diberi terus kepada create_board_card. Guna source_url untuk fail " +
-      "yang sudah ada di web, dan content_base64 hanya untuk fail kecil bawah 256 KB. " +
-      "Untuk fail pada komputer pengguna, guna create_upload_ticket. Keupayaan muat " +
-      "naik pengguna dikuatkuasakan oleh aplikasi.",
+      "yang boleh diberi terus kepada create_board_card. " +
+      "PILIH LALUAN YANG BETUL: fail pada komputer pengguna guna create_upload_ticket dan " +
+      "BUKAN tool ini; fail yang sudah ada di web guna source_url pada tool ini; " +
+      "content_base64 hanya untuk fail bawah 16 KB seperti nota teks pendek atau ikon kecil. " +
+      "JANGAN jana base64 untuk slaid, PDF, Word, Excel atau apa-apa fail dokumen: base64 " +
+      "menelan kira-kira 4 token setiap aksara, jadi fail 71 KB sahaja menelan lebih 380,000 " +
+      "token dan fail 245 KB menelan 1.3 juta. Ia akan ditolak, dan token itu sudah terbazir " +
+      "sebelum penolakan sampai. Keupayaan muat naik pengguna dikuatkuasakan oleh aplikasi.",
     roles: ALL,
     write: true,
     inputSchema: {
@@ -607,7 +619,7 @@ export const TOOLS: ToolDef[] = [
         board_id: { type: "string" },
         file_name: { type: "string" },
         source_url: { type: "string", description: "URL https yang diambil oleh pelayan. Laluan utama." },
-        content_base64: { type: "string", description: "Untuk fail kecil sahaja, had 256 KB" },
+        content_base64: { type: "string", description: "Hanya fail bawah 16 KB. Apa-apa yang lebih besar mesti guna create_upload_ticket atau source_url." },
         mime_type: { type: "string" },
       },
       required: ["file_name"],
@@ -638,10 +650,16 @@ export const TOOLS: ToolDef[] = [
       }
 
       if (args.content_base64.length > MAX_BASE64_CHARS) {
-        const mb = ((args.content_base64.length * 0.75) / (1024 * 1024)).toFixed(1);
+        const kb = Math.round((args.content_base64.length * 0.75) / 1024);
+        const tokens = Math.round(args.content_base64.length * TOKEN_PER_BASE64_CHAR);
+        const kosTeks =
+          tokens >= 1_000_000
+            ? `${(tokens / 1_000_000).toFixed(1)} juta`
+            : `${Math.round(tokens / 1000)} ribu`;
         throw new Error(
-          `Fail ${mb} MB terlalu besar untuk content_base64. ` +
-            `Guna create_upload_ticket untuk fail tempatan, atau source_url untuk fail dalam talian.`
+          `Fail ${kb} KB terlalu besar untuk content_base64, had ${MAX_BASE64_CHARS / 1024} KB. ` +
+            `Base64 menelan kira-kira 4 token setiap aksara, jadi fail ini memerlukan kira-kira ${kosTeks} token. ` +
+            `Guna create_upload_ticket untuk fail pada komputer anda, atau source_url untuk fail yang sudah ada di web.`
         );
       }
 
