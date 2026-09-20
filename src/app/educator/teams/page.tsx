@@ -1,6 +1,8 @@
 "use client";
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import Shell from "@/components/Shell";
+import ClassShell from "@/components/ClassShell";
+import RowMenu from "@/components/ui/RowMenu";
 import { EDU_TABS } from '@/lib/eduTabs';
 import Link from 'next/link';
 import { useEffect, useState, useRef, useCallback, Suspense } from "react";
@@ -43,6 +45,9 @@ function TeamsInner() {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [bulkMarkHuntId, setBulkMarkHuntId] = useState<string>("");
   const [memberCountByTeam, setMemberCountByTeam] = useState<Record<string,number>>({});
+  // Mod pilih disembunyikan sehingga diminta. Kotak semak pada setiap baris
+  // sepanjang masa menjadikan senarai kelihatan seperti borang.
+  const [selectMode, setSelectMode] = useState(false);
 
   const reloadClassTeams = useCallback(async (classId: string) => {
     try {
@@ -115,69 +120,131 @@ function TeamsInner() {
     return (a.name||'').localeCompare(b.name||'');
   });
 
-  return (
-    <Shell tabs={EDU_TABS}>
-      {activeClassId && (
-        <Link href={`/educator/classes/${activeClassId}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
-      )}
-      {/* Top bar: class + hunt selectors inline */}
-      <div className="flex items-center gap-3 mb-4 flex-wrap">
-        <select className="border border-gray-200 rounded-xl px-4 py-2.5 text-sm bg-white min-w-[200px] font-medium" value={activeClassId} onChange={e=>{setActiveClassId(e.target.value);setSelectedTeamId(null);}}>
-          <option value="">All classes</option>
-          {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-        </select>
-        
-        <div className="ml-auto inline-flex items-center gap-2 px-3 py-2 rounded-xl border border-gray-200 bg-white text-sm"><Users className="w-4 h-4 text-purple-600"/><span className="text-gray-700">{teams.length} team{teams.length!==1?'s':''} created</span></div>
+  const body = (
+    <>
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
+        <div>
+          <h2 className={activeClassId ? "section-title" : "page-title"}>Teams</h2>
+          {teams.length > 0 && (
+            <p className="text-sm text-ink-muted mt-0.5">{teams.length} {teams.length === 1 ? "team" : "teams"}</p>
+          )}
+        </div>
+        <div className="flex items-center gap-3">
+          {!activeClassId && (
+            <select className="input w-auto" value={activeClassId} onChange={e=>{setActiveClassId(e.target.value);setSelectedTeamId(null);}}>
+              <option value="">All classes</option>
+              {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+          {teams.length > 0 && (
+            <button onClick={()=>setShowCreate(true)} className="btn-primary"><Plus className="w-4 h-4"/>Create team</button>
+          )}
+        </div>
       </div>
 
-      {loading ? <p className="text-center py-12 text-gray-400">Loading teams...</p> : (
+      {loading ? <p className="text-sm text-ink-muted">Loading teams…</p> : (
         <div className="grid gap-4">
 
           {/* ── LEFT: Team list ── */}
           <div className={`flex flex-col ${sel ? "hidden" : ""}`}>
-            <div className="flex gap-2 mb-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-2.5 top-2.5 w-4 h-4 text-gray-400 pointer-events-none"/>
-                <input className="w-full border rounded-lg pl-9 pr-3 py-2 text-sm bg-white focus:ring-2 focus:ring-purple-300 outline-none" placeholder="Search..." value={search} onChange={e=>setSearch(e.target.value)}/>
+            {teams.length === 0 ? (
+              <div className="surface py-20 text-center">
+                <div className="w-14 h-14 rounded-full bg-[#EAE6FC] flex items-center justify-center mx-auto mb-4">
+                  <Users className="w-6 h-6 text-brand-purple"/>
+                </div>
+                <div className="section-title mb-1">Better learning, together.</div>
+                <p className="text-sm text-ink-muted mb-5">
+                  {activeClassId ? "Create a team to get started." : "Create a team in a class to get started."}
+                </p>
+                <button onClick={()=>setShowCreate(true)} className="btn-primary px-5">Create team</button>
+                {!activeClassId && (
+                  <p className="text-xs text-ink-faint mt-3">Choose a class when you create your team.</p>
+                )}
               </div>
-              <button onClick={()=>setShowCreate(true)} className="bg-purple-600 hover:bg-purple-700 text-white px-4 py-2.5 rounded-xl transition flex items-center gap-1.5 font-medium text-sm shrink-0"><Plus className="w-4 h-4"/>Add team</button>
-            </div>
-            <div className="flex items-center gap-2 mb-2">
-              <label className="text-xs text-gray-500">Sort by:</label>
-              <select value={sortBy} onChange={e=>setSortBy(e.target.value as any)} className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white"><option value="name">Name</option><option value="members">Members</option><option value="score">Score</option></select>
-              {selected.size>0 && hunts.length>0 && (<>
-              <select value={bulkMarkHuntId} onChange={e=>setBulkMarkHuntId(e.target.value)} className="text-xs border border-gray-300 rounded px-2 py-1 ml-2" data-testid="bulk-hunt-select"><option value="">— Activity —</option>{hunts.map(h=>(<option key={h.id} value={h.id}>{h.title}</option>))}</select>
-              <button onClick={onBulkMarkComplete} disabled={!bulkMarkHuntId} className="text-xs text-green-700 hover:bg-green-50 disabled:opacity-40 px-2 py-1 rounded-md border border-green-300" data-testid="bulk-mark-btn">✓ Mark complete ({selected.size})</button>
-            </>)}
-            {selected.size>0 && <button onClick={onBulkDelete} className="ml-auto text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded-md"><Trash2 className="w-3 h-3 inline mr-0.5"/>{selected.size}</button>}
-            </div>
-
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-              {filtered.length===0 && <p className="text-sm text-gray-300 text-center py-8">No teams</p>}
-              {filtered.map(t=>{
-                const act = selectedTeamId===t.id;
-                const sc = bonusMap[t.id]?.total ?? (t.score??0);
-                const bon = bonusMap[t.id]?.bonus ?? 0;
-                const mc = (typeof memberCountByTeam[t.id]==="number")?memberCountByTeam[t.id]:((membersByTeam[t.id]||[]).length||t.member_count||0);
-                return (
-                  <div key={t.id} onClick={()=>{setSelectedTeamId(t.id);setDetailTab('members');}} className={`group flex items-center gap-2 p-2.5 rounded-lg cursor-pointer border transition-all w-full ${act?'border-purple-400 bg-purple-50 shadow':'border-gray-100 hover:border-purple-200 hover:bg-gray-50 bg-white'}`}>
-                    <input type="checkbox" checked={selected.has(t.id)} onChange={()=>toggleOne(t.id)} onClick={e=>e.stopPropagation()} className="w-3.5 h-3.5 accent-purple-600 shrink-0"/>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-sm truncate">{t.name}</div>
-                      <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
-                        <span><Users className="w-3 h-3 inline"/> {mc}/{t.max_members??5}</span>
-                        <span className="text-purple-600 font-semibold">{sc}pts</span>
-                        {bon!==0 && <span className="text-amber-500">+{bon}</span>}
-                      </div>
-                    </div>
-                    <ChevronRight className={`w-4 h-4 shrink-0 transition ${act?'text-purple-500':'text-gray-200 group-hover:text-gray-400'}`}/>
+            ) : (
+              <>
+                <div className="flex items-center gap-3 flex-wrap mb-4">
+                  <div className="relative flex-1 min-w-[200px] max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint pointer-events-none"/>
+                    <input className="input pl-9" placeholder="Search teams..." value={search} onChange={e=>setSearch(e.target.value)}/>
                   </div>
-                );
-              })}
-            </div>
-            <label className="flex items-center gap-2 text-xs text-gray-400 pt-2 border-t mt-2 cursor-pointer select-none">
-              <input type="checkbox" checked={selected.size===teams.length&&teams.length>0} onChange={toggleAll} className="w-3.5 h-3.5 accent-purple-600"/>Select all ({teams.length})
-            </label>
+                  <select value={sortBy} onChange={e=>setSortBy(e.target.value as any)} className="input w-auto">
+                    <option value="name">Sort by name</option>
+                    <option value="members">Sort by members</option>
+                    <option value="score">Sort by points</option>
+                  </select>
+                  <button
+                    onClick={()=>{ setSelectMode(v=>!v); setSelected(new Set()); }}
+                    className={selectMode ? "btn-primary" : "btn-secondary"}
+                  >
+                    {selectMode ? "Done" : "Select"}
+                  </button>
+                </div>
+
+                {selectMode && selected.size > 0 && (
+                  <div className="flex items-center gap-3 flex-wrap rounded-xl bg-[#F5F3FE] px-4 py-2.5 mb-4">
+                    <span className="text-sm text-ink">{selected.size} selected</span>
+                    {hunts.length > 0 && (
+                      <>
+                        <select value={bulkMarkHuntId} onChange={e=>setBulkMarkHuntId(e.target.value)} className="input w-auto py-1.5 text-sm" data-testid="bulk-hunt-select">
+                          <option value="">Choose activity…</option>
+                          {hunts.map(h=>(<option key={h.id} value={h.id}>{h.title}</option>))}
+                        </select>
+                        <button onClick={onBulkMarkComplete} disabled={!bulkMarkHuntId} className="btn-quiet text-brand-purple disabled:opacity-40" data-testid="bulk-mark-btn">Mark complete</button>
+                      </>
+                    )}
+                    <button onClick={toggleAll} className="btn-quiet">Select all</button>
+                    <button onClick={onBulkDelete} className="btn-quiet text-[#C0392B] ml-auto"><Trash2 className="w-3.5 h-3.5"/>Delete</button>
+                  </div>
+                )}
+
+                <div className="surface">
+                  <div className="flex items-center gap-4 px-5 py-3 bg-[#FAFAFB]">
+                    <div className="t-head flex-1">Team</div>
+                    <div className="t-head w-36 text-right hidden sm:block">Members</div>
+                    <div className="t-head w-20 text-right">Points</div>
+                    <div className="w-8" />
+                  </div>
+                  {filtered.length === 0 && (
+                    <div className="px-5 py-8 text-sm text-ink-muted text-center">No teams match that search.</div>
+                  )}
+                  {filtered.map(t=>{
+                    const max = Number(t.max_members ?? 5);
+                    const mc = (typeof memberCountByTeam[t.id]==="number")?memberCountByTeam[t.id]:((membersByTeam[t.id]||[]).length||t.member_count||0);
+                    const sc = bonusMap[t.id]?.total ?? (t.score??0);
+                    return (
+                      <div
+                        key={t.id}
+                        onClick={()=>{ if(selectMode){ toggleOne(t.id); return; } setSelectedTeamId(t.id); setDetailTab('members'); }}
+                        className="t-row flex items-center gap-4 px-5 py-3.5 cursor-pointer"
+                      >
+                        {selectMode && (
+                          <input type="checkbox" checked={selected.has(t.id)} onChange={()=>toggleOne(t.id)} onClick={e=>e.stopPropagation()} className="w-4 h-4 accent-[#7057D9] shrink-0"/>
+                        )}
+                        <div className="flex-1 min-w-0 text-[15px] text-ink truncate">{t.name}</div>
+                        <div className="w-36 hidden sm:flex items-center justify-end gap-2">
+                          <span className="flex gap-0.5" aria-hidden>
+                            {Array.from({ length: Math.min(max, 8) }).map((_, k) => (
+                              <span key={k} className={`w-2.5 h-1.5 rounded-full ${k < mc ? "bg-brand-purple" : "bg-hairline"}`}/>
+                            ))}
+                          </span>
+                          <span className="text-xs text-ink-muted tabular-nums whitespace-nowrap">{mc} of {max}</span>
+                        </div>
+                        <div className="w-20 text-right text-[15px] text-ink tabular-nums">{sc}</div>
+                        <div onClick={e=>e.stopPropagation()}>
+                          <RowMenu items={[
+                            { label: "Open team", icon: <ChevronRight className="w-4 h-4"/>, onSelect: ()=>{ setSelectedTeamId(t.id); setDetailTab('members'); } },
+                            { label: "Rename team", icon: <Pencil className="w-4 h-4"/>, onSelect: ()=>onRename(t) },
+                            { label: "Change max members", icon: <Settings className="w-4 h-4"/>, onSelect: ()=>onMax(t) },
+                            { label: "Delete team", icon: <Trash2 className="w-4 h-4"/>, danger: true, onSelect: ()=>onDel(t) },
+                          ]}/>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </>
+            )}
           </div>
 
           {/* ── RIGHT: Detail panel ── */}
@@ -354,9 +421,17 @@ function TeamsInner() {
           </div>
         </div>
       )}
+    </>
+  );
+
+  return (
+    <Shell tabs={EDU_TABS}>
+      {activeClassId
+        ? <ClassShell classId={activeClassId} current="people">{body}</ClassShell>
+        : body}
     </Shell>
   );
 }
 
-export default function Teams(){return <Suspense fallback={<p>Loading...</p>}><TeamsInner/></Suspense>;}
+export default function Teams(){return <Suspense fallback={<p className="p-6 text-sm text-ink-muted">Loading…</p>}><TeamsInner/></Suspense>;}
 // force rebuild v2

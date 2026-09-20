@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ListChecks, Users, BarChart3, Zap, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity, Award, Plus, Minus, Trophy, EyeOff } from "lucide-react";
 import Shell from "@/components/Shell";
+import ClassShell from "@/components/ClassShell";
 import { EDU_TABS } from '@/lib/eduTabs';
 import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, endClass, reopenClass, addStudentScoreAdjustment, listStudentScoreAdjustments, deleteStudentScoreAdjustment, Klass, ClassInvite, StudentScoreAdjustment } from "@/lib/data";
 import EducatorsCard from "@/components/EducatorsCard";
@@ -133,18 +134,14 @@ export default function ClassDetail() {
     return arr;
   }, [members, search, sortBy]);
 
-  if (!klass) return <Shell tabs={EDU_TABS}><p className="text-sm text-gray-500">Loading…</p></Shell>;
+  if (!klass) return <Shell tabs={EDU_TABS}><p className="text-sm text-ink-muted">Loading…</p></Shell>;
 
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-center gap-2 mb-3">
-        <Link href="/educator/classes" className="text-sm text-gray-500 hover:text-gray-700">← Classes</Link>
-      </div>
+      <ClassShell classId={klass.id} current="overview" klass={klass}>
 
-      {/* Header card */}
-      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5 mb-4">
+      <div className="card mb-4">
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-xl shrink-0" style={{ background: klass.color || '#6366f1' }}/>
           <div className="flex-1 min-w-0">
             {editingName ? (
               <div className="flex items-center gap-2">
@@ -154,8 +151,8 @@ export default function ClassDetail() {
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                <div className="font-bold text-xl text-gray-900 truncate">{klass.name}</div>
-                <button title="Rename class" onClick={()=>{ setNameDraft(klass.name); setEditingName(true); }} className="text-gray-400 hover:text-gray-700"><Pencil className="w-3.5 h-3.5"/></button>
+                <div className="font-semibold text-ink truncate">Class details</div>
+                <button title="Rename class" onClick={()=>{ setNameDraft(klass.name); setEditingName(true); }} className="btn-quiet text-brand-purple"><Pencil className="w-3.5 h-3.5"/> Rename</button>
               </div>
             )}
             {klass.description && <div className="text-xs text-gray-500 mt-0.5">{klass.description}</div>}
@@ -202,28 +199,6 @@ export default function ClassDetail() {
           </div>
         </div>
 
-        {/* Tab pills */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-          <Link href={`/educator/classes/${klass.id}/board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition text-sm relative">
-            <LinkIcon className="w-5 h-5"/><span className="font-medium">Intro Board</span>
-            <span className="absolute left-3 right-3 -bottom-px h-0.5 bg-indigo-600 rounded-full"/>
-          </Link>
-          <Link href={`/educator/classes/${klass.id}/learning-board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
-            <GraduationCap className="w-5 h-5"/><span className="font-medium">Learning Board</span>
-          </Link>
-          <Link href={`/educator/activities?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
-            <ListChecks className="w-5 h-5"/><span>Activities</span>
-          </Link>
-          <Link href={`/educator/live?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
-            <Zap className="w-5 h-5"/><span>Quiz</span>
-          </Link>
-          <Link href={`/educator/teams?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
-            <Users className="w-5 h-5"/><span>Teams</span>
-          </Link>
-          <Link href={`/educator/rankings?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
-            <BarChart3 className="w-5 h-5"/><span>Rankings</span>
-          </Link>
-        </div>
       </div>
 
       {/* Leaderboard visibility */}
@@ -466,6 +441,7 @@ export default function ClassDetail() {
           </div>
         </div>
       )}
+      </ClassShell>
     </Shell>
   );
 }

@@ -7,6 +7,7 @@ import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as
 import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass, leaveClassAsEducator } from "@/lib/data";
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import RowMenu from "@/components/ui/RowMenu";
 
 function roleLabel(role: string): string {
   if (role === "owner") return "Owner";
@@ -133,28 +134,34 @@ export default function EduClasses() {
 
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 className="page-title">My Classes</h2>
-        <button onClick={() => setShowNew(s => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1"><Plus className="w-4 h-4"/> New Class</button>
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
+        <div>
+          <h1 className="page-title">Your classes</h1>
+          <p className="page-subtitle">Everything you teach, in one place.</p>
+        </div>
+        <button onClick={() => setShowNew(s => !s)} className="btn-primary"><Plus className="w-4 h-4"/> New class</button>
       </div>
 
       {invites.length > 0 && (
-        <div className="card mb-4 border-l-4" style={{ borderLeftColor: "#6366f1" }}>
-          <div className="flex items-center gap-2 mb-1"><Mail className="w-4 h-4 text-indigo-600"/><div className="font-semibold">Pending educator invites ({invites.length})</div></div>
-          <p className="text-xs text-gray-500 mb-3">You have been invited to co-educate the following classes. Accept to gain access.</p>
+        <div className="surface p-5 mb-6">
+          <div className="flex items-center gap-2 mb-1">
+            <Mail className="w-4 h-4 text-brand-purple"/>
+            <div className="font-semibold text-ink">You have been invited to co-teach</div>
+          </div>
+          <p className="text-sm text-ink-muted mb-4">Accept to gain access to the class.</p>
           {inviteMsg && (
-            <div className={`text-xs mb-2 ${inviteMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>{inviteMsg.text}</div>
+            <div className={`text-sm mb-3 ${inviteMsg.type === "ok" ? "text-[#2E7D4F]" : "text-red-600"}`}>{inviteMsg.text}</div>
           )}
-          <div className="space-y-2">
+          <div className="space-y-1">
             {invites.map((i) => (
-              <div key={i.id} className="flex items-center gap-2 py-2 border-b last:border-0">
-                <div className="w-6 h-6 rounded-md shrink-0" style={{ background: i.class_color || "#6366f1" }}/>
+              <div key={i.id} className="flex items-center gap-3 py-2.5 border-t border-hairline first:border-0">
+                <span className="w-8 h-8 rounded-lg shrink-0" style={{ background: i.class_color || "#7057D9" }}/>
                 <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{i.class_name}</div>
-                  <div className="text-xs text-gray-500 truncate">Invited by {i.inviter_name || "another educator"} · expires {new Date(i.expires_at).toLocaleDateString()}</div>
+                  <div className="font-medium text-ink truncate">{i.class_name}</div>
+                  <div className="text-xs text-ink-faint truncate">Invited by {i.inviter_name || "another educator"} · expires {new Date(i.expires_at).toLocaleDateString()}</div>
                 </div>
-                <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{i.code}</code>
-                <button disabled={inviteBusy === i.code} onClick={() => onAcceptInvite(i.code)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1"><Check className="w-4 h-4"/> Accept</button>
+                <code className="code-chip text-xs hidden sm:block">{i.code}</code>
+                <button disabled={inviteBusy === i.code} onClick={() => onAcceptInvite(i.code)} className="btn-secondary py-1.5 px-3 text-sm"><Check className="w-4 h-4"/> Accept</button>
               </div>
             ))}
           </div>
@@ -162,55 +169,70 @@ export default function EduClasses() {
       )}
 
       {showNew && (
-        <div className="card mb-4">
-          <div className="font-semibold mb-2">Create new class</div>
-          <input className="input w-full mb-2" placeholder="Class name" value={name} onChange={e => setName(e.target.value)}/>
-          <input className="input w-full mb-2" placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)}/>
-          <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">Color</label>
-            <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-10 h-8 rounded"/>
-            <button type="button" disabled={busy} onClick={onCreate} className="btn-primary ml-auto py-1 px-3 text-sm">{busy ? "Creating…" : "Create"}</button>
+        <div className="surface p-5 mb-6">
+          <div className="font-semibold text-ink mb-4">Create a class</div>
+          <label className="block text-sm font-medium text-ink mb-1.5">Class name</label>
+          <input className="input mb-4" placeholder="e.g. Kursus Pembangunan Laman Web" value={name} onChange={e => setName(e.target.value)}/>
+          <label className="block text-sm font-medium text-ink mb-1.5">Description <span className="text-ink-faint font-normal">(optional)</span></label>
+          <input className="input mb-4" placeholder="What is this class about?" value={desc} onChange={e => setDesc(e.target.value)}/>
+          <div className="flex items-center gap-3">
+            <label className="text-sm text-ink-muted">Colour</label>
+            <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-9 h-9 rounded-lg border border-hairline bg-white p-0.5"/>
+            <div className="ml-auto flex items-center gap-2">
+              <button type="button" onClick={() => setShowNew(false)} className="btn-secondary">Cancel</button>
+              <button type="button" disabled={busy} onClick={onCreate} className="btn-primary">{busy ? "Creating…" : "Create class"}</button>
+            </div>
           </div>
-          {err && <div className="text-xs text-red-600 mt-1">{err}</div>}
+          {err && <div className="text-sm text-red-600 mt-3">{err}</div>}
         </div>
       )}
 
       {!showNew && err && <div className="text-xs text-red-600 mb-2">{err}</div>}
 
       {loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-sm text-ink-muted">Loading…</p>
       ) : classes.length === 0 ? (
-        <p className="text-sm text-gray-500">No classes yet. Create one to organise your activities, teams and rankings.</p>
+        <div className="surface py-20 text-center">
+          <div className="w-14 h-14 rounded-full bg-[#EAE6FC] flex items-center justify-center mx-auto mb-4">
+            <GraduationCap className="w-6 h-6 text-brand-purple"/>
+          </div>
+          <div className="section-title mb-1">Start with a class.</div>
+          <p className="text-sm text-ink-muted mb-5">A class holds your learning board, activities, quizzes and rankings.</p>
+          <button onClick={() => setShowNew(true)} className="btn-primary">Create your first class</button>
+        </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {classes.map(k => (
-            <div key={k.id} className="card">
-              <div className="flex items-center justify-between gap-2">
-                <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className="w-8 h-8 rounded-lg shrink-0" style={{ background: k.color || "#6366f1" }}/>
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 min-w-0"><Link href={`/educator/classes/${k.id}`} className="font-semibold truncate block">{k.name}</Link>{k.ended_at && <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Ended</span>}</div>
-                    {k.description && <div className="text-xs text-gray-500 truncate">{k.description}</div>}
+            <div key={k.id} className="card hover:border-[#D8D9E0] transition">
+              <div className="flex items-start gap-3">
+                <span className="w-9 h-9 rounded-xl shrink-0 mt-0.5" style={{ background: k.color || "#7057D9" }}/>
+                <div className="min-w-0 flex-1">
+                  <div className="flex items-center gap-2 min-w-0">
+                    <Link href={`/educator/classes/${k.id}`} className="font-semibold text-ink truncate hover:text-brand-purple transition">{k.name}</Link>
+                    {k.ended_at && <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Ended</span>}
                   </div>
+                  {k.description
+                    ? <div className="text-sm text-ink-muted truncate mt-0.5">{k.description}</div>
+                    : <div className="text-sm text-ink-faint mt-0.5">{roleLabel(k.role)}</div>}
                 </div>
-                {k.role === "owner" ? (
-                  <><button onClick={() => openDuplicate(k)} title="Duplicate class" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><CopyPlus className="w-4 h-4"/></button><button onClick={() => onDelete(k)} title="Delete class" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4"/></button></>
-                ) : (
-                  <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">{roleLabel(k.role)}</span>
-                    <button onClick={() => onLeave(k)} title="Leave class" className="text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded-lg px-2 py-1 text-xs font-medium transition">Leave</button>
-                  </div>
-                )}
+                <RowMenu items={[
+                  ...(k.role === "owner" ? [
+                    { label: "Duplicate class", icon: <CopyPlus className="w-4 h-4"/>, onSelect: () => openDuplicate(k) },
+                    { label: "Delete class", icon: <Trash2 className="w-4 h-4"/>, danger: true, onSelect: () => onDelete(k) },
+                  ] : [
+                    { label: "Leave class", icon: <UserIcon className="w-4 h-4"/>, danger: true, onSelect: () => onLeave(k) },
+                  ]),
+                ]}/>
               </div>
-              <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">
-                Code: <code className="font-mono bg-gray-100 px-2 py-0.5 rounded">{k.join_code}</code>
-                <button onClick={() => navigator.clipboard.writeText(k.join_code)} className="text-blue-600 flex items-center gap-1"><Copy className="w-3 h-3"/>copy</button>
-                <Link href={`/educator/classes/${k.id}`} className="ml-auto text-brand-purple font-semibold">Manage →</Link>
+
+              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-hairline">
+                <code className="code-chip text-xs">{k.join_code}</code>
+                <button onClick={() => navigator.clipboard.writeText(k.join_code)} className="btn-quiet text-brand-purple"><Copy className="w-3.5 h-3.5"/>Copy</button>
+                <Link href={`/educator/classes/${k.id}`} className="ml-auto btn-quiet text-brand-purple">Open →</Link>
               </div>
             </div>
           ))}
-        </div>
-      )}
+        </div>      )}
       {dupTarget && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !dupBusy && setDupTarget(null)}>
           <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
