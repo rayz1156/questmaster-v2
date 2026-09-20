@@ -18,6 +18,7 @@ import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase, setRememberMe } from '@/lib/supabase';
 import Logo from '@/components/Logo';
+import GoogleButton from '@/components/GoogleButton';
 
 function LoginInner() {
   const router = useRouter();
@@ -99,7 +100,10 @@ function LoginInner() {
             <p className="text-[17px] text-ink-muted mt-2">Your next great class starts here.</p>
           </div>
 
-          <form onSubmit={signIn} className="bg-white rounded-2xl border border-hairline p-6">
+          <div className="bg-white rounded-2xl border border-hairline p-6">
+            <GoogleButton next={searchParams?.get('next') || undefined} className="mb-5 empty:hidden" />
+
+            <form onSubmit={signIn}>
             <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="email">Email</label>
             <input
               id="email"
@@ -164,13 +168,9 @@ function LoginInner() {
               {busy ? 'Signing in…' : 'Sign in'}
             </button>
 
-            <div className="flex items-center gap-3 my-5">
-              <span className="h-px flex-1 bg-hairline" />
-              <span className="text-xs text-ink-faint">or</span>
-              <span className="h-px flex-1 bg-hairline" />
-            </div>
+            </form>
 
-            <div className="flex items-center justify-between text-sm">
+            <div className="mt-5 flex items-center justify-between text-sm">
               <Link href="/forgot-password" className="text-brand-purple font-medium hover:underline">
                 Forgot password?
               </Link>
@@ -178,7 +178,7 @@ function LoginInner() {
                 Create an account
               </Link>
             </div>
-          </form>
+          </div>
         </div>
       </div>
 

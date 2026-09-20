@@ -1,20 +1,30 @@
 'use client';
+
+/**
+ * Create account, semakan September 2026. Lihat skrin log masuk untuk
+ * pasangannya; kedua-duanya sengaja kelihatan sama.
+ */
+
 import { useState } from 'react';
 import Link from 'next/link';
-import { supabase } from '@/lib/supabaseClient';
+import { Eye, EyeOff } from 'lucide-react';
+import { supabase } from '@/lib/supabase';
+import Logo from '@/components/Logo';
+import GoogleButton from '@/components/GoogleButton';
 
 export default function Register() {
-  const [email,setEmail]=useState('');
-  const [password,setPassword]=useState('');
-  const [name,setName]=useState('');
-  const [role,setRole]=useState<'participant'|'educator'>('participant');
-  const [busy,setBusy]=useState(false);
-  const [err,setErr]=useState('');
-  const [done,setDone]=useState(false);
-  const [resending,setResending]=useState(false);
-  const [resendMsg,setResendMsg]=useState('');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
+  const [name, setName] = useState('');
+  const [role, setRole] = useState<'participant' | 'educator'>('participant');
+  const [show, setShow] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const [done, setDone] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendMsg, setResendMsg] = useState('');
 
-  async function submit(e: React.FormEvent){
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     setBusy(true); setErr('');
     const redirectTo = `${window.location.origin}/auth/callback`;
@@ -24,73 +34,158 @@ export default function Register() {
     });
     setBusy(false);
     if (error) { setErr(error.message); return; }
-    // Notify admin if a new educator registered (fire-and-forget; non-blocking)
     if (role === 'educator') {
-      fetch('/api/notify-educator-pending', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email, name }) }).catch(() => {});
+      fetch('/api/notify-educator-pending', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, name }),
+      }).catch(() => {});
     }
     setDone(true);
   }
 
-  async function resendVerification(){
-    if(!email){ setResendMsg('Please enter your email above first.'); return; }
+  async function resendVerification() {
+    if (!email) { setResendMsg('Please enter your email above first.'); return; }
     setResending(true); setResendMsg('');
     const redirectTo = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
     setResending(false);
-    setResendMsg(error ? (error.message || 'Could not resend. Try again later.') : 'Verification email sent again. Please check your inbox (and spam folder).');
+    setResendMsg(error
+      ? (error.message || 'Could not resend. Try again later.')
+      : 'Verification email sent again. Please check your inbox, and your spam folder.');
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
-      <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg mb-3 text-3xl" aria-hidden="true">📚</div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Create your account</h1>
-          <p className="text-white/80 mt-1">Join Kuizen as a participant or educator</p>
-        </div>
-        {done ? (
-          <div className="bg-white rounded-2xl shadow-xl p-6 space-y-3">
-            <h2 className="text-xl font-bold text-gray-900">Check your email ✉️</h2>
-            <p className="text-sm text-gray-600">We sent a verification link to <b>{email}</b>. Click it to confirm your account, then sign in.</p>
-            {role==='educator' && <p className="text-sm text-amber-700 bg-amber-50 rounded-xl p-3">After verifying, an admin will need to approve your educator account before you can create hunts.</p>}
-            <button type="button" onClick={resendVerification} disabled={resending} className="block w-full text-center text-sm text-purple-600 font-medium mb-3 disabled:opacity-60">{resending ? 'Sending…' : "Didn't get the email? Resend verification"}</button>
-                {resendMsg && <p className="text-sm text-center text-gray-600 mb-3">{resendMsg}</p>}
-                <Link className="block text-center w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600" href="/login">Back to sign in</Link>
+    <div className="min-h-screen flex flex-col" style={{ background: '#FCFBF9' }}>
+      <div className="px-8 pt-7">
+        <Logo size={30} />
+      </div>
+
+      <div className="flex-1 flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-[380px]">
+          <div className="text-center mb-8">
+            <h1 className="text-[40px] leading-[1.1] font-semibold tracking-tight text-ink">
+              {done ? 'Check your email.' : 'Start here.'}
+            </h1>
+            <p className="text-[17px] text-ink-muted mt-2">
+              {done ? `We sent a verification link to ${email}.` : 'One account for every class you teach or join.'}
+            </p>
           </div>
-        ) : (
-          <form onSubmit={submit} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Display name</label>
-              <input value={name} onChange={e=>setName(e.target.value)} required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="Jane Doe" />
+
+          {done ? (
+            <div className="bg-white rounded-2xl border border-hairline p-6">
+              <p className="text-sm text-ink-muted">
+                Open the link to confirm your account, then sign in. If it is not there in a minute, check your spam folder.
+              </p>
+              {role === 'educator' && (
+                <p className="text-sm text-[#8A6100] bg-[#FEF6E7] rounded-xl px-3.5 py-2.5 mt-4">
+                  Educator accounts are approved by an admin after verification.
+                </p>
+              )}
+              <button
+                type="button"
+                onClick={resendVerification}
+                disabled={resending}
+                className="btn-quiet text-brand-purple mt-4 disabled:opacity-50"
+              >
+                {resending ? 'Sending…' : 'Resend verification email'}
+              </button>
+              {resendMsg && <p className="text-sm text-ink-muted mt-2">{resendMsg}</p>}
+              <Link href="/login" className="btn-primary w-full mt-5">Back to sign in</Link>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-              <input type="email" value={email} onChange={e=>setEmail(e.target.value)} required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="you@example.com" />
+          ) : (
+            <div className="bg-white rounded-2xl border border-hairline p-6">
+              <GoogleButton role={role} className="mb-5 empty:hidden" label="Sign up with Google" />
+
+              <form onSubmit={submit}>
+                <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="name">Display name</label>
+                <input
+                  id="name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  required
+                  autoComplete="name"
+                  className="input mb-4"
+                  placeholder="Jane Doe"
+                />
+
+                <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="email">Email</label>
+                <input
+                  id="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  type="email"
+                  required
+                  autoComplete="email"
+                  className="input mb-4"
+                  placeholder="you@example.com"
+                />
+
+                <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="password">Password</label>
+                <div className="relative mb-4">
+                  <input
+                    id="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    type={show ? 'text' : 'password'}
+                    minLength={8}
+                    required
+                    autoComplete="new-password"
+                    className="input pr-11"
+                    placeholder="At least 8 characters"
+                  />
+                  <button
+                    type="button"
+                    onClick={() => setShow((v) => !v)}
+                    aria-label={show ? 'Hide password' : 'Show password'}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink transition"
+                  >
+                    {show ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+                  </button>
+                </div>
+
+                <div className="text-sm font-medium text-ink mb-1.5">I am a</div>
+                <div className="inline-flex rounded-xl border border-hairline overflow-hidden text-sm mb-1">
+                  <button
+                    type="button"
+                    onClick={() => setRole('participant')}
+                    className={`px-4 py-2 font-medium transition ${role === 'participant' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}
+                  >
+                    Participant
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setRole('educator')}
+                    className={`px-4 py-2 font-medium transition border-l border-hairline ${role === 'educator' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}
+                  >
+                    Educator
+                  </button>
+                </div>
+                <p className="text-xs text-ink-faint mb-5">
+                  {role === 'educator'
+                    ? 'Educator accounts are approved by an admin before you can create classes.'
+                    : 'Join classes with a code from your educator.'}
+                </p>
+
+                {err && <p className="text-sm text-[#C0392B] mb-3">{err}</p>}
+
+                <button disabled={busy} className="btn-primary w-full py-3">
+                  {busy ? 'Creating…' : 'Create account'}
+                </button>
+              </form>
+
+              <p className="mt-5 text-sm text-center text-ink-muted">
+                Already have an account?{' '}
+                <Link href="/login" className="text-brand-purple font-medium hover:underline">Sign in</Link>
+              </p>
             </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-              <input type="password" minLength={8} value={password} onChange={e=>setPassword(e.target.value)} required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="At least 8 characters" />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">I am a…</label>
-              <div className="grid grid-cols-2 gap-2">
-                <button type="button" onClick={()=>setRole('participant')} className={`py-2 rounded-xl border ${role==='participant'?'bg-purple-600 text-white border-purple-600':'bg-white text-gray-700 border-gray-200'}`}>Participant</button>
-                <button type="button" onClick={()=>setRole('educator')} className={`py-2 rounded-xl border ${role==='educator'?'bg-purple-600 text-white border-purple-600':'bg-white text-gray-700 border-gray-200'}`}>Educator</button>
-              </div>
-              {role==='educator' && <p className="text-xs text-amber-700 mt-2">Educator accounts require admin approval after email verification.</p>}
-            </div>
-            {err && <p className="text-sm text-red-600">{err}</p>}
-            <button disabled={busy} className="w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600 disabled:opacity-60">{busy?'Creating…':'Create account'}</button>
-            <p className="text-sm text-center text-gray-600">Already have an account? <Link href="/login" className="text-purple-600 font-medium">Sign in</Link></p>
-          </form>
-        )}
+          )}
+        </div>
       </div>
-    
-      <div className="text-center mt-8 space-y-1">
-        <div className="text-[11px] text-white/60 uppercase tracking-widest">In collaboration with</div>
-        <div className="text-sm text-white/90 font-medium">UPSI · AFK · Veltrix</div>
-        <div className="text-[11px] text-white/60 mt-2">Powered by <span className="font-semibold text-white/80">Veltrix Technology</span></div>
+
+      <div className="pb-8 text-center text-xs text-ink-faint tracking-wide">
+        UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix
       </div>
-</div>
+    </div>
   );
 }
