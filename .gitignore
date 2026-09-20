@@ -40,3 +40,6 @@ next-env.d.ts
 *.bak
 .env.local.bak.*
 public/icons.backup-pre-rebrand/
+
+# Scratch brief handed to the coding agent, not part of the repo
+docs/TASK.md
