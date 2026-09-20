@@ -1,6 +1,7 @@
 "use client";
 import Shell from "@/components/Shell";
 import ClassShell from "@/components/ClassShell";
+import { LeaderboardPodium } from "@/components/LiveLeaderboard";
 import { EDU_TABS } from '@/lib/eduTabs';
 import Link from 'next/link';
 import { useEffect, useState, Suspense } from "react";
@@ -184,6 +185,13 @@ function RankingsInner() {
             <div className="text-sm text-ink-muted">Rankings begin when teams earn points.</div>
           </div>
         </div>
+      )}
+
+      {!semuaSifar && ranked.length >= 2 && (
+        <LeaderboardPodium
+          className="mb-6"
+          rows={ranked.slice(0, 3).map(r => ({ rank: r.rank, name: r.team_name, score: r.total_score }))}
+        />
       )}
 
       {ranked.length === 0 ? (

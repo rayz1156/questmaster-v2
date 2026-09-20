@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Users, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight, Activity, ClipboardList, Crown, Medal, Home, Compass, BookOpen } from "lucide-react";
-import { LB_TILE, LB_TILE_REST, LB_MEDAL, LB_MEDAL_REST, LB_PTS, LB_PTS_REST } from "@/components/LiveLeaderboard";
+import { LeaderboardPodium, LB_TILE, LB_TILE_REST, LB_MEDAL, LB_MEDAL_REST, LB_PTS, LB_PTS_REST } from "@/components/LiveLeaderboard";
 import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, listClassIndividualScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listEnrolledClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type ClassIndividualScore, type Klass } from "@/lib/data";
 
 
@@ -136,6 +136,10 @@ function LeaderboardInner() {
 
   const isIndividual = viewMode === 'individual';
   const leaderboard = activeId ? scores.sort((a, b) => b.total_score - a.total_score) : aggScores;
+  // Tangga hanya bermakna bila ada sekurang-kurangnya dua nama. Di bawah itu,
+  // senarai biasa lebih jujur daripada podium yang separuh kosong.
+  const indivRest = indivScores.length >= 2 ? 3 : 0;
+  const teamRest = leaderboard.length >= 2 ? 3 : 0;
 
   return (
     <ParticipantShell>
@@ -191,8 +195,16 @@ function LeaderboardInner() {
         )}
         {isIndividual && !activeId ? (
           indivScores.length === 0 ? <p className="text-sm text-ink-muted">No students ranked yet.</p> : (
+          <>
+          {indivRest > 0 && (
+            <LeaderboardPodium
+              className="mb-5"
+              rows={indivScores.slice(0, 3).map((s, i) => ({ rank: i + 1, name: s.display_name || 'Student', score: s.total_score }))}
+            />
+          )}
           <div className="space-y-2">
-          {indivScores.map((s, i) => {
+          {indivScores.slice(indivRest).map((s, j) => {
+            const i = j + indivRest;
             const tileBg = i < 3 ? LB_TILE[i] : LB_TILE_REST;
             const medalBg = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
             const ptsBg = i < 3 ? LB_PTS[i] : LB_PTS_REST;
@@ -213,10 +225,19 @@ function LeaderboardInner() {
             );
           })}
           </div>
+          </>
           )
         ) : leaderboard.length === 0 ? <p className="text-sm text-ink-muted">No teams yet.</p> : (
+          <>
+          {teamRest > 0 && (
+            <LeaderboardPodium
+              className="mb-5"
+              rows={leaderboard.slice(0, 3).map((s, i) => ({ rank: i + 1, name: s.team_name, score: s.total_score }))}
+            />
+          )}
           <div className="space-y-2">
-          {leaderboard.map((s, i) => {
+          {leaderboard.slice(teamRest).map((s, j) => {
+            const i = j + teamRest;
             const isExpanded = expandedTeam === s.team_id;
             const tileBg = i < 3 ? LB_TILE[i] : LB_TILE_REST;
             const medalBg = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
@@ -258,6 +279,7 @@ function LeaderboardInner() {
             );
           })}
           </div>
+          </>
         )}
       </div>
       </ParticipantShell>

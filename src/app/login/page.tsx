@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase, setRememberMe } from '@/lib/supabase';
+import Logo from '@/components/Logo';
 
 function LoginInner() {
   const router = useRouter();
@@ -88,7 +89,7 @@ function LoginInner() {
   return (
     <div className="min-h-screen flex flex-col" style={{ background: '#FCFBF9' }}>
       <div className="px-8 pt-7">
-        <span className="text-[19px] font-bold tracking-tight text-ink">Kuizen</span>
+        <Logo size={30} />
       </div>
 
       <div className="flex-1 flex items-center justify-center px-6 py-10">

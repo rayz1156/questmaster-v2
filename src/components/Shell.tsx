@@ -18,6 +18,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LogOut, HelpCircle, ChevronDown, User as UserIcon } from "lucide-react";
 import { getSession, clearSession } from "@/lib/session";
+import { LogoMark } from "@/components/Logo";
 import type { User, Profile } from "@/lib/types";
 import { getMyProfile } from "@/lib/data";
 
@@ -122,8 +123,22 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
       {/* ===== Bar atas 72px ===== */}
       <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
         <div className="mx-auto max-w-shell px-5 h-[72px] flex items-center gap-6">
-          <Link href="/educator/classes" className="shrink-0 text-[19px] font-bold tracking-tight text-ink">
-            Kuizen
+          <Link href="/educator/classes" className="shrink-0 inline-flex items-center gap-2.5" aria-label="Kuizen">
+            {profile?.logo_url ? (
+              <>
+                {/* Logo tersuai pendidik, seperti shell lama. Tanda Kuizen kekal
+                    di sebelahnya supaya pengguna masih tahu platform apa ini. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={profile.logo_url} alt="" className="h-7 w-auto max-w-[120px] object-contain" />
+                <span className="w-px h-5 bg-hairline" />
+                <LogoMark size={26} />
+              </>
+            ) : (
+              <>
+                <LogoMark size={28} />
+                <span className="hidden sm:inline text-[19px] font-semibold tracking-tight text-ink">Kuizen</span>
+              </>
+            )}
           </Link>
 
           {/* Destinasi utama, di tengah pada skrin lebar. */}

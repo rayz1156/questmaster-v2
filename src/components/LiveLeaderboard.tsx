@@ -5,14 +5,15 @@ import { Crown, Flame, User as UserIcon } from "lucide-react";
 /**
  * Leaderboard, satu bahasa untuk seluruh platform.
  *
- * Fail ini memiliki rupa jubin pangkat. Leaderboard aktiviti
- * (src/app/participant/leaderboard/page.tsx) mengimport pemalar di bawah,
- * jadi kuiz langsung dan aktiviti tidak boleh terpisah rupa lagi. Kalau
- * pangkat perlu ditukar rupa, tukar di sini sahaja.
+ * Fail ini memiliki rupa pangkat. Leaderboard aktiviti dan halaman Rankings
+ * pendidik mengimport pemalar dan komponen tangga di bawah, jadi kuiz
+ * langsung, aktiviti dan pangkat kelas mustahil terpisah rupa. Kalau pangkat
+ * perlu ditukar rupa, tukar di sini sahaja.
  *
- * Pingat kekal emas, perak dan gangsa kerana itulah maknanya. Yang dibuang
- * ialah bayang berwarna, bintang di tepi dan teks kecerunan: tiga perkara
- * yang menjerit tanpa memberitahu apa-apa.
+ * Tangga tiga anak (podium) ialah bahagian yang membuatkan orang menjerit
+ * dalam bilik kuliah, jadi ia dikekalkan sebagai idea. Yang tidak dibuat
+ * ialah konfeti, piala 3D dan bayang berwarna: bentuk tangga itu sendiri
+ * sudah memberitahu siapa menang, dan apa-apa lagi hanya bising.
  */
 
 export interface LiveLeaderboardRow {
@@ -31,7 +32,7 @@ export const LB_TILE = [
 ];
 export const LB_TILE_REST = "bg-white border-hairline hover:bg-[#FAFAFB]";
 
-/** Bulatan pangkat. Logam sebenar, tanpa bayang berwarna. */
+/** Bulatan pangkat dan anak tangga. Logam sebenar, tanpa bayang berwarna. */
 export const LB_MEDAL = [
   "bg-gradient-to-br from-[#F3C455] to-[#D19B28] text-white",
   "bg-gradient-to-br from-[#D2D6DD] to-[#A5ABB6] text-white",
@@ -47,6 +48,76 @@ export const LB_PTS = [
 ];
 export const LB_PTS_REST = "bg-[#F4F2FD] text-brand-purple";
 
+/** Tinggi anak tangga mengikut pangkat. Beza yang cukup untuk dibaca sekilas. */
+const STEP_H = [132, 100, 78];
+
+function initialsOf(name: string): string {
+  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
+
+export interface PodiumEntry {
+  rank: number;
+  name: string;
+  score: number;
+  /** Tonjolkan baris pemain atau pasukan yang sedang melihat. */
+  me?: boolean;
+  streak?: number;
+}
+
+/**
+ * Tangga tiga anak. Susunan kedua, pertama, ketiga, seperti podium sebenar,
+ * supaya juara berada di tengah dan paling tinggi tanpa perlu dilabel.
+ */
+export function LeaderboardPodium({ rows, className = "" }: { rows: PodiumEntry[]; className?: string }) {
+  const top = rows.slice(0, 3);
+  if (top.length < 2) return null;
+
+  const slots: Array<{ entry: PodiumEntry | undefined; place: number }> = [
+    { entry: top[1], place: 1 },
+    { entry: top[0], place: 0 },
+    { entry: top[2], place: 2 },
+  ];
+
+  return (
+    <div className={`border-b border-hairline ${className}`}>
+      <div className="flex items-end justify-center gap-2 sm:gap-3">
+        {slots.map(({ entry, place }) => {
+          if (!entry) {
+            return <div key={place} className="flex-1 max-w-[168px]" style={{ height: STEP_H[place] }} aria-hidden />;
+          }
+          return (
+            <div key={place} className="flex-1 max-w-[168px] min-w-0 flex flex-col items-center">
+              <div className={`w-11 h-11 rounded-full flex items-center justify-center text-[15px] font-semibold shrink-0 ${LB_MEDAL[place]}`}>
+                {initialsOf(entry.name)}
+              </div>
+              <div className={`mt-2 text-sm font-medium truncate max-w-full px-1 ${entry.me ? "text-brand-purple" : "text-ink"}`}>
+                {entry.name}
+              </div>
+              <div className="text-xs text-ink-muted tabular-nums mt-0.5">{entry.score.toLocaleString()} pts</div>
+              {(entry.streak ?? 0) >= 2 && (
+                <div className="text-xs text-[#8A6100] flex items-center gap-1 mt-0.5">
+                  <Flame className="w-3 h-3" /> {entry.streak}
+                </div>
+              )}
+              <div
+                className={`mt-2.5 w-full rounded-t-xl flex items-start justify-center pt-2 ${LB_MEDAL[place]} ${
+                  entry.me ? "ring-2 ring-brand-purple" : ""
+                }`}
+                style={{ height: STEP_H[place] }}
+              >
+                <span className="text-2xl font-semibold tabular-nums">{entry.rank}</span>
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
 export default function LiveLeaderboard({
   rows,
   title = "Leaderboard",
@@ -54,6 +125,7 @@ export default function LiveLeaderboard({
   highlight,
   limit,
   emptyText = "No players yet.",
+  podium = true,
 }: {
   rows: LiveLeaderboardRow[];
   title?: string;
@@ -62,8 +134,13 @@ export default function LiveLeaderboard({
   highlight?: string;
   limit?: number;
   emptyText?: string;
+  /** Matikan tangga bila ruang terlalu sempit, contohnya jalur sisi. */
+  podium?: boolean;
 }) {
   const senarai = typeof limit === "number" ? rows.slice(0, limit) : rows;
+  const naikTangga = podium && senarai.length >= 2;
+  const atas = naikTangga ? senarai.slice(0, 3) : [];
+  const baki = naikTangga ? senarai.slice(3) : senarai;
 
   return (
     <div className="relative overflow-hidden rounded-2xl bg-white border border-hairline p-5">
@@ -77,42 +154,58 @@ export default function LiveLeaderboard({
       {senarai.length === 0 ? (
         <p className="text-sm text-ink-muted">{emptyText}</p>
       ) : (
-        <div className="space-y-2">
-          {senarai.map((r, i) => {
-            const saya = !!highlight && r.nickname === highlight;
-            const tile = i < 3 ? LB_TILE[i] : LB_TILE_REST;
-            const medal = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
-            const pts = i < 3 ? LB_PTS[i] : LB_PTS_REST;
-            return (
-              <div
-                key={`${r.rank}-${r.nickname}`}
-                className={`flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tile} ${
-                  saya ? "ring-2 ring-brand-purple" : ""
-                }`}
-              >
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medal}`}>
-                  {r.rank}
-                </div>
-                <div className="flex-1 min-w-0">
-                  <div className="text-[15px] font-medium text-ink truncate flex items-center gap-1.5">
-                    <UserIcon className="w-4 h-4 text-ink-faint shrink-0" />
-                    <span className="truncate">{r.nickname}</span>
-                    {saya && <span className="text-xs text-brand-purple shrink-0">you</span>}
+        <>
+          {naikTangga && (
+            <LeaderboardPodium
+              className="mb-5"
+              rows={atas.map((r) => ({
+                rank: r.rank,
+                name: r.nickname,
+                score: r.score,
+                streak: r.streak,
+                me: !!highlight && r.nickname === highlight,
+              }))}
+            />
+          )}
+
+          <div className="space-y-2">
+            {baki.map((r, i) => {
+              const place = naikTangga ? i + 3 : i;
+              const saya = !!highlight && r.nickname === highlight;
+              const tile = place < 3 ? LB_TILE[place] : LB_TILE_REST;
+              const medal = place < 3 ? LB_MEDAL[place] : LB_MEDAL_REST;
+              const pts = place < 3 ? LB_PTS[place] : LB_PTS_REST;
+              return (
+                <div
+                  key={`${r.rank}-${r.nickname}`}
+                  className={`flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tile} ${
+                    saya ? "ring-2 ring-brand-purple" : ""
+                  }`}
+                >
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medal}`}>
+                    {r.rank}
                   </div>
-                  {(r.streak ?? 0) >= 2 && (
-                    <div className="text-xs text-[#8A6100] flex items-center gap-1 mt-0.5">
-                      <Flame className="w-3 h-3" /> {r.streak} in a row
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[15px] font-medium text-ink truncate flex items-center gap-1.5">
+                      <UserIcon className="w-4 h-4 text-ink-faint shrink-0" />
+                      <span className="truncate">{r.nickname}</span>
+                      {saya && <span className="text-xs text-brand-purple shrink-0">you</span>}
                     </div>
-                  )}
+                    {(r.streak ?? 0) >= 2 && (
+                      <div className="text-xs text-[#8A6100] flex items-center gap-1 mt-0.5">
+                        <Flame className="w-3 h-3" /> {r.streak} in a row
+                      </div>
+                    )}
+                  </div>
+                  <div className={`shrink-0 min-w-[64px] px-3 py-1.5 rounded-xl text-center ${pts}`}>
+                    <div className="text-lg font-semibold leading-none tabular-nums">{r.score}</div>
+                    <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
+                  </div>
                 </div>
-                <div className={`shrink-0 min-w-[64px] px-3 py-1.5 rounded-xl text-center ${pts}`}>
-                  <div className="text-lg font-semibold leading-none tabular-nums">{r.score}</div>
-                  <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
-                </div>
-              </div>
-            );
-          })}
-        </div>
+              );
+            })}
+          </div>
+        </>
       )}
     </div>
   );
