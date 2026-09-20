@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
@@ -17,6 +17,7 @@ interface Pemain { id: string; nickname: string; score: number; joined_at: strin
 interface Sesi {
   id: string; code: string; status: string; current_index: number;
   question_started_at: string | null;
+  max_players?: number;
 }
 interface KeadaanHos {
   session: Sesi;
@@ -52,7 +53,6 @@ const LABEL_STATUS: Record<string, string> = {
 
 export default function PanelHosSesi() {
   const { sessionId } = useParams<{ sessionId: string }>() as { sessionId: string };
-  const router = useRouter();
 
   const [state, setState] = useState<KeadaanHos | null>(null);
   const [loading, setLoading] = useState(true);
@@ -65,8 +65,8 @@ export default function PanelHosSesi() {
       const json = await authedFetch("/api/live/sessions/" + sessionId);
       setState(json.data);
       setErr(null);
-    } catch (e: any) {
-      setErr(e.message || "Gagal memuat sesi.");
+    } catch (e) {
+      setErr((e instanceof Error ? e.message : null) || "Gagal memuat sesi.");
     } finally {
       setLoading(false);
     }
@@ -89,8 +89,8 @@ export default function PanelHosSesi() {
         body: JSON.stringify({ action }),
       });
       await muat();
-    } catch (e: any) {
-      alert(e.message || "Tindakan gagal.");
+    } catch (e) {
+      alert((e instanceof Error ? e.message : null) || "Tindakan gagal.");
     } finally {
       setBusy(false);
     }
@@ -122,6 +122,8 @@ export default function PanelHosSesi() {
 
   const { session, quiz, questions, players, playerCount, currentQuestion, distribution } = state;
   const totalSoalan = questions.length;
+  const hadPemain = session.max_players ?? null;
+  const sesiPenuh = hadPemain !== null && playerCount >= hadPemain;
 
   return (
     <Shell tabs={EDU_TABS}>
@@ -145,9 +147,15 @@ export default function PanelHosSesi() {
         </div>
         <div className="ml-auto flex items-center gap-2 text-sm text-gray-600">
           <Users className="w-5 h-5 text-indigo-600" />
-          <span><strong>{playerCount}</strong> peserta</span>
+          <span><strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} peserta</span>
         </div>
       </div>
+
+      {sesiPenuh && (
+        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          Sesi ini sudah mencapai had {hadPemain} pemain. Pemain baharu akan ditolak buat sementara waktu.
+        </div>
+      )}
 
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         {session.status === "lobby" && (
@@ -193,7 +201,7 @@ export default function PanelHosSesi() {
       ) : session.status === "lobby" ? (
         <div className="card mb-4">
           <div className="font-semibold mb-1">Menunggu di lobi…</div>
-          <p className="text-sm text-gray-500">Peserta yang masuk akan kelihatan di sini. Tekan "Mula kuiz" bila sudah sedia.</p>
+          <p className="text-sm text-gray-500">Peserta yang masuk akan kelihatan di sini. Tekan &quot;Mula kuiz&quot; bila sudah sedia.</p>
         </div>
       ) : currentQuestion && (
         <div className="card mb-4">

@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
   interface AnswerRef { choice_key: string }
   const { data: session } = await auth.supa
     .from('qm_live_sessions')
-    .select('id, quiz_id, host_id, code, status, current_index, question_started_at, created_at, ended_at')
+    .select('id, quiz_id, host_id, code, status, current_index, question_started_at, max_players, created_at, ended_at')
     .eq('id', params.sessionId)
     .maybeSingle();
   const ses = session as LiveSessionRow | null;
