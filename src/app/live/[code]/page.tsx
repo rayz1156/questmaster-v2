@@ -1,12 +1,14 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trophy, Users, Timer, Check, X } from "lucide-react";
 
 interface Pilihan { key: string; text: string }
+// Soalan dalam cache klien (daripada laluan /questions — tiada correct_key).
 interface SoalanPemain { id: string; prompt: string; options: Pilihan[] }
+interface CacheSoalan { version: string; questions: SoalanPemain[] }
 interface Keadaan {
   fp: string;
   status: string;
@@ -15,7 +17,8 @@ interface Keadaan {
   serverNow: string;
   questionStartedAt: string | null;
   timeLimitSec: number | null;
-  question: SoalanPemain | null;
+  questionId: string | null;
+  version: string | null;
   myAnswer: { choiceKey: string; locked: boolean } | null;
   reveal: {
     correctKey: string | null;
@@ -49,6 +52,29 @@ export default function SkrinMainLangsung() {
   const [papan, setPapan] = useState<BarisPapan[] | null>(null);
   const [berbaki, setBerbaki] = useState<number | null>(null);
 
+  // Cache soalan klien (Bahagian 2.4): dimuat turun sekali, disimpan dalam
+  // localStorage di bawah kuizen-live-q-<kod>. Tinjauan state hanya
+  // memulangkan questionId + version; jika version berbeza, muat semula.
+  const [soalan, setSoalan] = useState<CacheSoalan | null>(null);
+  const soalanRef = useRef<CacheSoalan | null>(null);
+  const versRef = useRef<string>("");
+
+  const muatSoalan = useCallback(async () => {
+    const id = identitiRef.current;
+    if (!id) return;
+    try {
+      const r = await fetch(`/api/live/play/${kod}/questions?playerId=${encodeURIComponent(id.playerId)}`);
+      if (!r.ok) return;
+      const j = await r.json();
+      if (!j || !j.version) return;
+      const c: CacheSoalan = { version: String(j.version), questions: (j.questions || []) as SoalanPemain[] };
+      soalanRef.current = c;
+      versRef.current = c.version;
+      setSoalan(c);
+      try { window.localStorage.setItem("kuizen-live-q-" + kod, JSON.stringify(c)); } catch { /* storan tidak tersedia */ }
+    } catch { /* cuba lagi pada kitaran seterusnya */ }
+  }, [kod]);
+
   const fpRef = useRef<string>("");
   const identitiRef = useRef<Identiti | null>(null);
   const sorokRef = useRef<number>(0); // beza jam pelayar dengan pelayan (ms)
@@ -63,9 +89,26 @@ export default function SkrinMainLangsung() {
           setIdentiti(id);
         }
       }
+      // Pulihkan cache soalan yang disimpan sebelum ini (jika ada).
+      const rawQ = window.localStorage.getItem("kuizen-live-q-" + kod);
+      if (rawQ) {
+        const c = JSON.parse(rawQ) as CacheSoalan;
+        if (c && c.version && Array.isArray(c.questions)) {
+          soalanRef.current = c;
+          versRef.current = c.version;
+          setSoalan(c);
+        }
+      }
     } catch { /* storan tidak tersedia */ }
     setDimuat(true);
   }, [kod]);
+
+  // Panggil laluan questions sekali semasa menyertai (atau memulihkan
+  // identiti). Klien kemudian hanya memanggilnya semula bila `version`
+  // daripada state berbeza.
+  useEffect(() => {
+    if (identiti) muatSoalan();
+  }, [identiti, muatSoalan]);
 
   // Kira masa berbaki soalan semasa.
   useEffect(() => {
@@ -123,12 +166,15 @@ export default function SkrinMainLangsung() {
         fpRef.current = j.fp || "";
         if (j.serverNow) sorokRef.current = Date.now() - new Date(j.serverNow).getTime();
         setKeadaan(j as Keadaan);
+        // Version berbeza bermakna guru menyunting soalan atau menekan set
+        // semula — muat semula cache soalan.
+        if (j.version && j.version !== versRef.current) muatSoalan();
       } catch { /* cuba lagi pada kitaran seterusnya */ }
     };
     tinjau();
     const t = setInterval(tinjau, 2000);
     return () => { hidup = false; clearInterval(t); };
-  }, [identiti, kod]);
+  }, [identiti, kod, muatSoalan]);
 
   const onSertai = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -160,7 +206,7 @@ export default function SkrinMainLangsung() {
 
   const onJawab = async (kunci: string) => {
     const id = identitiRef.current;
-    if (!id || !keadaan || keadaan.status !== "asking" || !keadaan.question) return;
+    if (!id || !keadaan || keadaan.status !== "asking" || !keadaan.questionId) return;
     if (keadaan.myAnswer) return; // sudah dikunci
     setBusy(true);
     try {
@@ -170,7 +216,7 @@ export default function SkrinMainLangsung() {
         body: JSON.stringify({
           playerId: id.playerId,
           playerToken: id.playerToken,
-          questionId: keadaan.question.id,
+          questionId: keadaan.questionId,
           choiceKey: kunci,
         }),
       });
@@ -186,7 +232,10 @@ export default function SkrinMainLangsung() {
   };
 
   const keluar = () => {
-    try { window.localStorage.removeItem("kuizen-live-" + kod); } catch { /* abaikan */ }
+    try {
+      window.localStorage.removeItem("kuizen-live-" + kod);
+      window.localStorage.removeItem("kuizen-live-q-" + kod);
+    } catch { /* abaikan */ }
     router.push("/live");
   };
 
@@ -232,6 +281,11 @@ export default function SkrinMainLangsung() {
   }
 
   const k = keadaan;
+  // Render soalan daripada cache klien, bukan daripada balasan state.
+  const soalanSemasa =
+    soalan && k.questionId
+      ? soalan.questions.find((q) => q.id === k.questionId) ?? null
+      : null;
   const pendahuluSaya = papan?.find((b) => b.nickname === identiti.nickname);
 
   if (k.status === "ended") {
@@ -274,7 +328,7 @@ export default function SkrinMainLangsung() {
           </div>
         )}
 
-        {k.status === "asking" && k.question && (
+        {k.status === "asking" && soalanSemasa && (
           <div className="card">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span>Soalan {k.questionIndex + 1} / {k.totalQuestions}</span>
@@ -282,9 +336,9 @@ export default function SkrinMainLangsung() {
                 <Timer className="w-4 h-4" /> {berbaki !== null ? `${berbaki}s` : "—"}
               </span>
             </div>
-            <div className="font-semibold mb-3">{k.question.prompt}</div>
+            <div className="font-semibold mb-3">{soalanSemasa.prompt}</div>
             <div className="grid grid-cols-1 gap-2">
-              {k.question.options.map((o) => {
+              {soalanSemasa.options.map((o) => {
                 const terkunci = !!k.myAnswer;
                 const dipilih = k.myAnswer?.choiceKey === o.key;
                 return (
@@ -306,7 +360,7 @@ export default function SkrinMainLangsung() {
           </div>
         )}
 
-        {k.status === "revealed" && k.question && (
+        {k.status === "revealed" && soalanSemasa && (
           <div className="card">
             <div className="text-xs text-gray-500 mb-2">Soalan {k.questionIndex + 1} / {k.totalQuestions}</div>
             <div className={`text-center mb-3 ${k.reveal?.isCorrect ? "text-green-600" : "text-red-600"}`}>
@@ -322,7 +376,7 @@ export default function SkrinMainLangsung() {
               )}
             </div>
             <div className="space-y-1 mb-3">
-              {k.question.options.map((o) => {
+              {soalanSemasa.options.map((o) => {
                 const betul = o.key === k.reveal?.correctKey;
                 const pilihanSaya = o.key === k.reveal?.myChoice;
                 return (

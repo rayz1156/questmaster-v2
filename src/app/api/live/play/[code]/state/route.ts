@@ -1,11 +1,12 @@
 /**
  * GET /api/live/play/[code]/state?playerId=&fp= — tinjauan keadaan peserta.
  *
- * KESELAMATAN: correct_key tidak keluar dalam balasan ini. Soalan diambil
- * dengan senarai lajur eksplisit TANPA correct_key; kunci jawapan hanya
- * diambil dalam pertanyaan berasingan di dalam blok reveal apabila status
- * ialah 'revealed'. Objek balasan dibina secara eksplisit — tiada spread
- * baris pangkalan data.
+ * KESELAMATAN: correct_key tidak keluar dalam balasan ini. Sejak Bahagian 2.4
+ * laluan ini TIDAK memulangkan objek soalan lagi — klien menyimpan soalan
+ * daripada laluan /questions. Ia memulangkan questionId, questionIndex,
+ * version dan timeLimitSec sahaja. Kunci jawapan hanya diambil dalam
+ * pertanyaan berasingan di dalam blok reveal apabila status ialah 'revealed'.
+ * Objek balasan dibina secara eksplisit — tiada spread baris pangkalan data.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
@@ -27,9 +28,7 @@ interface SessionRow {
 }
 interface PlayerRow { id: string; score: number; }
 interface QuestionRow {
-  id: string; quiz_id: string; order_idx: number; prompt: string;
-  options: { key: string; text: string }[];
-  points: number; time_limit_sec: number;
+  id: string; order_idx: number; time_limit_sec: number;
 }
 interface AnswerRow { choice_key: string; is_correct: boolean; points_awarded: number; }
 
@@ -78,10 +77,12 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       .from('qm_live_players')
       .select('id', { count: 'exact', head: true })
       .eq('session_id', session.id),
-    // Senarai lajur eksplisit TANPA correct_key.
+    // Sejak Bahagian 2.4: hanya id, order_idx dan time_limit_sec — tiada
+    // prompt/options, kerana teks soalan datang daripada cache klien
+    // (laluan /questions). Senarai lajur eksplisit TANPA correct_key.
     supa
       .from('qm_live_questions')
-      .select('id, quiz_id, order_idx, prompt, options, points, time_limit_sec')
+      .select('id, order_idx, time_limit_sec')
       .eq('quiz_id', session.quiz_id)
       .order('order_idx'),
   ]);
@@ -103,6 +104,13 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       ? allQuestions[session.current_index]
       : null;
 
+  // Version ialah hash pendek bagi senarai id soalan dan order_idx — sama
+  // dengan pengiraan dalam laluan /questions. Klien memanggil semula laluan
+  // /questions apabila nilai ini berbeza daripada yang disimpan.
+  const version = createHash('sha256')
+    .update(allQuestions.map((q) => `${q.id}|${q.order_idx}`).join(';'))
+    .digest('hex')
+    .slice(0, 16);
 
   const payload: Record<string, unknown> = {
     fp,
@@ -112,9 +120,8 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     serverNow: new Date().toISOString(),
     questionStartedAt: session.question_started_at,
     timeLimitSec: currentQuestion?.time_limit_sec ?? null,
-    question: currentQuestion
-      ? { id: currentQuestion.id, prompt: currentQuestion.prompt, options: currentQuestion.options }
-      : null,
+    questionId: currentQuestion?.id ?? null,
+    version,
     myAnswer: null,
     reveal: null,
   };
