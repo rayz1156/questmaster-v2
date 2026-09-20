@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const playerId = req.nextUrl.searchParams.get('playerId') || '';
   const fpParam = req.nextUrl.searchParams.get('fp') || '';
   if (!playerId) {
-    return NextResponse.json({ error: 'playerId diperlukan.' }, { status: 400 });
+    return NextResponse.json({ error: 'playerId is required.' }, { status: 400 });
   }
 
   const supa = getServiceSupabase();
@@ -59,7 +59,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .eq('code', code)
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
-    return NextResponse.json({ error: 'Sesi tidak dijumpai.' }, { status: 404 });
+    return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
   }
 
   const { data: player } = (await supa
@@ -69,7 +69,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .eq('session_id', session.id)
     .maybeSingle()) as { data: PlayerRow | null };
   if (!player) {
-    return NextResponse.json({ error: 'Pemain tidak dijumpai dalam sesi ini.' }, { status: 403 });
+    return NextResponse.json({ error: 'Player not found in this session.' }, { status: 403 });
   }
 
   const [{ count: playerCount }, { data: questions }] = await Promise.all([

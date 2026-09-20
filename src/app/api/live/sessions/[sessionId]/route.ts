@@ -27,7 +27,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     .eq('id', params.sessionId)
     .maybeSingle();
   const ses = session as LiveSessionRow | null;
-  if (!ses) return NextResponse.json({ error: 'Sesi tidak dijumpai.' }, { status: 404 });
+  if (!ses) return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
 
   const isHost = ses.host_id === auth.user!.id;
   let isEducator = isHost;
@@ -61,7 +61,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
   }
 
   if (!isEducator && !isAdmin) {
-    return NextResponse.json({ error: 'Anda bukan hos sesi ini.' }, { status: 403 });
+    return NextResponse.json({ error: 'You are not the host of this session.' }, { status: 403 });
   }
 
   const { data: quiz } = await auth.supa

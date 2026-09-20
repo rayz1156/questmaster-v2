@@ -158,7 +158,7 @@ export default function SkrinMainLangsung() {
         const j = await r.json();
         if (!hidup) return;
         if (!r.ok) {
-          setErr(j.error || "Gagal mendapatkan keadaan sesi.");
+          setErr(j.error || "Could not read the session state.");
           return;
         }
         setErr(null);
@@ -181,7 +181,7 @@ export default function SkrinMainLangsung() {
     setErr(null);
     const bersih = nama.trim();
     if (bersih.length < 1 || bersih.length > 24) {
-      setErr("Nama pemain mesti antara 1 hingga 24 aksara.");
+      setErr("Your player name must be 1 to 24 characters.");
       return;
     }
     setBusy(true);
@@ -192,13 +192,13 @@ export default function SkrinMainLangsung() {
         body: JSON.stringify({ nickname: bersih }),
       });
       const j = await r.json();
-      if (!r.ok) { setErr(j.error || "Gagal menyertai sesi."); return; }
+      if (!r.ok) { setErr(j.error || "Could not join the session."); return; }
       const id: Identiti = { playerId: j.playerId, playerToken: j.playerToken, nickname: bersih };
       window.localStorage.setItem("kuizen-live-" + kod, JSON.stringify(id));
       identitiRef.current = id;
       setIdentiti(id);
     } catch {
-      setErr("Gagal menyertai sesi. Cuba lagi.");
+      setErr("Could not join the session. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -221,11 +221,11 @@ export default function SkrinMainLangsung() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) { setErr(j.error || "Jawapan tidak diterima."); return; }
+      if (!r.ok) { setErr(j.error || "Your answer was not accepted."); return; }
       setErr(null);
       fpRef.current = ""; // paksa tinjauan penuh supaya jawapan terkunci dipapar
     } catch {
-      setErr("Gagal menghantar jawapan. Cuba lagi.");
+      setErr("Could not send your answer. Please try again.");
     } finally {
       setBusy(false);
     }
@@ -245,12 +245,12 @@ export default function SkrinMainLangsung() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="card w-full max-w-sm">
-          <h1 className="text-xl font-bold text-center mb-1">Masuk Sesi {kod}</h1>
-          <p className="text-sm text-gray-500 text-center mb-4">Pilih nama pemain anda.</p>
+          <h1 className="text-xl font-bold text-center mb-1">Join Session {kod}</h1>
+          <p className="text-sm text-gray-500 text-center mb-4">Choose your player name.</p>
           <form onSubmit={onSertai}>
             <input
               className="input w-full mb-3"
-              placeholder="Nama pemain"
+              placeholder="Player name"
               maxLength={24}
               value={nama}
               onChange={(e) => setNama(e.target.value)}
@@ -258,11 +258,11 @@ export default function SkrinMainLangsung() {
             />
             {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
             <button type="submit" disabled={busy} className="btn-primary w-full py-2">
-              {busy ? "Menyertai…" : "Sertai"}
+              {busy ? "Joining…" : "Join"}
             </button>
           </form>
           <div className="text-center mt-3">
-            <Link href="/live" className="text-xs text-gray-500 hover:text-gray-800">← Kembali</Link>
+            <Link href="/live" className="text-xs text-gray-500 hover:text-gray-800">← Back</Link>
           </div>
         </div>
       </div>
@@ -273,7 +273,7 @@ export default function SkrinMainLangsung() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="card w-full max-w-md text-center">
-          <p className="text-sm text-gray-500 mb-1">Sedang menyambung ke sesi {kod}…</p>
+          <p className="text-sm text-gray-500 mb-1">Connecting to session {kod}…</p>
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
       </div>
@@ -293,13 +293,13 @@ export default function SkrinMainLangsung() {
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="card w-full max-w-md text-center">
           <Trophy className="w-10 h-10 mx-auto text-amber-500 mb-2" />
-          <h1 className="text-xl font-bold mb-1">Sesi Tamat</h1>
-          <p className="text-sm text-gray-500 mb-4">Terima kasih kerana bermain!</p>
+          <h1 className="text-xl font-bold mb-1">Session Over</h1>
+          <p className="text-sm text-gray-500 mb-4">Thanks for playing!</p>
           <div className="text-3xl font-bold text-brand-purple mb-1">{k.reveal?.score ?? pendahuluSaya?.score ?? 0}</div>
-          <div className="text-xs text-gray-500 mb-4">jumlah mata</div>
+          <div className="text-xs text-gray-500 mb-4">total points</div>
           {papan && (
             <div className="text-left border-t border-gray-100 pt-3">
-              <div className="text-xs font-semibold text-gray-500 mb-2">Papan pendahulu</div>
+              <div className="text-xs font-semibold text-gray-500 mb-2">Leaderboard</div>
               <ol className="text-sm space-y-1">
                 {papan.slice(0, 10).map((b) => (
                   <li key={b.rank} className={`flex items-center justify-between ${b.nickname === identiti.nickname ? "font-semibold text-brand-purple" : ""}`}>
@@ -310,7 +310,7 @@ export default function SkrinMainLangsung() {
               </ol>
             </div>
           )}
-          <button onClick={keluar} className="btn-primary w-full py-2 mt-4">Keluar</button>
+          <button onClick={keluar} className="btn-primary w-full py-2 mt-4">Exit</button>
         </div>
       </div>
     );
@@ -322,16 +322,16 @@ export default function SkrinMainLangsung() {
         {k.status === "lobby" && (
           <div className="card text-center">
             <Users className="w-8 h-8 mx-auto text-indigo-600 mb-2" />
-            <h1 className="text-xl font-bold mb-1">Lobi</h1>
-            <p className="text-sm text-gray-500 mb-3">Menunggu pendidik memulakan kuiz…</p>
-            <div className="text-xs text-gray-400">Kod sesi: <span className="font-mono font-bold text-brand-purple">{kod}</span></div>
+            <h1 className="text-xl font-bold mb-1">Lobby</h1>
+            <p className="text-sm text-gray-500 mb-3">Waiting for your educator to start the quiz…</p>
+            <div className="text-xs text-gray-400">Session code: <span className="font-mono font-bold text-brand-purple">{kod}</span></div>
           </div>
         )}
 
         {k.status === "asking" && soalanSemasa && (
           <div className="card">
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span>Soalan {k.questionIndex + 1} / {k.totalQuestions}</span>
+              <span>Question {k.questionIndex + 1} / {k.totalQuestions}</span>
               <span className="flex items-center gap-1 font-semibold text-gray-700">
                 <Timer className="w-4 h-4" /> {berbaki !== null ? `${berbaki}s` : "—"}
               </span>
@@ -351,7 +351,7 @@ export default function SkrinMainLangsung() {
                       ${terkunci && !dipilih ? "opacity-50" : ""}`}
                   >
                     <span className="font-mono mr-1">{o.key}.</span> {o.text}
-                    {dipilih && <span className="float-right text-xs">Jawapan dihantar ✓</span>}
+                    {dipilih && <span className="float-right text-xs">Answer sent ✓</span>}
                   </button>
                 );
               })}
@@ -362,17 +362,17 @@ export default function SkrinMainLangsung() {
 
         {k.status === "revealed" && soalanSemasa && (
           <div className="card">
-            <div className="text-xs text-gray-500 mb-2">Soalan {k.questionIndex + 1} / {k.totalQuestions}</div>
+            <div className="text-xs text-gray-500 mb-2">Question {k.questionIndex + 1} / {k.totalQuestions}</div>
             <div className={`text-center mb-3 ${k.reveal?.isCorrect ? "text-green-600" : "text-red-600"}`}>
               {k.reveal?.myChoice ? (
                 <>
                   {k.reveal.isCorrect ? <Check className="w-8 h-8 mx-auto" /> : <X className="w-8 h-8 mx-auto" />}
                   <div className="font-bold">
-                    {k.reveal.isCorrect ? `Betul! +${k.reveal.pointsAwarded} mata` : "Salah"}
+                    {k.reveal.isCorrect ? `Correct! +${k.reveal.pointsAwarded} points` : "Wrong"}
                   </div>
                 </>
               ) : (
-                <div className="font-bold text-gray-500">Tiada jawapan dihantar</div>
+                <div className="font-bold text-gray-500">No answer sent</div>
               )}
             </div>
             <div className="space-y-1 mb-3">
@@ -385,21 +385,21 @@ export default function SkrinMainLangsung() {
                     className={`rounded-lg border px-3 py-2 text-sm ${betul ? "border-green-500 bg-green-50 font-semibold text-green-800" : pilihanSaya ? "border-red-300 bg-red-50" : "border-gray-200"}`}
                   >
                     <span className="font-mono mr-1">{o.key}.</span> {o.text}
-                    {pilihanSaya && !betul && <span className="text-xs float-right">pilihan anda</span>}
-                    {betul && <span className="text-xs float-right">jawapan betul</span>}
+                    {pilihanSaya && !betul && <span className="text-xs float-right">your choice</span>}
+                    {betul && <span className="text-xs float-right">correct answer</span>}
                   </div>
                 );
               })}
             </div>
             <div className="text-center text-sm text-gray-600 border-t border-gray-100 pt-2">
-              Kedudukan <strong>#{k.reveal?.rank ?? "—"}</strong> · Mata keseluruhan <strong>{k.reveal?.score ?? 0}</strong>
+              Rank <strong>#{k.reveal?.rank ?? "—"}</strong> · Total points <strong>{k.reveal?.score ?? 0}</strong>
             </div>
           </div>
         )}
 
         {papan && k.status !== "lobby" && (
           <div className="card mt-4">
-            <div className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1"><Trophy className="w-4 h-4 text-amber-500" /> Papan pendahulu</div>
+            <div className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1"><Trophy className="w-4 h-4 text-amber-500" /> Leaderboard</div>
             <ol className="text-sm space-y-1">
               {papan.slice(0, 5).map((b) => (
                 <li key={b.rank} className={`flex items-center justify-between ${b.nickname === identiti.nickname ? "font-semibold text-brand-purple" : ""}`}>
@@ -412,7 +412,7 @@ export default function SkrinMainLangsung() {
         )}
 
         <div className="text-center mt-4">
-          <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">Keluar daripada sesi</button>
+          <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">Leave session</button>
         </div>
       </div>
     </div>

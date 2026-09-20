@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Badan permintaan tidak sah.' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
   const playerId = typeof body.playerId === 'string' ? body.playerId : '';
   const playerToken = typeof body.playerToken === 'string' ? body.playerToken : '';
@@ -50,7 +50,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const choiceKey = typeof body.choiceKey === 'string' ? body.choiceKey.trim().toUpperCase() : '';
   if (!playerId || !playerToken || !questionId || !choiceKey) {
     return NextResponse.json(
-      { error: 'playerId, playerToken, questionId dan choiceKey diperlukan.' },
+      { error: 'playerId, playerToken, questionId and choiceKey are required.' },
       { status: 400 },
     );
   }
@@ -63,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .eq('code', code)
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
-    return NextResponse.json({ error: 'Sesi tidak dijumpai.' }, { status: 404 });
+    return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
   }
 
   // Sahkan pemain + token.
@@ -74,13 +74,13 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .eq('session_id', session.id)
     .maybeSingle()) as { data: PlayerRow | null };
   if (!player || player.player_token !== playerToken) {
-    return NextResponse.json({ error: 'Token pemain tidak sah.' }, { status: 403 });
+    return NextResponse.json({ error: 'Invalid player token.' }, { status: 403 });
   }
 
   // Sahkan status dan soalan semasa (senarai lajur eksplisit, tanpa correct_key).
   if (session.status !== 'asking') {
     return NextResponse.json(
-      { error: 'Jawapan tidak diterima kerana soalan sudah ditutup.' },
+      { error: 'Your answer was rejected because the question is closed.' },
       { status: 409 },
     );
   }
@@ -93,7 +93,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .maybeSingle()) as { data: QuestionRow | null };
   if (!currentQuestion || currentQuestion.id !== questionId) {
     return NextResponse.json(
-      { error: 'Soalan ini bukan soalan semasa. Jawapan ditolak.' },
+      { error: 'That is not the current question, so the answer was rejected.' },
       { status: 409 },
     );
   }
@@ -108,7 +108,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .maybeSingle();
   if (existing) {
     return NextResponse.json(
-      { error: 'Anda sudah menjawab soalan ini.' },
+      { error: 'You have already answered this question.' },
       { status: 409 },
     );
   }
@@ -120,7 +120,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .eq('id', questionId)
     .maybeSingle()) as { data: KeyRow | null };
   if (!keyRow) {
-    return NextResponse.json({ error: 'Soalan tidak dijumpai.' }, { status: 404 });
+    return NextResponse.json({ error: 'Question not found.' }, { status: 404 });
   }
 
   const startedMs = session.question_started_at
@@ -147,7 +147,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   if (insertErr) {
     // 23505: kekangan unik (session_id, player_id, question_id) — jawapan berulang.
     if (insertErr.code === '23505') {
-      return NextResponse.json({ error: 'Anda sudah menjawab soalan ini.' }, { status: 409 });
+      return NextResponse.json({ error: 'You have already answered this question.' }, { status: 409 });
     }
     return NextResponse.json({ error: insertErr.message }, { status: 500 });
   }

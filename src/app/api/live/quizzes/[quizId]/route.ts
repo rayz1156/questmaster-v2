@@ -31,12 +31,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { quizId: st
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, unknown> = {};
   if (typeof body.title === 'string') {
-    if (!body.title.trim()) return NextResponse.json({ error: 'Tajuk tidak boleh kosong.' }, { status: 400 });
+    if (!body.title.trim()) return NextResponse.json({ error: 'The title cannot be empty.' }, { status: 400 });
     patch.title = body.title.trim();
   }
   if (typeof body.description === 'string') patch.description = body.description;
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: 'Tiada medan untuk dikemas kini.' }, { status: 400 });
+    return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
   }
 
   const { data: quiz, error } = await host.supa
@@ -47,7 +47,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { quizId: st
     .single();
 
   if (error || !quiz) {
-    return NextResponse.json({ error: error?.message || 'Kemas kini gagal.' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Update failed.' }, { status: 500 });
   }
   return NextResponse.json({ data: quiz });
 }

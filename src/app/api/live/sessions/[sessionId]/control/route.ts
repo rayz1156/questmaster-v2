@@ -31,7 +31,7 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     .eq('id', params.sessionId)
     .maybeSingle();
   const ses = session as LiveSessionRow | null;
-  if (!ses) return NextResponse.json({ error: 'Sesi tidak dijumpai.' }, { status: 404 });
+  if (!ses) return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
 
   // Sahkan hos: pemilik sesi, pendidik kelas kuiz atau admin.
   if (ses.host_id !== auth.user!.id) {
@@ -66,13 +66,13 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
       const me = profile as ProfileRef | null;
       if (me && !me.suspended && ['admin', 'superadmin'].includes(me.role)) allowed = true;
     }
-    if (!allowed) return NextResponse.json({ error: 'Anda bukan hos sesi ini.' }, { status: 403 });
+    if (!allowed) return NextResponse.json({ error: 'You are not the host of this session.' }, { status: 403 });
   }
 
   const body = await req.json().catch(() => ({}));
   const action = body.action;
   if (!['start', 'next', 'reveal', 'end', 'reset'].includes(action)) {
-    return NextResponse.json({ error: 'Tindakan tidak sah.' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });
   }
 
   const { data: questions } = await auth.supa
@@ -82,43 +82,43 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     .order('order_idx');
   const totalQuestions = (questions || []).length;
   if (totalQuestions === 0) {
-    return NextResponse.json({ error: 'Kuiz tiada soalan.' }, { status: 400 });
+    return NextResponse.json({ error: 'This quiz has no questions.' }, { status: 400 });
   }
 
   const patch: Record<string, unknown> = {};
 
   if (action === 'start') {
     if (ses.status !== 'lobby') {
-      return NextResponse.json({ error: 'Sesi tidak dalam lobi. Gunakan Set semula dahulu.' }, { status: 400 });
+      return NextResponse.json({ error: 'The session is not in the lobby. Reset it first.' }, { status: 400 });
     }
     patch.status = 'asking';
     patch.current_index = 0;
     patch.question_started_at = new Date().toISOString();
   } else if (action === 'next') {
     if (!['asking', 'revealed'].includes(ses.status)) {
-      return NextResponse.json({ error: 'Sesi tidak sedang menjawab soalan.' }, { status: 400 });
+      return NextResponse.json({ error: 'No question is open right now.' }, { status: 400 });
     }
     const nextIdx = ses.current_index + 1;
     if (nextIdx >= totalQuestions) {
-      return NextResponse.json({ error: 'Tiada lagi soalan. Gunakan Tamat.' }, { status: 400 });
+      return NextResponse.json({ error: 'No more questions. Use End session.' }, { status: 400 });
     }
     patch.status = 'asking';
     patch.current_index = nextIdx;
     patch.question_started_at = new Date().toISOString();
   } else if (action === 'reveal') {
     if (ses.status !== 'asking') {
-      return NextResponse.json({ error: 'Tiada soalan sedang berjalan untuk didedahkan.' }, { status: 400 });
+      return NextResponse.json({ error: 'There is no open question to reveal.' }, { status: 400 });
     }
     patch.status = 'revealed';
   } else if (action === 'end') {
     if (ses.status === 'ended') {
-      return NextResponse.json({ error: 'Sesi sudah tamat.' }, { status: 400 });
+      return NextResponse.json({ error: 'The session is already over.' }, { status: 400 });
     }
     patch.status = 'ended';
     patch.ended_at = new Date().toISOString();
   } else if (action === 'reset') {
     if (ses.status === 'ended') {
-      return NextResponse.json({ error: 'Sesi sudah tamat dan tidak boleh ditetap semula.' }, { status: 400 });
+      return NextResponse.json({ error: 'The session is over and cannot be reset.' }, { status: 400 });
     }
     // Padam semua jawapan sesi ini.
     const { error: delErr } = await auth.supa
@@ -145,7 +145,7 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     .single();
 
   if (upErr || !updated) {
-    return NextResponse.json({ error: upErr?.message || 'Kemas kini sesi gagal.' }, { status: 500 });
+    return NextResponse.json({ error: upErr?.message || 'Could not update the session.' }, { status: 500 });
   }
   return NextResponse.json({ data: updated });
 }

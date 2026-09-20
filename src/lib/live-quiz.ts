@@ -88,7 +88,7 @@ export async function requireLiveHost(
   return {
     user: null as unknown as User,
     supa: auth.supa,
-    response: NextResponse.json({ error: 'Anda bukan pendidik kelas ini.' }, { status: 403 }),
+    response: NextResponse.json({ error: 'You are not an educator of this class.' }, { status: 403 }),
   };
 }
 
@@ -133,7 +133,7 @@ export async function requireQuizHost(
       user: null as unknown as User,
       supa: auth.supa,
       quiz: null,
-      response: NextResponse.json({ error: 'Kuiz tidak dijumpai.' }, { status: 404 }),
+      response: NextResponse.json({ error: 'Quiz not found.' }, { status: 404 }),
     };
   }
 
@@ -164,7 +164,7 @@ export async function requireQuizHost(
     user: null as unknown as User,
     supa: auth.supa,
     quiz: null,
-    response: NextResponse.json({ error: 'Anda bukan pendidik kelas ini.' }, { status: 403 }),
+    response: NextResponse.json({ error: 'You are not an educator of this class.' }, { status: 403 }),
   };
 }
 
@@ -188,7 +188,7 @@ export async function requireQuestionHost(
       user: null as unknown as User,
       supa: auth.supa,
       question: null,
-      response: NextResponse.json({ error: 'Soalan tidak dijumpai.' }, { status: 404 }),
+      response: NextResponse.json({ error: 'Question not found.' }, { status: 404 }),
     };
   }
 
@@ -223,19 +223,19 @@ export async function generateSessionCode(supa: SupaClient): Promise<string | nu
 /** Sahkan struktur pilihan soalan: array [{"key":"A","text":"..."}], 2-6 item. */
 export function validateOptions(options: unknown): { ok: boolean; error?: string; keys?: string[] } {
   if (!Array.isArray(options) || options.length < 2 || options.length > 6) {
-    return { ok: false, error: 'Pilihan mesti antara 2 hingga 6 item.' };
+    return { ok: false, error: 'A question must have between 2 and 6 options.' };
   }
   const keys: string[] = [];
   for (const opt of options) {
-    if (!opt || typeof opt !== 'object') return { ok: false, error: 'Pilihan tidak sah.' };
+    if (!opt || typeof opt !== 'object') return { ok: false, error: 'Invalid option.' };
     const o = opt as { key?: unknown; text?: unknown };
     if (typeof o.key !== 'string' || !o.key.trim() || typeof o.text !== 'string' || !o.text.trim()) {
-      return { ok: false, error: 'Setiap pilihan mesti ada key dan text.' };
+      return { ok: false, error: 'Every option needs both key and text.' };
     }
     keys.push(o.key);
   }
   if (new Set(keys).size !== keys.length) {
-    return { ok: false, error: 'Kunci pilihan mesti unik.' };
+    return { ok: false, error: 'Option keys must be unique.' };
   }
   return { ok: true, keys };
 }
@@ -299,4 +299,243 @@ export function parseAiken(content: string): { questions: ParsedAikenQuestion[];
   }
 
   return { questions, skipped };
+}
+
+/* ============================================================
+ * Import CSV (templat muat turun -> isi -> muat naik)
+ * ============================================================
+ * Pendidik memuat turun templat, mengisinya dalam Excel atau Sheets, dan
+ * memuat naik semula. Semua baris disahkan dahulu: jika satu baris rosak,
+ * TIADA soalan dimasukkan dan senarai ralat dipulangkan. Ini menjadikan
+ * muat naik boleh diulang tanpa meninggalkan separuh kuiz dalam pangkalan
+ * data.
+ */
+
+/** Had muat naik: cukup besar untuk kelas sebenar, kecil untuk nginx (1 MB). */
+export const QUIZ_CSV_MAX_QUESTIONS = 100;
+export const QUIZ_CSV_MAX_BYTES = 500_000;
+
+export const QUIZ_CSV_HEADER =
+  'question,option_a,option_b,option_c,option_d,correct,points,seconds';
+
+/** Templat yang dimuat turun pendidik. CRLF supaya Excel gembira. */
+export const QUIZ_CSV_TEMPLATE = [
+  QUIZ_CSV_HEADER,
+  '"What is the capital of Malaysia?",Johor Bahru,Kuala Lumpur,Ipoh,Melaka,B,1000,20',
+  '"Which planet is closest to the Sun?",Venus,Mars,Mercury,Jupiter,C,1000,20',
+  '"2 + 2 x 3 = ?",8,10,12,6,A,1000,15',
+  '',
+].join('\r\n');
+
+export interface QuizCsvError {
+  /** Nombor baris seperti dilihat dalam Excel (baris 1 = pengepala). 0 = fail. */
+  row: number;
+  message: string;
+}
+export interface ParsedCsvQuestion {
+  prompt: string;
+  options: { key: string; text: string }[];
+  correct_key: string;
+  points: number;
+  time_limit_sec: number;
+}
+
+/**
+ * Pecah teks CSV mengikut RFC 4180: petikan berganda, koma dan baris baharu
+ * di dalam medan berpetik, "" sebagai petikan literal. Baris kosong DIKEKALKAN
+ * supaya nombor baris yang dilaporkan sepadan dengan yang dilihat pendidik
+ * dalam Excel.
+ */
+export function parseCsvRows(text: string, delimiter = ','): string[][] {
+  const s = text.replace(/^﻿/, '');
+  const rows: string[][] = [];
+  let row: string[] = [];
+  let field = '';
+  let inQuotes = false;
+
+  for (let i = 0; i < s.length; i++) {
+    const ch = s[i];
+    if (inQuotes) {
+      if (ch === '"') {
+        if (s[i + 1] === '"') { field += '"'; i++; } else { inQuotes = false; }
+      } else {
+        field += ch;
+      }
+      continue;
+    }
+    if (ch === '"') { inQuotes = true; continue; }
+    if (ch === delimiter) { row.push(field); field = ''; continue; }
+    if (ch === '\r') continue;
+    if (ch === '\n') { row.push(field); rows.push(row); row = []; field = ''; continue; }
+    field += ch;
+  }
+  if (field !== '' || row.length > 0) { row.push(field); rows.push(row); }
+  return rows;
+}
+
+/** Excel dalam sesetengah tetapan wilayah menulis ';' bukan ','. */
+export function detectCsvDelimiter(text: string): string {
+  const first = text.replace(/^﻿/, '').split(/\r?\n/)[0] || '';
+  let best = ',';
+  let bestCount = (first.match(/,/g) || []).length;
+  for (const d of [';', '\t']) {
+    const n = first.split(d).length - 1;
+    if (n > bestCount) { best = d; bestCount = n; }
+  }
+  return best;
+}
+
+const OPTION_LETTERS = ['a', 'b', 'c', 'd', 'e', 'f'];
+
+/** Normalkan nama lajur: huruf kecil, buang ruang dan tanda sempang. */
+function normHeader(h: string): string {
+  const k = h.trim().toLowerCase().replace(/[\s-]+/g, '_');
+  if (k === 'prompt' || k === 'soalan' || k === 'questions') return 'question';
+  if (k === 'answer' || k === 'key' || k === 'correct_answer' || k === 'correct_key' || k === 'jawapan') return 'correct';
+  if (k === 'point' || k === 'mata' || k === 'score') return 'points';
+  if (k === 'time' || k === 'time_limit' || k === 'time_limit_sec' || k === 'masa' || k === 'saat') return 'seconds';
+  const single = /^([a-f])$/.exec(k);
+  if (single) return 'option_' + single[1];
+  const opt = /^(?:option|pilihan|answer)_([a-f])$/.exec(k);
+  if (opt) return 'option_' + opt[1];
+  return k;
+}
+
+function parseWholeNumber(raw: string): number | null {
+  const t = raw.trim();
+  if (!t) return null;
+  if (!/^-?\d+$/.test(t)) return NaN;
+  return parseInt(t, 10);
+}
+
+/**
+ * Tukar teks CSV kepada senarai soalan. Semua atau tiada: jika `errors`
+ * tidak kosong, pemanggil MESTI tidak memasukkan apa-apa.
+ */
+export function parseQuizCsv(text: string): { questions: ParsedCsvQuestion[]; errors: QuizCsvError[] } {
+  const errors: QuizCsvError[] = [];
+  const questions: ParsedCsvQuestion[] = [];
+
+  const rows = parseCsvRows(text, detectCsvDelimiter(text));
+  const firstIdx = rows.findIndex((r) => r.some((c) => c.trim() !== ''));
+  if (firstIdx === -1) {
+    return { questions, errors: [{ row: 0, message: 'The file is empty.' }] };
+  }
+
+  const header = rows[firstIdx].map(normHeader);
+  const col = (name: string) => header.indexOf(name);
+  const iQuestion = col('question');
+  const iCorrect = col('correct');
+  const iPoints = col('points');
+  const iSeconds = col('seconds');
+  const optionCols = OPTION_LETTERS.map((l) => col('option_' + l));
+
+  if (iQuestion === -1) {
+    errors.push({ row: firstIdx + 1, message: 'The header row has no "question" column. Start from the downloaded template.' });
+  }
+  if (optionCols[0] === -1 || optionCols[1] === -1) {
+    errors.push({ row: firstIdx + 1, message: 'The header row needs at least "option_a" and "option_b" columns.' });
+  }
+  if (iCorrect === -1) {
+    errors.push({ row: firstIdx + 1, message: 'The header row has no "correct" column.' });
+  }
+  if (errors.length > 0) return { questions: [], errors };
+
+  const cell = (r: string[], i: number) => (i >= 0 && i < r.length ? String(r[i] ?? '').trim() : '');
+
+  for (let r = firstIdx + 1; r < rows.length; r++) {
+    const raw = rows[r];
+    if (!raw.some((c) => c.trim() !== '')) continue; // baris kosong dilangkau
+    const rowNo = r + 1;
+
+    const prompt = cell(raw, iQuestion);
+    if (!prompt) {
+      errors.push({ row: rowNo, message: 'the question text is empty.' });
+      continue;
+    }
+
+    // Pilihan mesti diisi berturutan bermula A. Lompang di tengah adalah
+    // ralat: kunci jawapan menjadi mengelirukan kepada pemain.
+    const texts = optionCols.map((i) => cell(raw, i));
+    let filled = 0;
+    let gap = false;
+    let gapReported = false;
+    for (let k = 0; k < texts.length; k++) {
+      if (texts[k]) {
+        if (gap) {
+          errors.push({
+            row: rowNo,
+            message: `option_${OPTION_LETTERS[k]} has text but an earlier option is empty. Fill the options in order, starting at option_a.`,
+          });
+          gapReported = true;
+          break;
+        }
+        filled++;
+      } else {
+        gap = true;
+      }
+    }
+    if (gapReported) continue;
+    if (filled < 2) {
+      errors.push({ row: rowNo, message: 'at least two options must be filled in.' });
+      continue;
+    }
+    const options = texts.slice(0, filled).map((t, k) => ({ key: OPTION_LETTERS[k].toUpperCase(), text: t }));
+
+    const correctRaw = cell(raw, iCorrect);
+    if (!correctRaw) {
+      errors.push({ row: rowNo, message: 'the "correct" column is empty.' });
+      continue;
+    }
+    const correctKey = correctRaw.trim().toUpperCase().replace(/[.)\s]+$/, '');
+    if (!/^[A-F]$/.test(correctKey)) {
+      errors.push({
+        row: rowNo,
+        message: `"correct" must be a single letter from A to F, but it reads "${correctRaw}".`,
+      });
+      continue;
+    }
+    if (!options.some((o) => o.key === correctKey)) {
+      errors.push({
+        row: rowNo,
+        message: `"correct" is ${correctKey}, but option_${correctKey.toLowerCase()} is empty.`,
+      });
+      continue;
+    }
+
+    let points = 1000;
+    const pRaw = iPoints === -1 ? '' : cell(raw, iPoints);
+    if (pRaw) {
+      const n = parseWholeNumber(pRaw);
+      if (n === null || Number.isNaN(n) || n < 1 || n > 10000) {
+        errors.push({ row: rowNo, message: `"points" must be a whole number between 1 and 10000, but it reads "${pRaw}".` });
+        continue;
+      }
+      points = n;
+    }
+
+    let timeLimitSec = 20;
+    const sRaw = iSeconds === -1 ? '' : cell(raw, iSeconds);
+    if (sRaw) {
+      const n = parseWholeNumber(sRaw);
+      if (n === null || Number.isNaN(n) || n < 5 || n > 300) {
+        errors.push({ row: rowNo, message: `"seconds" must be a whole number between 5 and 300, but it reads "${sRaw}".` });
+        continue;
+      }
+      timeLimitSec = n;
+    }
+
+    questions.push({ prompt, options, correct_key: correctKey, points, time_limit_sec: timeLimitSec });
+  }
+
+  if (errors.length === 0 && questions.length === 0) {
+    errors.push({ row: 0, message: 'The file has a header row but no questions under it.' });
+  }
+  if (questions.length > QUIZ_CSV_MAX_QUESTIONS) {
+    errors.push({
+      row: 0,
+      message: `The file holds ${questions.length} questions. The limit is ${QUIZ_CSV_MAX_QUESTIONS} per upload. Split it into smaller files.`,
+    });
+  }
+  return { questions: errors.length ? [] : questions, errors };
 }

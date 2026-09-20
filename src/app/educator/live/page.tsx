@@ -34,7 +34,7 @@ async function authedFetch(url: string, init?: RequestInit) {
     },
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Permintaan gagal.");
+  if (!res.ok) throw new Error(json.error || "Request failed.");
   return json;
 }
 
@@ -56,11 +56,11 @@ function SenaraiKuiz() {
     // bukan lagi tapisan ikut kelas.
     authedFetch("/api/live/quizzes")
       .then((json) => setQuizzes(json.data || []))
-      .catch((e) => setErr(e.message || "Gagal memuat kuiz."));
+      .catch((e) => setErr(e.message || "Could not load your quizzes."));
 
     listMyEducatorClasses()
       .then((cs) => setClasses(cs))
-      .catch((e) => setErr(e.message || "Gagal memuat kelas."));
+      .catch((e) => setErr(e.message || "Could not load your classes."));
 
     // Had pemain pengguna daripada profil (kelayakan pelan).
     supabase.auth.getUser().then(({ data: { user } }) => {
@@ -86,7 +86,7 @@ function SenaraiKuiz() {
       const json = await authedFetch("/api/live/quizzes");
       setQuizzes(json.data || []);
     } catch (e) {
-      setErr((e instanceof Error ? e.message : null) || "Gagal memuat kuiz.");
+      setErr((e instanceof Error ? e.message : null) || "Could not load your quizzes.");
     } finally {
       setLoading(false);
     }
@@ -94,7 +94,7 @@ function SenaraiKuiz() {
 
   const onCipta = async () => {
     setErr(null);
-    if (!title.trim()) { setErr("Tajuk diperlukan."); return; }
+    if (!title.trim()) { setErr("A title is required."); return; }
     setBusy(true);
     try {
       // Hantar classId hanya jika kelas dipilih; kosong bermakna kuiz peribadi.
@@ -109,54 +109,54 @@ function SenaraiKuiz() {
       setTitle(""); setDesc(""); setNewClassId(""); setShowNew(false);
       await reload();
     } catch (e) {
-      setErr((e instanceof Error ? e.message : null) || "Kuiz tidak dapat dicipta.");
+      setErr((e instanceof Error ? e.message : null) || "The quiz could not be created.");
     } finally { setBusy(false); }
   };
 
   const onPadam = async (q: LiveQuizRow) => {
-    if (!window.confirm(`Padam kuiz "${q.title}"? Semua soalan akan turut dipadam.`)) return;
+    if (!window.confirm(`Delete the quiz "${q.title}"? All of its questions will be deleted too.`)) return;
     try {
       await authedFetch("/api/live/quizzes/" + q.id, { method: "DELETE" });
       await reload();
     } catch (e) {
-      alert((e instanceof Error ? e.message : null) || "Gagal memadam kuiz.");
+      alert((e instanceof Error ? e.message : null) || "Could not delete the quiz.");
     }
   };
 
-  const labelKelas = (q: LiveQuizRow) => (q.class?.name ? q.class.name : "Peribadi");
+  const labelKelas = (q: LiveQuizRow) => (q.class?.name ? q.class.name : "Personal");
 
   return (
     <Shell tabs={EDU_TABS}>
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 className="page-title">Kuiz Langsung</h2>
+        <h2 className="page-title">Live Quiz</h2>
         <button onClick={() => setShowNew((s) => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
-          <Plus className="w-4 h-4" /> Kuiz Baharu
+          <Plus className="w-4 h-4" /> New Quiz
         </button>
       </div>
 
       {maxLivePlayers !== null && (
-        <p className="text-xs text-gray-500 mb-3">Pelan anda: sehingga {maxLivePlayers} pemain setiap sesi.</p>
+        <p className="text-xs text-gray-500 mb-3">Your plan allows up to {maxLivePlayers} players per session.</p>
       )}
 
       {showNew && (
         <div className="card mb-4">
-          <div className="font-semibold mb-2">Cipta kuiz langsung</div>
-          <input className="input w-full mb-2" placeholder="Tajuk kuiz" value={title} onChange={(e) => setTitle(e.target.value)} />
-          <input className="input w-full mb-2" placeholder="Keterangan (pilihan)" value={desc} onChange={(e) => setDesc(e.target.value)} />
-          <label className="block text-xs font-medium text-gray-700 mb-1">Kelas (boleh dikosongkan)</label>
+          <div className="font-semibold mb-2">Create a live quiz</div>
+          <input className="input w-full mb-2" placeholder="Quiz title" value={title} onChange={(e) => setTitle(e.target.value)} />
+          <input className="input w-full mb-2" placeholder="Description (optional)" value={desc} onChange={(e) => setDesc(e.target.value)} />
+          <label className="block text-xs font-medium text-gray-700 mb-1">Class (optional)</label>
           <select
             value={newClassId}
             onChange={(e) => setNewClassId(e.target.value)}
             className="input w-full max-w-xs mb-2"
           >
-            <option value="">Kuiz peribadi, tiada kelas</option>
+            <option value="">Personal quiz, no class</option>
             {classes.map((c) => (
               <option key={c.id} value={c.id}>{c.name}</option>
             ))}
           </select>
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Batal</button>
-            <button type="button" disabled={busy} onClick={onCipta} className="btn-primary py-1.5 px-3 text-sm">{busy ? "Mencipta…" : "Cipta"}</button>
+            <button type="button" onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
+            <button type="button" disabled={busy} onClick={onCipta} className="btn-primary py-1.5 px-3 text-sm">{busy ? "Creating…" : "Create"}</button>
           </div>
           {err && <div className="text-xs text-red-600 mt-1">{err}</div>}
         </div>
@@ -164,9 +164,9 @@ function SenaraiKuiz() {
       {!showNew && err && <div className="text-xs text-red-600 mb-2">{err}</div>}
 
       {loading ? (
-        <p className="text-sm text-gray-500">Memuat…</p>
+        <p className="text-sm text-gray-500">Loading…</p>
       ) : quizzes.length === 0 ? (
-        <p className="text-sm text-gray-500">Tiada kuiz langsung lagi. Cipta satu untuk memulakan sesi langsung.</p>
+        <p className="text-sm text-gray-500">No live quizzes yet. Create one to start a live session.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {quizzes.map((q) => (
@@ -177,7 +177,7 @@ function SenaraiKuiz() {
                   <Link href={`/educator/live/${q.id}`} className="font-semibold truncate block">{q.title}</Link>
                   {q.description && <div className="text-xs text-gray-500 truncate">{q.description}</div>}
                 </div>
-                <button onClick={() => onPadam(q)} title="Padam kuiz" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1">
+                <button onClick={() => onPadam(q)} title="Delete quiz" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1">
                   <Trash2 className="w-4 h-4" />
                 </button>
               </div>
@@ -187,7 +187,7 @@ function SenaraiKuiz() {
                 </span>
                 <span className="ml-2">{new Date(q.created_at).toLocaleDateString()}</span>
                 <button onClick={() => router.push(`/educator/live/${q.id}`)} className="ml-auto text-brand-purple font-semibold flex items-center gap-1">
-                  <Play className="w-3 h-3" /> Urus →
+                  <Play className="w-3 h-3" /> Manage →
                 </button>
               </div>
             </div>
@@ -200,7 +200,7 @@ function SenaraiKuiz() {
 
 export default function HalamanKuizLangsung() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Memuat…</div>}>
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center text-sm text-gray-500">Loading…</div>}>
       <SenaraiKuiz />
     </Suspense>
   );

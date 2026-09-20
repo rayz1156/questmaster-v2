@@ -276,3 +276,47 @@ memulangkan sifar baris walaupun sisipan berjaya.
 Pengajaran am: fungsi plpgsql tidak disahkan oleh `npx tsc` mahupun
 `npm run build`. Panggil ia terhadap pangkalan data sebenar sebelum percaya ia
 berfungsi.
+
+## Istilah antara muka: "Quiz", bukan "Kuiz"
+
+Antara muka Kuizen berbahasa Inggeris (Classes, Activities, Teams). Keputusan
+Dr Hariz, 20 September 2026: modul kuiz langsung mesti sepadan, jadi semua
+teks yang dilihat pengguna menggunakan **Quiz** dan **Live Quiz**. "Kuiz" hanya
+untuk kandungan Bahasa Melayu, bukan untuk UI.
+
+Ini termasuk mesej ralat API, kerana klien memaparkan `json.error` terus kepada
+pengguna, dan mesej `raise exception` dalam plpgsql, kerana mesej sesi penuh
+dan nama bertindih sampai ke skrin pemain (migrasi `0019`).
+
+Komen sumber, nama pemboleh ubah dan nama fungsi dalaman kekal Bahasa Melayu.
+Jangan menterjemah nama seperti `soalanSemasa` atau `SenaraiKuiz`: ia bukan
+teks pengguna dan menukarnya hanya menambah risiko tanpa faedah.
+
+## Import CSV soalan
+
+Pendidik memuat turun templat dari `GET /api/live/quiz-template` (tanpa auth,
+fail kosong), mengisinya dalam Excel, dan memuat naik ke
+`POST /api/live/quizzes/[quizId]/import-csv` sebagai `{content}` teks.
+
+Lajur: `question, option_a..option_f, correct, points, seconds`. Hanya
+`question`, `option_a`, `option_b` dan `correct` wajib.
+
+Tiga perkara yang sengaja dibuat begini:
+
+**Semua atau tiada.** Satu baris rosak bermakna TIADA soalan dimasukkan dan
+balasan 400 membawa `errors: [{row, message}]`. Import separuh jalan adalah
+lebih teruk daripada gagal: pendidik tidak tahu baris mana yang sudah masuk.
+
+**Nombor baris mengikut Excel.** `parseCsvRows` MENGEKALKAN baris kosong
+supaya "Row 7" dalam mesej ralat benar-benar baris 7 dalam Excel. Jangan
+tapis baris kosong di dalam pemecah itu.
+
+**BOM UTF-8 pada templat.** Tanpa BOM, Excel di Windows membaca fail sebagai
+ANSI dan merosakkan aksara beraksen apabila pendidik menyimpan semula.
+
+Had: 100 soalan dan ~500 KB setiap muat naik. Ingat `client_max_body_size`
+nginx ialah 1 MB; had 500 KB berada di bawahnya dengan sengaja.
+
+Pemecah CSV ditulis sendiri (RFC 4180, mengesan pembatas `,` `;` atau tab).
+Tiada kebergantungan baharu ditambah: VPS membina dengan `npm run build` dan
+setiap pakej baharu ialah satu lagi perkara yang boleh gagal di sana.

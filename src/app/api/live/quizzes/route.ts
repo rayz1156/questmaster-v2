@@ -18,10 +18,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const { classId, title } = body;
   if (classId !== undefined && classId !== null && typeof classId !== 'string') {
-    return NextResponse.json({ error: 'classId tidak sah.' }, { status: 400 });
+    return NextResponse.json({ error: 'classId is invalid.' }, { status: 400 });
   }
   if (typeof title !== 'string' || !title.trim()) {
-    return NextResponse.json({ error: 'Tajuk diperlukan.' }, { status: 400 });
+    return NextResponse.json({ error: 'A title is required.' }, { status: 400 });
   }
 
   // Jika classId diberi, sahkan pemanggil pendidik/pemilik kelas itu.
@@ -45,7 +45,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error || !quiz) {
-    return NextResponse.json({ error: error?.message || 'Kuiz tidak dapat dicipta.' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'The quiz could not be created.' }, { status: 500 });
   }
   return NextResponse.json({ data: quiz }, { status: 201 });
 }

@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
     .eq('code', code)
     .maybeSingle()) as { data: { id: string } | null };
   if (!session) {
-    return NextResponse.json({ error: 'Sesi tidak dijumpai.' }, { status: 404 });
+    return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
   }
 
   const { data: players } = (await supa

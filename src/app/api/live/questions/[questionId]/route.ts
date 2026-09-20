@@ -17,7 +17,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
   const patch: Record<string, unknown> = {};
 
   if (typeof body.prompt === 'string') {
-    if (!body.prompt.trim()) return NextResponse.json({ error: 'Soalan tidak boleh kosong.' }, { status: 400 });
+    if (!body.prompt.trim()) return NextResponse.json({ error: 'The question cannot be empty.' }, { status: 400 });
     patch.prompt = body.prompt.trim();
   }
 
@@ -30,13 +30,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
   const correctKey = body.correct_key !== undefined ? body.correct_key : body.correctKey;
   if (correctKey !== undefined) {
     if (typeof correctKey !== 'string') {
-      return NextResponse.json({ error: 'correct_key tidak sah.' }, { status: 400 });
+      return NextResponse.json({ error: 'correct_key is invalid.' }, { status: 400 });
     }
     const optionKeys = Array.isArray(patch.options)
       ? (patch.options as { key: string }[]).map((o) => o.key)
       : q.question!.options.map((o) => o.key);
     if (!optionKeys.includes(correctKey)) {
-      return NextResponse.json({ error: 'correct_key mesti salah satu kunci pilihan.' }, { status: 400 });
+      return NextResponse.json({ error: 'correct_key must be one of the option keys.' }, { status: 400 });
     }
     patch.correct_key = correctKey;
   }
@@ -44,7 +44,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
   if (body.points !== undefined) {
     const points = Number(body.points);
     if (!Number.isFinite(points) || points < 1) {
-      return NextResponse.json({ error: 'Mata mesti nombor positif.' }, { status: 400 });
+      return NextResponse.json({ error: 'Points must be a positive number.' }, { status: 400 });
     }
     patch.points = Math.floor(points);
   }
@@ -52,13 +52,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
   if (body.time_limit_sec !== undefined) {
     const tl = Number(body.time_limit_sec);
     if (!Number.isFinite(tl) || tl < 5) {
-      return NextResponse.json({ error: 'Had masa mesti sekurang-kurangnya 5 saat.' }, { status: 400 });
+      return NextResponse.json({ error: 'The time limit must be at least 5 seconds.' }, { status: 400 });
     }
     patch.time_limit_sec = Math.floor(tl);
   }
 
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: 'Tiada medan untuk dikemas kini.' }, { status: 400 });
+    return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
   }
 
   const { data: question, error } = await q.supa
@@ -69,7 +69,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
     .single();
 
   if (error || !question) {
-    return NextResponse.json({ error: error?.message || 'Kemas kini gagal.' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'Update failed.' }, { status: 500 });
   }
   return NextResponse.json({ data: question });
 }

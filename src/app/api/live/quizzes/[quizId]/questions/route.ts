@@ -15,14 +15,14 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
 
   const body = await req.json().catch(() => ({}));
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  if (!prompt) return NextResponse.json({ error: 'Soalan (prompt) diperlukan.' }, { status: 400 });
+  if (!prompt) return NextResponse.json({ error: 'A question prompt is required.' }, { status: 400 });
 
   const opts = validateOptions(body.options);
   if (!opts.ok) return NextResponse.json({ error: opts.error }, { status: 400 });
 
   const correctKey = typeof body.correct_key === 'string' ? body.correct_key : body.correctKey;
   if (typeof correctKey !== 'string' || !opts.keys!.includes(correctKey)) {
-    return NextResponse.json({ error: 'correct_key mesti salah satu kunci pilihan.' }, { status: 400 });
+    return NextResponse.json({ error: 'correct_key must be one of the option keys.' }, { status: 400 });
   }
 
   const points = Number.isFinite(Number(body.points)) ? Math.max(1, Math.floor(Number(body.points))) : 1000;
@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .single();
 
   if (error || !question) {
-    return NextResponse.json({ error: error?.message || 'Soalan tidak dapat disimpan.' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'The question could not be saved.' }, { status: 500 });
   }
   return NextResponse.json({ data: question }, { status: 201 });
 }

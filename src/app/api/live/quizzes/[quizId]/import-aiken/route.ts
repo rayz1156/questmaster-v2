@@ -18,12 +18,12 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
 
   const body = await req.json().catch(() => ({}));
   if (typeof body.content !== 'string' || !body.content.trim()) {
-    return NextResponse.json({ error: 'Kandungan Aiken (content) diperlukan.' }, { status: 400 });
+    return NextResponse.json({ error: 'Aiken content is required.' }, { status: 400 });
   }
 
   const { questions, skipped } = parseAiken(body.content);
   if (questions.length === 0) {
-    return NextResponse.json({ created: 0, skipped, error: 'Tiada soalan sah ditemui.' }, { status: 400 });
+    return NextResponse.json({ created: 0, skipped, error: 'No valid questions found.' }, { status: 400 });
   }
 
   const { data: last } = await host.supa

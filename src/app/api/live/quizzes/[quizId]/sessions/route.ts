@@ -12,7 +12,7 @@ export const fetchCache = 'force-no-store';
 export async function POST(req: NextRequest, { params }: { params: { quizId: string } }) {
   const host = await requireQuizHost(req, params.quizId);
   if (host.response || !host.quiz) {
-    return host.response || NextResponse.json({ error: 'Kuiz tidak dijumpai.' }, { status: 404 });
+    return host.response || NextResponse.json({ error: 'Quiz not found.' }, { status: 404 });
   }
 
   const { data: questions } = await host.supa
@@ -21,12 +21,12 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .eq('quiz_id', params.quizId)
     .limit(1);
   if (!questions || questions.length === 0) {
-    return NextResponse.json({ error: 'Kuiz mesti ada sekurang-kurangnya satu soalan.' }, { status: 400 });
+    return NextResponse.json({ error: 'The quiz needs at least one question.' }, { status: 400 });
   }
 
   const code = await generateSessionCode(host.supa);
   if (!code) {
-    return NextResponse.json({ error: 'Kod sesi tidak dapat dijana. Cuba lagi.' }, { status: 500 });
+    return NextResponse.json({ error: 'Could not generate a session code. Please try again.' }, { status: 500 });
   }
 
   // Bahagian 2.3: petik had pemain pemilik kuiz pada masa sesi dicipta, supaya
@@ -52,7 +52,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .single();
 
   if (error || !session) {
-    return NextResponse.json({ error: error?.message || 'Sesi tidak dapat dicipta.' }, { status: 500 });
+    return NextResponse.json({ error: error?.message || 'The session could not be created.' }, { status: 500 });
   }
   return NextResponse.json({ data: { sessionId: session.id, code: session.code } }, { status: 201 });
 }

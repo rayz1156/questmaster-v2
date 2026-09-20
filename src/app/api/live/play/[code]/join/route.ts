@@ -25,19 +25,19 @@ interface JoinRpcRow { player_id: string; player_token: string }
 export async function POST(req: NextRequest, { params }: { params: { code: string } }) {
   const code = String(params.code || '').toUpperCase();
   if (!/^[A-Z0-9]{6}$/.test(code)) {
-    return NextResponse.json({ error: 'Kod sesi tidak sah.' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid session code.' }, { status: 400 });
   }
 
   let body: { nickname?: unknown };
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Badan permintaan tidak sah.' }, { status: 400 });
+    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
   }
   const nickname = typeof body.nickname === 'string' ? body.nickname.trim() : '';
   if (nickname.length < 1 || nickname.length > 24) {
     return NextResponse.json(
-      { error: 'Nama pemain mesti antara 1 hingga 24 aksara.' },
+      { error: 'A player name must be 1 to 24 characters.' },
       { status: 400 },
     );
   }
@@ -51,10 +51,10 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .neq('status', 'ended')
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
-    return NextResponse.json({ error: 'Sesi tidak dijumpai atau sudah tamat.' }, { status: 404 });
+    return NextResponse.json({ error: 'Session not found, or already over.' }, { status: 404 });
   }
   if (session.status === 'ended') {
-    return NextResponse.json({ error: 'Sesi ini sudah tamat.' }, { status: 409 });
+    return NextResponse.json({ error: 'This session is already over.' }, { status: 409 });
   }
 
   // Sisipan pemain melalui qm_live_join_player (migrasi 0018): kiraan pemain
@@ -70,26 +70,26 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     // LV009 = nama sudah diambil (kekangan unik di pelayan pangkalan data).
     if (joinError?.code === 'LV009') {
       return NextResponse.json(
-        { error: joinError.message || 'Nama sudah diambil. Sila pilih nama lain.' },
+        { error: joinError.message || 'That name is taken. Please choose another.' },
         { status: 409 },
       );
     }
     // LV005 = had pemain sesi telah dicapai (Bahagian 2.3).
     if (joinError?.code === 'LV005') {
       return NextResponse.json(
-        { error: joinError.message || 'Sesi ini sudah penuh.' },
+        { error: joinError.message || 'This session is full.' },
         { status: 409 },
       );
     }
     // LV004 = sesi tidak dijumpai.
     if (joinError?.code === 'LV004') {
       return NextResponse.json(
-        { error: 'Sesi tidak dijumpai atau sudah tamat.' },
+        { error: 'Session not found, or already over.' },
         { status: 404 },
       );
     }
     return NextResponse.json(
-      { error: joinError?.message || 'Gagal menyertai sesi.' },
+      { error: joinError?.message || 'Could not join the session.' },
       { status: 500 },
     );
   }

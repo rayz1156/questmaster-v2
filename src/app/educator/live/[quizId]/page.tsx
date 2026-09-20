@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
-import { Plus, Trash2, Play, Upload, Pencil, Check, X } from "lucide-react";
+import { Plus, Trash2, Play, Upload, Pencil, Check, X, Download, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface Pilihan { key: string; text: string }
@@ -33,7 +33,7 @@ async function authedFetch(url: string, init?: RequestInit) {
     },
   });
   const json = await res.json().catch(() => ({}));
-  if (!res.ok) throw new Error(json.error || "Permintaan gagal.");
+  if (!res.ok) throw new Error(json.error || "Request failed.");
   return json;
 }
 
@@ -75,13 +75,19 @@ export default function EditorKuizLangsung() {
   const [aikenBusy, setAikenBusy] = useState(false);
   const [aikenMsg, setAikenMsg] = useState<{ ok: boolean; text: string } | null>(null);
 
+  // Import CSV: templat dimuat turun, diisi dalam Excel, dimuat naik semula.
+  const [csvBusy, setCsvBusy] = useState(false);
+  const [csvMsg, setCsvMsg] = useState<{ ok: boolean; text: string } | null>(null);
+  const [csvErrors, setCsvErrors] = useState<{ row: number; message: string }[]>([]);
+  const csvInputRef = useRef<HTMLInputElement | null>(null);
+
   const reload = async () => {
     try {
       const json = await authedFetch("/api/live/quizzes/" + quizId);
       setKuiz(json.data.quiz);
       setSoalan(json.data.questions || []);
     } catch (e: any) {
-      setErr(e.message || "Gagal memuat kuiz.");
+      setErr(e.message || "Could not load the quiz.");
     } finally {
       setLoading(false);
     }
@@ -91,9 +97,9 @@ export default function EditorKuizLangsung() {
   const onTambah = async () => {
     setErr(null);
     const bersih = opts.map((o, i) => ({ key: HURUF[i], text: o.text.trim() })).filter((o) => o.text);
-    if (!prompt.trim()) { setErr("Soalan diperlukan."); return; }
-    if (bersih.length < 2) { setErr("Sekurang-kurangnya dua pilihan perlu diisi."); return; }
-    if (!bersih.some((o) => o.key === kunci)) { setErr("Kunci jawapan mesti salah satu pilihan."); return; }
+    if (!prompt.trim()) { setErr("A question is required."); return; }
+    if (bersih.length < 2) { setErr("At least two options must be filled in."); return; }
+    if (!bersih.some((o) => o.key === kunci)) { setErr("The answer key must be one of the options."); return; }
     setBusy(true);
     try {
       await authedFetch(`/api/live/quizzes/${quizId}/questions`, {
@@ -110,7 +116,7 @@ export default function EditorKuizLangsung() {
       setKunci("A"); setPoints(1000); setTimeLimit(20); setShowNew(false);
       await reload();
     } catch (e: any) {
-      setErr(e.message || "Soalan tidak dapat disimpan.");
+      setErr(e.message || "The question could not be saved.");
     } finally { setBusy(false); }
   };
 
@@ -128,7 +134,7 @@ export default function EditorKuizLangsung() {
     setErr(null);
     const bersih = editOpts.map((o) => ({ key: o.key, text: o.text.trim() })).filter((o) => o.text);
     if (!editPrompt.trim() || bersih.length < 2 || !bersih.some((o) => o.key === editKunci)) {
-      setErr("Soalan, sekurang-kurangnya dua pilihan dan kunci yang sah diperlukan.");
+      setErr("A question, at least two options and a valid answer key are required.");
       return;
     }
     setBusy(true);
@@ -146,46 +152,85 @@ export default function EditorKuizLangsung() {
       setEditId(null);
       await reload();
     } catch (e: any) {
-      setErr(e.message || "Kemas kini gagal.");
+      setErr(e.message || "Update failed.");
     } finally { setBusy(false); }
   };
 
   const onPadamSoalan = async (s: Soalan) => {
-    if (!window.confirm("Padam soalan ini?")) return;
+    if (!window.confirm("Delete this question?")) return;
     try {
       await authedFetch("/api/live/questions/" + s.id, { method: "DELETE" });
       await reload();
     } catch (e: any) {
-      alert(e.message || "Gagal memadam soalan.");
+      alert(e.message || "Could not delete the question.");
     }
   };
 
   const onImportAiken = async () => {
     setAikenMsg(null);
-    if (!aiken.trim()) { setAikenMsg({ ok: false, text: "Tampal kandungan Aiken dahulu." }); return; }
+    if (!aiken.trim()) { setAikenMsg({ ok: false, text: "Paste the Aiken content first." }); return; }
     setAikenBusy(true);
     try {
       const json = await authedFetch(`/api/live/quizzes/${quizId}/import-aiken`, {
         method: "POST",
         body: JSON.stringify({ content: aiken }),
       });
-      setAikenMsg({ ok: true, text: `${json.created} soalan berjaya diimport, ${json.skipped} blok dilangkau.` });
+      setAikenMsg({ ok: true, text: `${json.created} questions imported, ${json.skipped} blocks skipped.` });
       setAiken("");
       await reload();
     } catch (e: any) {
-      setAikenMsg({ ok: false, text: e.message || "Import gagal." });
+      setAikenMsg({ ok: false, text: e.message || "Import failed." });
     } finally { setAikenBusy(false); }
+  };
+
+  /** Baca fail CSV di klien, hantar sebagai teks, papar ralat per baris. */
+  const onPilihCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setCsvMsg(null);
+    setCsvErrors([]);
+    if (file.size > 500000) {
+      setCsvMsg({ ok: false, text: "That file is too large. The limit is about 500 KB." });
+      if (csvInputRef.current) csvInputRef.current.value = "";
+      return;
+    }
+    setCsvBusy(true);
+    try {
+      const content = await file.text();
+      const { data: { session } } = await supabase.auth.getSession();
+      const r = await fetch(`/api/live/quizzes/${quizId}/import-csv`, {
+        method: "POST",
+        headers: {
+          "content-type": "application/json",
+          ...(session ? { Authorization: "Bearer " + session.access_token } : {}),
+        },
+        body: JSON.stringify({ content }),
+      });
+      const j = await r.json().catch(() => ({}));
+      if (!r.ok) {
+        setCsvErrors(Array.isArray(j.errors) ? j.errors : []);
+        setCsvMsg({ ok: false, text: j.error || "The file could not be imported." });
+        return;
+      }
+      setCsvMsg({ ok: true, text: `${j.created} questions imported from ${file.name}.` });
+      await reload();
+    } catch {
+      setCsvMsg({ ok: false, text: "The file could not be read. Save it again as CSV UTF-8." });
+    } finally {
+      setCsvBusy(false);
+      if (csvInputRef.current) csvInputRef.current.value = "";
+    }
   };
 
   const onMulaSesi = async () => {
     setErr(null);
-    if (soalan.length === 0) { setErr("Kuiz mesti ada sekurang-kurangnya satu soalan."); return; }
+    if (soalan.length === 0) { setErr("The quiz needs at least one question."); return; }
     setBusy(true);
     try {
       const json = await authedFetch(`/api/live/quizzes/${quizId}/sessions`, { method: "POST" });
       router.push(`/educator/live/session/${json.data.sessionId}`);
     } catch (e: any) {
-      setErr(e.message || "Sesi tidak dapat dimulakan.");
+      setErr(e.message || "The session could not be started.");
       setBusy(false);
     }
   };
@@ -193,14 +238,14 @@ export default function EditorKuizLangsung() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-gray-500">Memuat…</p>
+        <p className="text-sm text-gray-500">Loading…</p>
       </Shell>
     );
   }
   if (!kuiz) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-gray-500">Kuiz tidak dijumpai. <Link href="/educator/live" className="text-brand-purple font-semibold">Kembali →</Link></p>
+        <p className="text-sm text-gray-500">Quiz not found. <Link href="/educator/live" className="text-brand-purple font-semibold">Back →</Link></p>
       </Shell>
     );
   }
@@ -213,9 +258,9 @@ export default function EditorKuizLangsung() {
           {kuiz.description && <p className="text-xs text-gray-500">{kuiz.description}</p>}
         </div>
         <div className="flex items-center gap-2">
-          <Link href="/educator/live" className="text-xs text-gray-500 hover:text-gray-800">← Semua kuiz</Link>
+          <Link href="/educator/live" className="text-xs text-gray-500 hover:text-gray-800">← All quizzes</Link>
           <button onClick={onMulaSesi} disabled={busy} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
-            <Play className="w-4 h-4" /> Mula sesi
+            <Play className="w-4 h-4" /> Start session
           </button>
         </div>
       </div>
@@ -223,16 +268,16 @@ export default function EditorKuizLangsung() {
       {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
 
       <div className="flex items-center justify-between mb-2">
-        <h3 className="font-semibold text-sm">Soalan ({soalan.length})</h3>
+        <h3 className="font-semibold text-sm">Questions ({soalan.length})</h3>
         <button onClick={() => setShowNew((s) => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
-          <Plus className="w-4 h-4" /> Soalan Baharu
+          <Plus className="w-4 h-4" /> New Question
         </button>
       </div>
 
       {showNew && (
         <div className="card mb-4">
-          <div className="font-semibold mb-2">Tambah soalan</div>
-          <textarea className="input w-full mb-2" rows={2} placeholder="Teks soalan" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
+          <div className="font-semibold mb-2">Add a question</div>
+          <textarea className="input w-full mb-2" rows={2} placeholder="Question text" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
           <div className="space-y-2 mb-2">
             {opts.map((o, i) => (
               <div key={i} className="flex items-center gap-2">
@@ -242,12 +287,12 @@ export default function EditorKuizLangsung() {
                 </label>
                 <input
                   className="input w-full"
-                  placeholder={`Teks pilihan ${HURUF[i]}`}
+                  placeholder={`Option ${HURUF[i]} text`}
                   value={o.text}
                   onChange={(e) => setOpts(opts.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
                 />
                 {opts.length > 2 && (
-                  <button type="button" title="Buang pilihan" onClick={() => setOpts(opts.filter((_, j) => j !== i).map((x, j) => ({ key: HURUF[j], text: x.text })))} className="text-red-600 hover:bg-red-50 rounded px-1">
+                  <button type="button" title="Remove option" onClick={() => setOpts(opts.filter((_, j) => j !== i).map((x, j) => ({ key: HURUF[j], text: x.text })))} className="text-red-600 hover:bg-red-50 rounded px-1">
                     <X className="w-4 h-4" />
                   </button>
                 )}
@@ -256,22 +301,22 @@ export default function EditorKuizLangsung() {
           </div>
           {opts.length < 6 && (
             <button type="button" onClick={() => setOpts([...opts, { key: HURUF[opts.length], text: "" }])} className="text-xs text-blue-600 mb-3">
-              + Tambah pilihan
+              + Add option
             </button>
           )}
           <div className="flex items-center gap-3 mb-2 text-xs text-gray-600">
-            <label className="flex items-center gap-1">Mata: <input type="number" min={1} className="input w-20" value={points} onChange={(e) => setPoints(Number(e.target.value) || 1000)} /></label>
-            <label className="flex items-center gap-1">Masa (saat): <input type="number" min={5} className="input w-20" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value) || 20)} /></label>
+            <label className="flex items-center gap-1">Points: <input type="number" min={1} className="input w-20" value={points} onChange={(e) => setPoints(Number(e.target.value) || 1000)} /></label>
+            <label className="flex items-center gap-1">Time (seconds): <input type="number" min={5} className="input w-20" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value) || 20)} /></label>
           </div>
           <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Batal</button>
-            <button type="button" disabled={busy} onClick={onTambah} className="btn-primary py-1.5 px-3 text-sm">{busy ? "Menyimpan…" : "Simpan soalan"}</button>
+            <button type="button" onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
+            <button type="button" disabled={busy} onClick={onTambah} className="btn-primary py-1.5 px-3 text-sm">{busy ? "Saving…" : "Save question"}</button>
           </div>
         </div>
       )}
 
       {soalan.length === 0 ? (
-        <p className="text-sm text-gray-500 mb-4">Tiada soalan lagi. Tambah soalan atau import format Aiken di bawah.</p>
+        <p className="text-sm text-gray-500 mb-4">No questions yet. Add one by hand, or upload a CSV file below.</p>
       ) : (
         <div className="space-y-3 mb-6">
           {soalan.map((s, idx) => (
@@ -295,12 +340,12 @@ export default function EditorKuizLangsung() {
                     ))}
                   </div>
                   <div className="flex items-center gap-3 mb-2 text-xs text-gray-600">
-                    <label className="flex items-center gap-1">Mata: <input type="number" min={1} className="input w-20" value={editPoints} onChange={(e) => setEditPoints(Number(e.target.value) || 1000)} /></label>
-                    <label className="flex items-center gap-1">Masa (saat): <input type="number" min={5} className="input w-20" value={editTime} onChange={(e) => setEditTime(Number(e.target.value) || 20)} /></label>
+                    <label className="flex items-center gap-1">Points: <input type="number" min={1} className="input w-20" value={editPoints} onChange={(e) => setEditPoints(Number(e.target.value) || 1000)} /></label>
+                    <label className="flex items-center gap-1">Time (seconds): <input type="number" min={5} className="input w-20" value={editTime} onChange={(e) => setEditTime(Number(e.target.value) || 20)} /></label>
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => setEditId(null)} disabled={busy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Batal</button>
-                    <button onClick={onSimpanSunting} disabled={busy} className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Simpan</button>
+                    <button onClick={() => setEditId(null)} disabled={busy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
+                    <button onClick={onSimpanSunting} disabled={busy} className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Save</button>
                   </div>
                 </>
               ) : (
@@ -316,11 +361,11 @@ export default function EditorKuizLangsung() {
                           </span>
                         ))}
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">{s.points} mata · {s.time_limit_sec} saat</div>
+                      <div className="text-xs text-gray-400 mt-1">{s.points} points · {s.time_limit_sec}s</div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => mulaSunting(s)} title="Sunting soalan" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => onPadamSoalan(s)} title="Padam soalan" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4" /></button>
+                      <button onClick={() => mulaSunting(s)} title="Edit question" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><Pencil className="w-4 h-4" /></button>
+                      <button onClick={() => onPadamSoalan(s)} title="Delete question" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4" /></button>
                     </div>
                   </div>
                 </>
@@ -330,22 +375,75 @@ export default function EditorKuizLangsung() {
         </div>
       )}
 
+      <div className="card mb-4">
+        <div className="font-semibold mb-1 flex items-center gap-2">
+          <FileSpreadsheet className="w-4 h-4 text-violet-600" /> Upload questions from a CSV file
+        </div>
+        <p className="text-xs text-gray-500 mb-3">
+          Download the template, type one question per row, then upload the file here. Every
+          question is added to the end of this quiz. If any row is wrong, nothing is imported and
+          the problem rows are listed below.
+        </p>
+        <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-3 text-xs text-gray-700">
+          <div className="font-semibold mb-1">Columns</div>
+          <ul className="list-disc ml-4 space-y-0.5">
+            <li><code className="font-mono">question</code> — the question text</li>
+            <li><code className="font-mono">option_a</code> to <code className="font-mono">option_d</code> — the choices. At least A and B are needed, filled in order.</li>
+            <li><code className="font-mono">correct</code> — the letter of the right answer, A to D</li>
+            <li><code className="font-mono">points</code> — optional, 1 to 10000. Blank means 1000.</li>
+            <li><code className="font-mono">seconds</code> — optional, 5 to 300. Blank means 20.</li>
+          </ul>
+          <div className="mt-2">
+            Save the file as <strong>CSV UTF-8</strong> in Excel, and keep the header row exactly as
+            it comes in the template. Up to 100 questions per upload.
+          </div>
+        </div>
+        <div className="flex items-center gap-3 flex-wrap">
+          <a
+            href="/api/live/quiz-template"
+            className="px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 text-sm flex items-center gap-1"
+          >
+            <Download className="w-4 h-4" /> Download template
+          </a>
+          <input
+            ref={csvInputRef}
+            type="file"
+            accept=".csv,text/csv"
+            onChange={onPilihCsv}
+            disabled={csvBusy}
+            className="text-xs"
+          />
+          {csvBusy && <span className="text-xs text-gray-500">Uploading…</span>}
+        </div>
+        {csvMsg && (
+          <div className={`mt-3 text-sm rounded-lg px-3 py-2 ${csvMsg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
+            {csvMsg.text}
+          </div>
+        )}
+        {csvErrors.length > 0 && (
+          <ul className="mt-2 text-xs text-red-700 space-y-1 max-h-48 overflow-auto list-disc ml-4">
+            {csvErrors.map((x, i) => (
+              <li key={i}>{x.row > 0 ? `Row ${x.row}: ` : ""}{x.message}</li>
+            ))}
+          </ul>
+        )}
+      </div>
       <div className="card">
-        <div className="font-semibold mb-1 flex items-center gap-2"><Upload className="w-4 h-4 text-indigo-600" /> Import format Aiken</div>
+        <div className="font-semibold mb-1 flex items-center gap-2"><Upload className="w-4 h-4 text-indigo-600" /> Import Aiken format</div>
         <p className="text-xs text-gray-500 mb-2">
-          Tampal soalan dalam format Aiken. Pisahkan setiap soalan dengan baris kosong.
-          Baris <code className="font-mono bg-gray-100 px-1 rounded">ANSWER:</code> menentukan jawapan betul.
+          Paste questions in Aiken format. Separate every question with a blank line.
+          The <code className="font-mono bg-gray-100 px-1 rounded">ANSWER:</code> line sets the correct answer.
         </p>
         <textarea
           className="input w-full font-mono text-xs mb-2"
           rows={6}
-          placeholder={"Apakah ibu negara Malaysia?\nA. Johor Bahru\nB. Kuala Lumpur\nC. Ipoh\nANSWER: B"}
+          placeholder={"What is the capital of Malaysia?\nA. Johor Bahru\nB. Kuala Lumpur\nC. Ipoh\nANSWER: B"}
           value={aiken}
           onChange={(e) => setAiken(e.target.value)}
         />
         <div className="flex items-center gap-3">
           <button onClick={onImportAiken} disabled={aikenBusy} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
-            <Upload className="w-4 h-4" /> {aikenBusy ? "Mengimport…" : "Import"}
+            <Upload className="w-4 h-4" /> {aikenBusy ? "Importing…" : "Import"}
           </button>
           {aikenMsg && (
             <span className={`text-xs ${aikenMsg.ok ? "text-green-600" : "text-red-600"}`}>{aikenMsg.text}</span>

@@ -17,7 +17,7 @@ function BorangMasuk() {
     setErr(null);
     const bersih = kod.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(bersih)) {
-      setErr("Kod sesi mesti 6 aksara.");
+      setErr("The session code must be 6 characters.");
       return;
     }
     setBusy(true);
@@ -26,8 +26,8 @@ function BorangMasuk() {
 
   return (
     <div className="card w-full max-w-sm">
-      <h1 className="text-xl font-bold text-center mb-1">Kuiz Langsung</h1>
-      <p className="text-sm text-gray-500 text-center mb-4">Masukkan kod sesi daripada pendidik anda.</p>
+      <h1 className="text-xl font-bold text-center mb-1">Live Quiz</h1>
+      <p className="text-sm text-gray-500 text-center mb-4">Enter the session code from your educator.</p>
       <form onSubmit={onHantar}>
         <input
           className="input w-full text-center font-mono text-2xl tracking-widest uppercase mb-3"
@@ -39,7 +39,7 @@ function BorangMasuk() {
         />
         {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
         <button type="submit" disabled={busy} className="btn-primary w-full py-2">
-          Masuk
+          Enter
         </button>
       </form>
     </div>
@@ -49,7 +49,7 @@ function BorangMasuk() {
 export default function HalamanMasukLangsung() {
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Suspense fallback={<div className="card w-full max-w-sm text-center text-sm text-gray-500">Memuat…</div>}>
+      <Suspense fallback={<div className="card w-full max-w-sm text-center text-sm text-gray-500">Loading…</div>}>
         <BorangMasuk />
       </Suspense>
     </div>
