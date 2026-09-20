@@ -57,15 +57,32 @@ function CallbackInner() {
       // Peranan hanya boleh ditetapkan pada akaun yang belum mempunyai
       // peranan langsung, iaitu pendaftaran Google yang benar-benar baharu.
       // Akaun sedia ada tidak boleh dinaikkan taraf melalui parameter URL.
+      //
+      // Kerja sebenar berlaku di pelayan. Pelayar tidak dibenarkan menulis
+      // lajur role atau approved pada profil sendiri, jadi menetapkan
+      // peranan di sini sahaja akan meninggalkan profil sebagai peserta dan
+      // memintas pintu kelulusan pendidik.
+      let pendingEducator = false;
       if (sp?.get('role') === 'educator' && !meta.role) {
         try {
-          await supabase.auth.updateUser({ data: { role: 'educator' } });
-          fetch('/api/notify-educator-pending', {
+          const res = await fetch('/api/auth/claim-educator', {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ email: user.email, name: meta.name || meta.full_name || user.email }),
-          }).catch(() => {});
+            headers: { Authorization: `Bearer ${session.access_token}` },
+          });
+          pendingEducator = res.ok;
+          if (res.ok) {
+            fetch('/api/notify-educator-pending', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ email: user.email, name: meta.name || meta.full_name || user.email }),
+            }).catch(() => {});
+          }
         } catch { /* peranan kekal peserta; pentadbir boleh naikkan kemudian */ }
+      }
+
+      if (pendingEducator) {
+        router.replace('/pending-approval');
+        return;
       }
 
       const { data: prof } = await supabase
