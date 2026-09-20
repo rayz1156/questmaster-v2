@@ -7,13 +7,18 @@ import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
 import { Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check, Maximize2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import LiveLeaderboard from "@/components/LiveLeaderboard";
 
 interface Pilihan { key: string; text: string }
 interface Soalan {
   id: string; order_idx: number; prompt: string; options: Pilihan[];
-  correct_key: string; points: number; time_limit_sec: number; use_countdown?: boolean;
+  correct_key: string; points: number; time_limit_sec: number;
+  use_countdown?: boolean; double_points?: boolean;
 }
-interface Pemain { id: string; nickname: string; score: number; joined_at: string }
+interface Pemain {
+  id: string; nickname: string; score: number; joined_at: string;
+  streak?: number; best_streak?: number;
+}
 interface Sesi {
   id: string; code: string; status: string; current_index: number;
   question_started_at: string | null;
@@ -144,6 +149,14 @@ export default function PanelHosSesi() {
   const sesiPenuh = hadPemain !== null && playerCount >= hadPemain;
   const pautanSertai = asal + "/live/" + session.code;
   const pautanAsas = (asal || "") + "/live";
+  // Satu bentuk baris untuk komponen leaderboard yang dikongsi dengan
+  // leaderboard aktiviti.
+  const barisPapan = players.map((p, i) => ({
+    rank: i + 1,
+    nickname: p.nickname,
+    score: p.score,
+    streak: session.status === "ended" ? p.best_streak : p.streak,
+  }));
 
   return (
     <Shell tabs={EDU_TABS}>
@@ -250,17 +263,13 @@ export default function PanelHosSesi() {
       </div>
 
       {session.status === "ended" ? (
-        <div className="card mb-4">
-          <div className="font-semibold mb-2">The session has ended</div>
-          <p className="text-sm text-gray-500 mb-3">Final leaderboard:</p>
-          <ol className="text-sm space-y-1">
-            {players.slice(0, 10).map((p, i) => (
-              <li key={p.id} className="flex items-center justify-between">
-                <span>{i + 1}. {p.nickname}</span>
-                <span className="font-semibold">{p.score}</span>
-              </li>
-            ))}
-          </ol>
+        <div className="mb-4">
+          <LiveLeaderboard
+            rows={barisPapan}
+            limit={10}
+            title="Final leaderboard"
+            subtitle="Ranked by points, then by speed."
+          />
         </div>
       ) : session.status === "lobby" ? (
         <div className="card mb-4">
@@ -275,6 +284,7 @@ export default function PanelHosSesi() {
             {currentQuestion.use_countdown === false
               ? "No countdown. Reveal when you are ready; faster answers still score higher."
               : `${currentQuestion.time_limit_sec}s countdown`}
+            {currentQuestion.double_points ? " · double points" : ""}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {currentQuestion.options.map((o) => {
@@ -299,21 +309,28 @@ export default function PanelHosSesi() {
         </div>
       )}
 
-      <div className="card">
-        <div className="font-semibold mb-2 flex items-center gap-2"><Users className="w-4 h-4 text-indigo-600" /> Participants ({playerCount})</div>
-        {players.length === 0 ? (
-          <p className="text-sm text-gray-500">No participants yet.</p>
-        ) : (
-          <ol className="text-sm space-y-1">
-            {players.map((p, i) => (
-              <li key={p.id} className="flex items-center justify-between">
-                <span>{i + 1}. {p.nickname}</span>
-                <span className="font-semibold">{p.score}</span>
-              </li>
-            ))}
-          </ol>
-        )}
-      </div>
+      {session.status === "lobby" ? (
+        <div className="card">
+          <div className="font-semibold mb-2 flex items-center gap-2"><Users className="w-4 h-4 text-indigo-600" /> Participants ({playerCount})</div>
+          {players.length === 0 ? (
+            <p className="text-sm text-gray-500">No participants yet.</p>
+          ) : (
+            <ol className="text-sm space-y-1">
+              {players.map((p, i) => (
+                <li key={p.id} className="flex items-center justify-between">
+                  <span>{i + 1}. {p.nickname}</span>
+                  <span className="text-xs text-gray-400">joined</span>
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      ) : session.status === "ended" ? null : (
+        <LiveLeaderboard
+          rows={barisPapan}
+          subtitle={`${playerCount} taking part, ranked by points then speed.`}
+        />
+      )}
       {/* Paparan skrin penuh untuk projektor kelas. */}
       {paparPenuh && (
         <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6">

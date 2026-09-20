@@ -23,11 +23,13 @@ const ADMIN_ROLES = ['admin', 'superadmin'];
 export interface LiveQuizRow {
   id: string; class_id: string | null; owner_id: string;
   title: string; description: string | null; created_at: string;
+  streak_bonus?: boolean;
 }
 export interface LiveQuestionRow {
   id: string; quiz_id: string; order_idx: number; prompt: string;
   options: { key: string; text: string }[]; correct_key: string;
   points: number; time_limit_sec: number; use_countdown?: boolean;
+  double_points?: boolean;
 }
 
 /* ============================================================
@@ -49,6 +51,17 @@ export interface LiveQuestionRow {
 
 /** Jawapan betul di bawah tempoh ini sentiasa dapat mata penuh (paras Kahoot). */
 export const SCORE_INSTANT_MS = 500;
+/**
+ * Bonus rentetan, mengikut jadual Kahoot: jawapan betul kedua berturut-turut
+ * dapat +100, ketiga +200, dan seterusnya, berhenti pada +500.
+ *
+ * Satu perbezaan yang disengajakan: bonus diskalakan mengikut mata asas soalan
+ * (asas / 1000). Pada soalan 1000 mata lalai ia sama persis dengan Kahoot,
+ * tetapi pada soalan 100 mata bonus tidak lagi menenggelamkan mata jawapan.
+ */
+export const STREAK_BONUS_STEP = 100;
+export const STREAK_BONUS_MAX = 500;
+export const STREAK_BONUS_REFERENCE_POINTS = 1000;
 /** Kelonggaran rangkaian selepas kira detik tamat sebelum mata jadi sifar. */
 export const SCORE_LATE_GRACE_MS = 1500;
 /** Nisbah terendah bagi jawapan betul yang paling lambat. */
@@ -58,37 +71,68 @@ export interface ScoreInput {
   isCorrect: boolean;
   /** Masa dari soalan dibuka, dikira di pelayan. */
   msTaken: number;
-  /** Mata penuh soalan. */
+  /** Mata penuh soalan sebelum darab dua. */
   points: number;
   /** Had masa bila kira detik hidup; rentak rujukan bila dimatikan. */
   timeLimitSec: number;
   useCountdown: boolean;
+  /** Suis setiap soalan: darabkan mata asas dengan dua. */
+  doublePoints?: boolean;
+  /** Bilangan jawapan betul berturut-turut TERMASUK jawapan ini. */
+  streak?: number;
+  /** Suis setiap kuiz, dipetik ke sesi. */
+  streakBonusEnabled?: boolean;
 }
 
-/** Kira mata satu jawapan. `late` bermakna kira detik sudah tamat. */
-export function scoreAnswer(input: ScoreInput): { pointsAwarded: number; late: boolean } {
-  if (!input.isCorrect) return { pointsAwarded: 0, late: false };
+export interface ScoreResult {
+  /** Jumlah yang ditambah kepada skor: basePoints + streakBonus. */
+  pointsAwarded: number;
+  /** Mata kelajuan sahaja, sudah termasuk darab dua. */
+  basePoints: number;
+  /** Bonus rentetan sahaja. */
+  streakBonus: number;
+  /** Kira detik sudah tamat, jadi jawapan ini tidak diberi mata. */
+  late: boolean;
+}
 
-  const base = Math.max(1, Math.floor(input.points));
+/** Kira mata satu jawapan. Satu-satunya tempat formula ini wujud. */
+export function scoreAnswer(input: ScoreInput): ScoreResult {
+  const nil = { pointsAwarded: 0, basePoints: 0, streakBonus: 0 };
+  if (!input.isCorrect) return { ...nil, late: false };
+
+  const base = Math.max(1, Math.floor(input.points)) * (input.doublePoints ? 2 : 1);
   const t = Math.max(0, input.msTaken);
   const windowMs = Math.max(1, Math.floor(input.timeLimitSec)) * 1000;
 
+  // Lewat melepasi kelonggaran rangkaian: tiada mata, dan rentetan putus.
   if (input.useCountdown && t > windowMs + SCORE_LATE_GRACE_MS) {
-    return { pointsAwarded: 0, late: true };
+    return { ...nil, late: true };
   }
-  if (t <= SCORE_INSTANT_MS) return { pointsAwarded: base, late: false };
 
-  const ratio = input.useCountdown
-    ? Math.max(0, 1 - t / windowMs)
-    : windowMs / (windowMs + t);
+  let basePoints: number;
+  if (t <= SCORE_INSTANT_MS) {
+    basePoints = base;
+  } else {
+    const ratio = input.useCountdown
+      ? Math.max(0, 1 - t / windowMs)
+      : windowMs / (windowMs + t);
+    basePoints = Math.round(base * (SCORE_FLOOR_RATIO + (1 - SCORE_FLOOR_RATIO) * ratio));
+  }
 
-  const share = SCORE_FLOOR_RATIO + (1 - SCORE_FLOOR_RATIO) * ratio;
-  return { pointsAwarded: Math.round(base * share), late: false };
+  let streakBonus = 0;
+  const streak = Math.max(0, Math.floor(input.streak ?? 0));
+  if (input.streakBonusEnabled && streak >= 2) {
+    const flat = Math.min(STREAK_BONUS_MAX, (streak - 1) * STREAK_BONUS_STEP);
+    streakBonus = Math.round(flat * (base / STREAK_BONUS_REFERENCE_POINTS));
+  }
+
+  return { pointsAwarded: basePoints + streakBonus, basePoints, streakBonus, late: false };
 }
 export interface LiveSessionRow {
   id: string; quiz_id: string; host_id: string; code: string; status: string;
   current_index: number; question_started_at: string | null;
-  max_players?: number; created_at?: string; ended_at?: string | null;
+  max_players?: number; streak_bonus?: boolean;
+  created_at?: string; ended_at?: string | null;
 }
 interface ClassRef { id: string; owner_id: string }
 interface ProfileRef { role: string; suspended: boolean | null }
@@ -181,7 +225,7 @@ export async function requireQuizHost(
 
   const { data: quiz } = (await auth.supa
     .from('qm_live_quizzes')
-    .select('id, class_id, owner_id, title, description, created_at')
+    .select('id, class_id, owner_id, title, description, created_at, streak_bonus')
     .eq('id', quizId)
     .maybeSingle()) as { data: LiveQuizRow | null };
   if (!quiz) {
@@ -236,7 +280,7 @@ export async function requireQuestionHost(
 
   const { data: question } = (await auth.supa
     .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
     .eq('id', questionId)
     .maybeSingle()) as { data: LiveQuestionRow | null };
   if (!question) {
@@ -372,14 +416,14 @@ export const QUIZ_CSV_MAX_QUESTIONS = 100;
 export const QUIZ_CSV_MAX_BYTES = 500_000;
 
 export const QUIZ_CSV_HEADER =
-  'question,option_a,option_b,option_c,option_d,correct,points,seconds,countdown';
+  'question,option_a,option_b,option_c,option_d,correct,points,seconds,countdown,double_points';
 
 /** Templat yang dimuat turun pendidik. CRLF supaya Excel gembira. */
 export const QUIZ_CSV_TEMPLATE = [
   QUIZ_CSV_HEADER,
-  '"What is the capital of Malaysia?",Johor Bahru,Kuala Lumpur,Ipoh,Melaka,B,1000,20,yes',
-  '"Which planet is closest to the Sun?",Venus,Mars,Mercury,Jupiter,C,1000,20,yes',
-  '"2 + 2 x 3 = ?",8,10,12,6,A,1000,15,no',
+  '"What is the capital of Malaysia?",Johor Bahru,Kuala Lumpur,Ipoh,Melaka,B,1000,20,yes,no',
+  '"Which planet is closest to the Sun?",Venus,Mars,Mercury,Jupiter,C,1000,20,yes,yes',
+  '"2 + 2 x 3 = ?",8,10,12,6,A,1000,15,no,no',
   '',
 ].join('\r\n');
 
@@ -396,6 +440,8 @@ export interface ParsedCsvQuestion {
   time_limit_sec: number;
   /** false bermakna tiada kira detik; time_limit_sec jadi rentak sahaja. */
   use_countdown: boolean;
+  /** true mendarabkan mata asas dengan dua. */
+  double_points: boolean;
 }
 
 /**
@@ -453,6 +499,7 @@ function normHeader(h: string): string {
   if (k === 'point' || k === 'mata' || k === 'score') return 'points';
   if (k === 'time' || k === 'time_limit' || k === 'time_limit_sec' || k === 'masa' || k === 'saat') return 'seconds';
   if (k === 'timer' || k === 'countdown_timer' || k === 'use_countdown' || k === 'kira_detik') return 'countdown';
+  if (k === 'double' || k === 'x2' || k === 'mata_berganda') return 'double_points';
   const single = /^([a-f])$/.exec(k);
   if (single) return 'option_' + single[1];
   const opt = /^(?:option|pilihan|answer)_([a-f])$/.exec(k);
@@ -488,6 +535,7 @@ export function parseQuizCsv(text: string): { questions: ParsedCsvQuestion[]; er
   const iPoints = col('points');
   const iSeconds = col('seconds');
   const iCountdown = col('countdown');
+  const iDouble = col('double_points');
   const optionCols = OPTION_LETTERS.map((l) => col('option_' + l));
 
   if (iQuestion === -1) {
@@ -599,6 +647,18 @@ export function parseQuizCsv(text: string): { questions: ParsedCsvQuestion[]; er
       }
     }
 
+    let doublePoints = false;
+    const dRaw = iDouble === -1 ? '' : cell(raw, iDouble);
+    if (dRaw) {
+      const v = dRaw.trim().toLowerCase();
+      if (['yes', 'y', 'true', '1', 'on', 'ya'].includes(v)) doublePoints = true;
+      else if (['no', 'n', 'false', '0', 'off', 'tidak'].includes(v)) doublePoints = false;
+      else {
+        errors.push({ row: rowNo, message: `"double_points" must be yes or no, but it reads "${dRaw}".` });
+        continue;
+      }
+    }
+
     questions.push({
       prompt,
       options,
@@ -606,6 +666,7 @@ export function parseQuizCsv(text: string): { questions: ParsedCsvQuestion[]; er
       points,
       time_limit_sec: timeLimitSec,
       use_countdown: useCountdown,
+      double_points: doublePoints,
     });
   }
 

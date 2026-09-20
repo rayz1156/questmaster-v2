@@ -30,6 +30,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     ? Math.max(5, Math.floor(Number(body.time_limit_sec)))
     : 20;
   const useCountdown = body.use_countdown === undefined ? true : body.use_countdown !== false;
+  const doublePoints = body.double_points === true;
 
   const { data: last } = await host.supa
     .from('qm_live_questions')
@@ -50,8 +51,9 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       points,
       time_limit_sec: timeLimitSec,
       use_countdown: useCountdown,
+      double_points: doublePoints,
     })
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
     .single();
 
   if (error || !question) {

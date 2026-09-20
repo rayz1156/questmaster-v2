@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
 
   const { data: questions, error } = await host.supa
     .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
     .eq('quiz_id', params.quizId)
     .order('order_idx');
 
@@ -35,6 +35,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { quizId: st
     patch.title = body.title.trim();
   }
   if (typeof body.description === 'string') patch.description = body.description;
+  if (body.streak_bonus !== undefined) {
+    if (typeof body.streak_bonus !== 'boolean') {
+      return NextResponse.json({ error: 'streak_bonus must be true or false.' }, { status: 400 });
+    }
+    patch.streak_bonus = body.streak_bonus;
+  }
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
   }
@@ -43,7 +49,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { quizId: st
     .from('qm_live_quizzes')
     .update(patch)
     .eq('id', params.quizId)
-    .select('id, class_id, owner_id, title, description, created_at')
+    .select('id, class_id, owner_id, title, description, created_at, streak_bonus')
     .single();
 
   if (error || !quiz) {

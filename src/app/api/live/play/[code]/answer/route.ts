@@ -27,12 +27,16 @@ interface SessionRow {
   status: string;
   current_index: number;
   question_started_at: string | null;
+  streak_bonus: boolean;
 }
-interface PlayerRow { id: string; player_token: string; score: number; total_ms: number; }
+interface PlayerRow {
+  id: string; player_token: string; score: number; total_ms: number;
+  streak: number; best_streak: number;
+}
 interface QuestionRow {
   id: string; quiz_id: string; order_idx: number; prompt: string;
   options: { key: string; text: string }[];
-  points: number; time_limit_sec: number; use_countdown: boolean;
+  points: number; time_limit_sec: number; use_countdown: boolean; double_points: boolean;
 }
 interface KeyRow { correct_key: string; }
 
@@ -60,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   const { data: session } = (await supa
     .from('qm_live_sessions')
-    .select('id, quiz_id, status, current_index, question_started_at')
+    .select('id, quiz_id, status, current_index, question_started_at, streak_bonus')
     .eq('code', code)
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
@@ -70,7 +74,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   // Sahkan pemain + token.
   const { data: player } = (await supa
     .from('qm_live_players')
-    .select('id, player_token, score, total_ms')
+    .select('id, player_token, score, total_ms, streak, best_streak')
     .eq('id', playerId)
     .eq('session_id', session.id)
     .maybeSingle()) as { data: PlayerRow | null };
@@ -87,7 +91,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   }
   const { data: currentQuestion } = (await supa
     .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, points, time_limit_sec, use_countdown')
+    .select('id, quiz_id, order_idx, prompt, options, points, time_limit_sec, use_countdown, double_points')
     .eq('quiz_id', session.quiz_id)
     .order('order_idx')
     .range(session.current_index, session.current_index)
@@ -130,13 +134,21 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const msTaken = Math.max(0, Date.now() - startedMs);
   const isCorrect = choiceKey === keyRow.correct_key;
 
-  const { pointsAwarded } = scoreAnswer({
+  // Rentetan dikira di pelayan daripada baris pemain. Jawapan salah, dan
+  // jawapan betul yang melepasi kira detik, kedua-duanya memutuskannya.
+  const streakIfCorrect = isCorrect ? (player.streak || 0) + 1 : 0;
+  const score = scoreAnswer({
     isCorrect,
     msTaken,
     points: currentQuestion.points,
     timeLimitSec: currentQuestion.time_limit_sec,
     useCountdown: currentQuestion.use_countdown !== false,
+    doublePoints: currentQuestion.double_points === true,
+    streak: streakIfCorrect,
+    streakBonusEnabled: session.streak_bonus !== false,
   });
+  const pointsAwarded = score.pointsAwarded;
+  const streakAfter = score.late ? 0 : streakIfCorrect;
 
   const { error: insertErr } = await supa.from('qm_live_answers').insert({
     session_id: session.id,
@@ -146,6 +158,8 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     is_correct: isCorrect,
     ms_taken: msTaken,
     points_awarded: pointsAwarded,
+    streak_bonus: score.streakBonus,
+    streak_at: streakAfter,
   });
   if (insertErr) {
     // 23505: kekangan unik (session_id, player_id, question_id) — jawapan berulang.
@@ -160,6 +174,8 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .update({
       score: player.score + pointsAwarded,
       total_ms: player.total_ms + msTaken,
+      streak: streakAfter,
+      best_streak: Math.max(player.best_streak || 0, streakAfter),
       last_seen_at: new Date().toISOString(),
     })
     .eq('id', playerId);

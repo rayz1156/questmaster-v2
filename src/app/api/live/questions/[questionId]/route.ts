@@ -64,6 +64,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
     patch.use_countdown = body.use_countdown;
   }
 
+  if (body.double_points !== undefined) {
+    if (typeof body.double_points !== 'boolean') {
+      return NextResponse.json({ error: 'double_points must be true or false.' }, { status: 400 });
+    }
+    patch.double_points = body.double_points;
+  }
+
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
   }
@@ -72,7 +79,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
     .from('qm_live_questions')
     .update(patch)
     .eq('id', params.questionId)
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
     .single();
 
   if (error || !question) {

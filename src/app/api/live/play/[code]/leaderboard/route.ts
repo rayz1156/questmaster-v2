@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 // pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
 export const fetchCache = 'force-no-store';
 
-interface PlayerRow { nickname: string; score: number; }
+interface PlayerRow { nickname: string; score: number; streak: number; }
 
 export async function GET(_req: NextRequest, { params }: { params: { code: string } }) {
   const code = String(params.code || '').toUpperCase();
@@ -30,7 +30,7 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
 
   const { data: players } = (await supa
     .from('qm_live_players')
-    .select('nickname, score')
+    .select('nickname, score, streak')
     .eq('session_id', session.id)
     .order('score', { ascending: false })
     .order('total_ms', { ascending: true })
@@ -41,6 +41,7 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
     rank: i + 1,
     nickname: p.nickname,
     score: p.score,
+    streak: p.streak ?? 0,
   }));
 
   return NextResponse.json({ leaderboard });

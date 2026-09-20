@@ -4,6 +4,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trophy, Users, Timer, Check, X } from "lucide-react";
+import LiveLeaderboard from "@/components/LiveLeaderboard";
 
 interface Pilihan { key: string; text: string }
 // Soalan dalam cache klien (daripada laluan /questions — tiada correct_key).
@@ -26,11 +27,13 @@ interface Keadaan {
     myChoice: string | null;
     isCorrect: boolean;
     pointsAwarded: number;
+    streakBonus?: number;
+    streak?: number;
     rank: number;
     score: number;
   } | null;
 }
-interface BarisPapan { rank: number; nickname: string; score: number }
+interface BarisPapan { rank: number; nickname: string; score: number; streak?: number }
 
 interface Identiti {
   playerId: string;
@@ -292,27 +295,28 @@ export default function SkrinMainLangsung() {
 
   if (k.status === "ended") {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-        <div className="card w-full max-w-md text-center">
-          <Trophy className="w-10 h-10 mx-auto text-amber-500 mb-2" />
-          <h1 className="text-xl font-bold mb-1">Session Over</h1>
-          <p className="text-sm text-gray-500 mb-4">Thanks for playing!</p>
-          <div className="text-3xl font-bold text-brand-purple mb-1">{k.reveal?.score ?? pendahuluSaya?.score ?? 0}</div>
-          <div className="text-xs text-gray-500 mb-4">total points</div>
+      <div className="min-h-screen bg-gray-50 flex items-start justify-center p-4">
+        <div className="w-full max-w-md space-y-4 py-6">
+          <div className="card text-center">
+            <Trophy className="w-10 h-10 mx-auto text-amber-500 mb-2" />
+            <h1 className="text-xl font-bold mb-1">Session Over</h1>
+            <p className="text-sm text-gray-500 mb-4">Thanks for playing!</p>
+            <div className="text-3xl font-bold text-brand-purple mb-1">{k.reveal?.score ?? pendahuluSaya?.score ?? 0}</div>
+            <div className="text-xs text-gray-500">total points</div>
+            {(pendahuluSaya?.rank ?? 0) > 0 && (
+              <div className="text-xs text-gray-500 mt-1">finished #{pendahuluSaya?.rank}</div>
+            )}
+          </div>
           {papan && (
-            <div className="text-left border-t border-gray-100 pt-3">
-              <div className="text-xs font-semibold text-gray-500 mb-2">Leaderboard</div>
-              <ol className="text-sm space-y-1">
-                {papan.slice(0, 10).map((b) => (
-                  <li key={b.rank} className={`flex items-center justify-between ${b.nickname === identiti.nickname ? "font-semibold text-brand-purple" : ""}`}>
-                    <span>{b.rank}. {b.nickname}</span>
-                    <span>{b.score}</span>
-                  </li>
-                ))}
-              </ol>
-            </div>
+            <LiveLeaderboard
+              rows={papan}
+              limit={10}
+              highlight={identiti.nickname}
+              title="Final leaderboard"
+              subtitle="Ranked by points, then by speed."
+            />
           )}
-          <button onClick={keluar} className="btn-primary w-full py-2 mt-4">Exit</button>
+          <button onClick={keluar} className="btn-primary w-full py-2">Exit</button>
         </div>
       </div>
     );
@@ -379,6 +383,11 @@ export default function SkrinMainLangsung() {
                         : "Correct, but the time ran out"
                       : "Wrong"}
                   </div>
+                  {(k.reveal.streakBonus ?? 0) > 0 && (
+                    <div className="text-xs font-semibold text-amber-600 mt-1">
+                      includes +{k.reveal.streakBonus} streak bonus ({k.reveal.streak} correct in a row)
+                    </div>
+                  )}
                 </>
               ) : (
                 <div className="font-bold text-gray-500">No answer sent</div>
@@ -407,16 +416,13 @@ export default function SkrinMainLangsung() {
         )}
 
         {papan && k.status !== "lobby" && (
-          <div className="card mt-4">
-            <div className="text-xs font-semibold text-gray-500 mb-2 flex items-center gap-1"><Trophy className="w-4 h-4 text-amber-500" /> Leaderboard</div>
-            <ol className="text-sm space-y-1">
-              {papan.slice(0, 5).map((b) => (
-                <li key={b.rank} className={`flex items-center justify-between ${b.nickname === identiti.nickname ? "font-semibold text-brand-purple" : ""}`}>
-                  <span>{b.rank}. {b.nickname}</span>
-                  <span>{b.score}</span>
-                </li>
-              ))}
-            </ol>
+          <div className="mt-4">
+            <LiveLeaderboard
+              rows={papan}
+              limit={5}
+              highlight={identiti.nickname}
+              subtitle="Top five right now"
+            />
           </div>
         )}
 

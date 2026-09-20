@@ -72,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
 
   const { data: questions, error: qErr } = await auth.supa
     .from('qm_live_questions')
-    .select('id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
+    .select('id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
     .eq('quiz_id', ses.quiz_id)
     .order('order_idx');
   if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
 
   const { data: players, error: pErr } = await auth.supa
     .from('qm_live_players')
-    .select('id, nickname, score, total_ms, joined_at')
+    .select('id, nickname, score, total_ms, joined_at, streak, best_streak')
     .eq('session_id', params.sessionId)
     .order('score', { ascending: false });
   if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });

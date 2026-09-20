@@ -19,8 +19,9 @@ interface Soalan {
   points: number;
   time_limit_sec: number;
   use_countdown?: boolean;
+  double_points?: boolean;
 }
-interface Kuiz { id: string; title: string; description: string | null }
+interface Kuiz { id: string; title: string; description: string | null; streak_bonus?: boolean }
 
 /**Permintaan dengan token Bearer pendidik. */
 async function authedFetch(url: string, init?: RequestInit) {
@@ -62,6 +63,7 @@ export default function EditorKuizLangsung() {
   const [points, setPoints] = useState(1000);
   const [timeLimit, setTimeLimit] = useState(20);
   const [kiraDetik, setKiraDetik] = useState(true);
+  const [mataBerganda, setMataBerganda] = useState(false);
   const [busy, setBusy] = useState(false);
 
   // Suntingan soalan sedia ada
@@ -72,6 +74,7 @@ export default function EditorKuizLangsung() {
   const [editPoints, setEditPoints] = useState(1000);
   const [editTime, setEditTime] = useState(20);
   const [editKira, setEditKira] = useState(true);
+  const [editBerganda, setEditBerganda] = useState(false);
 
   // Import Aiken
   const [aiken, setAiken] = useState("");
@@ -114,10 +117,12 @@ export default function EditorKuizLangsung() {
           points,
           time_limit_sec: timeLimit,
           use_countdown: kiraDetik,
+          double_points: mataBerganda,
         }),
       });
       setPrompt(""); setOpts([{ key: "A", text: "" }, { key: "B", text: "" }, { key: "C", text: "" }, { key: "D", text: "" }]);
-      setKunci("A"); setPoints(1000); setTimeLimit(20); setKiraDetik(true); setShowNew(false);
+      setKunci("A"); setPoints(1000); setTimeLimit(20); setKiraDetik(true);
+      setMataBerganda(false); setShowNew(false);
       await reload();
     } catch (e: any) {
       setErr(e.message || "The question could not be saved.");
@@ -132,6 +137,7 @@ export default function EditorKuizLangsung() {
     setEditPoints(s.points);
     setEditTime(s.time_limit_sec);
     setEditKira(s.use_countdown !== false);
+    setEditBerganda(s.double_points === true);
   };
 
   const onSimpanSunting = async () => {
@@ -153,6 +159,7 @@ export default function EditorKuizLangsung() {
           points: editPoints,
           time_limit_sec: editTime,
           use_countdown: editKira,
+          double_points: editBerganda,
         }),
       });
       setEditId(null);
@@ -228,6 +235,22 @@ export default function EditorKuizLangsung() {
     }
   };
 
+  /** Bonus rentetan ialah tetapan seluruh kuiz, dipetik ke sesi bila dimulakan. */
+  const onTukarStreak = async (v: boolean) => {
+    if (!kuiz) return;
+    const sebelum = kuiz;
+    setKuiz({ ...kuiz, streak_bonus: v });
+    try {
+      await authedFetch("/api/live/quizzes/" + quizId, {
+        method: "PATCH",
+        body: JSON.stringify({ streak_bonus: v }),
+      });
+    } catch (e: any) {
+      setErr(e.message || "The setting could not be saved.");
+      setKuiz(sebelum);
+    }
+  };
+
   const onMulaSesi = async () => {
     setErr(null);
     if (soalan.length === 0) { setErr("The quiz needs at least one question."); return; }
@@ -273,6 +296,23 @@ export default function EditorKuizLangsung() {
 
       {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
 
+      <div className="card mb-4">
+        <label className="flex items-center gap-2 text-sm font-medium">
+          <input
+            type="checkbox"
+            checked={kuiz.streak_bonus !== false}
+            onChange={(e) => onTukarStreak(e.target.checked)}
+            className="rounded"
+          />
+          Answer streak bonus
+        </label>
+        <p className="text-xs text-gray-500 mt-1">
+          Extra points for correct answers back to back: +100 on the second in a row, +200 on the
+          third, rising to +500. A wrong answer, a skipped question or running out of time resets
+          the streak. The setting is fixed when a session starts, so changing it mid-game is safe.
+        </p>
+      </div>
+
       <div className="flex items-center justify-between mb-2">
         <h3 className="font-semibold text-sm">Questions ({soalan.length})</h3>
         <button onClick={() => setShowNew((s) => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
@@ -316,6 +356,10 @@ export default function EditorKuizLangsung() {
             <label className="flex items-center gap-1">
               <input type="checkbox" checked={kiraDetik} onChange={(e) => setKiraDetik(e.target.checked)} className="rounded" />
               Countdown
+            </label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={mataBerganda} onChange={(e) => setMataBerganda(e.target.checked)} className="rounded" />
+              Double points
             </label>
           </div>
           <p className="text-[11px] text-gray-500 mb-2">
@@ -361,6 +405,10 @@ export default function EditorKuizLangsung() {
                       <input type="checkbox" checked={editKira} onChange={(e) => setEditKira(e.target.checked)} className="rounded" />
                       Countdown
                     </label>
+                    <label className="flex items-center gap-1">
+                      <input type="checkbox" checked={editBerganda} onChange={(e) => setEditBerganda(e.target.checked)} className="rounded" />
+                      Double points
+                    </label>
                   </div>
                   <div className="flex items-center justify-end gap-2">
                     <button onClick={() => setEditId(null)} disabled={busy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
@@ -381,7 +429,7 @@ export default function EditorKuizLangsung() {
                         ))}
                       </div>
                       <div className="text-xs text-gray-400 mt-1">
-                        {s.points} points ·{" "}
+                        {s.points} points{s.double_points ? " × 2" : ""} ·{" "}
                         {s.use_countdown === false
                           ? `no countdown, pace ${s.time_limit_sec}s`
                           : `${s.time_limit_sec}s countdown`}

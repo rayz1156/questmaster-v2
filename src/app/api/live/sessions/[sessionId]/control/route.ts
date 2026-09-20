@@ -110,6 +110,25 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
       return NextResponse.json({ error: 'There is no open question to reveal.' }, { status: 400 });
     }
     patch.status = 'revealed';
+    // Tidak menjawab memutuskan rentetan, sama seperti jawapan salah.
+    // Tanpa ini, melangkau soalan sukar akan mengekalkan bonus.
+    const currentQ = (questions || [])[ses.current_index] as { id: string } | undefined;
+    if (currentQ) {
+      const { data: answered } = await auth.supa
+        .from('qm_live_answers')
+        .select('player_id')
+        .eq('session_id', params.sessionId)
+        .eq('question_id', currentQ.id);
+      const ids = (answered || []).map((a) => (a as { player_id: string }).player_id);
+      let reset = auth.supa
+        .from('qm_live_players')
+        .update({ streak: 0 })
+        .eq('session_id', params.sessionId);
+      if (ids.length > 0) {
+        reset = reset.not('id', 'in', `(${ids.map((i) => `"${i}"`).join(',')})`);
+      }
+      await reset;
+    }
   } else if (action === 'end') {
     if (ses.status === 'ended') {
       return NextResponse.json({ error: 'The session is already over.' }, { status: 400 });
@@ -129,7 +148,7 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     // Set semula skor pemain kepada 0. Baris pemain JANGAN dipadam.
     const { error: pErr } = await auth.supa
       .from('qm_live_players')
-      .update({ score: 0, total_ms: 0 })
+      .update({ score: 0, total_ms: 0, streak: 0, best_streak: 0 })
       .eq('session_id', params.sessionId);
     if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
     patch.status = 'lobby';

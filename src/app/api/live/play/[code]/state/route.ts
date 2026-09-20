@@ -30,7 +30,10 @@ interface PlayerRow { id: string; score: number; }
 interface QuestionRow {
   id: string; order_idx: number; time_limit_sec: number; use_countdown: boolean;
 }
-interface AnswerRow { choice_key: string; is_correct: boolean; points_awarded: number; }
+interface AnswerRow {
+  choice_key: string; is_correct: boolean; points_awarded: number;
+  streak_bonus: number; streak_at: number;
+}
 
 /** Cap jari pendek (16 aksara) bagi keadaan sesi. */
 function fingerprint(
@@ -153,7 +156,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
     const { data: myAns } = (await supa
       .from('qm_live_answers')
-      .select('choice_key, is_correct, points_awarded')
+      .select('choice_key, is_correct, points_awarded, streak_bonus, streak_at')
       .eq('session_id', session.id)
       .eq('player_id', playerId)
       .eq('question_id', currentQuestion.id)
@@ -170,6 +173,8 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       myChoice: myAns?.choice_key ?? null,
       isCorrect: myAns?.is_correct ?? false,
       pointsAwarded: myAns?.points_awarded ?? 0,
+      streakBonus: myAns?.streak_bonus ?? 0,
+      streak: myAns?.streak_at ?? 0,
       rank: (betterCount || 0) + 1,
       score: player.score,
     };

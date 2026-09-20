@@ -108,6 +108,49 @@ for (let ms = 600; ms < 120000; ms += 900) if (no(ms) > no(ms - 900)) mono = fal
 check('tanpa kira detik: menurun secara tertib', mono);
 check('tanpa kira detik lebih lembut pada 15 saat', no(15000) > cd(15000), [no(15000), cd(15000)]);
 
+/* ===== Bahagian 3: mata berganda dan bonus rentetan ===== */
+
+const sc = (o: Partial<Parameters<typeof scoreAnswer>[0]>) =>
+  scoreAnswer({ isCorrect: true, msTaken: 5000, points: P, timeLimitSec: T, useCountdown: true, ...o });
+
+check('mata berganda mendarabkan mata kelajuan', sc({ doublePoints: true }).basePoints === 1750,
+  sc({ doublePoints: true }));
+check('tanpa berganda kekal', sc({}).basePoints === 875, sc({}));
+
+const bonus = (streak: number, extra = {}) =>
+  sc({ streak, streakBonusEnabled: true, ...extra }).streakBonus;
+check('rentetan 1 tiada bonus', bonus(1) === 0, bonus(1));
+check('rentetan 2 bonus 100', bonus(2) === 100, bonus(2));
+check('rentetan 3 bonus 200', bonus(3) === 200, bonus(3));
+check('rentetan 5 bonus 400', bonus(5) === 400, bonus(5));
+check('rentetan 6 bonus 500', bonus(6) === 500, bonus(6));
+check('rentetan 20 masih 500 (had)', bonus(20) === 500, bonus(20));
+check('bonus dimatikan', sc({ streak: 6, streakBonusEnabled: false }).streakBonus === 0);
+
+check('bonus diskalakan pada soalan 100 mata',
+  scoreAnswer({ isCorrect: true, msTaken: 5000, points: 100, timeLimitSec: T, useCountdown: true,
+    streak: 6, streakBonusEnabled: true }).streakBonus === 50);
+check('bonus diskalakan pada mata berganda',
+  sc({ streak: 6, streakBonusEnabled: true, doublePoints: true }).streakBonus === 1000);
+
+const full = sc({ streak: 3, streakBonusEnabled: true });
+check('jumlah = asas + bonus', full.pointsAwarded === full.basePoints + full.streakBonus, full);
+
+check('jawapan salah tiada bonus',
+  scoreAnswer({ isCorrect: false, msTaken: 1000, points: P, timeLimitSec: T, useCountdown: true,
+    streak: 9, streakBonusEnabled: true }).streakBonus === 0);
+const lewat = scoreAnswer({ isCorrect: true, msTaken: 40000, points: P, timeLimitSec: T,
+  useCountdown: true, streak: 9, streakBonusEnabled: true });
+check('jawapan lewat tiada bonus dan ditanda lewat',
+  lewat.pointsAwarded === 0 && lewat.streakBonus === 0 && lewat.late === true, lewat);
+
+check('template: double_points soalan 2 hidup', t.questions[1]?.double_points === true, t.questions[1]);
+check('template: double_points soalan 1 mati', t.questions[0]?.double_points === false);
+check('double_points lalai mati',
+  parseQuizCsv('question,option_a,option_b,correct\nX?,Y,N,A\n').questions[0]?.double_points === false);
+check('double_points nilai salah ditolak',
+  parseQuizCsv('question,option_a,option_b,correct,double_points\nX?,Y,N,A,kadang\n').errors.length === 1);
+
 console.log('\nJadual mata (mata penuh 1000, had atau rentak 20 saat)');
 console.log('saat | kira detik | tanpa kira detik');
 for (const s of [0, 1, 2, 5, 10, 15, 20, 30, 60, 120]) {

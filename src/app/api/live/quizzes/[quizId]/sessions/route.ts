@@ -47,6 +47,9 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       status: 'lobby',
       current_index: -1,
       max_players: maxPlayers,
+      // Petik tetapan bonus rentetan kuiz sekarang, supaya menukarnya
+      // kemudian tidak mengubah sesi yang sedang berjalan.
+      streak_bonus: host.quiz.streak_bonus !== false,
     })
     .select('id, quiz_id, code, status, current_index')
     .single();
