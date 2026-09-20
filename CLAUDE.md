@@ -245,3 +245,34 @@ belum diterima tidak sepatutnya memberi hak.
 menghubungi Supabase semasa prerender. Binaan di VPS (yang ada `.env.local`)
 lulus dengan sifar ralat. Jangan buang masa memburu ralat ini pada mesin
 pembangunan; sahkan binaan di pelayan.
+
+### Perangkap plpgsql: tiga yang memakan satu pusingan ujian
+
+Fungsi `qm_live_join_player` (migrasi 0018) mengunci baris sesi lalu membuat
+satu sisipan bersyarat, supaya had pemain dikuatkuasa tanpa perlumbaan. Ia
+ditulis dengan betul dari segi logik tetapi gagal sepenuhnya pada masa jalan
+tiga kali berturut-turut. Ketiga-tiganya lulus semakan kod dan hanya muncul
+apabila fungsi itu benar-benar dipanggil.
+
+**SQLSTATE mesti TEPAT lima aksara.** `using errcode = 'LIVE05'` ada enam
+aksara, jadi Postgres menganggapnya nama keadaan dan menukarnya kepada `42704`
+sambil membuang mesej asal. Kesannya sesi penuh dipulangkan sebagai 500, bukan
+409. Guna lima aksara seperti `LV005`.
+
+**`gen_random_bytes` tidak boleh dicapai.** pgcrypto dipasang dalam skema
+`extensions`, bukan `public`. Fungsi dengan `set search_path = public` tidak
+nampak ia langsung. Guna `gen_random_uuid()` yang sebahagian teras Postgres:
+`substr(replace(gen_random_uuid()::text || gen_random_uuid()::text,'-',''),1,32)`.
+
+**Parameter `returns table` berada dalam skop seluruh badan fungsi.** Kalau
+namanya sama dengan lajur jadual, rujukan dalam klausa `RETURNING` menjadi
+samar pada masa jalan. Layakkan lajur dengan nama jadual:
+`returning qm_live_players.id, qm_live_players.player_token into v_id, v_token`.
+Menukar nama sasaran `INTO` sahaja TIDAK mencukupi.
+
+Nota keempat: `returns table` memerlukan `return next`. `return` kosong
+memulangkan sifar baris walaupun sisipan berjaya.
+
+Pengajaran am: fungsi plpgsql tidak disahkan oleh `npx tsc` mahupun
+`npm run build`. Panggil ia terhadap pangkalan data sebenar sebelum percaya ia
+berfungsi.
