@@ -9,27 +9,34 @@ export const dynamic = 'force-dynamic';
 // pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
 export const fetchCache = 'force-no-store';
 
-/** POST /api/live/quizzes — cipta kuiz langsung. Badan: {classId,title,description?} */
+/** POST /api/live/quizzes — cipta kuiz langsung. Badan: {classId?,title,description?}
+ *  classId pilihan (Fasa 2): kosong bermakna kuiz peribadi (class_id null). */
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
 
   const body = await req.json().catch(() => ({}));
   const { classId, title } = body;
-  if (!classId) return NextResponse.json({ error: 'classId diperlukan.' }, { status: 400 });
+  if (classId !== undefined && classId !== null && typeof classId !== 'string') {
+    return NextResponse.json({ error: 'classId tidak sah.' }, { status: 400 });
+  }
   if (typeof title !== 'string' || !title.trim()) {
     return NextResponse.json({ error: 'Tajuk diperlukan.' }, { status: 400 });
   }
 
-  const host = await requireLiveHost(req, classId);
-  if (host.response) return host.response;
+  // Jika classId diberi, sahkan pemanggil pendidik/pemilik kelas itu.
+  // Jika tidak diberi, kuiz disimpan sebagai peribadi (class_id null).
+  if (classId) {
+    const host = await requireLiveHost(req, classId);
+    if (host.response) return host.response;
+  }
 
   const description = typeof body.description === 'string' ? body.description : null;
 
   const { data: quiz, error } = await auth.supa
     .from('qm_live_quizzes')
     .insert({
-      class_id: classId,
+      class_id: classId || null,
       owner_id: auth.user!.id,
       title: title.trim(),
       description,

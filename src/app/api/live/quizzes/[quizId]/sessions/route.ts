@@ -11,7 +11,9 @@ export const fetchCache = 'force-no-store';
 /** POST /api/live/quizzes/[quizId]/sessions — mula sesi baharu dalam lobi. */
 export async function POST(req: NextRequest, { params }: { params: { quizId: string } }) {
   const host = await requireQuizHost(req, params.quizId);
-  if (host.response) return host.response;
+  if (host.response || !host.quiz) {
+    return host.response || NextResponse.json({ error: 'Kuiz tidak dijumpai.' }, { status: 404 });
+  }
 
   const { data: questions } = await host.supa
     .from('qm_live_questions')
@@ -27,6 +29,15 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     return NextResponse.json({ error: 'Kod sesi tidak dapat dijana. Cuba lagi.' }, { status: 500 });
   }
 
+  // Bahagian 2.3: petik had pemain pemilik kuiz pada masa sesi dicipta, supaya
+  // menurunkan taraf pengguna tidak menjejaskan sesi yang sedang berjalan.
+  const { data: ownerProfile } = (await host.supa
+    .from('qm_profiles')
+    .select('max_live_players')
+    .eq('id', host.quiz.owner_id)
+    .maybeSingle()) as { data: { max_live_players: number } | null };
+  const maxPlayers = ownerProfile?.max_live_players ?? 50;
+
   const { data: session, error } = await host.supa
     .from('qm_live_sessions')
     .insert({
@@ -35,6 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       code,
       status: 'lobby',
       current_index: -1,
+      max_players: maxPlayers,
     })
     .select('id, quiz_id, code, status, current_index')
     .single();

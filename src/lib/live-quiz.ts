@@ -21,7 +21,7 @@ export interface LiveHostAuth {
 const ADMIN_ROLES = ['admin', 'superadmin'];
 
 export interface LiveQuizRow {
-  id: string; class_id: string; owner_id: string;
+  id: string; class_id: string | null; owner_id: string;
   title: string; description: string | null; created_at: string;
 }
 export interface LiveQuestionRow {
@@ -32,7 +32,7 @@ export interface LiveQuestionRow {
 export interface LiveSessionRow {
   id: string; quiz_id: string; host_id: string; code: string; status: string;
   current_index: number; question_started_at: string | null;
-  created_at?: string; ended_at?: string | null;
+  max_players?: number; created_at?: string; ended_at?: string | null;
 }
 interface ClassRef { id: string; owner_id: string }
 interface ProfileRef { role: string; suspended: boolean | null }
@@ -92,15 +92,36 @@ export async function requireLiveHost(
   };
 }
 
-/** Muat kuiz dan sahkan pemanggil pendidik kelas kuiz itu. */
+/**
+ * Semak peranan admin dalam qm_profiles. Dibetulkan sebelum ini: JANGAN
+ * sekali-kali semak qm_class_members; itu jadual PESERTA dan menyemaknya
+ * memberi setiap pelajar hak mengawal sesi kuiz.
+ */
+export async function isLiveAdmin(supa: SupaClient, userId: string): Promise<boolean> {
+  const { data: profile } = await supa
+    .from('qm_profiles')
+    .select('role, suspended')
+    .eq('id', userId)
+    .maybeSingle();
+  const me = profile as ProfileRef | null;
+  return !!(me && !me.suspended && ADMIN_ROLES.includes(me.role));
+}
+
+/** Muat kuiz dan sahkan pemanggil ialah hos kuiz itu (Fasa 2, class_id nullable):
+ *  1. pemilik kuiz sentiasa dibenarkan (jalan utama untuk kuiz peribadi);
+ *  2. jika class_id tidak null, pendidik kelas itu (qm_class_educators,
+ *     educator_id + accepted_at tidak null) dibenarkan;
+ *  3. jika tidak, admin;
+ *  4. jika tidak, tolak 403. */
 export async function requireQuizHost(
   req: NextRequest | Request | null,
   quizId: string,
 ): Promise<LiveHostAuth & { quiz: LiveQuizRow | null }> {
   const auth = await requireUser(req);
-  if (auth.response) {
-    return { user: null as unknown as User, supa: auth.supa, quiz: null, response: auth.response };
+  if (auth.response || !auth.user) {
+    return { user: null as unknown as User, supa: auth.supa, quiz: null, response: auth.response || null };
   }
+  const userId = auth.user.id;
 
   const { data: quiz } = (await auth.supa
     .from('qm_live_quizzes')
@@ -116,9 +137,35 @@ export async function requireQuizHost(
     };
   }
 
-  const host = await requireLiveHost(req, quiz.class_id);
-  if (host.response) return { ...host, quiz: null };
-  return { ...host, quiz };
+  // 1. Pemilik kuiz — dibenarkan tanpa syarat (kuiz peribadi dan berkongsi).
+  if (quiz.owner_id === userId) {
+    return { user: auth.user, supa: auth.supa, quiz, response: null };
+  }
+
+  // 2. Pendidik kelas, hanya apabila kuiz berkongsi dengan sesuatu kelas.
+  if (quiz.class_id) {
+    const { data: educator } = await auth.supa
+      .from('qm_class_educators')
+      .select('educator_id, accepted_at')
+      .eq('class_id', quiz.class_id)
+      .eq('educator_id', userId)
+      .not('accepted_at', 'is', null)
+      .maybeSingle();
+    if (educator) return { user: auth.user, supa: auth.supa, quiz, response: null };
+  }
+
+  // 3. Admin.
+  if (await isLiveAdmin(auth.supa, userId)) {
+    return { user: auth.user, supa: auth.supa, quiz, response: null };
+  }
+
+  // 4. Tolak.
+  return {
+    user: null as unknown as User,
+    supa: auth.supa,
+    quiz: null,
+    response: NextResponse.json({ error: 'Anda bukan pendidik kelas ini.' }, { status: 403 }),
+  };
 }
 
 /** Muat soalan dan sahkan pemanggil pendidik kelas kuiz induknya. */

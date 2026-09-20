@@ -256,3 +256,143 @@ rosak dan laporkan bilangan yang dilangkau, jangan gagalkan keseluruhan import.
    dan melihat papan pendahulu yang betul.
 5. Menghantar jawapan dua kali untuk soalan sama ditolak.
 6. Migrasi boleh dijalankan dua kali tanpa ralat.
+
+# FASA 2: Kuiz sebagai objek tahap atas
+
+Keputusan produk oleh Dr Hariz, 20 September 2026. Bahagian ini mengatasi
+mana-mana percanggahan dengan Fasa 1 di atas.
+
+## Keputusan
+
+1. Kuiz **bukan** sebahagian daripada aktiviti. Aktiviti menghasilkan
+   penghantaran untuk dinilai dan disimpan; kuiz langsung menghasilkan satu
+   detik dalam kelas. Ia objek berasingan.
+2. `qm_live_quizzes.class_id` jadi **NULLABLE**. Kosong bermakna kuiz peribadi
+   milik pencipta, boleh dipakai di mana-mana termasuk bengkel luar. Diisi
+   bermakna kuiz dikongsi dengan pendidik kelas itu.
+3. **Mod majlis sahaja** buat masa ini. Hos memandu rentak. Sesiapa yang ada
+   kod boleh masuk tanpa akaun. Mod latihan sendiri (tanpa hos) TIDAK dibina
+   dalam fasa ini; jangan tambah.
+4. Had pemain seiring sesi: **Free 50, Pro 200**. Bukan tiada had.
+
+## Bahagian 2.1: Migrasi 0018
+
+Fail `migrations/0018_live_quiz_standalone.sql`. Idempoten. Akhiri dengan
+`notify pgrst, 'reload schema';`.
+
+```sql
+alter table public.qm_live_quizzes alter column class_id drop not null;
+alter table public.qm_profiles
+  add column if not exists max_live_players integer not null default 50;
+alter table public.qm_live_sessions
+  add column if not exists max_players integer not null default 50;
+```
+
+`max_live_players` pada profil ialah kelayakan pengguna. Ikut pola sedia ada
+dalam jadual itu: `max_classes_owned`, `can_upload_files`, `can_upload_videos`.
+Jangan cipta sistem pelan berasingan. Jadual `subscriptions` wujud tetapi
+kosong; ia akan disambungkan kemudian, bukan sekarang.
+
+`qm_live_sessions.max_players` ialah petikan had pada masa sesi dicipta, supaya
+menurunkan taraf pengguna tidak menjejaskan sesi yang sedang berjalan.
+
+Dasar RLS sedia ada menganggap `class_id` sentiasa ada. Kemas kini supaya:
+pemilik kuiz (`owner_id = auth.uid()`) sentiasa ada akses penuh, DAN pendidik
+kelas ada akses apabila `class_id` tidak null. Admin kekal seperti sedia ada.
+
+## Bahagian 2.2: Kebenaran dengan class_id nullable
+
+`requireLiveHost` dan `requireQuizHost` dalam `src/lib/live-quiz.ts` sekarang
+menganggap setiap kuiz ada kelas. Tukar logiknya kepada:
+
+1. Jika `quiz.owner_id` sama dengan pengguna, benarkan. Ini jalan utama untuk
+   kuiz peribadi.
+2. Jika tidak, dan `quiz.class_id` tidak null, semak `qm_class_educators`
+   dengan `educator_id` dan `accepted_at` tidak null.
+3. Jika tidak, semak peranan admin dalam `qm_profiles`.
+4. Jika tidak, tolak 403.
+
+**JANGAN** semak `qm_class_members`. Itu jadual peserta. Menyemaknya memberi
+setiap pelajar hak mengawal sesi. Ini pernah berlaku dan sudah dibetulkan;
+jangan masukkan semula.
+
+Laluan cipta kuiz menerima `classId` sebagai pilihan. Jika diberi, sahkan
+pemanggil pendidik kelas itu. Jika tidak diberi, simpan null.
+
+## Bahagian 2.3: Had pemain
+
+Semasa sesi dicipta, salin `max_live_players` pemilik ke
+`qm_live_sessions.max_players`.
+
+Dalam laluan `POST /api/live/play/[code]/join`, sebelum memasukkan pemain,
+kira pemain sedia ada dalam sesi itu. Jika kiraan sudah mencapai
+`max_players`, tolak dengan **409** dan mesej Bahasa Melayu:
+
+    Sesi ini sudah penuh. Had sesi ini ialah <N> pemain.
+
+Kiraan dan sisipan mesti selamat daripada perlumbaan. Gunakan satu pertanyaan
+sisipan bersyarat, bukan baca dahulu kemudian tulis, supaya dua pemain yang
+masuk serentak pada tempat terakhir tidak kedua-duanya berjaya.
+
+Panel hos memaparkan `pemain semasa / had`, contohnya `37 / 50`.
+
+## Bahagian 2.4: Prestasi tinjauan (WAJIB)
+
+Masalah sedia ada: `GET /api/live/play/[code]/state` mengambil **semua soalan**
+daripada pangkalan data pada setiap tinjauan, setiap dua saat, untuk setiap
+pemain. Pada 200 pemain itu ratusan pertanyaan sesaat yang tidak perlu.
+
+Pembetulan, meniru pendekatan yang terbukti pada Selaluh:
+
+1. Tambah laluan `GET /api/live/play/[code]/questions?playerId=` yang
+   memulangkan semua soalan **tanpa `correct_key`** beserta satu tag `version`.
+   `version` ialah hash pendek bagi senarai id soalan dan `order_idx`.
+2. Klien pemain memanggilnya **sekali** semasa menyertai, dan simpan dalam
+   `localStorage` di bawah `kuizen-live-q-<kod>`.
+3. Laluan `state` **berhenti** memulangkan objek `question`. Sebaliknya ia
+   memulangkan `questionId`, `questionIndex` dan `version`.
+4. Jika `version` yang diterima berbeza daripada yang disimpan, klien
+   memanggil semula laluan `questions`. Ini berlaku apabila guru menyunting
+   soalan atau menekan set semula.
+
+Selepas perubahan ini, tinjauan dua saat hanya menyentuh baris sesi, baris
+pemain, dan jawapan pemain bagi soalan semasa.
+
+Kekalkan peraturan keselamatan sepenuhnya: laluan `questions` menggunakan
+senarai lajur eksplisit tanpa `correct_key`, dan `correct_key` masih hanya
+muncul dalam blok `reveal` selepas status menjadi `revealed`.
+
+## Bahagian 2.5: Antara muka
+
+Kuiz jadi bahagian tahap atas dalam navigasi pendidik, setaraf dengan kelas,
+bukan tersarang di bawahnya. Gunakan label **Kuiz**.
+
+Pada halaman senarai `/educator/live`:
+
+- Borang cipta kuiz ada pemilih kelas yang **boleh dikosongkan**. Pilihan
+  pertama ialah "Kuiz peribadi, tiada kelas".
+- Senarai kuiz menunjukkan label kelas, atau "Peribadi" jika `class_id` null.
+- Papar had pemain pengguna, contohnya "Pelan anda: sehingga 50 pemain setiap
+  sesi".
+
+Pada panel hos, papar kiraan pemain berbanding had, dan bila had dicapai papar
+pemberitahuan tenang bahawa pemain baharu akan ditolak.
+
+Semua teks dalam Bahasa Melayu tulen.
+
+## Bahagian 2.6: Kriteria penerimaan Fasa 2
+
+1. `npx tsc --noEmit` lulus. Jangan jalankan `npm run build` pada mesin tanpa
+   `.env.local`; ia gagal atas sebab persekitaran, bukan kod.
+2. Kuiz boleh dicipta tanpa kelas, dan pemiliknya boleh mengurus serta
+   melancarkan sesi.
+3. Kuiz dengan kelas masih boleh diurus oleh pendidik kelas yang jemputannya
+   sudah diterima.
+4. `grep -rn "qm_class_members" src/app/api/live/ src/lib/live-quiz.ts`
+   tidak memulangkan sebarang panggilan `.from()`.
+5. Pemain ke-51 pada sesi berhad 50 ditolak dengan 409 dan mesej Bahasa
+   Melayu yang betul.
+6. `grep -rn "correct_key" src/app/api/live/play/` hanya menunjukkan komen,
+   jenis, logik pemarkahan pelayan, dan blok reveal.
+7. Laluan `state` tidak lagi mengembalikan teks soalan mahupun pilihan.
+8. Migrasi boleh dijalankan dua kali tanpa ralat.
