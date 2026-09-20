@@ -230,7 +230,11 @@ create policy p_live_answer_educator_all on public.qm_live_answers
 -- mengunci baris sesi (for update), kemudian membuat SATU sisipan
 -- bersyarat dalam transaksi yang sama. Kembali kod ralat tersuai:
 --   LV005 = sesi penuh, LV009 = nama sudah diambil, LV004 = sesi tiada.
-create or replace function public.qm_live_join_player(
+-- NOTA: JANGAN guna gen_random_bytes di sini. Fungsi itu datang daripada
+-- pgcrypto yang dipasang dalam skema "extensions", bukan "public", jadi ia
+-- TIDAK dapat dicapai dengan "set search_path = public" di bawah dan sisipan
+-- pemain akan gagal sepenuhnya. gen_random_uuid() ialah sebahagian teras
+-- Postgres dan sentiasa ada. Disahkan pada pangkalan data sebenar.create or replace function public.qm_live_join_player(
   p_session_id uuid,
   p_nickname text
 )
@@ -257,7 +261,7 @@ begin
   select
     p_session_id,
     p_nickname,
-    substr(encode(gen_random_bytes(16), 'hex'), 1, 32)
+    substr(replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''), 1, 32)
   where (select count(*) from public.qm_live_players where session_id = p_session_id) < v_limit
   returning id, player_token into player_id, player_token;
 
