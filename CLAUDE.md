@@ -173,3 +173,57 @@ Translate hardcoded strings in source only. Never translate user-entered
 content stored in the database, including class names and educator bios. If a
 string appears in a `.tsx` or `.ts` file it is fair game; if it only exists in
 DB rows, leave it alone.
+
+## Kuiz Langsung (live quiz), mod pemain individu
+
+Ciri gaya Kahoot: pendidik cipta set soalan aneka pilihan, mula satu sesi,
+peserta masuk guna kod 6 aksara dan menjawab secara individu. Markah ikut betul
+dan kelajuan. Spesifikasi penuh ada di `docs/live-quiz-spec.md`.
+
+Lima jadual `qm_live_*` (migrasi `0017_live_quiz.sql`): `qm_live_quizzes`,
+`qm_live_questions`, `qm_live_sessions`, `qm_live_players`, `qm_live_answers`.
+Tiada jadual sedia ada diubah.
+
+`qm_live_questions.correct_key` ialah kunci jawapan. Jangan sekali `select("*")`
+pada jadual itu dalam apa-apa yang peserta boleh capai. Laluan
+`/api/live/play/**` menggunakan senarai lajur eksplisit dan hanya mengambil
+`correct_key` dalam pertanyaan berasingan di dalam blok reveal.
+
+Tiada WebSocket. Peserta dan hos meninjau setiap 2 saat dengan cap jari (`fp`);
+bila tiada perubahan, pelayan balas `{ noChange: true, fp }`.
+
+### Perangkap: Next.js men-cache panggilan Supabase dalam route handler
+
+Ini memakan satu pusingan ujian penuh. `export const dynamic = 'force-dynamic'`
+**tidak mencukupi**. Next.js tetap men-cache panggilan `fetch` yang dibuat oleh
+klien Supabase di dalam route handler, jadi laluan tinjauan membeku: `status`
+kekal `asking` walaupun pangkalan data sudah `revealed`, dan jawapan pemain
+tidak pernah muncul. Gejalanya nampak seperti kuiz tergantung, bukan seperti
+masalah cache.
+
+Setiap `route.ts` di bawah `src/app/api/live/` mesti ada:
+
+```ts
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+```
+
+Mana-mana laluan tinjauan baharu memerlukan kedua-duanya.
+
+### Perangkap: pendidik bukan dalam qm_class_members
+
+`qm_class_members` ialah jadual **peserta** (`class_id, user_id, joined_at`).
+Pendidik ada dalam `qm_class_educators` (`class_id, educator_id, role,
+invited_by, invited_at, accepted_at`). Menyemak kebenaran pendidik terhadap
+`qm_class_members` memberi setiap pelajar dalam kelas hak penuh mengawal sesi.
+Semak `educator_id` dan pastikan `accepted_at` tidak null, kerana jemputan yang
+belum diterima tidak sepatutnya memberi hak.
+
+### Binaan tempatan tanpa .env.local
+
+`npm run build` pada mesin tanpa `.env.local` gagal dengan kira-kira 36 ralat
+"Error occurred prerendering page" pada `/admin/*`, `/educator/*`,
+`/participant/*` dan `/login`. Itu bukan masalah repo. Halaman tersebut
+menghubungi Supabase semasa prerender. Binaan di VPS (yang ada `.env.local`)
+lulus dengan sifar ralat. Jangan buang masa memburu ralat ini pada mesin
+pembangunan; sahkan binaan di pelayan.
