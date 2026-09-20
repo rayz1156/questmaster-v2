@@ -3,7 +3,7 @@
 export const dynamic = "force-dynamic";
 
 import { Suspense, useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
@@ -41,7 +41,11 @@ async function authedFetch(url: string, init?: RequestInit) {
 function SenaraiKuiz() {
   const router = useRouter();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
-  const [newClassId, setNewClassId] = useState(""); // kosong = kuiz peribadi
+  // Datang dari jubin Quiz pada dashboard kelas: tapis senarai dan pilih
+  // kelas itu terlebih dahulu dalam borang cipta.
+  const sp = useSearchParams();
+  const tapisKelas = sp.get("classId") || "";
+  const [newClassId, setNewClassId] = useState(tapisKelas); // kosong = kuiz peribadi
   const [quizzes, setQuizzes] = useState<LiveQuizRow[]>([]);
   const [maxLivePlayers, setMaxLivePlayers] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
@@ -79,6 +83,8 @@ function SenaraiKuiz() {
     setLoading(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => { setNewClassId(tapisKelas); }, [tapisKelas]);
 
   const reload = async () => {
     setLoading(true);
@@ -125,10 +131,25 @@ function SenaraiKuiz() {
 
   const labelKelas = (q: LiveQuizRow) => (q.class?.name ? q.class.name : "Personal");
 
+  // Senarai yang dipaparkan. Tanpa tapisan, semua quiz yang boleh dihoskan.
+  const senarai = tapisKelas ? quizzes.filter((q) => q.class_id === tapisKelas) : quizzes;
+  const namaKelas =
+    classes.find((c) => c.id === tapisKelas)?.name ||
+    senarai.find((q) => q.class?.name)?.class?.name ||
+    "";
+
   return (
     <Shell tabs={EDU_TABS}>
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 className="page-title">Live Quiz</h2>
+        <div>
+          <h2 className="page-title">Live Quiz</h2>
+          {tapisKelas && (
+            <p className="text-xs text-gray-500">
+              {namaKelas ? `Quizzes shared with ${namaKelas}. ` : "Quizzes for this class. "}
+              <Link href="/educator/live" className="text-brand-purple font-semibold">Show all quizzes</Link>
+            </p>
+          )}
+        </div>
         <button onClick={() => setShowNew((s) => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
           <Plus className="w-4 h-4" /> New Quiz
         </button>
@@ -165,11 +186,15 @@ function SenaraiKuiz() {
 
       {loading ? (
         <p className="text-sm text-gray-500">Loading…</p>
-      ) : quizzes.length === 0 ? (
-        <p className="text-sm text-gray-500">No live quizzes yet. Create one to start a live session.</p>
+      ) : senarai.length === 0 ? (
+        <p className="text-sm text-gray-500">
+          {tapisKelas
+            ? "No quizzes for this class yet. Create one and it will be shared with the class."
+            : "No live quizzes yet. Create one to start a live session."}
+        </p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {quizzes.map((q) => (
+          {senarai.map((q) => (
             <div key={q.id} className="card">
               <div className="flex items-center gap-2">
                 <ListChecks className="w-5 h-5 text-indigo-600 shrink-0" />

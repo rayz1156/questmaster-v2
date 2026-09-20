@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity, Award, Plus, Minus, Trophy, EyeOff } from "lucide-react";
+import { ListChecks, Users, BarChart3, Zap, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity, Award, Plus, Minus, Trophy, EyeOff } from "lucide-react";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from '@/lib/eduTabs';
 import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, endClass, reopenClass, addStudentScoreAdjustment, listStudentScoreAdjustments, deleteStudentScoreAdjustment, Klass, ClassInvite, StudentScoreAdjustment } from "@/lib/data";
@@ -203,7 +203,7 @@ export default function ClassDetail() {
         </div>
 
         {/* Tab pills */}
-        <div className="mt-4 grid grid-cols-2 sm:grid-cols-5 gap-2">
+        <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
           <Link href={`/educator/classes/${klass.id}/board`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition text-sm relative">
             <LinkIcon className="w-5 h-5"/><span className="font-medium">Intro Board</span>
             <span className="absolute left-3 right-3 -bottom-px h-0.5 bg-indigo-600 rounded-full"/>
@@ -213,6 +213,9 @@ export default function ClassDetail() {
           </Link>
           <Link href={`/educator/activities?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
             <ListChecks className="w-5 h-5"/><span>Activities</span>
+          </Link>
+          <Link href={`/educator/live?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
+            <Zap className="w-5 h-5"/><span>Quiz</span>
           </Link>
           <Link href={`/educator/teams?classId=${klass.id}`} className="flex flex-col items-center justify-center gap-1 px-3 py-3 rounded-xl border border-gray-200 bg-white text-gray-700 hover:bg-gray-50 transition text-sm">
             <Users className="w-5 h-5"/><span>Teams</span>
