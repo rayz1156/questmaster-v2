@@ -1,8 +1,15 @@
 'use client';
+
+/**
+ * Learning. Kepala tersendiri dibuang; ClassShell sudah membawa breadcrumb,
+ * nama kelas dan tab. Yang tinggal ialah satu ayat tentang apa skrin ini
+ * untuk, kemudian terus kepada bahan.
+ */
+
 import { useParams } from 'next/navigation';
 import Link from 'next/link';
-import { ArrowLeft, GraduationCap, ListChecks, Users, BarChart3, Activity, User as UserIcon } from 'lucide-react';
 import Shell from '@/components/Shell';
+import ClassShell from '@/components/ClassShell';
 import { EDU_TABS } from '@/lib/eduTabs';
 import LearningBoardView from '@/components/learning-board/LearningBoardView';
 
@@ -11,15 +18,22 @@ export default function EducatorLearningBoardPage() {
   const classId = params.id;
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="min-h-screen bg-gray-50 text-gray-900">
-<div className="px-4 md:px-6 py-4 flex items-center gap-3 border-b border-gray-200 bg-white">
-          <Link href={`/educator/classes/${classId}`} className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1 text-sm">
-            <ArrowLeft className="w-4 h-4" /> Back to class
+      <ClassShell classId={classId} current="learning">
+        <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
+          <div>
+            <h2 className="section-title">Everything for your next session.</h2>
+            <p className="text-sm text-ink-muted mt-0.5">
+              Organise your content, share resources and keep your class on track.
+            </p>
+          </div>
+          <Link href={`/educator/classes/${classId}/board`} className="btn-quiet text-brand-purple">
+            Intro board →
           </Link>
-          <h1 className="text-xl font-semibold ml-2">Learning Board</h1>
         </div>
-        <LearningBoardView classId={classId} isEditor={true} />
-      </div>
+        <div className="-mx-1">
+          <LearningBoardView classId={classId} isEditor={true} />
+        </div>
+      </ClassShell>
     </Shell>
   );
 }

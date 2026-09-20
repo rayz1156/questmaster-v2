@@ -92,49 +92,156 @@ export default function Page() {
 
   return (
     <ParticipantShell>
-      <div className="space-y-5">
-        {/* Welcome hero */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-50 via-white to-purple-50 border border-purple-100 shadow-sm p-6 sm:p-8">
-          <div className="relative z-10 max-w-[60%]">
-            <div className="text-xs font-semibold text-purple-700 tracking-widest mb-1">✋ WELCOME</div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900">{dataReady ? (name || 'Participant') : ''}</div>
-            <div className="mt-2 text-sm text-slate-600">Keep learning, keep growing! You&rsquo;re doing great! <span className="text-amber-500">⭐</span></div>
+      <div className="max-w-shell mx-auto px-6 py-10">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <div className="eyebrow mb-1">Welcome back</div>
+            <h1 className="page-title truncate">{dataReady ? (name || "Participant") : " "}</h1>
+            <p className="page-subtitle">
+              {activeClass ? activeClass.name : dataReady ? "You have not joined a class yet." : " "}
+            </p>
           </div>
-          <div aria-hidden className="hidden sm:block absolute right-6 top-1/2 -translate-y-1/2 text-7xl select-none">
-            <span className="inline-block">🏆</span>
-          </div>
-          <div aria-hidden className="absolute -right-8 -top-8 w-40 h-40 rounded-full bg-purple-200/40 blur-2xl" />
-          <div aria-hidden className="absolute -right-16 bottom-0 w-56 h-24 rounded-full bg-yellow-200/40 blur-2xl" />
+          {classes.length > 1 && (
+            <select
+              value={activeClassId}
+              onChange={e => setActiveClassId(e.target.value)}
+              aria-label="Active class"
+              className="input w-auto min-w-[220px]"
+            >
+              {classes.map((c: any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            </select>
+          )}
         </div>
 
-        {/* Class selector + Quick actions (left)  Intro Board (right) */}
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="space-y-5 lg:col-span-1">
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-purple-100 text-purple-700"><Users className="w-5 h-5" /></span>
-                <span className="font-semibold text-slate-800">Select your class</span>
+        {activeClass?.ended_at && (
+          <div data-class-banner="ended" className="mt-6 rounded-xl bg-[#FEF6E7] px-4 py-3 text-sm text-[#8A6100]">
+            <span className="font-medium">This class has ended.</span> You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.
+          </div>
+        )}
+
+        {dataReady && classes.length === 0 ? (
+          <div className="mt-10 max-w-md">
+            <div className="section-title">Join your first class</div>
+            <p className="text-sm text-ink-muted mt-1">Enter the class code your educator gave you.</p>
+            <form onSubmit={onJoinClass} className="mt-4 space-y-3">
+              <input
+                type="text"
+                value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
+                placeholder="ABCD1234"
+                maxLength={16}
+                required
+                className="input font-mono text-center text-lg uppercase tracking-[0.2em]"
+              />
+              <button type="submit" disabled={joinBusy || !joinCode.trim()} className="btn-primary w-full">
+                {joinBusy ? "Joining…" : "Join class"}
+              </button>
+            </form>
+            {joinErr && <p className="mt-2 text-sm text-[#C0392B]">{joinErr}</p>}
+            {joinOk && <p className="mt-2 text-sm text-[#2E7D4F]">{joinOk}</p>}
+          </div>
+        ) : (
+          <>
+            <div className="mt-8 grid gap-4 sm:grid-cols-3">
+              <div className="card">
+                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{dataReady ? activeQuestCount : 0}</div>
+                <div className="text-sm text-ink-muted mt-1.5">Active activities</div>
+                <Link href="/participant/activities" className="btn-quiet text-brand-purple mt-2">Go to activities</Link>
               </div>
-              {classes.length === 0 ? (
-                <p className="text-sm text-slate-500">No class joined yet. <Link href="/participant/join" className="text-purple-700 underline">Join one</Link>.</p>
+              <div className="card">
+                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{totalPoints.toLocaleString()}</div>
+                <div className="text-sm text-ink-muted mt-1.5">Total points</div>
+                <div className="text-xs text-ink-faint mt-2">{totalPoints > 0 ? "Earned with your team." : "Join a team to start earning."}</div>
+              </div>
+              <div className="card">
+                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{myRank > 0 ? `#${myRank}` : "—"}</div>
+                <div className="text-sm text-ink-muted mt-1.5">Leaderboard rank</div>
+                <div className="text-xs text-ink-faint mt-2">{myRank > 0 && myRank <= 3 ? "Top three. Keep it up." : myRank > 0 ? "Climb higher." : "Join a team to be ranked."}</div>
+              </div>
+            </div>
+
+            <div className="mt-12">
+              <div className="section-title mb-1">Your class</div>
+              <div className="surface">
+                <Link
+                  href={activeClassId ? `/participant/classes/${activeClassId}/board` : "#"}
+                  aria-disabled={!activeClassId}
+                  className={`flex items-center gap-4 px-5 py-4 ${activeClassId ? "hover:bg-[#FAFAFB]" : "pointer-events-none opacity-50"}`}
+                >
+                  <span className="w-10 h-10 rounded-full bg-[#EAE6FC] text-brand-purple flex items-center justify-center shrink-0"><ClipboardList className="w-5 h-5" /></span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-medium text-ink">Intro Board</span>
+                    <span className="block text-sm text-ink-muted mt-0.5">Class information, announcements and guidelines.</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-ink-faint shrink-0" />
+                </Link>
+                <Link
+                  href={activeClassId ? `/participant/classes/${activeClassId}/learning-board` : "#"}
+                  aria-disabled={!activeClassId}
+                  className={`t-row flex items-center gap-4 px-5 py-4 ${activeClassId ? "hover:bg-[#FAFAFB]" : "pointer-events-none opacity-50"}`}
+                >
+                  <span className="w-10 h-10 rounded-full bg-[#EAE6FC] text-brand-purple flex items-center justify-center shrink-0"><BookOpen className="w-5 h-5" /></span>
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-medium text-ink">Learning Board</span>
+                    <span className="block text-sm text-ink-muted mt-0.5">Modules, lessons and materials, session by session.</span>
+                  </span>
+                  <ArrowRight className="w-4 h-4 text-ink-faint shrink-0" />
+                </Link>
+              </div>
+            </div>
+
+            <div className="mt-12">
+              <div className="flex items-baseline justify-between gap-3 mb-1">
+                <div className="section-title">Leaderboard</div>
+                <Link href="/participant/leaderboard" className="btn-quiet text-brand-purple">View all</Link>
+              </div>
+              {scoresLoading ? (
+                <div className="space-y-2 mt-3">{[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-[#F4F4F6] animate-pulse" />)}</div>
+              ) : top4.length === 0 ? (
+                <p className="text-sm text-ink-muted py-6">No team scores yet for this class.</p>
               ) : (
-                <select value={activeClassId} onChange={e => setActiveClassId(e.target.value)} className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
-                  {classes.map((c: any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-                </select>
+                <div className="surface mt-3">
+                  {top4.map((r: any, idx: number) => {
+                    const isMine = r.team_id === myTeamId;
+                    return (
+                      <div key={r.team_id} className={`flex items-center gap-3 px-5 py-3.5 ${idx > 0 ? "t-row" : ""} ${isMine ? "bg-[#F7F6FD]" : ""}`}>
+                        <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${idx < 3 ? `${medalBg[idx]} text-white` : "bg-[#F4F4F6] text-ink-muted"}`}>{idx + 1}</span>
+                        <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs ${teamPalette[idx % teamPalette.length]}`}>
+                          {initials(r.team_name || ("Team " + String(r.team_id).slice(0, 2)))}
+                        </span>
+                        <span className="flex-1 min-w-0 text-[15px] text-ink truncate">
+                          {r.team_name || ("Team " + String(r.team_id).slice(0, 8))}
+                          {isMine && <span className="ml-2 text-xs text-brand-purple">Your team</span>}
+                        </span>
+                        <span className="text-sm font-semibold text-ink tabular-nums whitespace-nowrap">{(Number(r.total_score) || 0).toLocaleString()} pts</span>
+                      </div>
+                    );
+                  })}
+                </div>
               )}
-              <div className="mt-3 flex items-center gap-2 text-xs text-emerald-600">
-                <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
-                <span>Active class</span>
-              </div>
-                {activeClass?.ended_at && (
-                  <div data-class-banner="ended" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
-                    <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />
-                    <div className="flex-1 min-w-0">
-                      <div className="font-semibold">This class has ended.</div>
-                      <div className="text-amber-700 mt-0.5">You can still review the Learning Board, Activities and final Ranking. New submissions are closed.</div>
-                    </div>
-                  </div>
-                )}
+            </div>
+
+            <div className="mt-16 mb-4 border-t border-hairline pt-6 flex flex-wrap items-start justify-between gap-4">
+              <details className="min-w-0">
+                <summary className="btn-quiet cursor-pointer list-none text-brand-purple">Join another class</summary>
+                <form onSubmit={onJoinClass} className="mt-3 flex flex-wrap items-center gap-2">
+                  <input
+                    type="text"
+                    value={joinCode}
+                    onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
+                    placeholder="ABCD1234"
+                    maxLength={16}
+                    required
+                    className="input w-[200px] font-mono uppercase tracking-[0.2em]"
+                  />
+                  <button type="submit" disabled={joinBusy || !joinCode.trim()} className="btn-secondary">
+                    {joinBusy ? "Joining…" : "Join"}
+                  </button>
+                </form>
+                {joinErr && <p className="mt-2 text-sm text-[#C0392B]">{joinErr}</p>}
+                {joinOk && <p className="mt-2 text-sm text-[#2E7D4F]">{joinOk}</p>}
+              </details>
+
               {activeClassId && (
                 <button
                   type="button"
@@ -151,169 +258,14 @@ export default function Page() {
                       alert(err?.message || "Failed to leave class");
                     }
                   }}
-                  className="mt-3 w-full text-xs font-medium text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded-lg px-3 py-2 transition"
+                  className="btn-quiet text-[#C0392B]"
                 >
                   Leave this class
                 </button>
               )}
             </div>
-
-            <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-              <div className="flex items-center gap-2 mb-3">
-                <span className="inline-flex items-center justify-center w-9 h-9 rounded-xl bg-purple-100 text-purple-700"><KeyRound className="w-5 h-5" /></span>
-                <span className="font-semibold text-slate-800">Join a Class</span>
-              </div>
-              <form onSubmit={onJoinClass} className="space-y-2">
-                <input
-                  type="text"
-                  value={joinCode}
-                  onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
-                  placeholder="ABCD1234"
-                  maxLength={16}
-                  required
-                  className="w-full px-3 py-2.5 rounded-xl border border-slate-200 bg-white text-center font-mono text-lg uppercase tracking-wider focus:outline-none focus:ring-2 focus:ring-purple-300"
-                />
-                <button
-                  type="submit"
-                  disabled={joinBusy || !joinCode.trim()}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-xl bg-purple-600 text-white text-sm font-semibold hover:bg-purple-700 disabled:opacity-60 disabled:cursor-not-allowed transition"
-                >
-                  {joinBusy ? "Joining…" : (<><Compass className="w-4 h-4" /> Join class</>)}
-                </button>
-              </form>
-              {joinErr && <p className="mt-2 text-xs text-red-600">{joinErr}</p>}
-              {joinOk && <p className="mt-2 text-xs text-emerald-600">{joinOk}</p>}
-              {!joinErr && !joinOk && <p className="mt-3 text-xs text-slate-500">Enter the class code given by your educator.</p>}
-            </div>
-          </div>
-
-          {/* Intro Board */}
-          <div className="relative overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <div className="flex items-start gap-3">
-              <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-100 text-purple-700 shrink-0"><ClipboardList className="w-5 h-5" /></span>
-              <div className="flex-1">
-                <div className="text-xl font-bold text-slate-900">Intro Board</div>
-                {activeClass && (<div className="mt-1 inline-block text-xs font-medium text-purple-700 bg-purple-100 px-3 py-1 rounded-full">{activeClass.name}</div>)}
-                <p className="mt-3 text-sm text-slate-600 max-w-md">Everything you need to get started in your class. Find class info, announcements, and guidelines.</p>
-                <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                  <li className="flex items-center gap-2"><Clock className="w-4 h-4 text-purple-600" /> Class information</li>
-                  <li className="flex items-center gap-2"><Megaphone className="w-4 h-4 text-purple-600" /> Announcements</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-purple-600" /> Guidelines &amp; resources</li>
-                </ul>
-              </div>
-              <div aria-hidden className="hidden sm:flex w-32 h-32 rounded-full bg-purple-50 items-center justify-center shrink-0"><ClipboardList className="w-16 h-16 text-purple-500" /></div>
-            </div>
-            {activeClassId ? (
-              <Link href={`/participant/classes/${activeClassId}/board`} className="mt-5 flex items-center justify-center gap-2 w-full bg-purple-600 hover:bg-purple-700 text-white font-semibold py-3 rounded-xl transition">
-                Open Intro Board <ArrowRight className="w-4 h-4" />
-              </Link>
-            ) : (
-              <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded-xl cursor-not-allowed">Select a class to open Intro Board</button>
-            )}
-          </div>
-
-        {/* Learning Board */}
-        <div className="relative overflow-hidden bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-          <div className="flex items-start gap-3">
-            <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 shrink-0"><BookOpen className="w-5 h-5" /></span>
-            <div className="flex-1">
-              <div className="text-xl font-bold text-slate-900">Learning Board</div>
-              {activeClass && (<div className="mt-1 inline-block text-xs font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">{activeClass.name}</div>)}
-              <p className="mt-3 text-sm text-slate-600 max-w-md">Your daily learning hub. Access modules, lessons, and materials and track your progress.</p>
-              <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                <li className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-emerald-600" /> Modules &amp; lessons</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-emerald-600" /> Learning materials</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Track your progress</li>
-              </ul>
-            </div>
-            <div aria-hidden className="hidden sm:flex w-32 h-32 rounded-full bg-emerald-50 items-center justify-center shrink-0"><BookOpen className="w-16 h-16 text-emerald-500" /></div>
-          </div>
-          {activeClassId ? (
-            <Link href={`/participant/classes/${activeClassId}/learning-board`} className="mt-5 flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded-xl transition">
-              Continue Learning <ArrowRight className="w-4 h-4" />
-            </Link>
-          ) : (
-            <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded-xl cursor-not-allowed">Select a class to open Learning Board</button>
-          )}
-        </div>
-        </div>
-
-        {/* 3 stat cards */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-purple-50 rounded-2xl p-5 flex items-center gap-4">
-            <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-100 text-purple-700 shrink-0"><ClipboardList className="w-7 h-7" /></span>
-            <div className="min-w-0">
-              <div className="text-3xl font-extrabold text-purple-700">{dataReady ? activeQuestCount : 0}</div>
-              <div className="font-semibold text-slate-800">Active Activities</div>
-              <div className="text-xs text-slate-500 mt-0.5">Keep going! Complete more to earn points.</div>
-              <Link href="/participant/activities" className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900">Go to Activities <ArrowRight className="w-3 h-3" /></Link>
-            </div>
-          </div>
-          <div className="bg-emerald-50 rounded-2xl p-5 flex items-center gap-4">
-            <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-emerald-100 text-emerald-700 shrink-0"><Trophy className="w-7 h-7" /></span>
-            <div className="min-w-0">
-              <div className="text-3xl font-extrabold text-emerald-700">{totalPoints.toLocaleString()}</div>
-              <div className="font-semibold text-slate-800">Total Points</div>
-              <div className="text-xs text-slate-500 mt-0.5">{totalPoints > 0 ? 'Great job! Keep climbing the leaderboard.' : 'Join a team and earn points to see your score.'}</div>
-            </div>
-          </div>
-          <div className="bg-orange-50 rounded-2xl p-5 flex items-center gap-4">
-            <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-orange-100 text-orange-700 shrink-0"><BarChart3 className="w-7 h-7" /></span>
-            <div className="min-w-0">
-              <div className="text-3xl font-extrabold text-orange-700">{myRank > 0 ? `#${myRank}` : '—'}</div>
-              <div className="font-semibold text-slate-800">Leaderboard Rank</div>
-              <div className="text-xs text-slate-500 mt-0.5">{myRank > 0 && myRank <= 3 ? "You're in the top 3. Keep it up!" : myRank > 0 ? 'Climb higher — you can do it!' : 'Join a team to be ranked.'}</div>
-            </div>
-          </div>
-        </div>
-
-        {/* Class Leaderboard */}
-        <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">
-          <div className="flex items-start justify-between gap-3 mb-4">
-            <div className="flex items-start gap-3">
-              <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-purple-100 text-purple-700 shrink-0"><BarChart3 className="w-5 h-5" /></span>
-              <div>
-                <div className="font-bold text-slate-900">Class Leaderboard</div>
-                <div className="text-xs text-slate-500">Top performers{activeClass ? ` in ${activeClass.name}` : ''}</div>
-              </div>
-            </div>
-            <Link href="/participant/leaderboard" className="text-sm font-semibold text-purple-700 hover:text-purple-900 inline-flex items-center gap-1">View full leaderboard <ArrowRight className="w-4 h-4" /></Link>
-          </div>
-
-          {scoresLoading ? (
-            <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-gray-100 rounded-xl animate-pulse" />)}</div>
-          ) : top4.length === 0 ? (
-            <p className="text-sm text-slate-500 py-6 text-center">No team scores yet for this class.</p>
-          ) : (
-            <div className="space-y-2">
-              {top4.map((r: any, idx: number) => {
-                const isMine = r.team_id === myTeamId;
-                return (
-                  <div key={r.team_id} className={`flex items-center gap-3 p-3 rounded-xl border transition ${isMine ? 'bg-purple-50 border-purple-200' : 'border-slate-100 hover:border-purple-200'}`}>
-                    <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-sm ${idx < 3 ? `${medalBg[idx]} text-white` : 'bg-slate-100 text-slate-600'}`}>
-                      {idx + 1}
-                    </span>
-                    <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${teamPalette[idx % teamPalette.length]}`}>
-                      {initials(r.team_name || ('Team ' + String(r.team_id).slice(0,2)))}
-                    </span>
-                    <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-slate-900 truncate">{r.team_name || ('Team ' + String(r.team_id).slice(0,8))}</span>
-                      {isMine && <span className="ml-2 text-xs text-purple-700 font-medium">(Your Team)</span>}
-                    </div>
-                    <div className="text-purple-700 font-bold text-sm whitespace-nowrap">{(Number(r.total_score)||0).toLocaleString()} pts</div>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-        </div>
-
-        {/* Footer banner */}
-        <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded-2xl p-4">
-          <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 text-amber-600 shrink-0"><Star className="w-5 h-5" /></span>
-          <div className="flex-1 text-sm text-slate-700">Complete activities, earn points, and climb the leaderboard!</div>
-          <Link href="/participant/activities" className="text-sm font-semibold text-amber-600 hover:text-amber-800 inline-flex items-center gap-1 whitespace-nowrap">Go to Activities <ArrowRight className="w-4 h-4" /></Link>
-        </div>
+          </>
+        )}
       </div>
     </ParticipantShell>
   );

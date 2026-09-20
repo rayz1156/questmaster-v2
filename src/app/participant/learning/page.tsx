@@ -36,33 +36,31 @@ export default function ParticipantLearningHome() {
 
   return (
     <ParticipantShell>
-      <div className="max-w-3xl mx-auto p-6">
-        <div className="flex items-center gap-3 mb-6">
-          <span className="inline-flex items-center justify-center w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-700"><BookOpen className="w-6 h-6" /></span>
-          <h1 className="text-2xl font-bold text-slate-900">Learning Board</h1>
+      <div className="max-w-shell mx-auto px-6 py-10">
+        <div className="max-w-2xl mb-8">
+          <div className="eyebrow mb-1">Learning</div>
+          <h1 className="page-title">Pick a class.</h1>
+          <p className="page-subtitle">Each class keeps its own Learning Board.</p>
         </div>
         {loading ? (
-          <div className="text-slate-500">Loading…</div>
+          <div className="text-sm text-ink-muted">Loading…</div>
         ) : classes.length === 0 ? (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <p className="text-slate-700">You haven&apos;t joined any class yet.</p>
-            <Link href="/participant/join" className="mt-4 inline-flex items-center gap-2 bg-purple-600 hover:bg-purple-700 text-white font-semibold py-2.5 px-4 rounded-xl transition">Join a class <ArrowRight className="w-4 h-4" /></Link>
+          <div className="max-w-md">
+            <p className="text-sm text-ink-muted">You have not joined any class yet.</p>
+            <Link href="/participant/join" className="btn-primary mt-4">Join a class</Link>
           </div>
         ) : (
-          <div className="space-y-4">
-            <p className="text-slate-600">Pick a class to open its Learning Board.</p>
-            <ul className="space-y-3">
+          <div className="surface max-w-2xl">
+            <ul className="divide-y divide-hairline">
               {classes.map((c: any) => (
                 <li key={c.id}>
-                  <Link href={`/participant/classes/${c.id}/learning-board`} className="flex items-center justify-between bg-white rounded-2xl shadow-sm border border-slate-100 p-5 hover:border-emerald-300 hover:bg-emerald-50/30 transition group">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <span className="inline-flex items-center justify-center w-10 h-10 rounded-xl bg-emerald-100 text-emerald-700 shrink-0"><BookOpen className="w-5 h-5" /></span>
-                      <div className="min-w-0">
-                        <div className="font-semibold text-slate-900 truncate">{c.name}</div>
-                        <div className="text-xs text-slate-500 truncate">Open the Learning Board for this class</div>
-                      </div>
-                    </div>
-                    <ArrowRight className="w-5 h-5 text-emerald-600 group-hover:translate-x-1 transition" />
+                  <Link href={`/participant/classes/${c.id}/learning-board`} className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFB]">
+                    <span className="w-10 h-10 rounded-full bg-[#EAE6FC] text-brand-purple flex items-center justify-center shrink-0"><BookOpen className="w-5 h-5" /></span>
+                    <span className="flex-1 min-w-0">
+                      <span className="block text-[15px] font-medium text-ink truncate">{c.name}</span>
+                      <span className="block text-sm text-ink-muted mt-0.5">Open the Learning Board</span>
+                    </span>
+                    <ArrowRight className="w-4 h-4 text-ink-faint shrink-0" />
                   </Link>
                 </li>
               ))}

@@ -23,12 +23,18 @@ type Summary = {
   hourly: Array<{ hour: number; events: number }>;
 };
 
-function Stat({ icon, label, value, hint }: { icon: React.ReactNode; label: string; value: number | string; hint?: string }) {
+function Stat({ icon, label, value, hint, tone = "violet" }: { icon: React.ReactNode; label: string; value: number | string; hint?: string; tone?: "violet" | "green" | "rose" }) {
+  const ring = tone === "green" ? "bg-[#E3F5EA] text-[#2E7D4F]"
+             : tone === "rose" ? "bg-[#FDEBEA] text-[#C0392B]"
+             : "bg-[#EAE6FC] text-brand-purple";
   return (
-    <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-4">
-      <div className="flex items-center gap-2 text-xs font-semibold text-gray-500 uppercase tracking-wide">{icon}<span>{label}</span></div>
-      <div className="mt-2 text-2xl font-bold text-gray-900">{value}</div>
-      {hint && <div className="text-xs text-gray-500 mt-1">{hint}</div>}
+    <div className="card flex items-center gap-4">
+      <span className={`w-11 h-11 rounded-full flex items-center justify-center shrink-0 ${ring}`}>{icon}</span>
+      <div className="min-w-0">
+        <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{value}</div>
+        <div className="text-sm text-ink-muted mt-1.5">{label}</div>
+        {hint && <div className="text-xs text-ink-faint mt-0.5">{hint}</div>}
+      </div>
     </div>
   );
 }
@@ -48,13 +54,13 @@ function LineChart({ data }: { data: Array<{ day: string; dau: number }> }) {
   }, [data]);
   if (data.length === 0) return <div className="text-sm text-gray-500">No data yet — analytics start collecting now.</div>;
   return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-44">
-      <polyline fill="none" stroke="#7c3aed" strokeWidth="2.5" points={points} />
+    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-56">
+      <polyline fill="none" stroke="#7057D9" strokeWidth="2.5" points={points} />
       <polyline fill="url(#g)" stroke="none" points={`28,${height-28} ${points} ${width-28},${height-28}`} opacity="0.15" />
       <defs>
         <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#7c3aed" />
-          <stop offset="100%" stopColor="#7c3aed" stopOpacity="0" />
+          <stop offset="0%" stopColor="#7057D9" />
+          <stop offset="100%" stopColor="#7057D9" stopOpacity="0" />
         </linearGradient>
       </defs>
       <text x="6" y="14" fontSize="10" fill="#6b7280">peak {max}</text>
@@ -69,7 +75,7 @@ function HourBars({ data }: { data: Array<{ hour: number; events: number }> }) {
     <div className="flex items-end gap-1 h-32">
       {buckets.map((v, h) => (
         <div key={h} className="flex-1 flex flex-col items-center gap-1" title={`${h}:00 — ${v} events`}>
-          <div className="w-full bg-purple-500/80 rounded-t" style={{ height: `${(v / max) * 100}%` }} />
+          <div className="w-full bg-[#B9ABF1] rounded-t" style={{ height: `${(v / max) * 100}%` }} />
           {h % 3 === 0 && <span className="text-[10px] text-gray-500">{h}h</span>}
         </div>
       ))}
@@ -112,91 +118,104 @@ export default function EducatorAnalyticsPage() {
   const t = summary?.totals;
   const inact = summary?.inactivity;
 
+  const learners = t?.unique_users ?? 0;
+  const active30 = inact?.active_30d ?? 0;
+  const atRisk = inact?.at_risk_inactive_7d ?? 0;
+
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-start justify-between gap-4 flex-wrap">
+      <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <h1 className="text-3xl font-bold flex items-center gap-2"><Activity className="w-7 h-7 text-purple-600"/> Analytics</h1>
-          <p className="text-sm text-gray-600 mt-1">Engagement & access overview for the last 90 days.</p>
+          <div className="eyebrow mb-1">Global insights</div>
+          <h1 className="page-title">See how learning is going.</h1>
+          <p className="page-subtitle">
+            Track engagement across all your classes and spot opportunities to support your learners.
+          </p>
         </div>
-        <select
-          value={classId}
-          onChange={(e) => setClassId(e.target.value as string | "all")}
-          className="px-3 py-2 border border-gray-300 rounded-lg text-sm bg-white"
-        >
-          <option value="all">All my classes</option>
-          {classes.map(c => (<option key={c.id} value={c.id}>{c.name}</option>))}
-        </select>
+        <div className="flex items-center gap-3">
+          <select
+            value={classId}
+            onChange={(e) => setClassId(e.target.value as string | "all")}
+            className="input w-auto"
+          >
+            <option value="all">All classes</option>
+            {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+          </select>
+          <span className="input w-auto flex items-center text-ink-muted cursor-default">Last 90 days</span>
+        </div>
       </div>
 
-      {loading && <div className="mt-6 text-sm text-gray-500">Loading analytics…</div>}
-      {error && <div className="mt-6 text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg p-3">{error}</div>}
+      {loading && <p className="text-sm text-ink-muted">Loading…</p>}
+      {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
 
       {summary && (
         <>
-          <div className="mt-6 grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-            <Stat icon={<Eye className="w-4 h-4"/>}        label="Page views"   value={t!.page_views} />
-            <Stat icon={<LogIn className="w-4 h-4"/>}      label="Logins"       value={t!.logins} />
-            <Stat icon={<Users className="w-4 h-4"/>}      label="Unique users" value={t!.unique_users} />
-            <Stat icon={<Target className="w-4 h-4"/>}     label="Quest opens"  value={t!.quest_opens} />
-            <Stat icon={<CheckCircle2 className="w-4 h-4"/>} label="Submissions"  value={t!.quest_submits} />
-            <Stat icon={<TrendingUp className="w-4 h-4"/>} label="Total events" value={t!.total_events} />
+          {/* Tiga nombor yang benar-benar menjawab soalan "bagaimana keadaannya". */}
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
+            <Stat icon={<Users className="w-5 h-5" />} label="Learners" value={learners} />
+            <Stat icon={<TrendingUp className="w-5 h-5" />} label="Active in 30 days" value={active30} tone="green" />
+            <Stat icon={<Users className="w-5 h-5" />} label="Inactive over 7 days" value={atRisk} tone="rose" />
           </div>
 
-          <div className="mt-6 grid grid-cols-1 md:grid-cols-4 gap-3">
-            <Stat icon={<Activity className="w-4 h-4 text-green-600"/>}    label="Active 24h"  value={inact!.active_1d} />
-            <Stat icon={<Activity className="w-4 h-4 text-purple-600"/>}   label="Active 7d"   value={inact!.active_7d} />
-            <Stat icon={<Activity className="w-4 h-4 text-indigo-600"/>}   label="Active 30d"  value={inact!.active_30d} />
-            <Stat icon={<AlertTriangle className="w-4 h-4 text-amber-600"/>} label="At risk (>7d)" value={inact!.at_risk_inactive_7d} hint="Inactive for over a week" />
-          </div>
-
-          <div className="mt-6 grid grid-cols-1 lg:grid-cols-12 gap-4">
-              {/* Left column: key tables & performance summaries */}
-              <div className="lg:col-span-8 space-y-4">
-                <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-                  <div className="flex items-center justify-between gap-2 flex-wrap">
-                    <h2 className="font-bold text-gray-900 flex items-center gap-2">
-                      <TrendingUp className="w-5 h-5 text-purple-600"/>
-                      Engagement overview
-                      <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 1">1</span>
-                    </h2>
-                    <span className="text-xs text-gray-500">Last 90 days</span>
-                  </div>
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <p className="text-xs text-gray-500">Unique users per day across this {classId === 'all' ? 'account' : 'class'}.</p>
-                      <div className="mt-2"><LineChart data={summary.daily} /></div>
-                    </div>
-                    <div>
-                      <p className="text-xs text-gray-500 flex items-center gap-1"><BookOpen className="w-3.5 h-3.5 text-purple-600"/> Time-of-day heatmap — when students actually work.</p>
-                      <div className="mt-2"><HourBars data={summary.hourly} /></div>
-                    </div>
-                  </div>
-                </div>
-                <div className="max-h-[520px] overflow-auto rounded-xl">
-                  <ActivityStatsPanel classId={classId} />
-                </div>
-                <div className="max-h-[520px] overflow-auto rounded-xl">
-                  <TeamStatsPanel classId={classId} />
-                </div>
-              </div>
-
-              {/* Right column: insights, topic summary, quick filters */}
-              <div className="lg:col-span-4 space-y-4">
-                <div className="max-h-[420px] overflow-auto rounded-xl">
-                  <MasteryPanel classId={classId} />
-                </div>
-                <div className="max-h-[420px] overflow-auto rounded-xl">
-                  <AtRiskPanel classId={classId} />
-                </div>
-                <div className="max-h-[420px] overflow-auto rounded-xl">
-                  <GamificationPanel classId={classId} />
-                </div>
-                <p className="text-xs text-gray-500 px-1">
-                  All six levels (engagement, activity, contribution, mastery, at-risk, gamification) are live. Submit ideas via <a className="text-purple-600 underline" href="/help">Help → Send Feedback</a>.
-                </p>
-              </div>
+          {atRisk > 0 && (
+            <div className="flex items-center gap-3 rounded-2xl border border-[#F3E2C0] bg-[#FDF8EC] px-4 py-3.5 mb-5">
+              <span className="w-8 h-8 rounded-full bg-[#F6E3BC] flex items-center justify-center shrink-0">
+                <AlertTriangle className="w-4 h-4 text-[#9A6B14]" />
+              </span>
+              <span className="text-sm text-[#7A5410] flex-1">
+                {atRisk} {atRisk === 1 ? "learner has" : "learners have"} not visited in over a week.
+              </span>
+              <a href="#explore" className="btn-quiet text-[#7A5410] whitespace-nowrap">View learners →</a>
             </div>
+          )}
+
+          <div className="surface p-5 mb-5">
+            <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
+              <h2 className="font-semibold text-ink">Daily active learners</h2>
+              <span className="text-xs text-ink-faint">Last 90 days</span>
+            </div>
+            <LineChart data={summary.daily} />
+            <details className="mt-3 border-t border-hairline pt-3">
+              <summary className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink">
+                <BarChart3 className="w-4 h-4 text-ink-faint" />
+                More usage metrics
+                <span className="text-ink-faint">· {t!.page_views.toLocaleString()} page views</span>
+              </summary>
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
+                <Stat icon={<Eye className="w-5 h-5" />} label="Page views" value={t!.page_views} />
+                <Stat icon={<LogIn className="w-5 h-5" />} label="Sign ins" value={t!.logins} />
+                <Stat icon={<Target className="w-5 h-5" />} label="Activity opens" value={t!.quest_opens} />
+                <Stat icon={<CheckCircle2 className="w-5 h-5" />} label="Submissions" value={t!.quest_submits} />
+                <Stat icon={<TrendingUp className="w-5 h-5" />} label="Total events" value={t!.total_events} />
+                <Stat icon={<Activity className="w-5 h-5" />} label="Active in 24 hours" value={inact!.active_1d} />
+              </div>
+              <div className="mt-5">
+                <p className="text-sm text-ink-muted mb-2 flex items-center gap-1.5">
+                  <BookOpen className="w-4 h-4 text-ink-faint" /> When students actually work
+                </p>
+                <HourBars data={summary.hourly} />
+              </div>
+            </details>
+          </div>
+
+          <div id="explore" className="mb-4">
+            <h2 className="section-title">Explore a class</h2>
+            <p className="text-sm text-ink-muted mt-0.5">
+              Choose a class to see activity completion, team contribution and learning outcomes.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
+            <div className="lg:col-span-7 space-y-4">
+              <ActivityStatsPanel classId={classId} />
+              <TeamStatsPanel classId={classId} />
+            </div>
+            <div className="lg:col-span-5 space-y-4">
+              <MasteryPanel classId={classId} />
+              <AtRiskPanel classId={classId} />
+              <GamificationPanel classId={classId} />
+            </div>
+          </div>
         </>
       )}
     </Shell>

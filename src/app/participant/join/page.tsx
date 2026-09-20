@@ -47,15 +47,15 @@ function Inner() {
   };
   return (
     <form onSubmit={onSubmit} className="card w-full max-w-sm space-y-3">
-      <a href="/participant/home" className="flex items-center gap-1 text-sm text-purple-600 hover:underline mb-3"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>Back to Home</a><h1 className="font-bold text-lg">Join a class</h1>
-      <p className="text-xs text-gray-500">Enter the class code given by your educator.</p>
-      <input className="input w-full text-center font-mono text-lg uppercase" placeholder="ABCD1234" value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setErr(null);}} required maxLength={16}/>
+      <a href="/participant/home" className="btn-quiet mb-4"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>Back to Home</a><h1 className="section-title">Join a class</h1>
+      <p className="text-sm text-ink-muted">Enter the class code given by your educator.</p>
+      <input className="input text-center font-mono text-lg uppercase tracking-[0.2em]" placeholder="ABCD1234" value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setErr(null);}} required maxLength={16}/>
       <button disabled={busy} className="btn-primary w-full py-2">{busy ? 'Joining…' : 'Join class'}</button>
-      {err && <div className="text-xs text-red-600">{err}</div>}
-      {ok && <div className="text-xs text-green-700">{ok}</div>}
+      {err && <div className="text-sm text-[#C0392B]">{err}</div>}
+      {ok && <div className="text-sm text-[#2E7D4F]">{ok}</div>}
     </form>
   );
 }
 export default function ParticipantJoin() {
-  return (<div className="min-h-screen bg-gray-50 flex items-center justify-center p-4"><Suspense fallback={<div className="card w-full max-w-sm">Loading…</div>}><Inner/></Suspense></div>);
+  return (<div className="min-h-screen bg-canvas flex items-center justify-center p-4"><Suspense fallback={<div className="card w-full max-w-sm">Loading…</div>}><Inner/></Suspense></div>);
 }

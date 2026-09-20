@@ -1,16 +1,18 @@
 "use client";
 
-import { Trophy, Crown, Flame, User as UserIcon } from "lucide-react";
+import { Crown, Flame, User as UserIcon } from "lucide-react";
 
 /**
- * Leaderboard Live Quiz.
+ * Leaderboard, satu bahasa untuk seluruh platform.
  *
- * Reka bentuk sengaja disalin daripada leaderboard aktiviti
- * (src/app/participant/leaderboard/page.tsx): jubin bulat pangkat dengan
- * gradien emas, perak dan gangsa untuk tiga teratas, pil mata di kanan, dan
- * kad putih rounded-2xl dengan tera air Crown. Satu platform, satu rupa.
+ * Fail ini memiliki rupa jubin pangkat. Leaderboard aktiviti
+ * (src/app/participant/leaderboard/page.tsx) mengimport pemalar di bawah,
+ * jadi kuiz langsung dan aktiviti tidak boleh terpisah rupa lagi. Kalau
+ * pangkat perlu ditukar rupa, tukar di sini sahaja.
  *
- * Kalau leaderboard aktiviti berubah rupa, ubah fail ini sekali.
+ * Pingat kekal emas, perak dan gangsa kerana itulah maknanya. Yang dibuang
+ * ialah bayang berwarna, bintang di tepi dan teks kecerunan: tiga perkara
+ * yang menjerit tanpa memberitahu apa-apa.
  */
 
 export interface LiveLeaderboardRow {
@@ -21,22 +23,29 @@ export interface LiveLeaderboardRow {
   streak?: number;
 }
 
-const TILE = [
-  "bg-gradient-to-r from-yellow-50 via-amber-50 to-yellow-50 border-yellow-200",
-  "bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50 border-gray-200",
-  "bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 border-orange-200",
+/** Latar jubin untuk tiga teratas. */
+export const LB_TILE = [
+  "bg-[#FFFBEF] border-[#F0DFB4]",
+  "bg-[#F8F8FA] border-hairline",
+  "bg-[#FDF5EE] border-[#EFDBC8]",
 ];
-const MEDAL = [
-  "bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-yellow-200",
-  "bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-slate-200",
-  "bg-gradient-to-br from-orange-400 to-amber-700 text-white shadow-orange-200",
+export const LB_TILE_REST = "bg-white border-hairline hover:bg-[#FAFAFB]";
+
+/** Bulatan pangkat. Logam sebenar, tanpa bayang berwarna. */
+export const LB_MEDAL = [
+  "bg-gradient-to-br from-[#F3C455] to-[#D19B28] text-white",
+  "bg-gradient-to-br from-[#D2D6DD] to-[#A5ABB6] text-white",
+  "bg-gradient-to-br from-[#D79A63] to-[#A96B33] text-white",
 ];
-const PTS = [
-  "bg-yellow-100 text-amber-700",
-  "bg-slate-100 text-slate-700",
-  "bg-orange-100 text-orange-700",
+export const LB_MEDAL_REST = "bg-[#F1F1F4] text-ink-muted";
+
+/** Pil mata di hujung kanan. */
+export const LB_PTS = [
+  "bg-[#FBF1D9] text-[#8A6100]",
+  "bg-[#EFF0F3] text-ink-muted",
+  "bg-[#F8E9DC] text-[#8A4B18]",
 ];
-const SIDE = ["text-yellow-400", "text-slate-300", "text-orange-300"];
+export const LB_PTS_REST = "bg-[#F4F2FD] text-brand-purple";
 
 export default function LiveLeaderboard({
   rows,
@@ -57,59 +66,49 @@ export default function LiveLeaderboard({
   const senarai = typeof limit === "number" ? rows.slice(0, limit) : rows;
 
   return (
-    <div className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-4 sm:p-5">
-      <Crown className="absolute -top-2 -right-2 w-16 h-16 text-purple-100 opacity-70 pointer-events-none" />
+    <div className="relative overflow-hidden rounded-2xl bg-white border border-hairline p-5">
+      <Crown className="absolute -top-2 -right-2 w-16 h-16 text-[#EFEBFB] pointer-events-none" />
 
-      <div className="flex items-start gap-3 mb-4">
-        <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center shrink-0 shadow-md">
-          <Trophy className="w-5 h-5" />
-        </div>
-        <div className="min-w-0">
-          <div className="font-bold text-base sm:text-lg">{title}</div>
-          {subtitle && <div className="text-xs text-gray-500">{subtitle}</div>}
-        </div>
+      <div className="mb-4">
+        <div className="section-title">{title}</div>
+        {subtitle && <div className="text-sm text-ink-muted mt-0.5">{subtitle}</div>}
       </div>
 
       {senarai.length === 0 ? (
-        <p className="text-xs text-gray-500">{emptyText}</p>
+        <p className="text-sm text-ink-muted">{emptyText}</p>
       ) : (
         <div className="space-y-2">
           {senarai.map((r, i) => {
             const saya = !!highlight && r.nickname === highlight;
-            const tile = i < 3 ? TILE[i] : "bg-white border-gray-100 hover:bg-gray-50";
-            const medal = i < 3 ? MEDAL[i] : "bg-gray-200 text-gray-600";
-            const pts = i < 3 ? PTS[i] : "bg-purple-50 text-purple-700";
+            const tile = i < 3 ? LB_TILE[i] : LB_TILE_REST;
+            const medal = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
+            const pts = i < 3 ? LB_PTS[i] : LB_PTS_REST;
             return (
               <div
                 key={`${r.rank}-${r.nickname}`}
-                className={`relative flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tile} ${
-                  saya ? "ring-2 ring-purple-400" : ""
+                className={`flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tile} ${
+                  saya ? "ring-2 ring-brand-purple" : ""
                 }`}
               >
-                <div
-                  className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-lg font-extrabold shadow ${medal}`}
-                >
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medal}`}>
                   {r.rank}
                 </div>
                 <div className="flex-1 min-w-0">
-                  <div className="font-bold text-sm sm:text-base truncate flex items-center gap-1.5">
-                    <UserIcon className="w-4 h-4 text-purple-400 shrink-0" />
+                  <div className="text-[15px] font-medium text-ink truncate flex items-center gap-1.5">
+                    <UserIcon className="w-4 h-4 text-ink-faint shrink-0" />
                     <span className="truncate">{r.nickname}</span>
-                    {saya && <span className="text-[10px] font-semibold text-purple-600 shrink-0">you</span>}
+                    {saya && <span className="text-xs text-brand-purple shrink-0">you</span>}
                   </div>
                   {(r.streak ?? 0) >= 2 && (
-                    <div className="text-xs text-amber-600 font-semibold flex items-center gap-1 mt-0.5">
+                    <div className="text-xs text-[#8A6100] flex items-center gap-1 mt-0.5">
                       <Flame className="w-3 h-3" /> {r.streak} in a row
                     </div>
                   )}
                 </div>
-                <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${pts}`}>
-                  <div className="text-center">
-                    <div className="font-extrabold text-lg leading-none">{r.score}</div>
-                    <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
-                  </div>
+                <div className={`shrink-0 min-w-[64px] px-3 py-1.5 rounded-xl text-center ${pts}`}>
+                  <div className="text-lg font-semibold leading-none tabular-nums">{r.score}</div>
+                  <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
                 </div>
-                {i < 3 && <span className={`shrink-0 text-lg ${SIDE[i]}`}>★</span>}
               </div>
             );
           })}

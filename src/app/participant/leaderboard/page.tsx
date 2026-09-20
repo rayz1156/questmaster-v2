@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Users, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight, Activity, ClipboardList, Crown, Medal, Home, Compass, BookOpen } from "lucide-react";
+import { LB_TILE, LB_TILE_REST, LB_MEDAL, LB_MEDAL_REST, LB_PTS, LB_PTS_REST } from "@/components/LiveLeaderboard";
 import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, listClassIndividualScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listEnrolledClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type ClassIndividualScore, type Klass } from "@/lib/data";
 
 
@@ -139,100 +140,72 @@ function LeaderboardInner() {
   return (
     <ParticipantShell>
       {classId && (
-        <Link href={`/participant/classes/${classId}`} className="inline-flex items-center gap-1 mb-4 text-sm text-purple-700 hover:text-purple-900 hover:underline">← Back to class dashboard</Link>
+        <Link href={`/participant/classes/${classId}`} className="btn-quiet mb-6">← Back to class dashboard</Link>
       )}
-      {/* Hero header */}
-      <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-purple-50 via-white to-purple-50 border border-purple-100 p-5 sm:p-6 mb-5">
-        <div className="flex items-start sm:items-center justify-between gap-4 flex-wrap">
-          <div className="flex items-center gap-4 sm:gap-5">
-            <div className="w-16 h-16 sm:w-20 sm:h-20 rounded-2xl bg-gradient-to-br from-yellow-100 via-yellow-50 to-purple-100 flex items-center justify-center text-4xl sm:text-5xl shrink-0 shadow-inner">🏆</div>
-            <div className="min-w-0">
-              <h1 className="text-2xl sm:text-3xl font-extrabold tracking-tight bg-gradient-to-r from-purple-700 to-purple-500 bg-clip-text text-transparent flex items-center gap-2">
-                Live Rankings
-                <span className="inline-flex items-center justify-center w-6 h-6 rounded-full bg-purple-100 text-purple-600"><Activity className="w-3.5 h-3.5"/></span>
-              </h1>
-              <p className="text-sm text-gray-500 mt-0.5">See how each group is performing in real time.</p>
-            </div>
-          </div>
-          <button onClick={loadScores} className="inline-flex items-center gap-2 px-4 py-2 rounded-xl bg-white border border-purple-200 text-sm font-semibold text-purple-700 hover:bg-purple-50 shadow-sm shrink-0"><RefreshCw className="w-4 h-4"/>Refresh</button>
+      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
+        <div className="min-w-0">
+          <div className="eyebrow mb-1">Rankings</div>
+          <h1 className="page-title">Who is ahead right now.</h1>
+          <p className="page-subtitle">Scores update as groups complete activities.</p>
         </div>
+        <button onClick={loadScores} className="btn-secondary shrink-0"><RefreshCw className="w-4 h-4"/>Refresh</button>
       </div>
 
       {/* Class & Activity selectors */}
-      <div className="rounded-2xl bg-white border border-gray-100 shadow-sm p-4 sm:p-5 mb-5">
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Class</label>
-            {classes.length === 0 ? <p className="text-sm text-gray-500">Tiada leaderboard tersedia buat masa ini.</p> : (
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-purple-100 text-purple-600 inline-flex items-center justify-center pointer-events-none"><Users className="w-4 h-4"/></span>
-                <select className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-300" value={classId} onChange={e => setClassId(e.target.value)}>
-                  {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                </select>
-              </div>
-            )}
-          </div>
-          <div>
-            <label className="text-xs font-semibold text-gray-500 mb-1 block">Activity</label>
-            {classId && hunts.length > 0 ? (
-              <div className="relative">
-                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 w-7 h-7 rounded-lg bg-purple-100 text-purple-600 inline-flex items-center justify-center pointer-events-none"><ClipboardList className="w-4 h-4"/></span>
-                <select className="w-full pl-12 pr-3 py-2.5 rounded-xl border border-gray-200 bg-gray-50 text-sm font-medium focus:outline-none focus:ring-2 focus:ring-purple-300" value={activeId} onChange={e => setActiveId(e.target.value)}>
-                  <option value="">All Activities (Class Leaderboard)</option>
-                  {hunts.map(h => <option key={h.id} value={h.id}>{h.title}</option>)}
-                </select>
-              </div>
-            ) : (
-              <p className="text-sm text-gray-400 italic py-2.5">Select a class with activities</p>
-            )}
-          </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 max-w-3xl">
+        <div>
+          <div className="text-sm font-medium text-ink mb-1.5">Class</div>
+          {classes.length === 0 ? <p className="text-sm text-ink-muted">No leaderboard is available yet.</p> : (
+            <select className="input" value={classId} onChange={e => setClassId(e.target.value)}>
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </select>
+          )}
+        </div>
+        <div>
+          <div className="text-sm font-medium text-ink mb-1.5">Activity</div>
+          {classId && hunts.length > 0 ? (
+            <select className="input" value={activeId} onChange={e => setActiveId(e.target.value)}>
+              <option value="">All activities</option>
+              {hunts.map(h => <option key={h.id} value={h.id}>{h.title}</option>)}
+            </select>
+          ) : (
+            <p className="text-sm text-ink-faint py-2.5">Select a class with activities.</p>
+          )}
         </div>
       </div>
 
-      {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
+      {err && <div className="text-sm text-[#C0392B] mb-4">{err}</div>}
 
       {/* Leaderboard */}
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-gray-100 shadow-sm p-4 sm:p-5 mb-3">
-        <Crown className="absolute -top-2 -right-2 w-16 h-16 text-purple-100 opacity-70 pointer-events-none"/>
-        <div className="flex items-start gap-3 mb-4">
-          <div className="w-11 h-11 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 text-white flex items-center justify-center shrink-0 shadow-md"><Trophy className="w-5 h-5"/></div>
-          <div className="min-w-0">
-            <div className="font-bold text-base sm:text-lg">{isIndividual && !activeId ? `Individual Leaderboard` : activeId ? `Activity Leaderboard` : `Class Leaderboard`}</div>
-            <div className="text-xs text-gray-500">{isIndividual && !activeId ? "Students ranked by their own approved work." : "Rankings update automatically as groups complete quests."}</div>
-          </div>
+      <div className="relative overflow-hidden rounded-2xl bg-white border border-hairline p-5 mb-3">
+        <Crown className="absolute -top-2 -right-2 w-16 h-16 text-[#EFEBFB] pointer-events-none"/>
+        <div className="mb-4">
+          <div className="section-title">{isIndividual && !activeId ? `Individuals` : activeId ? `Activity leaderboard` : `Class leaderboard`}</div>
+          <div className="text-sm text-ink-muted mt-0.5">{isIndividual && !activeId ? "Students ranked by their own approved work." : "Rankings update automatically as groups complete activities."}</div>
         </div>
         {!activeId && (
-          <div className="flex items-center gap-1 p-1 mb-4 bg-gray-100 rounded-xl w-fit">
-            <button onClick={() => setViewMode('team')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'team' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}>Teams</button>
-            <button onClick={() => setViewMode('individual')} className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${viewMode === 'individual' ? 'bg-white shadow text-purple-700' : 'text-gray-500 hover:text-gray-700'}`}>Individuals</button>
+          <div className="inline-flex rounded-xl border border-hairline overflow-hidden mb-4 text-sm">
+            <button onClick={() => setViewMode('team')} className={`px-3.5 py-1.5 font-medium transition ${viewMode === 'team' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}>Teams</button>
+            <button onClick={() => setViewMode('individual')} className={`px-3.5 py-1.5 font-medium transition border-l border-hairline ${viewMode === 'individual' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}>Individuals</button>
           </div>
         )}
         {isIndividual && !activeId ? (
-          indivScores.length === 0 ? <p className="text-xs text-gray-500">No students ranked yet.</p> : (
+          indivScores.length === 0 ? <p className="text-sm text-ink-muted">No students ranked yet.</p> : (
           <div className="space-y-2">
           {indivScores.map((s, i) => {
-            const tileBg = i === 0 ? 'bg-gradient-to-r from-yellow-50 via-amber-50 to-yellow-50 border-yellow-200'
-                         : i === 1 ? 'bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50 border-gray-200'
-                         : i === 2 ? 'bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 border-orange-200'
-                         : 'bg-white border-gray-100 hover:bg-gray-50';
-            const medalBg = i === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-yellow-200'
-                          : i === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-slate-200'
-                          : i === 2 ? 'bg-gradient-to-br from-orange-400 to-amber-700 text-white shadow-orange-200'
-                          : 'bg-gray-200 text-gray-600';
-            const ptsBg = i === 0 ? 'bg-yellow-100 text-amber-700'
-                        : i === 1 ? 'bg-slate-100 text-slate-700'
-                        : i === 2 ? 'bg-orange-100 text-orange-700'
-                        : 'bg-purple-50 text-purple-700';
+            const tileBg = i < 3 ? LB_TILE[i] : LB_TILE_REST;
+            const medalBg = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
+            const ptsBg = i < 3 ? LB_PTS[i] : LB_PTS_REST;
             return (
               <div key={s.user_id} className={`relative flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tileBg}`}>
-                <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-lg font-extrabold shadow ${medalBg}`}>{i + 1}</div>
+                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medalBg}`}>{i + 1}</div>
                 <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <UserIcon className="w-4 h-4 text-purple-400 shrink-0"/>
-                  <div className="font-bold text-sm sm:text-base truncate">{s.display_name || 'Student'}</div>
+                  <UserIcon className="w-4 h-4 text-ink-faint shrink-0"/>
+                  <div className="text-[15px] font-medium text-ink truncate">{s.display_name || 'Student'}</div>
                 </div>
                 <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${ptsBg}`}>
                   <div className="text-center">
-                    <div className="font-extrabold text-lg leading-none">{s.total_score}</div>
+                    <div className="text-lg font-semibold leading-none tabular-nums">{s.total_score}</div>
                     <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
                   </div>
                 </div>
@@ -241,24 +214,13 @@ function LeaderboardInner() {
           })}
           </div>
           )
-        ) : leaderboard.length === 0 ? <p className="text-xs text-gray-500">No teams yet.</p> : (
+        ) : leaderboard.length === 0 ? <p className="text-sm text-ink-muted">No teams yet.</p> : (
           <div className="space-y-2">
           {leaderboard.map((s, i) => {
             const isExpanded = expandedTeam === s.team_id;
-            const tileBg = i === 0 ? 'bg-gradient-to-r from-yellow-50 via-amber-50 to-yellow-50 border-yellow-200'
-                         : i === 1 ? 'bg-gradient-to-r from-slate-50 via-gray-50 to-slate-50 border-gray-200'
-                         : i === 2 ? 'bg-gradient-to-r from-orange-50 via-rose-50 to-orange-50 border-orange-200'
-                         : 'bg-white border-gray-100 hover:bg-gray-50';
-            const medalBg = i === 0 ? 'bg-gradient-to-br from-yellow-400 to-amber-500 text-white shadow-yellow-200'
-                          : i === 1 ? 'bg-gradient-to-br from-slate-300 to-slate-400 text-white shadow-slate-200'
-                          : i === 2 ? 'bg-gradient-to-br from-orange-400 to-amber-700 text-white shadow-orange-200'
-                          : 'bg-gray-200 text-gray-600';
-            const ptsBg = i === 0 ? 'bg-yellow-100 text-amber-700'
-                        : i === 1 ? 'bg-slate-100 text-slate-700'
-                        : i === 2 ? 'bg-orange-100 text-orange-700'
-                        : 'bg-purple-50 text-purple-700';
-            const sideMark = i === 0 ? '★' : i === 1 ? '★' : i === 2 ? '★' : '';
-            const sideColor = i === 0 ? 'text-yellow-400' : i === 1 ? 'text-slate-300' : i === 2 ? 'text-orange-300' : '';
+            const tileBg = i < 3 ? LB_TILE[i] : LB_TILE_REST;
+            const medalBg = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
+            const ptsBg = i < 3 ? LB_PTS[i] : LB_PTS_REST;
             return (
               <div key={s.team_id}>
                 <div
@@ -266,28 +228,27 @@ function LeaderboardInner() {
                   onClick={() => toggleTeam(s.team_id)}
                 >
                   {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-500 shrink-0"/> : <ChevronRight className="w-4 h-4 text-gray-500 shrink-0"/>}
-                  <div className={`w-12 h-12 sm:w-14 sm:h-14 rounded-full flex items-center justify-center text-lg font-extrabold shadow ${medalBg}`}>
+                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medalBg}`}>
                     {i < 3 ? (i + 1) : (i + 1)}
                   </div>
                   <div className="flex-1 min-w-0">
-                    <div className="font-bold text-sm sm:text-base truncate">{s.team_name}</div>
+                    <div className="text-[15px] font-medium text-ink truncate">{s.team_name}</div>
                     {'quest_count' in s && <div className="text-xs text-gray-500">{(s as AggScore).quest_count} activity(s)</div>}
                   </div>
                   <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${ptsBg}`}>
                     <div className="text-center">
-                      <div className="font-extrabold text-lg leading-none">{s.total_score}</div>
+                      <div className="text-lg font-semibold leading-none tabular-nums">{s.total_score}</div>
                       <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
                     </div>
                   </div>
-                  {sideMark && <span className={`shrink-0 text-lg ${sideColor}`}>{sideMark}</span>}
                 </div>
                 {isExpanded && (
-                  <div className="ml-14 mt-1 mb-1 pl-3 border-l-2 border-purple-200 space-y-1">
+                  <div className="ml-14 mt-1 mb-1 pl-3 border-l-2 border-hairline space-y-1">
                     {!teamMembers[s.team_id] ? <p className="text-xs text-gray-400 py-1">Loading members...</p> :
                      teamMembers[s.team_id].length === 0 ? <p className="text-xs text-gray-400 py-1">No members</p> :
                      teamMembers[s.team_id].map((m: any) => (
                       <div key={m.user_id} className="text-xs text-gray-600 flex items-center gap-2 py-0.5">
-                        <UserIcon className="w-3 h-3 text-purple-400"/>
+                        <UserIcon className="w-3 h-3 text-ink-faint"/>
                         <span>{m.profile?.display_name || m.profile?.email || m.user_id.slice(0,8)}</span>
                       </div>
                     ))}

@@ -1,13 +1,9 @@
 "use client";
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import {
-  HelpCircle, BookOpen, MessageSquare, ChevronDown, ChevronUp,
-  Send, Trophy, ArrowLeft, Bug, Lightbulb, MessageCircle, CheckCircle2,
-} from "lucide-react";
+import { Search, ChevronDown, ArrowLeft, CheckCircle2, Send } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 
-type Tab = "kb" | "faq" | "feedback";
 
 const KB_ARTICLES = [
   {
@@ -48,10 +44,43 @@ const FAQS = [
   { q: "How do I report a bug?", a: "Use the Feedback tab on this page — select 'Bug report' as the type. Include what you were doing when it happened." },
 ];
 
+type Hit = { section: string; q: string; a: string };
+
+const ALL: Hit[] = [
+  ...KB_ARTICLES.flatMap((s) => s.items.map((it) => ({ section: s.role, q: it.t, a: it.b }))),
+  ...FAQS.map((f) => ({ section: "FAQ", q: f.q, a: f.a })),
+];
+
+function Accordion({ items, openKey, onToggle }: { items: Hit[]; openKey: string | null; onToggle: (k: string) => void }) {
+  if (items.length === 0) {
+    return <p className="text-sm text-ink-muted py-6">Nothing matches that yet. Try fewer words, or send us the question below.</p>;
+  }
+  return (
+    <div>
+      {items.map((it) => {
+        const open = openKey === it.q;
+        return (
+          <div key={it.q} className="border-t border-hairline">
+            <button
+              onClick={() => onToggle(it.q)}
+              className="w-full flex items-start justify-between gap-6 py-4 text-left"
+            >
+              <span className="text-[15px] font-medium text-ink">{it.q}</span>
+              <ChevronDown className={`w-4 h-4 mt-1 shrink-0 text-ink-faint transition-transform ${open ? "rotate-180" : ""}`} />
+            </button>
+            {open && <p className="text-sm text-ink-muted leading-relaxed pb-5 pr-10">{it.a}</p>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 export default function HelpPage() {
-  const [tab, setTab] = useState<Tab>("kb");
-  const [openFaq, setOpenFaq] = useState<number | null>(null);
-  const [openKb, setOpenKb] = useState<string | null>("Getting Started");
+  const [query, setQuery] = useState("");
+  const [category, setCategory] = useState<string | null>(null);
+  const [openKey, setOpenKey] = useState<string | null>(null);
+  const [showFb, setShowFb] = useState(false);
   const [fbType, setFbType] = useState<"bug" | "idea" | "question" | "other">("idea");
   const [fbSubject, setFbSubject] = useState("");
   const [fbMessage, setFbMessage] = useState("");
@@ -69,6 +98,15 @@ export default function HelpPage() {
       }
     });
   }, []);
+
+  const q = query.trim().toLowerCase();
+  const results: Hit[] = q
+    ? ALL.filter((it) => (it.q + " " + it.a).toLowerCase().includes(q))
+    : category
+    ? ALL.filter((it) => it.section === category)
+    : FAQS.map((f) => ({ section: "FAQ", q: f.q, a: f.a }));
+
+  const heading = q ? `${results.length} ${results.length === 1 ? "answer" : "answers"}` : category ? category : "Popular questions";
 
   const submitFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -105,151 +143,125 @@ export default function HelpPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-indigo-50">
-      <header className="bg-gradient-to-r from-purple-600 to-indigo-600 text-white">
-        <div className="max-w-5xl mx-auto px-4 py-6 flex items-center gap-4">
-          <Link href="/" className="opacity-80 hover:opacity-100" aria-label="Back">
-            <ArrowLeft className="w-5 h-5" />
+    <div className="min-h-screen bg-canvas">
+      <div className="max-w-3xl mx-auto px-6">
+        <div className="pt-6">
+          <Link href="/" className="btn-quiet">
+            <ArrowLeft className="w-4 h-4" /> Back
           </Link>
-          <div className="w-10 h-10 rounded-lg bg-white/15 flex items-center justify-center">
-            <Trophy className="w-6 h-6" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold leading-tight">Help &amp; Support</h1>
-            <p className="text-sm opacity-90">Find answers, learn the platform, or send us feedback.</p>
-          </div>
         </div>
-      </header>
 
-      <nav className="max-w-5xl mx-auto px-4 mt-6">
-        <div className="inline-flex bg-white rounded-xl shadow-sm border border-gray-200 p-1">
-          {[
-            { id: "kb" as const, label: "Knowledge Base", icon: <BookOpen className="w-4 h-4" /> },
-            { id: "faq" as const, label: "FAQ", icon: <HelpCircle className="w-4 h-4" /> },
-            { id: "feedback" as const, label: "Send Feedback", icon: <MessageSquare className="w-4 h-4" /> },
-          ].map((t) => (
+        <div className="pt-12 pb-2 text-center">
+          <h1 className="text-[34px] leading-tight font-semibold tracking-tight text-ink">How can we help?</h1>
+        </div>
+
+        <div className="relative mt-6">
+          <Search className="w-[18px] h-[18px] text-ink-faint absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <input
+            value={query}
+            onChange={(e) => { setQuery(e.target.value); setOpenKey(null); }}
+            placeholder="Search help"
+            aria-label="Search help"
+            className="input pl-11 pr-4"
+            style={{ minHeight: 52, fontSize: "1rem" }}
+          />
+        </div>
+
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-2">
+          {KB_ARTICLES.map((s) => (
             <button
-              key={t.id}
-              onClick={() => setTab(t.id)}
-              className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-semibold transition ${
-                tab === t.id ? "bg-purple-600 text-white" : "text-gray-600 hover:bg-gray-50"
+              key={s.role}
+              onClick={() => { setCategory(category === s.role ? null : s.role); setQuery(""); setOpenKey(null); }}
+              className={`text-sm font-medium rounded-full px-3.5 py-1.5 border transition ${
+                category === s.role && !q
+                  ? "border-brand-purple text-brand-purple bg-[#F4F2FD]"
+                  : "border-hairline text-ink-muted hover:text-ink"
               }`}
             >
-              {t.icon}
-              {t.label}
+              {s.role}
             </button>
           ))}
         </div>
-      </nav>
 
-      <main className="max-w-5xl mx-auto px-4 py-6 pb-32">
-        {tab === "kb" && (
-          <div className="space-y-4">
-            {KB_ARTICLES.map((section) => (
-              <div key={section.role} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <button
-                  onClick={() => setOpenKb(openKb === section.role ? null : section.role)}
-                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50"
-                >
-                  <span className="font-bold text-gray-900">{section.role}</span>
-                  {openKb === section.role ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                </button>
-                {openKb === section.role && (
-                  <div className="px-5 pb-5 space-y-4 border-t border-gray-100">
-                    {section.items.map((it) => (
-                      <div key={it.t} className="pt-4">
-                        <h3 className="font-semibold text-gray-900">{it.t}</h3>
-                        <p className="text-sm text-gray-600 mt-1 leading-relaxed">{it.b}</p>
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="mt-12">
+          <div className="section-title mb-1">{heading}</div>
+          <Accordion items={results} openKey={openKey} onToggle={(k) => setOpenKey(openKey === k ? null : k)} />
+        </div>
 
-        {tab === "faq" && (
-          <div className="space-y-2">
-            {FAQS.map((f, i) => (
-              <div key={i} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden">
-                <button
-                  onClick={() => setOpenFaq(openFaq === i ? null : i)}
-                  className="w-full flex items-center justify-between px-5 py-4 text-left hover:bg-gray-50"
-                >
-                  <span className="font-medium text-gray-900">{f.q}</span>
-                  {openFaq === i ? <ChevronUp className="w-5 h-5 text-gray-500" /> : <ChevronDown className="w-5 h-5 text-gray-500" />}
-                </button>
-                {openFaq === i && (
-                  <div className="px-5 pb-4 text-sm text-gray-600 leading-relaxed border-t border-gray-100 pt-3">{f.a}</div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
+        <div className="mt-16 mb-20 border-t border-hairline pt-6">
+          {!showFb && !submitted && (
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <span className="text-sm text-ink-muted">Have an idea or need a hand?</span>
+              <button onClick={() => setShowFb(true)} className="btn-quiet text-brand-purple">Send feedback</button>
+            </div>
+          )}
 
-        {tab === "feedback" && (
-          <div className="bg-white rounded-xl shadow-sm border border-gray-200 p-6 max-w-2xl">
-            {submitted ? (
-              <div className="text-center py-8">
-                <CheckCircle2 className="w-12 h-12 text-green-500 mx-auto" />
-                <h2 className="text-xl font-bold mt-3">Thank you!</h2>
-                <p className="text-gray-600 mt-2">Your feedback has been sent. We read every message.</p>
-                <button onClick={() => setSubmitted(false)} className="mt-5 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold">Send another</button>
+          {submitted && (
+            <div className="flex items-start gap-3">
+              <CheckCircle2 className="w-5 h-5 text-[#2E7D4F] mt-0.5 shrink-0" />
+              <div>
+                <div className="text-[15px] font-medium text-ink">Thank you.</div>
+                <p className="text-sm text-ink-muted mt-0.5">Your feedback has been sent. We read every message.</p>
+                <button onClick={() => { setSubmitted(false); setShowFb(true); }} className="btn-quiet text-brand-purple mt-2">Send another</button>
               </div>
-            ) : (
-              <form onSubmit={submitFeedback} className="space-y-4">
+            </div>
+          )}
+
+          {showFb && !submitted && (
+            <form onSubmit={submitFeedback} className="space-y-4">
+              <div className="flex items-center justify-between">
+                <div className="section-title">Send feedback</div>
+                <button type="button" onClick={() => setShowFb(false)} className="btn-quiet">Close</button>
+              </div>
+
+              <div className="flex flex-wrap gap-2">
+                {[
+                  { v: "bug" as const, label: "Bug" },
+                  { v: "idea" as const, label: "Idea" },
+                  { v: "question" as const, label: "Question" },
+                  { v: "other" as const, label: "Other" },
+                ].map((o) => (
+                  <button
+                    type="button"
+                    key={o.v}
+                    onClick={() => setFbType(o.v)}
+                    className={`text-sm font-medium rounded-full px-3.5 py-1.5 border transition ${
+                      fbType === o.v ? "border-brand-purple text-brand-purple bg-[#F4F2FD]" : "border-hairline text-ink-muted hover:text-ink"
+                    }`}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+
+              <div>
+                <label htmlFor="fb-subject" className="text-sm font-medium text-ink">Subject</label>
+                <input id="fb-subject" value={fbSubject} onChange={(e) => setFbSubject(e.target.value)} className="input mt-1.5" placeholder="Short summary" maxLength={120} />
+              </div>
+
+              <div>
+                <label htmlFor="fb-message" className="text-sm font-medium text-ink">Message</label>
+                <textarea id="fb-message" value={fbMessage} onChange={(e) => setFbMessage(e.target.value)} rows={6} className="input mt-1.5 resize-y leading-relaxed" placeholder="Tell us what happened, or what you would like to see." maxLength={4000} />
+              </div>
+
+              {!userEmail && (
                 <div>
-                  <h2 className="text-lg font-bold text-gray-900">Help us improve Kuizen</h2>
-                  <p className="text-sm text-gray-600 mt-1">Bug? Feature idea? Confused about something? Tell us — we use this to plan the next release.</p>
+                  <label htmlFor="fb-email" className="text-sm font-medium text-ink">Email</label>
+                  <div className="text-xs text-ink-faint mt-0.5">Optional, so we can reply.</div>
+                  <input id="fb-email" type="email" value={fbEmail} onChange={(e) => setFbEmail(e.target.value)} className="input mt-1.5" placeholder="you@example.com" />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-gray-700 mb-2">Type of feedback</label>
-                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { v: "bug" as const, label: "Bug", icon: <Bug className="w-4 h-4" /> },
-                      { v: "idea" as const, label: "Idea", icon: <Lightbulb className="w-4 h-4" /> },
-                      { v: "question" as const, label: "Question", icon: <HelpCircle className="w-4 h-4" /> },
-                      { v: "other" as const, label: "Other", icon: <MessageCircle className="w-4 h-4" /> },
-                    ].map((o) => (
-                      <button
-                        type="button"
-                        key={o.v}
-                        onClick={() => setFbType(o.v)}
-                        className={`flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-sm font-medium border ${
-                          fbType === o.v ? "bg-purple-50 border-purple-500 text-purple-700" : "border-gray-200 text-gray-700 hover:bg-gray-50"
-                        }`}
-                      >
-                        {o.icon}
-                        {o.label}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div>
-                  <label htmlFor="fb-subject" className="block text-xs font-semibold text-gray-700 mb-1">Subject</label>
-                  <input id="fb-subject" value={fbSubject} onChange={(e) => setFbSubject(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Short summary" maxLength={120} />
-                </div>
-                <div>
-                  <label htmlFor="fb-message" className="block text-xs font-semibold text-gray-700 mb-1">Message</label>
-                  <textarea id="fb-message" value={fbMessage} onChange={(e) => setFbMessage(e.target.value)} rows={6} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="Tell us what happened or what you’d like to see…" maxLength={4000} />
-                </div>
-                {!userEmail && (
-                  <div>
-                    <label htmlFor="fb-email" className="block text-xs font-semibold text-gray-700 mb-1">Email (optional, so we can reply)</label>
-                    <input id="fb-email" type="email" value={fbEmail} onChange={(e) => setFbEmail(e.target.value)} className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-500" placeholder="you@example.com" />
-                  </div>
-                )}
-                {error && <div className="text-sm text-red-600">{error}</div>}
-                <button type="submit" disabled={submitting} className="inline-flex items-center gap-2 px-4 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
-                  <Send className="w-4 h-4" />
-                  {submitting ? "Sending…" : "Send feedback"}
-                </button>
-              </form>
-            )}
-          </div>
-        )}
-      </main>
+              )}
+
+              {error && <div className="text-sm text-[#C0392B]">{error}</div>}
+
+              <button type="submit" disabled={submitting} className="btn-primary">
+                <Send className="w-4 h-4" />
+                {submitting ? "Sending…" : "Send feedback"}
+              </button>
+            </form>
+          )}
+        </div>
+      </div>
     </div>
   );
 }

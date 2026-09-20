@@ -37,6 +37,14 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   const [addCardTarget, setAddCardTarget] = useState<{ columnId: string; insertIndex: number | null } | null>(null);
   const [editCardTarget, setEditCardTarget] = useState<LearningCard | null>(null);
   const [openMenuColumnId, setOpenMenuColumnId] = useState<string | null>(null);
+  // Rangka sesi: jalur 210px di kiri, panel bacaan lebar di kanan.
+  const paneRef = useRef<HTMLDivElement | null>(null);
+  const [activeColumnId, setActiveColumnId] = useState<string | null>(null);
+  const goToColumn = useCallback((columnId: string, index: number) => {
+    setActiveColumnId(columnId);
+    const el = paneRef.current?.children?.[index] as HTMLElement | undefined;
+    if (el) el.scrollIntoView({ behavior: 'smooth', inline: 'start', block: 'nearest' });
+  }, []);
   // Drag-and-drop state (editor only)
   const [dragCardId, setDragCardId] = useState<string | null>(null);
   // --- Import learning board from another class ---
@@ -136,22 +144,22 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
   return (
     <div className="h-full">
       <div className="px-4 pt-3 flex items-center justify-end">
-        <div className="inline-flex rounded-lg border border-gray-200 bg-white shadow-sm overflow-hidden text-sm">
+        <div className="inline-flex rounded-xl border border-hairline bg-white overflow-hidden text-sm">
           <button
             type="button"
             onClick={() => changeLayout('columns')}
-            className={`px-3 py-1.5 transition ${layoutMode === 'columns' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-3.5 py-1.5 font-medium transition ${layoutMode === 'columns' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}
             title="Display items side by side in columns"
           >Columns</button>
           <button
             type="button"
             onClick={() => changeLayout('mood')}
-            className={`px-3 py-1.5 transition border-l border-gray-200 ${layoutMode === 'mood' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
+            className={`px-3.5 py-1.5 font-medium transition border-l border-hairline ${layoutMode === 'mood' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}
             title="Display items in a visual mood-board grid"
           >Mood Board</button>
           {isEditor && (
             <>
-              <button type="button" onClick={openImport} disabled={impBusy} title="Import learning board from another class" className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 shadow disabled:opacity-60"><FolderInput className="w-3.5 h-3.5"/>Import from class</button>
+              <button type="button" onClick={openImport} disabled={impBusy} title="Import learning board from another class" className="ml-3 btn-quiet disabled:opacity-40"><FolderInput className="w-3.5 h-3.5"/>Import from class</button>
               <AiThumbnailBatchButton classId={classId} onDone={refresh} />
             </>
           )}
@@ -190,9 +198,21 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
         />
       ) : (
       <div
-        className="flex gap-4 overflow-x-auto px-4 pt-4 pb-4 h-[calc(100vh-180px)] min-h-[520px]"
+        className="flex gap-6 px-4 pt-4 pb-4 h-[calc(100vh-180px)] min-h-[520px]"
         onClick={() => setOpenMenuColumnId(null)}
       >
+        <SessionRail
+          columns={snap.columns}
+          activeId={activeColumnId ?? snap.columns[0]?.id ?? null}
+          isEditor={isEditor}
+          dragCardId={dragCardId}
+          onSelect={goToColumn}
+          onDropCard={(columnId) => {
+            if (dragCardId) moveCard(dragCardId, { action: 'to', columnId, position: 0 });
+            setDragCardId(null); setDragColumnId(null); setDropTarget(null);
+          }}
+        />
+        <div ref={paneRef} className="flex-1 min-w-0 flex gap-4 overflow-x-auto">
         {snap.columns.map((col, ci) => (
           <ColumnCard
             key={col.id}
@@ -233,6 +253,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
         {isEditor && (
           <NewColumnButton classId={classId} onCreated={refresh} />
         )}
+        </div>
       </div>
       )}
 
@@ -286,6 +307,64 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
       </div>
     )}
     </div>
+  );
+}
+
+
+/** Rangka sesi. Satu jalur senyap selebar 210px yang menamakan setiap sesi
+ *  pada papan dan berapa banyak item di dalamnya. Ia juga sasaran lepas,
+ *  jadi kad boleh dipindah ke sesi yang tidak kelihatan pada skrin. */
+function SessionRail({
+  columns,
+  activeId,
+  isEditor,
+  dragCardId,
+  onSelect,
+  onDropCard,
+}: {
+  columns: Array<LearningColumn & { cards: LearningCard[] }>;
+  activeId: string | null;
+  isEditor: boolean;
+  dragCardId: string | null;
+  onSelect: (columnId: string, index: number) => void;
+  onDropCard: (columnId: string) => void;
+}) {
+  const [over, setOver] = useState<string | null>(null);
+  if (columns.length === 0) return null;
+  return (
+    <nav className="hidden lg:block w-[210px] shrink-0 overflow-y-auto pr-1" aria-label="Sessions">
+      <div className="eyebrow px-2.5 pb-2">Sessions</div>
+      {columns.map((col, i) => {
+        const active = activeId === col.id;
+        const hot = !!dragCardId && over === col.id;
+        return (
+          <button
+            key={col.id}
+            type="button"
+            onClick={() => onSelect(col.id, i)}
+            onDragOver={(e) => {
+              if (!isEditor || !dragCardId) return;
+              e.preventDefault();
+              e.dataTransfer.dropEffect = 'move';
+              setOver(col.id);
+            }}
+            onDragLeave={() => setOver((v) => (v === col.id ? null : v))}
+            onDrop={(e) => {
+              if (!isEditor || !dragCardId) return;
+              e.preventDefault();
+              setOver(null);
+              onDropCard(col.id);
+            }}
+            className={`w-full text-left rounded-lg px-2.5 py-2 mb-0.5 transition ${
+              hot ? 'bg-[#F4F2FD] ring-1 ring-brand-purple' : active ? 'bg-[#F4F2FD]' : 'hover:bg-[#F7F7F9]'
+            }`}
+          >
+            <span className={`block text-sm truncate ${active ? 'text-brand-purple font-medium' : 'text-ink-muted'}`}>{col.title}</span>
+            <span className="block text-xs text-ink-faint mt-0.5">{col.cards.length} {col.cards.length === 1 ? 'item' : 'items'}</span>
+          </button>
+        );
+      })}
+    </nav>
   );
 }
 
@@ -368,7 +447,7 @@ function ColumnCard({
   const isColDropAfter = !!(isEditor && dragColId && dragColId !== column.id && colDropIdx === columnIndex);
   return (
     <div
-      className={`flex-shrink-0 w-80 bg-white rounded-2xl border ${isColDragging ? 'opacity-40 border-indigo-400' : isColDropAfter ? 'border-indigo-500 ring-2 ring-indigo-200' : 'border-slate-200'} shadow-[0_1px_3px_rgba(15,23,42,0.05)] hover:shadow-[0_4px_14px_rgba(15,23,42,0.08)] transition-shadow flex flex-col self-start max-h-full overflow-hidden`}
+      className={`flex-shrink-0 w-[340px] bg-white rounded-2xl border ${isColDragging ? 'opacity-40 border-brand-purple' : isColDropAfter ? 'border-brand-purple ring-2 ring-[#EAE6FC]' : 'border-hairline'} transition flex flex-col self-start max-h-full overflow-hidden`}
       onDragOver={(e) => {
         if (!isEditor) return;
         if (dragColId && dragColId !== column.id) {
@@ -386,7 +465,7 @@ function ColumnCard({
       }}
     >
       <div
-        className="flex items-center gap-2 px-3 py-2 border-b border-gray-200"
+        className="flex items-center gap-2 px-3 py-2.5 border-b border-hairline"
         draggable={isEditor}
         onDragStart={(e) => {
           if (!isEditor) return;

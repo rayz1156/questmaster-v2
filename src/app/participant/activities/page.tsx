@@ -60,140 +60,128 @@ function Inner() {
 
   return (
     <ParticipantShell>
-      <div className="space-y-5">
-        {/* Hero header */}
-        <div className="relative overflow-hidden rounded-2xl bg-gradient-to-r from-purple-50 via-white to-purple-50 border border-purple-100 shadow-sm p-5 sm:p-6">
-          <div className="flex flex-col md:flex-row md:items-center gap-4 md:gap-6">
-            <div className="flex items-center gap-4 flex-1 min-w-0">
-              <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-100 text-purple-600 shrink-0"><Target className="w-7 h-7" /></span>
-              <div className="min-w-0">
-                <div className="text-2xl sm:text-3xl font-extrabold text-slate-900">My Activities</div>
-                <div className="text-sm text-slate-600 mt-0.5">Complete activities to earn points and climb the leaderboard!</div>
-              </div>
-            </div>
-            <div className="md:w-80 shrink-0">
-              <label className="block text-xs text-slate-500 mb-1">Filter by class</label>
-              <div className="relative">
-                <span className="absolute left-3 top-1/2 -translate-y-1/2 inline-flex items-center justify-center w-7 h-7 rounded-lg bg-purple-100 text-purple-600"><Users className="w-4 h-4" /></span>
-                <select value={filterClass} onChange={e => setFilterClass(e.target.value)} className="w-full pl-12 pr-3 py-3 rounded-xl border border-purple-200 bg-white text-sm font-medium text-slate-800 focus:outline-none focus:ring-2 focus:ring-purple-300">
-                  <option value="">All classes</option>
-                  {classes.map((c: any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-                </select>
-              </div>
-            </div>
+      <div className="max-w-shell mx-auto px-6 py-10">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <div className="eyebrow mb-1">Activities</div>
+            <h1 className="page-title">What is on your plate.</h1>
+            <p className="page-subtitle">Complete activities to earn points for your team.</p>
           </div>
+          {classes.length > 0 && (
+            <select
+              value={filterClass}
+              onChange={e => setFilterClass(e.target.value)}
+              aria-label="Filter by class"
+              className="input w-auto min-w-[220px]"
+            >
+              <option value="">All classes</option>
+              {classes.map((c: any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+            </select>
+          )}
         </div>
 
-        {/* Activity tabs row */}
         {busy && hunts.length === 0 ? (
-          <div className="flex gap-2 overflow-x-auto pb-2">{[1,2,3,4].map(i => <div key={i} className="shrink-0 h-10 w-32 bg-gray-100 rounded-full animate-pulse" />)}</div>
+          <div className="mt-8 flex gap-2 overflow-x-auto pb-2">{[1, 2, 3, 4].map(i => <div key={i} className="shrink-0 h-9 w-32 bg-[#F4F4F6] rounded-full animate-pulse" />)}</div>
         ) : filteredHunts.length === 0 ? (
-          <div className="text-sm text-slate-500">No activities yet. Activities appear here once your educator creates them in your classes.</div>
+          <p className="mt-8 text-sm text-ink-muted">No activities yet. They appear here once your educator creates them in your classes.</p>
         ) : (
-          <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-thin">
+          <div className="mt-8 flex gap-2 overflow-x-auto pb-2">
             {filteredHunts.map(h => {
               const isActive = active?.id === h.id;
               return (
-                <Link key={h.id} href={`/participant/activities?hunt=${h.id}`} onClick={() => setActive(h)} className={`shrink-0 inline-flex items-center gap-2 px-4 py-2.5 rounded-full text-sm transition border ${isActive ? 'bg-purple-600 text-white border-purple-600 shadow-sm' : 'bg-white text-slate-700 border-slate-200 hover:border-purple-300 hover:bg-purple-50'}`}>
-                  {!isActive && (<span className="inline-flex items-center justify-center w-6 h-6 rounded-md bg-emerald-50 text-emerald-600">{questIcon(h.title)}</span>)}
-                  <span className="font-medium whitespace-nowrap">{h.title}</span>
+                <Link
+                  key={h.id}
+                  href={`/participant/activities?hunt=${h.id}`}
+                  onClick={() => setActive(h)}
+                  className={`shrink-0 inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-sm font-medium transition ${
+                    isActive ? "border-brand-purple bg-[#F4F2FD] text-brand-purple" : "border-hairline text-ink-muted hover:text-ink"
+                  }`}
+                >
+                  {!isActive && <span className="text-ink-faint">{questIcon(h.title)}</span>}
+                  <span className="whitespace-nowrap">{h.title}</span>
                 </Link>
               );
             })}
           </div>
         )}
 
-        {/* Active quest detail card */}
         {active && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-6">
-            <div className="flex items-start gap-4">
-              <span className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-purple-50 text-purple-600 shrink-0">
-                <ClipboardList className="w-8 h-8" />
-              </span>
-              <div className="flex-1 min-w-0">
-                <div className="text-2xl font-extrabold text-slate-900">{active.title}</div>
-                <div className="mt-2">
-                  <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${statusLower === 'active' ? 'bg-emerald-50 text-emerald-700' : statusLower === 'draft' ? 'bg-sky-50 text-sky-700' : 'bg-slate-100 text-slate-600'}`}>
-                    <span className={`inline-block w-1.5 h-1.5 rounded-full ${statusLower === 'active' ? 'bg-emerald-500' : statusLower === 'draft' ? 'bg-sky-500' : 'bg-slate-400'}`} />
+          <div className="mt-10 max-w-3xl">
+            <div className="flex items-start justify-between gap-6">
+              <div className="min-w-0">
+                <h2 className="text-[22px] leading-tight font-semibold tracking-tight text-ink">{active.title}</h2>
+                <div className="mt-2 flex items-center gap-2">
+                  <span className={`inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1 rounded-full ${
+                    statusLower === "active" ? "bg-[#E3F5EA] text-[#2E7D4F]" : statusLower === "draft" ? "bg-[#EAF2FB] text-[#2E5F8A]" : "bg-[#F1F1F4] text-ink-muted"
+                  }`}>
                     {status}
                   </span>
                 </div>
-                {active.description && <p className="mt-3 text-sm text-slate-600 whitespace-pre-wrap">{active.description}</p>}
+                {active.description && <p className="mt-4 text-sm text-ink-muted whitespace-pre-wrap leading-relaxed">{active.description}</p>}
               </div>
               <div className="text-right shrink-0">
-                <div className="text-xs text-slate-500">Reward</div>
-                <div className="flex items-center gap-1 justify-end">
-                  <span className="text-2xl font-extrabold text-purple-700">{(active as any).points ?? 0} pts</span>
-                  <span className="inline-flex items-center justify-center w-5 h-5 rounded-full bg-amber-100 text-amber-500 text-xs"><Star className="w-3 h-3 fill-amber-400" /></span>
-                </div>
+                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{(active as any).points ?? 0}</div>
+                <div className="text-xs text-ink-faint mt-1.5">points</div>
               </div>
             </div>
 
             {(active as any).instructions && (
-              <div className="mt-5">
-                <div className="text-xs font-semibold text-slate-500 tracking-widest mb-2">INSTRUCTIONS</div>
-                <p className="text-sm text-slate-700 whitespace-pre-wrap">{(active as any).instructions}</p>
+              <div className="mt-8">
+                <div className="eyebrow mb-1.5">Instructions</div>
+                <p className="text-sm text-ink whitespace-pre-wrap leading-relaxed">{(active as any).instructions}</p>
               </div>
             )}
 
-            {((active as any).submission_link) && (
-              <div className="mt-5">
-                <div className="text-xs font-semibold text-slate-500 tracking-widest mb-2">SUBMISSION LINK</div>
-                <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-purple-200 bg-purple-50/40">
-                  <a href={(active as any).submission_link} target="_blank" rel="noreferrer" className="text-sm text-purple-700 underline truncate min-w-0">{(active as any).submission_link_label || (active as any).submission_link}</a>
-                  <a href={(active as any).submission_link} target="_blank" rel="noreferrer" className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition">
-                    <ExternalLink className="w-4 h-4" /> Open submission
-                  </a>
-                </div>
-              </div>
-            )}
+            <div className="mt-8 surface">
+              {((active as any).submission_link) && (
+                <a
+                  href={(active as any).submission_link}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFB]"
+                >
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-medium text-ink">Submission link</span>
+                    <span className="block text-sm text-ink-muted mt-0.5 truncate">{(active as any).submission_link_label || (active as any).submission_link}</span>
+                  </span>
+                  <ExternalLink className="w-4 h-4 text-ink-faint shrink-0" />
+                </a>
+              )}
 
-            {(active as any) && (
-          <div className="mt-5">
-            <div className="text-xs font-semibold text-slate-500 tracking-widest mb-2">SUBMISSION BOARD</div>
-            <div className="flex items-center justify-between gap-3 p-3 rounded-xl border border-purple-200 bg-purple-50/40">
-              <div className="text-sm text-slate-700 min-w-0 truncate">Share your work and see your classmates' submissions.</div>
-              <Link href={`/participant/activities/${(active as any).id}/submissions`} className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-600 hover:bg-purple-700 text-white text-sm font-semibold transition">
-                <ClipboardList className="w-4 h-4" /> Open board
+              <Link
+                href={`/participant/activities/${(active as any).id}/submissions`}
+                className={`flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFB] ${((active as any).submission_link) ? "t-row" : ""}`}
+              >
+                <span className="flex-1 min-w-0">
+                  <span className="block text-[15px] font-medium text-ink">Submission board</span>
+                  <span className="block text-sm text-ink-muted mt-0.5">Share your work and see what your classmates posted.</span>
+                </span>
+                <ClipboardList className="w-4 h-4 text-ink-faint shrink-0" />
               </Link>
+
+              {[((active as any).link1) as string, ((active as any).link2) as string].filter(Boolean).map((lnk, i) => (
+                <a key={i} href={lnk} target="_blank" rel="noreferrer" className="t-row flex items-center gap-4 px-5 py-4 hover:bg-[#FAFAFB]">
+                  <span className="flex-1 min-w-0">
+                    <span className="block text-[15px] font-medium text-ink">Resource {i + 1}</span>
+                    <span className="block text-sm text-ink-muted mt-0.5 truncate">{lnk}</span>
+                  </span>
+                  <ExternalLink className="w-4 h-4 text-ink-faint shrink-0" />
+                </a>
+              ))}
             </div>
-          </div>
-        )}
 
-        {((active as any).link1 || (active as any).link2) && (
-              <div className="mt-5">
-                <div className="text-xs font-semibold text-slate-500 tracking-widest mb-2">RESOURCES</div>
-                <div className="space-y-2">
-                  {[((active as any).link1) as string, ((active as any).link2) as string].filter(Boolean).map((lnk, i) => (
-                    <div key={i} className="flex items-center justify-between gap-3 p-3 rounded-xl border border-slate-200">
-                      <a href={lnk} target="_blank" rel="noreferrer" className="text-sm text-purple-700 underline truncate min-w-0">{lnk}</a>
-                      <a href={lnk} target="_blank" rel="noreferrer" className="shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-purple-50 hover:bg-purple-100 text-purple-700 text-sm font-medium transition">
-                        <ExternalLink className="w-4 h-4" /> Open
-                      </a>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            <div className={`mt-5 flex items-start gap-3 p-3.5 rounded-xl ${myDone ? 'bg-emerald-50 border border-emerald-100' : 'bg-purple-50 border border-purple-100'}`}>
-              <span className={`inline-flex items-center justify-center w-7 h-7 rounded-full shrink-0 ${myDone ? 'bg-emerald-500 text-white' : 'bg-purple-600 text-white'}`}>
-                <Info className="w-4 h-4" />
-              </span>
-              <div className={`text-sm ${myDone ? 'text-emerald-800' : 'text-slate-700'}`}>
-                {myDone
-                  ? `✓ Your team has been awarded ${(active as any).points ?? 0} pts for this quest.`
-                  : 'Your team has not been marked complete yet. Your educator will tick the team once the quest is done.'}
-              </div>
+            <div className={`mt-8 rounded-xl px-4 py-3 text-sm ${myDone ? "bg-[#E3F5EA] text-[#2E7D4F]" : "bg-[#F4F2FD] text-ink"}`}>
+              {myDone
+                ? `Your team has been awarded ${(active as any).points ?? 0} points for this activity.`
+                : "Your team has not been marked complete yet. Your educator ticks the team once the activity is done."}
             </div>
           </div>
         )}
 
         {!busy && hunts.length === 0 && (
-          <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-8 text-center">
-            <span className="inline-flex items-center justify-center w-14 h-14 rounded-2xl bg-purple-50 text-purple-500 mb-3"><ClipboardList className="w-7 h-7" /></span>
-            <div className="font-semibold text-slate-800">No activities yet</div>
-            <p className="text-sm text-slate-500 mt-1">Activities appear here once your educator creates them in your classes.</p>
+          <div className="mt-16 max-w-md">
+            <div className="section-title">No activities yet</div>
+            <p className="text-sm text-ink-muted mt-1">They appear here once your educator creates them in your classes.</p>
           </div>
         )}
       </div>

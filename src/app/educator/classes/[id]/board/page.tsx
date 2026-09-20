@@ -4,6 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, User as UserIcon, ArrowLeft, Activity } from "lucide-react";
 import Shell from "@/components/Shell";
+import ClassShell from "@/components/ClassShell";
 import { EDU_TABS } from '@/lib/eduTabs';
 import { supabase } from "@/lib/supabase";
 import { Board, getBoardForClass } from "@/lib/boards";
@@ -31,15 +32,21 @@ export default function ClassBoardPage() {
 
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="mb-3">
-        <Link href={`/educator/classes/${classId}`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Back to Class
-        </Link>
-      </div>
-      {loading && <p className="text-sm text-gray-500">Memuatkan…</p>}
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      {!loading && !board && <p className="text-sm text-gray-600">Board pengenalan belum dicipta untuk kelas ini.</p>}
-      {board && <IntroBoardView board={board} canManage={true} currentUserId={userId} />}
+      <ClassShell classId={classId} current="learning">
+        <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
+          <div>
+            <h2 className="section-title">Intro board</h2>
+            <p className="text-sm text-ink-muted mt-0.5">Where the class introduces itself.</p>
+          </div>
+          <Link href={`/educator/classes/${classId}/learning-board`} className="btn-quiet text-brand-purple">
+            Learning board →
+          </Link>
+        </div>
+        {loading && <p className="text-sm text-ink-muted">Loading…</p>}
+        {err && <p className="text-sm text-red-600">{err}</p>}
+        {!loading && !board && <p className="text-sm text-ink-muted">No intro board has been created for this class yet.</p>}
+        {board && <IntroBoardView board={board} canManage={true} currentUserId={userId} />}
+      </ClassShell>
     </Shell>
   );
 }
