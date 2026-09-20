@@ -183,8 +183,12 @@ export default function Register() {
         </div>
       </div>
 
-      <div className="pb-8 text-center text-xs text-ink-faint tracking-wide">
-        UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix
+      <div className="pb-8 text-center text-xs text-ink-faint tracking-wide space-y-2">
+        <div>UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix</div>
+        <div className="space-x-4">
+          <Link href="/privacy" className="hover:text-ink-muted">Privacy</Link>
+          <Link href="/terms" className="hover:text-ink-muted">Terms</Link>
+        </div>
       </div>
     </div>
   );
