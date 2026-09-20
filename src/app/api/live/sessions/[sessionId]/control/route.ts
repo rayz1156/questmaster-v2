@@ -114,20 +114,33 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     // Tanpa ini, melangkau soalan sukar akan mengekalkan bonus.
     const currentQ = (questions || [])[ses.current_index] as { id: string } | undefined;
     if (currentQ) {
-      const { data: answered } = await auth.supa
-        .from('qm_live_answers')
-        .select('player_id')
-        .eq('session_id', params.sessionId)
-        .eq('question_id', currentQ.id);
-      const ids = (answered || []).map((a) => (a as { player_id: string }).player_id);
-      let reset = auth.supa
-        .from('qm_live_players')
-        .update({ streak: 0 })
-        .eq('session_id', params.sessionId);
-      if (ids.length > 0) {
-        reset = reset.not('id', 'in', `(${ids.map((i) => `"${i}"`).join(',')})`);
+      const [{ data: answered }, { data: semua }] = await Promise.all([
+        auth.supa
+          .from('qm_live_answers')
+          .select('player_id')
+          .eq('session_id', params.sessionId)
+          .eq('question_id', currentQ.id),
+        auth.supa
+          .from('qm_live_players')
+          .select('id, streak')
+          .eq('session_id', params.sessionId)
+          .gt('streak', 0),
+      ]);
+      const menjawab = new Set(
+        (answered || []).map((a) => (a as { player_id: string }).player_id),
+      );
+      // Senarai dikira di sini, bukan melalui penapis `not.in` bertulis
+      // tangan: `.in('id', senarai)` ialah panggilan supabase-js biasa dan
+      // tidak bergantung pada sintaks rentetan PostgREST.
+      const diamDiam = (semua || [])
+        .map((p) => (p as { id: string }).id)
+        .filter((id) => !menjawab.has(id));
+      if (diamDiam.length > 0) {
+        await auth.supa
+          .from('qm_live_players')
+          .update({ streak: 0 })
+          .in('id', diamDiam);
       }
-      await reset;
     }
   } else if (action === 'end') {
     if (ses.status === 'ended') {
