@@ -1,0 +1,165 @@
+/**
+ * GET /api/live/play/[code]/state?playerId=&fp= — tinjauan keadaan peserta.
+ *
+ * KESELAMATAN: correct_key tidak keluar dalam balasan ini. Soalan diambil
+ * dengan senarai lajur eksplisit TANPA correct_key; kunci jawapan hanya
+ * diambil dalam pertanyaan berasingan di dalam blok reveal apabila status
+ * ialah 'revealed'. Objek balasan dibina secara eksplisit — tiada spread
+ * baris pangkalan data.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { getServiceSupabase } from '@/lib/supabase-route';
+import { createHash } from 'crypto';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+
+interface SessionRow {
+  id: string;
+  quiz_id: string;
+  status: string;
+  current_index: number;
+  question_started_at: string | null;
+}
+interface PlayerRow { id: string; score: number; }
+interface QuestionRow {
+  id: string; quiz_id: string; order_idx: number; prompt: string;
+  options: { key: string; text: string }[];
+  points: number; time_limit_sec: number;
+}
+interface AnswerRow { choice_key: string; is_correct: boolean; points_awarded: number; }
+
+/** Cap jari pendek (16 aksara) bagi keadaan sesi. */
+function fingerprint(
+  status: string,
+  currentIndex: number,
+  startedAt: string | null,
+  playerCount: number,
+): string {
+  const raw = `${status}|${currentIndex}|${startedAt || ''}|${playerCount}`;
+  return createHash('sha256').update(raw).digest('hex').slice(0, 16);
+}
+
+export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
+  const code = String(params.code || '').toUpperCase();
+  const playerId = req.nextUrl.searchParams.get('playerId') || '';
+  const fpParam = req.nextUrl.searchParams.get('fp') || '';
+  if (!playerId) {
+    return NextResponse.json({ error: 'playerId diperlukan.' }, { status: 400 });
+  }
+
+  const supa = getServiceSupabase();
+
+  const { data: session } = (await supa
+    .from('qm_live_sessions')
+    .select('id, quiz_id, status, current_index, question_started_at')
+    .eq('code', code)
+    .maybeSingle()) as { data: SessionRow | null };
+  if (!session) {
+    return NextResponse.json({ error: 'Sesi tidak dijumpai.' }, { status: 404 });
+  }
+
+  const { data: player } = (await supa
+    .from('qm_live_players')
+    .select('id, score')
+    .eq('id', playerId)
+    .eq('session_id', session.id)
+    .maybeSingle()) as { data: PlayerRow | null };
+  if (!player) {
+    return NextResponse.json({ error: 'Pemain tidak dijumpai dalam sesi ini.' }, { status: 403 });
+  }
+
+  const [{ count: playerCount }, { data: questions }] = await Promise.all([
+    supa
+      .from('qm_live_players')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', session.id),
+    // Senarai lajur eksplisit TANPA correct_key.
+    supa
+      .from('qm_live_questions')
+      .select('id, quiz_id, order_idx, prompt, options, points, time_limit_sec')
+      .eq('quiz_id', session.quiz_id)
+      .order('order_idx'),
+  ]);
+
+  const fp = fingerprint(
+    session.status,
+    session.current_index,
+    session.question_started_at,
+    playerCount || 0,
+  );
+  if (fpParam && fpParam === fp) {
+    return NextResponse.json({ noChange: true, fp });
+  }
+
+  const allQuestions = (questions || []) as QuestionRow[];
+  const totalQuestions = allQuestions.length;
+  const currentQuestion =
+    session.current_index >= 0 && session.current_index < totalQuestions
+      ? allQuestions[session.current_index]
+      : null;
+
+
+  const payload: Record<string, unknown> = {
+    fp,
+    status: session.status,
+    questionIndex: session.current_index,
+    totalQuestions,
+    serverNow: new Date().toISOString(),
+    questionStartedAt: session.question_started_at,
+    timeLimitSec: currentQuestion?.time_limit_sec ?? null,
+    question: currentQuestion
+      ? { id: currentQuestion.id, prompt: currentQuestion.prompt, options: currentQuestion.options }
+      : null,
+    myAnswer: null,
+    reveal: null,
+  };
+
+  // myAnswer: jawapan pemain bagi soalan SEMASA sahaja.
+  if (currentQuestion) {
+    const { data: ans } = (await supa
+      .from('qm_live_answers')
+      .select('choice_key')
+      .eq('session_id', session.id)
+      .eq('player_id', playerId)
+      .eq('question_id', currentQuestion.id)
+      .maybeSingle()) as { data: { choice_key: string } | null };
+    if (ans) {
+      payload.myAnswer = { choiceKey: ans.choice_key, locked: true };
+    }
+  }
+
+  // Reveal: kunci jawapan hanya dihantar selepas sesi menjadi 'revealed'.
+  if (session.status === 'revealed' && currentQuestion) {
+    const { data: keyRow } = (await supa
+      .from('qm_live_questions')
+      .select('correct_key')
+      .eq('id', currentQuestion.id)
+      .maybeSingle()) as { data: { correct_key: string } | null };
+
+    const { data: myAns } = (await supa
+      .from('qm_live_answers')
+      .select('choice_key, is_correct, points_awarded')
+      .eq('session_id', session.id)
+      .eq('player_id', playerId)
+      .eq('question_id', currentQuestion.id)
+      .maybeSingle()) as { data: AnswerRow | null };
+
+    const { count: betterCount } = await supa
+      .from('qm_live_players')
+      .select('id', { count: 'exact', head: true })
+      .eq('session_id', session.id)
+      .gt('score', player.score);
+
+    payload.reveal = {
+      correctKey: keyRow?.correct_key ?? null,
+      myChoice: myAns?.choice_key ?? null,
+      isCorrect: myAns?.is_correct ?? false,
+      pointsAwarded: myAns?.points_awarded ?? 0,
+      rank: (betterCount || 0) + 1,
+      score: player.score,
+    };
+  }
+
+  return NextResponse.json(payload);
+}
