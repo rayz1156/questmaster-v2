@@ -1,1 +1,10 @@
-Æioz»"¢
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256" role="img" aria-label="Kuizen">
+  <title>Kuizen</title>
+  <rect width="256" height="256" rx="58" ry="58" fill="#7057D9"/>
+  <g fill="none" stroke="#FFFFFF" stroke-width="20" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M66 66 L66 190"/>
+    <path d="M66 128 L132 66"/>
+    <path d="M66 128 L122 184 L176 118"/>
+  </g>
+  <circle cx="186" cy="70" r="15" fill="#FFFFFF"/>
+</svg>
