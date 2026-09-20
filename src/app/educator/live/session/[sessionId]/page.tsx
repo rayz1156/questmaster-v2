@@ -5,7 +5,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
-import { Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check } from "lucide-react";
+import { Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check, Maximize2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 
 interface Pilihan { key: string; text: string }
@@ -59,6 +59,15 @@ export default function PanelHosSesi() {
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [disalin, setDisalin] = useState(false);
+  const [pautanDisalin, setPautanDisalin] = useState(false);
+  const [paparPenuh, setPaparPenuh] = useState(false);
+  // Asal URL diambil daripada pelayar supaya pautan sertai betul pada
+  // staging mahupun pengeluaran tanpa tetapan tambahan.
+  const [asal, setAsal] = useState("");
+
+  useEffect(() => {
+    setAsal(window.location.origin);
+  }, []);
 
   const muat = async () => {
     try {
@@ -105,6 +114,15 @@ export default function PanelHosSesi() {
     } catch { /* pelayar mungkin tidak membenarkan */ }
   };
 
+  const salinPautan = async () => {
+    if (!state) return;
+    try {
+      await navigator.clipboard.writeText(asal + "/live/" + state.session.code);
+      setPautanDisalin(true);
+      setTimeout(() => setPautanDisalin(false), 1500);
+    } catch { /* pelayar mungkin tidak membenarkan */ }
+  };
+
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
@@ -124,6 +142,8 @@ export default function PanelHosSesi() {
   const totalSoalan = questions.length;
   const hadPemain = session.max_players ?? null;
   const sesiPenuh = hadPemain !== null && playerCount >= hadPemain;
+  const pautanSertai = asal + "/live/" + session.code;
+  const pautanAsas = (asal || "") + "/live";
 
   return (
     <Shell tabs={EDU_TABS}>
@@ -137,18 +157,62 @@ export default function PanelHosSesi() {
         </span>
       </div>
 
-      <div className="card mb-4 flex items-center gap-4 flex-wrap">
-        <div>
-          <div className="text-xs text-gray-500">Session code — ask participants to join at /live</div>
-          <button onClick={salinKod} className="flex items-center gap-2 font-mono text-3xl font-bold tracking-widest text-brand-purple">
-            {session.code}
-            {disalin ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5 text-gray-400" />}
-          </button>
+      {/* Tiga cara masuk: imbas QR, buka pautan, atau taip kod di /live. */}
+      <div className="card mb-4">
+        <div className="flex items-start gap-5 flex-wrap">
+          <div className="text-center shrink-0">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={`/api/live/qr?code=${session.code}&size=220`}
+              alt={`QR code for session ${session.code}`}
+              width={140}
+              height={140}
+              className="rounded-lg border border-gray-200"
+            />
+            <div className="text-[11px] text-gray-500 mt-1">Scan to join</div>
+          </div>
+
+          <div className="min-w-0 flex-1">
+            <div className="text-xs text-gray-500">Session code</div>
+            <button
+              onClick={salinKod}
+              title="Copy the code"
+              className="flex items-center gap-2 font-mono text-3xl font-bold tracking-widest text-brand-purple"
+            >
+              {session.code}
+              {disalin ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5 text-gray-400" />}
+            </button>
+
+            <div className="text-xs text-gray-500 mt-3">Join link</div>
+            <button
+              onClick={salinPautan}
+              title="Copy the link"
+              className="flex items-center gap-2 text-sm text-gray-700 hover:text-brand-purple max-w-full"
+            >
+              <span className="font-mono truncate">{pautanSertai || "/live/" + session.code}</span>
+              {pautanDisalin
+                ? <Check className="w-4 h-4 text-green-600 shrink-0" />
+                : <Copy className="w-4 h-4 text-gray-400 shrink-0" />}
+            </button>
+
+            <div className="flex items-center gap-3 mt-3 flex-wrap">
+              <button
+                onClick={() => setPaparPenuh(true)}
+                className="px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 text-sm flex items-center gap-1"
+              >
+                <Maximize2 className="w-4 h-4" /> Show on screen
+              </button>
+              <span className="flex items-center gap-2 text-sm text-gray-600">
+                <Users className="w-5 h-5 text-indigo-600" />
+                <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} participants
+              </span>
+            </div>
+          </div>
         </div>
-        <div className="ml-auto flex items-center gap-2 text-sm text-gray-600">
-          <Users className="w-5 h-5 text-indigo-600" />
-          <span><strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} participants</span>
-        </div>
+        <p className="text-xs text-gray-500 mt-3">
+          Three ways in: scan the QR code, open the link, or go to{" "}
+          <span className="font-mono">{pautanAsas}</span> and type the code.
+        </p>
       </div>
 
       {sesiPenuh && (
@@ -245,6 +309,35 @@ export default function PanelHosSesi() {
           </ol>
         )}
       </div>
+      {/* Paparan skrin penuh untuk projektor kelas. */}
+      {paparPenuh && (
+        <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6">
+          <button
+            onClick={() => setPaparPenuh(false)}
+            title="Close"
+            className="absolute top-4 right-4 text-gray-400 hover:text-gray-700"
+          >
+            <X className="w-7 h-7" />
+          </button>
+          <div className="text-lg text-gray-500 mb-3">Join the quiz</div>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={`/api/live/qr?code=${session.code}&size=900`}
+            alt={`QR code for session ${session.code}`}
+            className="w-[min(52vh,52vw)] h-[min(52vh,52vw)]"
+          />
+          <div className="font-mono text-6xl sm:text-7xl font-bold tracking-widest text-brand-purple mt-4">
+            {session.code}
+          </div>
+          <div className="text-base text-gray-600 mt-2 font-mono break-all text-center">
+            {pautanSertai}
+          </div>
+          <div className="text-sm text-gray-500 mt-4 flex items-center gap-2">
+            <Users className="w-5 h-5 text-indigo-600" />
+            <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} joined
+          </div>
+        </div>
+      )}
     </Shell>
   );
 }
