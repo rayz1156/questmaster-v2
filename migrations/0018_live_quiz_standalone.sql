@@ -234,7 +234,8 @@ create policy p_live_answer_educator_all on public.qm_live_answers
 -- pgcrypto yang dipasang dalam skema "extensions", bukan "public", jadi ia
 -- TIDAK dapat dicapai dengan "set search_path = public" di bawah dan sisipan
 -- pemain akan gagal sepenuhnya. gen_random_uuid() ialah sebahagian teras
--- Postgres dan sentiasa ada. Disahkan pada pangkalan data sebenar.create or replace function public.qm_live_join_player(
+-- Postgres dan sentiasa ada. Disahkan pada pangkalan data sebenar.
+create or replace function public.qm_live_join_player(
   p_session_id uuid,
   p_nickname text
 )
