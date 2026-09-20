@@ -247,34 +247,47 @@ set search_path = public
 as $$
 declare
   v_limit integer;
+  v_id    uuid;
+  v_token text;
 begin
+  -- Kunci baris sesi. Ini yang menjadikan kiraan dan sisipan atomik: dua
+  -- pemain yang masuk serentak pada tempat terakhir mesti beratur.
   select s.max_players into v_limit
   from public.qm_live_sessions s
   where s.id = p_session_id
   for update;
-  -- Sesi tiada: raise exception, bukan balik kosong (balik kosong merencana
-  -- pengendalian ralat di pelayan aplikasi).
+
   if v_limit is null then
     raise exception 'Sesi tidak dijumpai.' using errcode = 'LV004';
   end if;
 
-  insert into public.qm_live_players (session_id, nickname, player_token)
-  select
-    p_session_id,
-    p_nickname,
-    substr(replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''), 1, 32)
-  where (select count(*) from public.qm_live_players where session_id = p_session_id) < v_limit
-  returning id, player_token into player_id, player_token;
+  -- Pemboleh ubah tempatan MESTI berlainan nama daripada lajur jadual.
+  -- Menggunakan player_token sebagai sasaran INTO menyebabkan ralat
+  -- "column reference player_token is ambiguous" pada masa jalan.
+  begin
+    insert into public.qm_live_players (session_id, nickname, player_token)
+    select
+      p_session_id,
+      p_nickname,
+      substr(replace(gen_random_uuid()::text || gen_random_uuid()::text, '-', ''), 1, 32)
+    where (
+      select count(*) from public.qm_live_players pl where pl.session_id = p_session_id
+    ) < v_limit
+    returning id, player_token into v_id, v_token;
+  exception
+    when unique_violation then
+      raise exception 'Nama sudah diambil. Sila pilih nama lain.' using errcode = 'LV009';
+  end;
 
-  if player_id is null then
+  if v_id is null then
     raise exception 'Sesi ini sudah penuh. Had sesi ini ialah % pemain.', v_limit
       using errcode = 'LV005';
   end if;
-  return;
-exception
-  when unique_violation then
-    raise exception 'Nama sudah diambil. Sila pilih nama lain.'
-      using errcode = 'LV009';
+
+  -- RETURNS TABLE memerlukan return next; return kosong memulangkan sifar baris.
+  player_id := v_id;
+  player_token := v_token;
+  return next;
 end;
 $$;
 
