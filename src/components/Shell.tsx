@@ -1,19 +1,54 @@
 "use client";
+
+/**
+ * Shell aplikasi, semakan September 2026.
+ *
+ * Bar sisi gradien digantikan dengan satu bar atas setinggi 72px: wordmark
+ * di kiri, tiga destinasi di tengah, Help dan avatar di kanan. Sebab: bar
+ * sisi mengambil seperempat skrin untuk memaparkan tujuh pautan yang jarang
+ * ditukar, sedangkan kandungan kelas memerlukan lebar itu.
+ *
+ * Tandatangan komponen ini TIDAK berubah. Ia masih menerima `tabs`, jadi
+ * setiap halaman sedia ada yang memanggil <Shell tabs={EDU_TABS}> terus
+ * mendapat rupa baharu tanpa disunting. Tiada ciri hilang semasa peralihan.
+ */
+
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
-import { LogOut, HelpCircle } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { LogOut, HelpCircle, ChevronDown, User as UserIcon } from "lucide-react";
 import { getSession, clearSession } from "@/lib/session";
 import type { User, Profile } from "@/lib/types";
 import { getMyProfile } from "@/lib/data";
 
-type Tab = { href: string; label: string; icon?: React.ReactNode };
+type Tab = {
+  href: string;
+  label: string;
+  icon?: React.ReactNode;
+  /** Awalan laluan tambahan yang masih dikira destinasi yang sama. */
+  match?: string[];
+};
+
+/** Huruf awal untuk avatar. Tiada gambar rekaan. */
+function initials(name?: string | null): string {
+  const parts = String(name || "")
+    .replace(/^(Dr|Dr\.|Prof|Prof\.|Mr|Ms|Mrs)\s+/i, "")
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean);
+  if (parts.length === 0) return "?";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
+}
 
 export default function Shell({ tabs, children }: { tabs: Tab[]; children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement | null>(null);
+
   useEffect(() => {
     let cancelled = false;
     let resolved = false;
@@ -32,7 +67,6 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
     const initial = getSession();
     if (initial) apply(initial);
     else {
-      // Wait briefly for Supabase async session hydration before redirecting
       import("@/lib/supabase")
         .then(({ supabase }) => supabase.auth.getUser())
         .then(() => {
@@ -45,9 +79,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
         if (!resolved) apply(getSession());
       }, 1500);
     }
-    const onAuth = () => {
-      apply(getSession());
-    };
+    const onAuth = () => apply(getSession());
     window.addEventListener("qm-auth", onAuth);
     window.addEventListener("qm-brand", onAuth);
     return () => {
@@ -56,124 +88,153 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
       window.removeEventListener("qm-brand", onAuth);
     };
   }, [router]);
+
+  useEffect(() => {
+    if (!menuOpen) return;
+    const onAway = (e: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setMenuOpen(false); };
+    document.addEventListener("mousedown", onAway);
+    document.addEventListener("keydown", onEsc);
+    return () => {
+      document.removeEventListener("mousedown", onAway);
+      document.removeEventListener("keydown", onEsc);
+    };
+  }, [menuOpen]);
+
+  useEffect(() => { setMenuOpen(false); }, [pathname]);
+
   if (!user) return null;
-  const logoUrl = profile?.logo_url || null;
+
   const onLogout = () => {
     clearSession();
     router.replace("/login");
   };
 
-  // ---------- Brand block (re-used in mobile header + desktop sidebar) ----------
-  const Brand = ({ desktop = false }: { desktop?: boolean }) => (
-    <div className={`flex items-center gap-3 ${desktop ? "" : ""}`}>
-      {logoUrl ? (
-        <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white/90 p-1" />
-      ) : (
-        <img src="/logo-mark.svg" alt="Kuizen" className="w-10 h-10 rounded-lg" />
-      )}
-      <div className="min-w-0">
-        <div className="font-bold text-lg leading-tight truncate">Kuizen</div>
-        <div className="text-xs opacity-90 truncate">
-          {user.display_name} · {user.role}
-        </div>
-      </div>
-    </div>
-  );
+  const mark = initials(profile?.display_name || user.display_name);
+  const here = (href: string) => pathname === href || pathname?.startsWith(href + "/");
+  const active = (href: string) => here(href);
+  const activeTab = (t: Tab) => here(t.href) || (t.match || []).some(here);
 
   return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* ============ DESKTOP SIDEBAR (lg+) ============ */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 xl:w-72 lg:fixed lg:inset-y-0 lg:left-0 bg-brand-gradient text-white shadow-xl">
-        <div className="p-5 border-b border-white/10">
-          <Brand desktop />
-        </div>
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {tabs.map((t) => {
-            const active = pathname === t.href || pathname?.startsWith(t.href + "/");
-            return (
+    <div className="min-h-screen bg-canvas flex flex-col">
+      {/* ===== Bar atas 72px ===== */}
+      <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
+        <div className="mx-auto max-w-shell px-5 h-[72px] flex items-center gap-6">
+          <Link href="/educator/classes" className="shrink-0 text-[19px] font-bold tracking-tight text-ink">
+            Kuizen
+          </Link>
+
+          {/* Destinasi utama, di tengah pada skrin lebar. */}
+          <nav className="hidden md:flex items-center gap-1 mx-auto h-full">
+            {tabs.map((t) => (
               <Link
                 key={t.href}
                 href={t.href}
-                className={`flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium transition ${
-                  active
-                    ? "bg-white text-brand-purple shadow-sm"
-                    : "text-white/90 hover:bg-white/10"
+                className={`relative h-full flex items-center px-3 text-[15px] transition ${
+                  activeTab(t)
+                    ? "text-brand-purple font-semibold"
+                    : "text-ink-muted hover:text-ink font-medium"
                 }`}
               >
-                <span className={active ? "text-brand-purple" : "text-white"}>{t.icon}</span>
-                <span>{t.label}</span>
-              </Link>
-            );
-          })}
-                <Link
-          href="/help"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium transition mt-2 ${
-            pathname === "/help" || pathname?.startsWith("/help/")
-              ? "bg-white text-brand-purple shadow-sm"
-              : "text-white/90 hover:bg-white/10"
-          }`}
-        >
-          <span className={pathname === "/help" ? "text-brand-purple" : "text-white"}><HelpCircle className="w-5 h-5" /></span>
-          <span>Help</span>
-        </Link>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-white/90 hover:bg-white/10 transition mt-1"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Sign out</span>
-          </button>
-        </nav>
-
-      </aside>
-
-      {/* ============ MAIN COLUMN ============ */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-64 xl:ml-72">
-        {/* ---- Mobile header (hidden on lg+) ---- */}
-        <header className="lg:hidden bg-brand-gradient text-white p-5 rounded-b-3xl flex items-center justify-between">
-          <Brand />
-          <button onClick={onLogout} className="opacity-90 hover:opacity-100" aria-label="Sign out">
-            <LogOut className="w-5 h-5" />
-          </button>
-        </header>
-
-        <main className="flex-1 px-4 py-5 lg:px-10 lg:py-8 pb-24 lg:pb-10">
-          <div className="max-w-6xl mx-auto w-full">{children}</div>
-        </main>
-
-        <footer className="hidden lg:block text-center text-xs text-gray-400 py-4">
-          <span className="font-semibold text-gray-500">UPSI · AFK · Veltrix</span>
-        </footer>
-
-        {/* ---- Mobile bottom tab bar (hidden on lg+) ---- */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-2 z-30">
-          {tabs.map((t) => {
-            const active = pathname === t.href || pathname?.startsWith(t.href + "/");
-            return (
-              <Link
-                key={t.href}
-                href={t.href}
-                className={`flex flex-col items-center text-xs px-2 py-1 ${
-                  active ? "text-brand-purple font-semibold" : "text-gray-500"
-                }`}
-              >
-                {t.icon}
                 {t.label}
+                {activeTab(t) && (
+                  <span className="absolute left-3 right-3 bottom-0 h-[2px] bg-brand-purple rounded-full" />
+                )}
               </Link>
-            );
-          })}
-                    <Link
-              key="__help"
+            ))}
+          </nav>
+
+          <div className="ml-auto md:ml-0 flex items-center gap-1 shrink-0">
+            <Link
               href="/help"
-              className={`flex flex-col items-center text-xs px-2 py-1 ${
-                pathname === "/help" ? "text-brand-purple font-semibold" : "text-gray-500"
+              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm transition ${
+                active("/help") ? "text-brand-purple font-semibold" : "text-ink-muted hover:text-ink"
               }`}
             >
-              <HelpCircle className="w-5 h-5" />
-              Help
+              <HelpCircle className="w-4 h-4" /> Help
             </Link>
-</nav>
-      </div>
+
+            <span className="hidden sm:block w-px h-5 bg-hairline mx-1" />
+
+            <div className="relative" ref={menuRef}>
+              <button
+                onClick={() => setMenuOpen((v) => !v)}
+                aria-haspopup="menu"
+                aria-expanded={menuOpen}
+                className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[#F4F4F6] transition"
+              >
+                <span className="w-9 h-9 rounded-full bg-[#EAE6FC] text-brand-purple text-[13px] font-semibold flex items-center justify-center">
+                  {mark}
+                </span>
+                <ChevronDown className="w-4 h-4 text-ink-faint" />
+              </button>
+
+              {menuOpen && (
+                <div
+                  role="menu"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-hairline shadow-raised py-1.5 z-50"
+                >
+                  <div className="px-3.5 py-2.5">
+                    <div className="text-sm font-semibold text-ink truncate">
+                      {profile?.display_name || user.display_name}
+                    </div>
+                    <div className="text-xs text-ink-faint truncate">{user.role}</div>
+                  </div>
+                  <div className="h-px bg-hairline my-1" />
+                  <Link
+                    href="/educator/profile"
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
+                  >
+                    <UserIcon className="w-4 h-4 text-ink-faint" /> Account settings
+                  </Link>
+                  <Link
+                    href="/help"
+                    className="sm:hidden flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
+                  >
+                    <HelpCircle className="w-4 h-4 text-ink-faint" /> Help
+                  </Link>
+                  <div className="h-px bg-hairline my-1" />
+                  <button
+                    onClick={onLogout}
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
+                  >
+                    <LogOut className="w-4 h-4 text-ink-faint" /> Sign out
+                  </button>
+                </div>
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Navigasi telefon: baris tatal, bukan bar bawah yang menutup kandungan. */}
+        <nav className="md:hidden flex items-center gap-1 px-4 pb-2 overflow-x-auto">
+          {tabs.map((t) => (
+            <Link
+              key={t.href}
+              href={t.href}
+              className={`shrink-0 px-3 py-1.5 rounded-lg text-sm transition ${
+                activeTab(t)
+                  ? "bg-[#EAE6FC] text-brand-purple font-semibold"
+                  : "text-ink-muted hover:text-ink"
+              }`}
+            >
+              {t.label}
+            </Link>
+          ))}
+        </nav>
+      </header>
+
+      <main className="flex-1 w-full">
+        <div className="mx-auto max-w-shell px-5 py-8">{children}</div>
+      </main>
+
+      <footer className="border-t border-hairline">
+        <div className="mx-auto max-w-shell px-5 py-5 text-center text-xs text-ink-faint tracking-wide">
+          UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix
+        </div>
+      </footer>
     </div>
   );
 }

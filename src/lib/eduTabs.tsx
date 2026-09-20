@@ -1,14 +1,42 @@
-import { GraduationCap, ListChecks, Users, BarChart3, Activity, Zap, User as UserIcon } from 'lucide-react';
+/**
+ * Destinasi utama pendidik, semakan September 2026.
+ *
+ * Tujuh pautan bar sisi dikurangkan kepada tiga. Sebabnya: Activities,
+ * Quizzes, Teams dan Rankings semuanya bermakna "di dalam kelas mana", jadi
+ * tempatnya ialah di dalam kelas, bukan di aras atas. Yang tinggal di aras
+ * atas hanyalah tiga soalan sebenar yang seorang pendidik tanya:
+ *
+ *   Classes   siapa yang saya ajar
+ *   Library   apa yang saya ada untuk diajar
+ *   Insights  bagaimana keadaannya
+ *
+ * Profile dan Help berpindah ke bar atas sebelah kanan. Teams dan Rankings
+ * peringkat global masih ada dan dicapai dari halaman Classes; tiada laluan
+ * dibuang.
+ *
+ * `match` menyenaraikan laluan lain yang masih dikira destinasi yang sama,
+ * supaya /educator/live turut menyalakan Library.
+ */
+export type EduTab = {
+  href: string;
+  label: string;
+  /** Awalan laluan tambahan yang dikira aktif untuk tab ini. */
+  match?: string[];
+};
 
-// Single source of truth for the educator sidebar navigation.
-// Import this everywhere a page renders <Shell tabs={EDU_TABS}>.
-export const EDU_TABS = [
-  { href: "/educator/classes",    label: "Classes",    icon: <GraduationCap className="w-5 h-5"/> },
-  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  // Live Quiz: top-level section, same rank as classes (Fasa 2).
-  { href: "/educator/live",       label: "Quiz",       icon: <Zap className="w-5 h-5"/> },
-  { href: "/educator/teams",      label: "Teams",      icon: <Users className="w-5 h-5"/> },
-  { href: "/educator/rankings",   label: "Rankings",   icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/analytics",  label: "Analytics",  icon: <Activity className="w-5 h-5"/> },
-  { href: "/educator/profile",    label: "Profile",    icon: <UserIcon className="w-5 h-5"/> },
+export const EDU_TABS: EduTab[] = [
+  {
+    href: "/educator/classes",
+    label: "Classes",
+    match: ["/educator/teams", "/educator/rankings", "/educator/invites", "/educator/outcomes"],
+  },
+  {
+    href: "/educator/library",
+    label: "Library",
+    match: ["/educator/activities", "/educator/live"],
+  },
+  {
+    href: "/educator/analytics",
+    label: "Insights",
+  },
 ];
