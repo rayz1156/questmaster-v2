@@ -54,12 +54,14 @@ export async function POST(req: NextRequest) {
       .maybeSingle();
     const inviterName = profile?.display_name || user.email || 'A colleague';
 
-    const host = process.env.BREVO_SMTP_HOST;
-    const port = Number(process.env.BREVO_SMTP_PORT || 587);
-    const smtpUser = process.env.BREVO_SMTP_USER;
-    const smtpPass = process.env.BREVO_SMTP_PASS;
-    const fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@airizintelligence.com';
-    const fromName = process.env.BREVO_FROM_NAME || 'Kuizen';
+    // Penghantar emel: SMTP_* (Emailit) diutamakan; BREVO_* dikekalkan sebagai
+    // sandaran supaya pertukaran boleh dipatahbalikkan tanpa mengubah kod.
+    const host = process.env.SMTP_HOST || process.env.BREVO_SMTP_HOST;
+    const port = Number(process.env.SMTP_PORT || process.env.BREVO_SMTP_PORT || 587);
+    const smtpUser = process.env.SMTP_USER || process.env.BREVO_SMTP_USER;
+    const smtpPass = process.env.SMTP_PASS || process.env.BREVO_SMTP_PASS;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.BREVO_FROM_EMAIL || 'noreply@airizintelligence.com';
+    const fromName = process.env.SMTP_FROM_NAME || process.env.BREVO_FROM_NAME || 'Kuizen';
 
     if (!host || !smtpUser || !smtpPass) {
       return NextResponse.json({ error: 'SMTP not configured' }, { status: 500 });
