@@ -1,12 +1,14 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins } from "next/font/google";
+import { Inter } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 
-const poppins = Poppins({ subsets: ["latin"], weight: ["300","400","500","600","700"] });
+// Inter: satu muka taip untuk seluruh aplikasi. Berat 400 hingga 700 sahaja;
+// apa-apa lebih daripada itu hanya menambah saiz muat turun.
+const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://kuizen.fun"),
@@ -39,7 +41,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#7c3aed",
+  themeColor: "#7057D9",
   width: "device-width",
   initialScale: 1,
 };
@@ -47,7 +49,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
-      <body className={poppins.className}>
+      <body className={inter.className}>
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <AnalyticsTracker />
