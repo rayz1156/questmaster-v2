@@ -17,6 +17,7 @@ interface Keadaan {
   serverNow: string;
   questionStartedAt: string | null;
   timeLimitSec: number | null;
+  useCountdown?: boolean;
   questionId: string | null;
   version: string | null;
   myAnswer: { choiceKey: string; locked: boolean } | null;
@@ -114,7 +115,8 @@ export default function SkrinMainLangsung() {
   useEffect(() => {
     const kira = () => {
       const k = keadaan;
-      if (!k || k.status !== "asking" || !k.questionStartedAt || !k.timeLimitSec) {
+      if (!k || k.status !== "asking" || !k.questionStartedAt || !k.timeLimitSec
+          || k.useCountdown === false) {
         setBerbaki(null);
         return;
       }
@@ -333,7 +335,10 @@ export default function SkrinMainLangsung() {
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span>Question {k.questionIndex + 1} / {k.totalQuestions}</span>
               <span className="flex items-center gap-1 font-semibold text-gray-700">
-                <Timer className="w-4 h-4" /> {berbaki !== null ? `${berbaki}s` : "—"}
+                <Timer className="w-4 h-4" />{" "}
+                {k.useCountdown === false
+                  ? "No countdown"
+                  : berbaki !== null ? `${berbaki}s` : "—"}
               </span>
             </div>
             <div className="font-semibold mb-3">{soalanSemasa.prompt}</div>
@@ -368,7 +373,11 @@ export default function SkrinMainLangsung() {
                 <>
                   {k.reveal.isCorrect ? <Check className="w-8 h-8 mx-auto" /> : <X className="w-8 h-8 mx-auto" />}
                   <div className="font-bold">
-                    {k.reveal.isCorrect ? `Correct! +${k.reveal.pointsAwarded} points` : "Wrong"}
+                    {k.reveal.isCorrect
+                      ? k.reveal.pointsAwarded > 0
+                        ? `Correct! +${k.reveal.pointsAwarded} points`
+                        : "Correct, but the time ran out"
+                      : "Wrong"}
                   </div>
                 </>
               ) : (

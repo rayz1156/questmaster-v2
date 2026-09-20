@@ -11,7 +11,7 @@ import { supabase } from "@/lib/supabase";
 interface Pilihan { key: string; text: string }
 interface Soalan {
   id: string; order_idx: number; prompt: string; options: Pilihan[];
-  correct_key: string; points: number; time_limit_sec: number;
+  correct_key: string; points: number; time_limit_sec: number; use_countdown?: boolean;
 }
 interface Pemain { id: string; nickname: string; score: number; joined_at: string }
 interface Sesi {
@@ -270,7 +270,12 @@ export default function PanelHosSesi() {
       ) : currentQuestion && (
         <div className="card mb-4">
           <div className="text-xs text-gray-500 mb-1">Question {session.current_index + 1} / {totalSoalan}</div>
-          <div className="font-semibold mb-2">{currentQuestion.prompt}</div>
+          <div className="font-semibold mb-1">{currentQuestion.prompt}</div>
+          <div className="text-xs text-gray-400 mb-2">
+            {currentQuestion.use_countdown === false
+              ? "No countdown. Reveal when you are ready; faster answers still score higher."
+              : `${currentQuestion.time_limit_sec}s countdown`}
+          </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {currentQuestion.options.map((o) => {
               const betul = session.status === "revealed" && o.key === currentQuestion.correct_key;

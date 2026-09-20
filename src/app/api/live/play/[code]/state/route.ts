@@ -28,7 +28,7 @@ interface SessionRow {
 }
 interface PlayerRow { id: string; score: number; }
 interface QuestionRow {
-  id: string; order_idx: number; time_limit_sec: number;
+  id: string; order_idx: number; time_limit_sec: number; use_countdown: boolean;
 }
 interface AnswerRow { choice_key: string; is_correct: boolean; points_awarded: number; }
 
@@ -82,7 +82,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     // (laluan /questions). Senarai lajur eksplisit TANPA correct_key.
     supa
       .from('qm_live_questions')
-      .select('id, order_idx, time_limit_sec')
+      .select('id, order_idx, time_limit_sec, use_countdown')
       .eq('quiz_id', session.quiz_id)
       .order('order_idx'),
   ]);
@@ -120,6 +120,9 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     serverNow: new Date().toISOString(),
     questionStartedAt: session.question_started_at,
     timeLimitSec: currentQuestion?.time_limit_sec ?? null,
+    // false bermakna tiada jam berdetik pada skrin pemain. Mata masih
+    // mengambil kira kelajuan melalui lengkung susut di pelayan.
+    useCountdown: currentQuestion ? currentQuestion.use_countdown !== false : true,
     questionId: currentQuestion?.id ?? null,
     version,
     myAnswer: null,

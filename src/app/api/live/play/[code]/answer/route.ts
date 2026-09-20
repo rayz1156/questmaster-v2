@@ -12,6 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
+import { scoreAnswer } from '@/lib/live-quiz';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ interface PlayerRow { id: string; player_token: string; score: number; total_ms:
 interface QuestionRow {
   id: string; quiz_id: string; order_idx: number; prompt: string;
   options: { key: string; text: string }[];
-  points: number; time_limit_sec: number;
+  points: number; time_limit_sec: number; use_countdown: boolean;
 }
 interface KeyRow { correct_key: string; }
 
@@ -86,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   }
   const { data: currentQuestion } = (await supa
     .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, points, time_limit_sec')
+    .select('id, quiz_id, order_idx, prompt, options, points, time_limit_sec, use_countdown')
     .eq('quiz_id', session.quiz_id)
     .order('order_idx')
     .range(session.current_index, session.current_index)
@@ -129,11 +130,13 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const msTaken = Math.max(0, Date.now() - startedMs);
   const isCorrect = choiceKey === keyRow.correct_key;
 
-  let pointsAwarded = 0;
-  if (isCorrect) {
-    const ratio = Math.max(0, 1 - msTaken / (currentQuestion.time_limit_sec * 1000));
-    pointsAwarded = Math.round(currentQuestion.points * (0.5 + 0.5 * ratio));
-  }
+  const { pointsAwarded } = scoreAnswer({
+    isCorrect,
+    msTaken,
+    points: currentQuestion.points,
+    timeLimitSec: currentQuestion.time_limit_sec,
+    useCountdown: currentQuestion.use_countdown !== false,
+  });
 
   const { error: insertErr } = await supa.from('qm_live_answers').insert({
     session_id: session.id,

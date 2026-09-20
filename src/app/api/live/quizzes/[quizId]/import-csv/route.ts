@@ -54,6 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     correct_key: q.correct_key,
     points: q.points,
     time_limit_sec: q.time_limit_sec,
+    use_countdown: q.use_countdown,
   }));
 
   const { error } = await host.supa.from('qm_live_questions').insert(rows);

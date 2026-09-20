@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
 
   const { data: questions, error } = await host.supa
     .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
     .eq('quiz_id', params.quizId)
     .order('order_idx');
 

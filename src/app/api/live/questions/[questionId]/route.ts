@@ -57,6 +57,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
     patch.time_limit_sec = Math.floor(tl);
   }
 
+  if (body.use_countdown !== undefined) {
+    if (typeof body.use_countdown !== 'boolean') {
+      return NextResponse.json({ error: 'use_countdown must be true or false.' }, { status: 400 });
+    }
+    patch.use_countdown = body.use_countdown;
+  }
+
   if (Object.keys(patch).length === 0) {
     return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
   }
@@ -65,7 +72,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { questionId
     .from('qm_live_questions')
     .update(patch)
     .eq('id', params.questionId)
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
     .single();
 
   if (error || !question) {

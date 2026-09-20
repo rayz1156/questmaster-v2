@@ -72,7 +72,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
 
   const { data: questions, error: qErr } = await auth.supa
     .from('qm_live_questions')
-    .select('id, order_idx, prompt, options, correct_key, points, time_limit_sec')
+    .select('id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown')
     .eq('quiz_id', ses.quiz_id)
     .order('order_idx');
   if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });

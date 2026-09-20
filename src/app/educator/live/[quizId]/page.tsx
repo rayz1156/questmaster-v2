@@ -18,6 +18,7 @@ interface Soalan {
   correct_key: string;
   points: number;
   time_limit_sec: number;
+  use_countdown?: boolean;
 }
 interface Kuiz { id: string; title: string; description: string | null }
 
@@ -60,6 +61,7 @@ export default function EditorKuizLangsung() {
   const [kunci, setKunci] = useState("A");
   const [points, setPoints] = useState(1000);
   const [timeLimit, setTimeLimit] = useState(20);
+  const [kiraDetik, setKiraDetik] = useState(true);
   const [busy, setBusy] = useState(false);
 
   // Suntingan soalan sedia ada
@@ -69,6 +71,7 @@ export default function EditorKuizLangsung() {
   const [editKunci, setEditKunci] = useState("");
   const [editPoints, setEditPoints] = useState(1000);
   const [editTime, setEditTime] = useState(20);
+  const [editKira, setEditKira] = useState(true);
 
   // Import Aiken
   const [aiken, setAiken] = useState("");
@@ -110,10 +113,11 @@ export default function EditorKuizLangsung() {
           correct_key: kunci,
           points,
           time_limit_sec: timeLimit,
+          use_countdown: kiraDetik,
         }),
       });
       setPrompt(""); setOpts([{ key: "A", text: "" }, { key: "B", text: "" }, { key: "C", text: "" }, { key: "D", text: "" }]);
-      setKunci("A"); setPoints(1000); setTimeLimit(20); setShowNew(false);
+      setKunci("A"); setPoints(1000); setTimeLimit(20); setKiraDetik(true); setShowNew(false);
       await reload();
     } catch (e: any) {
       setErr(e.message || "The question could not be saved.");
@@ -127,6 +131,7 @@ export default function EditorKuizLangsung() {
     setEditKunci(s.correct_key);
     setEditPoints(s.points);
     setEditTime(s.time_limit_sec);
+    setEditKira(s.use_countdown !== false);
   };
 
   const onSimpanSunting = async () => {
@@ -147,6 +152,7 @@ export default function EditorKuizLangsung() {
           correct_key: editKunci,
           points: editPoints,
           time_limit_sec: editTime,
+          use_countdown: editKira,
         }),
       });
       setEditId(null);
@@ -304,10 +310,19 @@ export default function EditorKuizLangsung() {
               + Add option
             </button>
           )}
-          <div className="flex items-center gap-3 mb-2 text-xs text-gray-600">
+          <div className="flex items-center gap-3 mb-1 text-xs text-gray-600 flex-wrap">
             <label className="flex items-center gap-1">Points: <input type="number" min={1} className="input w-20" value={points} onChange={(e) => setPoints(Number(e.target.value) || 1000)} /></label>
-            <label className="flex items-center gap-1">Time (seconds): <input type="number" min={5} className="input w-20" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value) || 20)} /></label>
+            <label className="flex items-center gap-1">{kiraDetik ? "Time (seconds):" : "Pace (seconds):"} <input type="number" min={5} className="input w-20" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value) || 20)} /></label>
+            <label className="flex items-center gap-1">
+              <input type="checkbox" checked={kiraDetik} onChange={(e) => setKiraDetik(e.target.checked)} className="rounded" />
+              Countdown
+            </label>
           </div>
+          <p className="text-[11px] text-gray-500 mb-2">
+            {kiraDetik
+              ? "Players see a clock. Answering at once earns the full points, answering on the last second earns half, and answers after time is up earn none."
+              : "No clock and no cut-off. Points still fall the longer a player takes, easing toward half, so faster answers always score higher."}
+          </p>
           <div className="flex items-center justify-end gap-2">
             <button type="button" onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
             <button type="button" disabled={busy} onClick={onTambah} className="btn-primary py-1.5 px-3 text-sm">{busy ? "Saving…" : "Save question"}</button>
@@ -339,9 +354,13 @@ export default function EditorKuizLangsung() {
                       </div>
                     ))}
                   </div>
-                  <div className="flex items-center gap-3 mb-2 text-xs text-gray-600">
+                  <div className="flex items-center gap-3 mb-2 text-xs text-gray-600 flex-wrap">
                     <label className="flex items-center gap-1">Points: <input type="number" min={1} className="input w-20" value={editPoints} onChange={(e) => setEditPoints(Number(e.target.value) || 1000)} /></label>
-                    <label className="flex items-center gap-1">Time (seconds): <input type="number" min={5} className="input w-20" value={editTime} onChange={(e) => setEditTime(Number(e.target.value) || 20)} /></label>
+                    <label className="flex items-center gap-1">{editKira ? "Time (seconds):" : "Pace (seconds):"} <input type="number" min={5} className="input w-20" value={editTime} onChange={(e) => setEditTime(Number(e.target.value) || 20)} /></label>
+                    <label className="flex items-center gap-1">
+                      <input type="checkbox" checked={editKira} onChange={(e) => setEditKira(e.target.checked)} className="rounded" />
+                      Countdown
+                    </label>
                   </div>
                   <div className="flex items-center justify-end gap-2">
                     <button onClick={() => setEditId(null)} disabled={busy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
@@ -361,7 +380,12 @@ export default function EditorKuizLangsung() {
                           </span>
                         ))}
                       </div>
-                      <div className="text-xs text-gray-400 mt-1">{s.points} points · {s.time_limit_sec}s</div>
+                      <div className="text-xs text-gray-400 mt-1">
+                        {s.points} points ·{" "}
+                        {s.use_countdown === false
+                          ? `no countdown, pace ${s.time_limit_sec}s`
+                          : `${s.time_limit_sec}s countdown`}
+                      </div>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <button onClick={() => mulaSunting(s)} title="Edit question" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><Pencil className="w-4 h-4" /></button>

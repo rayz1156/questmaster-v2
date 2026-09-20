@@ -320,3 +320,38 @@ nginx ialah 1 MB; had 500 KB berada di bawahnya dengan sengaja.
 Pemecah CSV ditulis sendiri (RFC 4180, mengesan pembatas `,` `;` atau tab).
 Tiada kebergantungan baharu ditambah: VPS membina dengan `npm run build` dan
 setiap pakej baharu ialah satu lagi perkara yang boleh gagal di sana.
+
+## Pengiraan mata Live Quiz
+
+Satu tempat sahaja: `scoreAnswer()` dalam `src/lib/live-quiz.ts`. Laluan
+jawapan memanggilnya. Jangan sekali-kali menyalin formula ke tempat lain.
+
+**Mod kira detik (lalai) sepadan TEPAT dengan Kahoot**, bukan lebih kurang:
+
+    mata = bulat( (1 - (masa / had) / 2) * mata_penuh )
+
+Jadi betul serta-merta dapat 1000, betul pada saat akhir dapat 500, salah dapat
+0. Seperti Kahoot, jawapan betul di bawah 0.5 saat sentiasa dapat mata penuh,
+supaya kelewatan rangkaian tidak menghukum pemain. `scripts/selftest-live-quiz.ts`
+menguji padanan ini pada lapan titik masa; kalau ia gagal, formula sudah
+terpesong daripada penanda aras.
+
+**Mod tanpa kira detik** (`use_countdown = false`, migrasi 0020) tiada had masa
+dan tiada jam pada skrin pemain, tetapi kelajuan masih dikira:
+
+    mata = bulat( mata_penuh * (0.5 + 0.5 * rentak / (rentak + masa)) )
+
+Lengkung ini menghampiri 50% tanpa pernah rata, jadi dua pemain yang menjawab
+pada saat ke-30 dan ke-90 tetap berbeza markah. Dalam mod ini `time_limit_sec`
+bukan had, ia rentak rujukan sahaja.
+
+**Jawapan lewat kini dapat sifar.** Sebelum ini jawapan selepas had masa masih
+mendapat 500 kerana nisbah diapit pada 0. Klien melumpuhkan butang, tetapi
+pelayan tidak, jadi klien yang diubah suai boleh menjawab lewat dan tetap
+mendapat separuh mata. Kelonggaran 1.5 saat diberi untuk rangkaian, selepas itu
+sifar. `masa` sentiasa dikira di pelayan daripada `question_started_at`; masa
+daripada badan permintaan TIDAK pernah dipercayai.
+
+Jalankan `npx tsx scripts/selftest-live-quiz.ts` selepas menyentuh pemarkahan
+atau pemecah CSV. `npx tsc` dan `npm run build` tidak menangkap kesilapan
+formula.
