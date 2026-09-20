@@ -51,6 +51,12 @@ export const LB_PTS_REST = "bg-[#F4F2FD] text-brand-purple";
 /** Tinggi anak tangga mengikut pangkat. Beza yang cukup untuk dibaca sekilas. */
 const STEP_H = [132, 100, 78];
 
+/** Warna dan tinggi anak tangga datang daripada pangkat, bukan kedudukan
+ *  dalam baris, supaya markah seri tidak dilukis sebagai gangsa. */
+function placeOf(rank: number): number {
+  return Math.min(2, Math.max(0, Math.floor(rank) - 1));
+}
+
 function initialsOf(name: string): string {
   const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
   if (parts.length === 0) return "?";
@@ -75,21 +81,24 @@ export function LeaderboardPodium({ rows, className = "" }: { rows: PodiumEntry[
   const top = rows.slice(0, 3);
   if (top.length < 2) return null;
 
-  const slots: Array<{ entry: PodiumEntry | undefined; place: number }> = [
-    { entry: top[1], place: 1 },
-    { entry: top[0], place: 0 },
-    { entry: top[2], place: 2 },
+  // Susunan kedua, pertama, ketiga, seperti podium sebenar. `fallback` hanya
+  // dipakai untuk ruang kosong bila kurang daripada tiga nama.
+  const slots: Array<{ entry: PodiumEntry | undefined; fallback: number }> = [
+    { entry: top[1], fallback: 1 },
+    { entry: top[0], fallback: 0 },
+    { entry: top[2], fallback: 2 },
   ];
 
   return (
     <div className={`border-b border-hairline ${className}`}>
       <div className="flex items-end justify-center gap-2 sm:gap-3">
-        {slots.map(({ entry, place }) => {
+        {slots.map(({ entry, fallback }) => {
           if (!entry) {
-            return <div key={place} className="flex-1 max-w-[168px]" style={{ height: STEP_H[place] }} aria-hidden />;
+            return <div key={`gap-${fallback}`} className="flex-1 max-w-[168px]" style={{ height: STEP_H[fallback] }} aria-hidden />;
           }
+          const place = placeOf(entry.rank);
           return (
-            <div key={place} className="flex-1 max-w-[168px] min-w-0 flex flex-col items-center">
+            <div key={`${entry.rank}-${entry.name}`} className="flex-1 max-w-[168px] min-w-0 flex flex-col items-center">
               <div className={`w-11 h-11 rounded-full flex items-center justify-center text-[15px] font-semibold shrink-0 ${LB_MEDAL[place]}`}>
                 {initialsOf(entry.name)}
               </div>
