@@ -4,6 +4,10 @@ import type { LiveSessionRow } from '@/lib/live-quiz';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Next.js men-cache panggilan fetch Supabase di dalam route handler secara
+// lalai, yang membekukan keadaan sesi langsung (status kekal 'asking' walaupun
+// pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
+export const fetchCache = 'force-no-store';
 
 /**
  * GET /api/live/sessions/[sessionId] — keadaan hos penuh.

@@ -3,6 +3,10 @@ import { requireQuizHost, validateOptions } from '@/lib/live-quiz';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Next.js men-cache panggilan fetch Supabase di dalam route handler secara
+// lalai, yang membekukan keadaan sesi langsung (status kekal 'asking' walaupun
+// pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
+export const fetchCache = 'force-no-store';
 
 /** POST /api/live/quizzes/[quizId]/questions — tambah soalan. */
 export async function POST(req: NextRequest, { params }: { params: { quizId: string } }) {
