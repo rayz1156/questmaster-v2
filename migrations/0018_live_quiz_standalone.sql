@@ -261,9 +261,9 @@ begin
     raise exception 'Sesi tidak dijumpai.' using errcode = 'LV004';
   end if;
 
-  -- Pemboleh ubah tempatan MESTI berlainan nama daripada lajur jadual.
-  -- Menggunakan player_token sebagai sasaran INTO menyebabkan ralat
-  -- "column reference player_token is ambiguous" pada masa jalan.
+  -- Lajur dalam RETURNING MESTI dilayakkan dengan nama jadual. Parameter
+  -- keluar player_token berada dalam skop seluruh badan fungsi, jadi
+  -- "player_token" tanpa kelayakan menjadi samar pada masa jalan.
   begin
     insert into public.qm_live_players (session_id, nickname, player_token)
     select
@@ -273,7 +273,7 @@ begin
     where (
       select count(*) from public.qm_live_players pl where pl.session_id = p_session_id
     ) < v_limit
-    returning id, player_token into v_id, v_token;
+    returning qm_live_players.id, qm_live_players.player_token into v_id, v_token;
   exception
     when unique_violation then
       raise exception 'Nama sudah diambil. Sila pilih nama lain.' using errcode = 'LV009';
