@@ -167,6 +167,11 @@ editing `.env.local` alone. Host `smtp.emailit.com`, port 587, STARTTLS,
 username is the literal string `emailit`, password is an API key starting
 `secret_`. DKIM selector is `emailit`.
 
+The live sender is `noreply@veltrix.technology` with the From name `Kuizen`. It was
+chosen over `airizintelligence.com` because its apex SPF already includes Emailit
+and it carries exactly one DMARC record, where airizintelligence.com carries
+two and is therefore treated as having none. `kuizen.fun` has no email DNS at
+all and cannot send until it is added to Emailit and given all five records.
 Brevo was the original provider and is why mail went to spam: the From domain
 `airizintelligence.com` never had a Brevo `include` in its SPF and had no
 Brevo DKIM selector, so every message failed both SPF and DKIM. The same domain
