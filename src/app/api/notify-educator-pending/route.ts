@@ -10,12 +10,14 @@ export async function POST(req: NextRequest) {
     if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
 
     const adminTo = process.env.ADMIN_NOTIFICATION_EMAIL;
-    const host = process.env.BREVO_SMTP_HOST;
-    const port = Number(process.env.BREVO_SMTP_PORT || 587);
-    const user = process.env.BREVO_SMTP_USER;
-    const pass = process.env.BREVO_SMTP_PASS;
-    const fromEmail = process.env.BREVO_FROM_EMAIL || 'noreply@airizintelligence.com';
-    const fromName = process.env.BREVO_FROM_NAME || 'Kuizen';
+    // Penghantar emel: SMTP_* (Emailit) diutamakan; BREVO_* dikekalkan sebagai
+    // sandaran supaya pertukaran boleh dipatahbalikkan tanpa mengubah kod.
+    const host = process.env.SMTP_HOST || process.env.BREVO_SMTP_HOST;
+    const port = Number(process.env.SMTP_PORT || process.env.BREVO_SMTP_PORT || 587);
+    const user = process.env.SMTP_USER || process.env.BREVO_SMTP_USER;
+    const pass = process.env.SMTP_PASS || process.env.BREVO_SMTP_PASS;
+    const fromEmail = process.env.SMTP_FROM_EMAIL || process.env.BREVO_FROM_EMAIL || 'noreply@airizintelligence.com';
+    const fromName = process.env.SMTP_FROM_NAME || process.env.BREVO_FROM_NAME || 'Kuizen';
 
     if (!adminTo || !host || !user || !pass) {
       return NextResponse.json({ error: 'SMTP not configured' }, { status: 500 });

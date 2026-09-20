@@ -161,8 +161,26 @@ Pages reading query params must wrap the `useSearchParams()` consumer in
 `<Suspense>` and usually `export const dynamic = "force-dynamic"`, or the build
 fails at prerender.
 
-Email goes out through Brevo over SMTP (`BREVO_SMTP_*`) with an HTTP fallback
-(`BREVO_API_KEY`).
+Email goes out through **Emailit** over SMTP. The routes read `SMTP_*` first
+and fall back to `BREVO_SMTP_*`, so the provider can be switched back by
+editing `.env.local` alone. Host `smtp.emailit.com`, port 587, STARTTLS,
+username is the literal string `emailit`, password is an API key starting
+`secret_`. DKIM selector is `emailit`.
+
+The live sender is `noreply@veltrix.technology` with the From name `Kuizen`. It was
+chosen over `airizintelligence.com` because its apex SPF already includes Emailit
+and it carries exactly one DMARC record, where airizintelligence.com carries
+two and is therefore treated as having none. `kuizen.fun` has no email DNS at
+all and cannot send until it is added to Emailit and given all five records.
+Brevo was the original provider and is why mail went to spam: the From domain
+`airizintelligence.com` never had a Brevo `include` in its SPF and had no
+Brevo DKIM selector, so every message failed both SPF and DKIM. The same domain
+was already fully set up for Emailit on the `emailit.` subdomain.
+
+Two things bite here. Emailit puts MX and SPF on the `emailit.` subdomain and
+leaves the apex alone, so the apex SPF and DMARC are yours to add. And a domain
+carrying **two** DMARC TXT records is treated as having no DMARC at all, which
+is its own deliverability failure; check the count, not just the presence.
 
 Link previews decode HTML entities at extraction time in
 `src/app/api/learning-boards/link-preview/route.ts`. The decode is deliberately
