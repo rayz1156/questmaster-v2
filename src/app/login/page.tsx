@@ -1,10 +1,22 @@
 'use client';
-import Image from 'next/image';
+
+/**
+ * Sign in, semakan September 2026.
+ *
+ * Yang dibuang: gradien ungu ke biru penuh skrin, logo 80px, tiga baris
+ * slogan pemasaran, dan nota kerjasama yang lebih besar daripada borang.
+ * Orang yang datang ke skrin ini mahu masuk; mereka sudah tahu apa itu
+ * Kuizen. Yang tinggal ialah nama, satu ayat, dan borang.
+ *
+ * Semua kelakuan dikekalkan: emel diingati, tunjuk kata laluan, hantar
+ * semula emel pengesahan, penghalaan ikut peranan, dan parameter next.
+ */
+
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
+import { Eye, EyeOff } from 'lucide-react';
 import { supabase, setRememberMe } from '@/lib/supabase';
-
 
 function LoginInner() {
   const router = useRouter();
@@ -32,16 +44,19 @@ function LoginInner() {
     e?.preventDefault();
     setBusy(true); setErr('');
     const creds = override ?? { email, password };
-    // Route the session to localStorage (remember) or sessionStorage (forget on close),
-    // and keep the email handy for next time when remembering.
     setRememberMe(remember);
     try {
       if (remember) window.localStorage.setItem('qm-remembered-email', creds.email);
       else window.localStorage.removeItem('qm-remembered-email');
     } catch { /* ignore */ }
     const { data, error } = await supabase.auth.signInWithPassword(creds);
-    if (error || !data.user) { setBusy(false); const m = error?.message || 'Sign-in failed'; setErr(m); setNeedsVerify(/confirm|verif/i.test(m)); return; }
-    // Read role + approved from qm_profiles (RLS allows self select)
+    if (error || !data.user) {
+      setBusy(false);
+      const m = error?.message || 'Sign-in failed';
+      setErr(m);
+      setNeedsVerify(/confirm|verif/i.test(m));
+      return;
+    }
     const { data: prof } = await supabase.from('qm_profiles').select('role, approved').eq('id', data.user.id).maybeSingle();
     const role = (prof?.role as string) || (data.user.user_metadata?.role as string) || 'participant';
     if (role === 'educator' && prof && prof.approved === false) {
@@ -49,74 +64,130 @@ function LoginInner() {
       router.replace('/pending-approval');
       return;
     }
-    // Ensure session is fully cached before navigation to avoid double-login
     try { await supabase.auth.getUser(); } catch {}
     setBusy(false);
     const nextParam = searchParams?.get('next');
     const isSafeNext = !!nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//');
-    const defaultDest = role === 'educator' ? '/educator/classes' : (role === 'admin' || role === 'superadmin') ? '/admin/overview' : '/participant/home';
-    const dest = isSafeNext ? nextParam : defaultDest;
-    window.location.href = dest;
+    const defaultDest = role === 'educator'
+      ? '/educator/classes'
+      : (role === 'admin' || role === 'superadmin') ? '/admin/overview' : '/participant/home';
+    window.location.href = isSafeNext ? nextParam : defaultDest;
   }
 
-
-  async function resendVerification(){
-    if(!email){ setResendMsg('Please enter your email above first.'); return; }
+  async function resendVerification() {
+    if (!email) { setResendMsg('Please enter your email above first.'); return; }
     setResending(true); setResendMsg('');
     const redirectTo = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
     setResending(false);
-    setResendMsg(error ? (error.message || 'Could not resend. Try again later.') : 'Verification email sent. Please check your inbox (and spam folder).');
+    setResendMsg(error
+      ? (error.message || 'Could not resend. Try again later.')
+      : 'Verification email sent. Please check your inbox, and your spam folder.');
   }
 
   return (
-    <div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10">
-      <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-2xl bg-white/15 backdrop-blur-sm shadow-lg mb-3" aria-hidden="true"><Image src="/logo-mark.svg" alt="Kuizen" width={64} height={64} priority /></div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">Kuizen</h1>
-          <p className="text-white/90 mt-2 text-base font-medium tracking-wide">Learn. Compete. Conquer.</p>
-          <p className="text-white/75 mt-1 text-sm">Where classrooms become arenas and learners become champions.</p>
-          <p className="text-white/70 mt-3 text-sm">Welcome back 👋 Sign in to continue</p>
-        </div>
-        <form onSubmit={signIn} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input value={email} onChange={e=>setEmail(e.target.value)} type="email" required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="you@example.com" />
+    <div className="min-h-screen flex flex-col" style={{ background: '#FCFBF9' }}>
+      <div className="px-8 pt-7">
+        <span className="text-[19px] font-bold tracking-tight text-ink">Kuizen</span>
+      </div>
+
+      <div className="flex-1 flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-[380px]">
+          <div className="text-center mb-8">
+            <h1 className="text-[40px] leading-[1.1] font-semibold tracking-tight text-ink">Welcome back.</h1>
+            <p className="text-[17px] text-ink-muted mt-2">Your next great class starts here.</p>
           </div>
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input value={password} onChange={e=>setPassword(e.target.value)} type={show?'text':'password'} required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-purple-500 outline-none" placeholder="••••••••" />
-            <label className="flex items-center gap-2 mt-2 text-sm text-gray-600">
-              <input type="checkbox" checked={show} onChange={e=>setShow(e.target.checked)} /> Show password
+
+          <form onSubmit={signIn} className="bg-white rounded-2xl border border-hairline p-6">
+            <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="email">Email</label>
+            <input
+              id="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              type="email"
+              required
+              autoComplete="email"
+              className="input mb-4"
+              placeholder="you@example.com"
+            />
+
+            <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="password">Password</label>
+            <div className="relative mb-4">
+              <input
+                id="password"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                type={show ? 'text' : 'password'}
+                required
+                autoComplete="current-password"
+                className="input pr-11"
+                placeholder="Enter your password"
+              />
+              <button
+                type="button"
+                onClick={() => setShow((v) => !v)}
+                aria-label={show ? 'Hide password' : 'Show password'}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink transition"
+              >
+                {show ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
+              </button>
+            </div>
+
+            <label className="flex items-center gap-2.5 text-sm text-ink select-none mb-5">
+              <input
+                type="checkbox"
+                checked={remember}
+                onChange={(e) => setRemember(e.target.checked)}
+                className="w-4 h-4 rounded accent-[#7057D9]"
+              />
+              Remember me
             </label>
-          </div>
-          <label className="flex items-center gap-2 text-sm text-gray-600 select-none">
-            <input type="checkbox" checked={remember} onChange={e=>setRemember(e.target.checked)} className="accent-purple-600 w-4 h-4" /> Remember me on this device
-          </label>
-          {err && <p className="text-sm text-red-600">{err}</p>}
+
+            {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
+
             {needsVerify && (
-              <div className="text-sm">
-                <button type="button" onClick={resendVerification} disabled={resending} className="text-purple-600 font-medium disabled:opacity-60">{resending ? 'Sending…' : 'Resend verification email'}</button>
-                {resendMsg && <p className="text-gray-600 mt-1">{resendMsg}</p>}
+              <div className="text-sm mb-3">
+                <button
+                  type="button"
+                  onClick={resendVerification}
+                  disabled={resending}
+                  className="text-brand-purple font-medium disabled:opacity-50"
+                >
+                  {resending ? 'Sending…' : 'Resend verification email'}
+                </button>
+                {resendMsg && <p className="text-ink-muted mt-1">{resendMsg}</p>}
               </div>
             )}
-          <button disabled={busy} className="w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600 disabled:opacity-60">{busy ? 'Signing in…' : 'Sign In'}</button>
-          <div className="flex justify-between text-sm">
-            <Link href="/forgot-password" className="text-purple-600 font-medium">Forgot password?</Link>
-            <Link href="/register" className="text-purple-600 font-medium">Create account</Link>
-          </div>
-        </form>
+
+            <button disabled={busy} className="btn-primary w-full py-3">
+              {busy ? 'Signing in…' : 'Sign in'}
+            </button>
+
+            <div className="flex items-center gap-3 my-5">
+              <span className="h-px flex-1 bg-hairline" />
+              <span className="text-xs text-ink-faint">or</span>
+              <span className="h-px flex-1 bg-hairline" />
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <Link href="/forgot-password" className="text-brand-purple font-medium hover:underline">
+                Forgot password?
+              </Link>
+              <Link href="/register" className="text-brand-purple font-medium hover:underline">
+                Create an account
+              </Link>
+            </div>
+          </form>
         </div>
-    
-      <div className="text-center mt-8 space-y-1">
-        <div className="text-[11px] text-white/60 uppercase tracking-widest">In collaboration with</div>
-        <div className="text-sm text-white/90 font-medium">UPSI · AFK · Veltrix</div>
-        <div className="text-[11px] text-white/60 mt-2">Powered by <span className="font-semibold text-white/80">Veltrix Technology</span></div>
       </div>
-</div>
+
+      <div className="pb-8 text-center text-xs text-ink-faint tracking-wide">
+        UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix
+      </div>
+    </div>
   );
 }
 
-
-export default function LoginPage(){ return (<Suspense fallback={null}><LoginInner/></Suspense>); }
+export default function LoginPage() {
+  return (<Suspense fallback={null}><LoginInner /></Suspense>);
+}
