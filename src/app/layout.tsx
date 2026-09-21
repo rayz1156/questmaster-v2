@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter } from "next/font/google";
+import { Inter, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
@@ -9,6 +9,16 @@ import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 // Inter: satu muka taip untuk seluruh aplikasi. Berat 400 hingga 700 sahaja;
 // apa-apa lebih daripada itu hanya menambah saiz muat turun.
 const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+
+// Muka taip paparan untuk tajuk halaman utama. Ia diberikan sebagai pemboleh
+// ubah CSS dan bukan sebagai kelas pada body, supaya Inter kekal menjadi muka
+// taip badan dan hanya tajuk yang memilih untuk menggunakannya.
+const playfair = Playfair_Display({
+  subsets: ["latin"],
+  weight: ["500", "600"],
+  variable: "--font-display",
+  display: "swap",
+});
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://kuizen.fun"),
@@ -51,7 +61,7 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en" className={playfair.variable}>
       <head>
         {/* VisitorTracking. Skrip vendor memanggil init_tracer selepas ia
             dimuatkan, jadi definisi mesti wujud sebelum itu. Skrip luar
