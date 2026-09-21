@@ -9,6 +9,17 @@ const nextConfig = {
   // Nota: destination TIDAK membawa query param, kerana param yang ditambah
   // oleh rewrite tidak sampai ke handler dengan pasti. Setiap dokumen ada
   // routenya sendiri.
+  // /panduan digantikan oleh /blog. Pengalihan diletakkan di sini dan bukan
+  // sebagai halaman yang memanggil permanentRedirect, kerana halaman yang
+  // diprarender secara statik memulangkan 308 tanpa pengepala Location, iaitu
+  // pengalihan yang tidak mengalih ke mana mana. Diuji, bukan diandaikan.
+  //
+  // Alamat artikel kekal di bawah /panduan kerana ketiga tiganya sudah
+  // dihantar ke Search Console dengan alamat itu.
+  async redirects() {
+    return [{ source: "/panduan", destination: "/blog", permanent: true }];
+  },
+
   async rewrites() {
     return [
       { source: "/.well-known/oauth-protected-resource", destination: "/api/oauth/protected-resource" },

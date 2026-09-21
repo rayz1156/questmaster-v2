@@ -10,7 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: "https://kuizen.fun", lastModified: now, changeFrequency: "weekly", priority: 1 },
     { url: "https://kuizen.fun/register", lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: "https://kuizen.fun/login", lastModified: now, changeFrequency: "monthly", priority: 0.5 },
-    { url: "https://kuizen.fun/panduan", lastModified: now, changeFrequency: "monthly", priority: 0.8 },
+    { url: "https://kuizen.fun/blog", lastModified: now, changeFrequency: "weekly", priority: 0.8 },
     { url: "https://kuizen.fun/panduan/cara-buat-kuiz-online", lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: "https://kuizen.fun/panduan/apa-itu-pdpc", lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: "https://kuizen.fun/panduan/alternatif-kahoot", lastModified: now, changeFrequency: "monthly", priority: 0.9 },

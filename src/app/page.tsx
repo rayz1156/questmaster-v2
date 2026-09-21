@@ -153,6 +153,11 @@ export default function Home() {
       <header className="px-6 sm:px-8 pt-6">
         <div className="mx-auto w-full max-w-[1040px] flex items-center justify-between gap-4">
           <Logo size={28} />
+          <nav className="hidden sm:flex items-center gap-7 text-sm text-ink-muted">
+            <Link href="#ciri" className="hover:text-ink">Ciri</Link>
+            <Link href="/blog" className="hover:text-ink">Blog</Link>
+            <Link href="/help" className="hover:text-ink">Bantuan</Link>
+          </nav>
           <nav className="flex items-center gap-4 text-sm">
             <Link href="/login" className="btn-quiet">Log masuk</Link>
             <Link href="/register" className="btn-primary">Daftar</Link>
@@ -192,7 +197,7 @@ export default function Home() {
           </div>
         </section>
 
-        <section className="px-6 sm:px-8 pt-12 pb-16">
+        <section id="ciri" className="px-6 sm:px-8 pt-12 pb-16">
           <div className="mx-auto w-full max-w-[960px]">
             <h2
               style={DISPLAY}
@@ -267,8 +272,8 @@ export default function Home() {
             </div>
             <p className="mt-6 text-[15px] text-ink-muted">
               Baharu dengan kuiz dalam talian?{" "}
-              <Link href="/panduan" className="text-brand-purple hover:underline">
-                Baca panduan untuk pendidik
+              <Link href="/blog" className="text-brand-purple hover:underline">
+                Baca blog Kuizen
               </Link>
               .
             </p>
@@ -285,7 +290,7 @@ export default function Home() {
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-muted">
             <Link href="/privacy" className="hover:text-ink">Privasi</Link>
             <Link href="/terms" className="hover:text-ink">Terma</Link>
-            <Link href="/panduan" className="hover:text-ink">Panduan</Link>
+            <Link href="/blog" className="hover:text-ink">Blog</Link>
             <Link href="/help" className="hover:text-ink">Bantuan</Link>
           </nav>
         </div>
