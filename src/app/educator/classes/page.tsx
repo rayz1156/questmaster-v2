@@ -8,6 +8,7 @@ import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInv
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import RowMenu from "@/components/ui/RowMenu";
+import { pelanSaya, mesejHad, tanpaHad, type RingkasanPelan } from "@/lib/pelan";
 
 function roleLabel(role: string): string {
   if (role === "owner") return "Owner";
@@ -29,12 +30,14 @@ export default function EduClasses() {
   const [err, setErr] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
   const [inviteMsg, setInviteMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
+  const [pelan, setPelan] = useState<RingkasanPelan | null>(null);
 
   const reload = async () => {
     try {
-      const [cls, inv] = await Promise.all([listMyEducatorClasses(), listMyClassEducatorInvites()]);
+      const [cls, inv, pl] = await Promise.all([listMyEducatorClasses(), listMyClassEducatorInvites(), pelanSaya()]);
       setClasses(cls);
       setInvites(inv);
+      setPelan(pl);
     } catch (e: any) {
       setErr(e.message || "Failed to load");
     } finally {
@@ -52,7 +55,7 @@ export default function EduClasses() {
       setName(""); setDesc(""); setShowNew(false);
       await reload();
     } catch (e: any) {
-      setErr(e.message || "Failed to create class");
+      setErr(mesejHad(e, "Kelas tidak dapat dicipta."));
     } finally { setBusy(false); }
   };
 
@@ -165,6 +168,22 @@ export default function EduClasses() {
               </div>
             ))}
           </div>
+        </div>
+      )}
+
+      {pelan && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
+          <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${pelan.pelan === "pro" ? "bg-violet-50 text-brand-purple border border-violet-200" : "bg-[#F3F2F7] text-ink-muted border border-hairline"}`}>
+            {pelan.pelan === "pro" ? "Pro plan" : "Free plan"}
+          </span>
+          <span className="text-ink-muted">
+            {tanpaHad(pelan.hadKelas)
+              ? `${pelan.kelasDigunakan} classes`
+              : `Classes: ${pelan.kelasDigunakan} of ${pelan.hadKelas} used`}
+          </span>
+          {!tanpaHad(pelan.hadKelas) && pelan.kelasDigunakan >= (pelan.hadKelas ?? 0) && (
+            <span className="text-ink-faint">Delete a class or upgrade to add more.</span>
+          )}
         </div>
       )}
 

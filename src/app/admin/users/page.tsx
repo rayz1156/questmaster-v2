@@ -6,6 +6,7 @@ import { adminListProfiles, adminUpdateProfile, adminListUsersMeta, adminDeleteU
 import { Search } from "lucide-react";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { supabase } from '@/lib/supabaseClient';
+import { mesejHad } from '@/lib/pelan';
 
 function fmt(d: string | null | undefined) {
   if (!d) return "Never";
@@ -50,6 +51,15 @@ export default function Page() {
         }
       } catch (e: any) { alert('Failed to load classes: ' + (e?.message || e)); }
     }
+  };
+  const setPlan = async (u: Profile, plan: 'free' | 'pro') => {
+    if (plan === ((u as any).plan === 'pro' ? 'pro' : 'free')) return;
+    try {
+      const { error } = await supabase.rpc('qm_set_plan', { p_user: u.id, p_plan: plan });
+      if (error) throw error;
+      await logAudit('set_plan', 'profile', u.id, { plan });
+      reload();
+    } catch (e: any) { alert(mesejHad(e, 'Failed to change plan.')); }
   };
   const saveLimits = async (u: Profile) => {
     const d = limitDraft[u.id] || { owned: String(u.max_classes_owned ?? ''), coed: String(u.max_classes_as_coeducator ?? '') };
@@ -226,6 +236,18 @@ export default function Page() {
             {m && !m.email_confirmed_at && m.email && <button onClick={()=>verifyEmails([u.id])} disabled={verifying} className="text-xs px-2 py-1 rounded bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-40">Sahkan emel</button>}
             {m && !m.email_confirmed_at && m.email && <label className="text-xs px-2 py-1 rounded bg-gray-100 flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={selected.has(u.id)} onChange={()=>toggleSelected(u.id)} />Pilih</label>}
           </div>
+          {(u.role === 'educator' || u.role === 'admin' || u.role === 'superadmin') && (
+            <div className="mt-2 flex items-center gap-2 flex-wrap text-xs">
+              <span className="text-gray-500">Plan</span>
+              <select className="border rounded px-2 py-1"
+                value={(u as any).plan === 'pro' ? 'pro' : 'free'}
+                onChange={e=>setPlan(u, e.target.value as 'free' | 'pro')}>
+                <option value="free">Free (quizzes only)</option>
+                <option value="pro">Pro (all features)</option>
+              </select>
+              <span className="text-gray-400">Switching the plan also resets the limits below.</span>
+            </div>
+          )}
           {(u.role === 'educator' || u.role === 'admin') && (
             <div className="mt-2 flex items-end gap-2 flex-wrap text-xs">
               <label className="flex flex-col">Max classes (own)
