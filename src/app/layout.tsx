@@ -49,6 +49,26 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
+      <head>
+        {/* VisitorTracking. Skrip vendor memanggil init_tracer selepas ia
+            dimuatkan, jadi definisi mesti wujud sebelum itu. Skrip luar
+            ditanda defer, jadi ia berjalan selepas HTML selesai dihurai dan
+            fungsi di bawah sudah tersedia. */}
+        <script async defer src="https://app.visitortracking.com/assets/js/tracer.js" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+  function init_tracer() {
+   var tracer = new Tracer({
+    websiteId : '13c3aba1-8336-4406-8d41-789e67544b5a',
+    async : true,
+    debug : false
+   });
+}
+`,
+          }}
+        />
+      </head>
       <body className={inter.className}>
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
