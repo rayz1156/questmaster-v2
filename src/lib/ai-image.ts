@@ -2,7 +2,7 @@
  * AI image generation with multi-provider fallback.
  *
  * Provider chain (in order, configurable via AI_IMAGE_PROVIDERS env var, csv):
- *   horde      -> AI Horde (stablehorde.net) — free, crowdsourced, no hard cap, variable queue
+ *   horde      -> AI Horde (stablehorde.net), free, crowdsourced, no hard cap, variable queue
  *   cloudflare -> Cloudflare Workers AI (FLUX.1-schnell), ~10k neurons/day free
  *   huggingface-> Hugging Face Inference API (FLUX.1-schnell), free tier
  *   pollinations -> Pollinations.ai (no key required)
@@ -71,7 +71,7 @@ function sleep(ms: number, signal?: AbortSignal): Promise<void> {
 }
 
 // ---------------------------------------------------------------------------
-// Provider: AI Horde (stablehorde.net) — crowdsourced, free, no hard cap
+// Provider: AI Horde (stablehorde.net), crowdsourced, free, no hard cap
 // Docs: https://stablehorde.net/api/  (POST /v2/generate/async, GET /v2/generate/status/{id})
 // ---------------------------------------------------------------------------
 async function generateHorde(prompt: string, opts: GenOpts): Promise<AiImageResult> {
@@ -153,7 +153,7 @@ async function generateHorde(prompt: string, opts: GenOpts): Promise<AiImageResu
 }
 
 // ---------------------------------------------------------------------------
-// Provider: Cloudflare Workers AI — FLUX.1-schnell, fast edge inference
+// Provider: Cloudflare Workers AI, FLUX.1-schnell, fast edge inference
 // Docs: https://developers.cloudflare.com/workers-ai/models/flux-1-schnell/
 // ---------------------------------------------------------------------------
 async function generateCloudflare(prompt: string, opts: GenOpts): Promise<AiImageResult> {
@@ -189,7 +189,7 @@ async function generateCloudflare(prompt: string, opts: GenOpts): Promise<AiImag
 }
 
 // ---------------------------------------------------------------------------
-// Provider: Hugging Face Inference API — FLUX.1-schnell or configurable
+// Provider: Hugging Face Inference API, FLUX.1-schnell or configurable
 // Docs: https://huggingface.co/docs/api-inference
 // ---------------------------------------------------------------------------
 async function generateHuggingFace(prompt: string, opts: GenOpts): Promise<AiImageResult> {
@@ -228,7 +228,7 @@ async function generateHuggingFace(prompt: string, opts: GenOpts): Promise<AiIma
 }
 
 // ---------------------------------------------------------------------------
-// Provider: Pollinations.ai — no key required (fallback)
+// Provider: Pollinations.ai, no key required (fallback)
 // ---------------------------------------------------------------------------
 const POLLINATIONS_BASE = 'https://image.pollinations.ai/prompt';
 async function generatePollinations(prompt: string, opts: GenOpts): Promise<AiImageResult> {
@@ -294,7 +294,7 @@ export async function generateAiImage(prompt: string, opts?: GenOpts): Promise<A
         const result = await fn(prompt, opts || {});
         return result;
       } catch (e: any) {
-        if (e?.name === 'AbortError') throw e; // user cancelled — don't try other providers
+        if (e?.name === 'AbortError') throw e; // user cancelled, don't try other providers
         lastErr = e;
         const msg = e?.message || String(e);
         errors.push(`r${round + 1}/${name}: ${msg}`);

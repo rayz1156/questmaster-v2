@@ -162,7 +162,7 @@ export default function ClassPeoplePage() {
                   <div className="text-sm text-ink-muted">
                     {m.joined_at
                       ? new Date(String(m.joined_at)).toLocaleDateString(undefined, { day: "numeric", month: "short" })
-                      : "—"}
+                      : ","}
                   </div>
                 </div>
               ))}

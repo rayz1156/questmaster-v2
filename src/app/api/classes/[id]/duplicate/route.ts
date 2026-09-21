@@ -51,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const summary: any = { classId: newClassId, name: title, copied: { columns: 0, cards: 0, hunts: 0, challenges: 0, members: 0, educators: 0 } };
 
-  // ---- 3. Learning board (copy structure always — but cards conditionally)
+  // ---- 3. Learning board (copy structure always, but cards conditionally)
   if (body.copyLearningBoard) {
     const { data: srcBoard } = await admin
       .from('qm_learning_boards')
@@ -83,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         summary.copied.columns++;
 
         if (!body.asTemplate) {
-          // copy cards by reference (same file/image URLs — no re-upload)
+          // copy cards by reference (same file/image URLs, no re-upload)
           const { data: srcCards } = await admin
             .from('qm_learning_cards')
             .select('*')

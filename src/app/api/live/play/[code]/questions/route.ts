@@ -1,5 +1,5 @@
 /**
- * GET /api/live/play/[code]/questions?playerId= — muat turun soalan sekali.
+ * GET /api/live/play/[code]/questions?playerId=, muat turun soalan sekali.
  *
  * Laluan ini memulangkan SEMUA soalan sesi TANPA correct_key, beserta satu
  * tag `version` (hash pendek bagi senarai id soalan dan order_idx). Klien
@@ -8,7 +8,7 @@
  * laluan state berbeza.
  *
  * KESELAMATAN: correct_key TIDAK keluar dalam balasan ini. Senarai lajur
- * eksplisit tanpa correct_key; objek balasan dibina secara eksplisit — tiada
+ * eksplisit tanpa correct_key; objek balasan dibina secara eksplisit, tiada
  * spread baris pangkalan data. Kunci jawapan hanya muncul dalam blok reveal
  * pada laluan state selepas status menjadi 'revealed'.
  */

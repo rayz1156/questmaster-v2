@@ -8,7 +8,7 @@ export const maxDuration = 30;
 
 /**
  * Initiates a Bunny Stream upload (educator/class-owner only) and returns
- * presigned TUS auth so the browser uploads directly to Bunny — our VPS
+ * presigned TUS auth so the browser uploads directly to Bunny, our VPS
  * never touches the video bytes and the API key never leaves the server.
  *
  * Body: { columnId, filename, mimeType, sizeBytes, durationSeconds? }

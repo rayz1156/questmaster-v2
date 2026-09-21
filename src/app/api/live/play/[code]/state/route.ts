@@ -1,12 +1,12 @@
 /**
- * GET /api/live/play/[code]/state?playerId=&fp= — tinjauan keadaan peserta.
+ * GET /api/live/play/[code]/state?playerId=&fp=, tinjauan keadaan peserta.
  *
  * KESELAMATAN: correct_key tidak keluar dalam balasan ini. Sejak Bahagian 2.4
- * laluan ini TIDAK memulangkan objek soalan lagi — klien menyimpan soalan
+ * laluan ini TIDAK memulangkan objek soalan lagi, klien menyimpan soalan
  * daripada laluan /questions. Ia memulangkan questionId, questionIndex,
  * version dan timeLimitSec sahaja. Kunci jawapan hanya diambil dalam
  * pertanyaan berasingan di dalam blok reveal apabila status ialah 'revealed'.
- * Objek balasan dibina secara eksplisit — tiada spread baris pangkalan data.
+ * Objek balasan dibina secara eksplisit, tiada spread baris pangkalan data.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
@@ -80,7 +80,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       .from('qm_live_players')
       .select('id', { count: 'exact', head: true })
       .eq('session_id', session.id),
-    // Sejak Bahagian 2.4: hanya id, order_idx dan time_limit_sec — tiada
+    // Sejak Bahagian 2.4: hanya id, order_idx dan time_limit_sec, tiada
     // prompt/options, kerana teks soalan datang daripada cache klien
     // (laluan /questions). Senarai lajur eksplisit TANPA correct_key.
     supa
@@ -107,7 +107,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       ? allQuestions[session.current_index]
       : null;
 
-  // Version ialah hash pendek bagi senarai id soalan dan order_idx — sama
+  // Version ialah hash pendek bagi senarai id soalan dan order_idx, sama
   // dengan pengiraan dalam laluan /questions. Klien memanggil semula laluan
   // /questions apabila nilai ini berbeza daripada yang disimpan.
   const version = createHash('sha256')

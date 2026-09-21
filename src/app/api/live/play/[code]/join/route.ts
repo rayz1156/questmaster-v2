@@ -1,5 +1,5 @@
 /**
- * POST /api/live/play/[code]/join — peserta masuk sesi kuiz langsung.
+ * POST /api/live/play/[code]/join, peserta masuk sesi kuiz langsung.
  *
  * Peserta tiada akaun: semua akses melalui getServiceSupabase() (service role)
  * dan lajur ditapis secara eksplisit di sini. Balasan 409 jika sesi sudah

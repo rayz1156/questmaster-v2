@@ -241,7 +241,7 @@ export async function getAdiloFile(fileId: string): Promise<{
   if (!res.ok) throw new Error(`Adilo getFile failed: ${res.status}`);
   const json = await res.json();
   const data = json.payload ?? json.data ?? json;
-  // Adilo can deliver thumbnail under many names — also try posters/snapshots arrays.
+  // Adilo can deliver thumbnail under many names, also try posters/snapshots arrays.
   const thumbCandidate = data.thumbnail ?? data.thumbnailUrl ?? data.thumbnail_url ?? data.thumb ?? data.thumb_url ?? data.poster ?? data.poster_url ?? data.image ?? data.image_url ?? (Array.isArray(data.thumbnails) && data.thumbnails[0]?.url) ?? (Array.isArray(data.posters) && data.posters[0]?.url) ?? (Array.isArray(data.snapshots) && data.snapshots[0]?.url) ?? null;
   if (!thumbCandidate) {
     console.warn('[adilo] getFile: no thumbnail field. Response keys:', Object.keys(data || {}).join(','), '| raw:', JSON.stringify(json).slice(0, 600));
@@ -271,7 +271,7 @@ export async function getAdiloFile(fileId: string): Promise<{
 /**
  * Build the Adilo embed URL we render inside our own iframe.
  * Adilo's player URL pattern for embeds: https://adilo.bigcommand.com/embed/{fileId}
- * Students never see this URL in their address bar — only inside an iframe
+ * Students never see this URL in their address bar, only inside an iframe
  * inside our LightboxPlayer component.
  */
 export function buildAdiloEmbedUrl(fileId: string): string {

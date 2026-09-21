@@ -34,15 +34,15 @@ function initialsOf(name: string){
 }
 
 function formatJoined(iso?: string|null){
-  if(!iso) return "—";
+  if(!iso) return ",";
   try{
     const d = new Date(iso);
     return d.toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
-  }catch{ return "—"; }
+  }catch{ return ","; }
 }
 
 function formatLastActive(iso?: string|null){
-  if(!iso) return "—";
+  if(!iso) return ",";
   try{
     const d = new Date(iso);
     const now = new Date();
@@ -53,7 +53,7 @@ function formatLastActive(iso?: string|null){
     if(sameDay) return `Today, ${time}`;
     if(isYest) return `Yesterday, ${time}`;
     return d.toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'}) + `, ${time}`;
-  }catch{ return "—"; }
+  }catch{ return ","; }
 }
 
 type SortKey = "recent" | "name" | "joined";
@@ -313,7 +313,7 @@ export default function ClassDetail() {
         {filteredMembers.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 text-center">
             <div className="w-12 h-12 rounded-full bg-gray-50 flex items-center justify-center mb-2"><Users className="w-6 h-6 text-gray-300"/></div>
-            <p className="text-sm text-gray-500">{members.length === 0 ? "No members yet — share the class code above to invite participants." : "No members match your search."}</p>
+            <p className="text-sm text-gray-500">{members.length === 0 ? "No members yet, share the class code above to invite participants." : "No members match your search."}</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

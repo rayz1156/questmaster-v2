@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
 export const fetchCache = 'force-no-store';
 
-/** PATCH /api/live/questions/[questionId] — kemas kini separa medan soalan. */
+/** PATCH /api/live/questions/[questionId], kemas kini separa medan soalan. */
 export async function PATCH(req: NextRequest, { params }: { params: { questionId: string } }) {
   const q = await requireQuestionHost(req, params.questionId);
   if (q.response) return q.response;

@@ -216,7 +216,7 @@ function PageInner() {
                 </Link>
               </div>
               <div className="text-sm text-ink-muted truncate hidden sm:block">
-                {h.class_id && classMap[h.class_id] ? classMap[h.class_id] : "—"}
+                {h.class_id && classMap[h.class_id] ? classMap[h.class_id] : ","}
               </div>
               <div className="text-sm text-ink tabular-nums text-right">{h.points ?? 0}</div>
               <div className="hidden sm:block"><StatusDot status={h.status} /></div>

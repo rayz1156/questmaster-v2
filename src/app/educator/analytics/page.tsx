@@ -52,7 +52,7 @@ function LineChart({ data }: { data: Array<{ day: string; dau: number }> }) {
     }).join(" ");
     return { points: pts, max, width: w, height: h };
   }, [data]);
-  if (data.length === 0) return <div className="text-sm text-gray-500">No data yet — analytics start collecting now.</div>;
+  if (data.length === 0) return <div className="text-sm text-gray-500">No data yet, analytics start collecting now.</div>;
   return (
     <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-56">
       <polyline fill="none" stroke="#7057D9" strokeWidth="2.5" points={points} />
@@ -74,7 +74,7 @@ function HourBars({ data }: { data: Array<{ hour: number; events: number }> }) {
   return (
     <div className="flex items-end gap-1 h-32">
       {buckets.map((v, h) => (
-        <div key={h} className="flex-1 flex flex-col items-center gap-1" title={`${h}:00 — ${v} events`}>
+        <div key={h} className="flex-1 flex flex-col items-center gap-1" title={`${h}:00, ${v} events`}>
           <div className="w-full bg-[#B9ABF1] rounded-t" style={{ height: `${(v / max) * 100}%` }} />
           {h % 3 === 0 && <span className="text-[10px] text-gray-500">{h}h</span>}
         </div>

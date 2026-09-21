@@ -29,7 +29,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { classId: 
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
   const admin = getServiceSupabase();
-  // Note: Adilo file is intentionally NOT deleted here — the educator may
+  // Note: Adilo file is intentionally NOT deleted here, the educator may
   // re-link or recover. Cleanup is a Phase 2 admin operation.
   const { error } = await admin.from('qm_learning_cards').delete().eq('id', params.cardId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });

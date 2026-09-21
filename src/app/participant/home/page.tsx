@@ -154,7 +154,7 @@ export default function Page() {
                 <div className="text-xs text-ink-faint mt-2">{totalPoints > 0 ? "Earned with your team." : "Join a team to start earning."}</div>
               </div>
               <div className="card">
-                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{myRank > 0 ? `#${myRank}` : "—"}</div>
+                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{myRank > 0 ? `#${myRank}` : ","}</div>
                 <div className="text-sm text-ink-muted mt-1.5">Leaderboard rank</div>
                 <div className="text-xs text-ink-faint mt-2">{myRank > 0 && myRank <= 3 ? "Top three. Keep it up." : myRank > 0 ? "Climb higher." : "Join a team to be ranked."}</div>
               </div>

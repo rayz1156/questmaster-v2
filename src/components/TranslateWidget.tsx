@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import Script from "next/script";
 import { Languages } from "lucide-react";
 
-// GTranslate floating widget — free, no account required.
+// GTranslate floating widget, free, no account required.
 // Renders bottom-left (bottom-right reserved for future chatbot), offers Bahasa Melayu, Mandarin, Arabic, Tamil, etc.
 // Uses browser auto-translate as a free fallback when offline.
 

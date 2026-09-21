@@ -237,7 +237,7 @@ export async function requireQuizHost(
     };
   }
 
-  // 1. Pemilik kuiz — dibenarkan tanpa syarat (kuiz peribadi dan berkongsi).
+  // 1. Pemilik kuiz, dibenarkan tanpa syarat (kuiz peribadi dan berkongsi).
   if (quiz.owner_id === userId) {
     return { user: auth.user, supa: auth.supa, quiz, response: null };
   }

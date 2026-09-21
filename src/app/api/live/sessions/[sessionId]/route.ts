@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 /**
- * GET /api/live/sessions/[sessionId] — keadaan hos penuh.
+ * GET /api/live/sessions/[sessionId], keadaan hos penuh.
  * Hos sahaja (pemilik sesi, pendidik kelas atau admin). Termasuk soalan semasa
  * dengan correct_key kerana ini laluan hos.
  */

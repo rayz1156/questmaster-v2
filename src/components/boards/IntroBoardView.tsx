@@ -400,7 +400,7 @@ function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
                 placeholder="https://www.youtube.com/watch?v=..."
                 className="w-full px-3 py-2 border rounded-lg"
               />
-              <p className="text-xs text-gray-500">Direct video upload requires educator permission. Upload your intro to YouTube (unlisted is fine) and paste the link here — it will play right on the board.</p>
+              <p className="text-xs text-gray-500">Direct video upload requires educator permission. Upload your intro to YouTube (unlisted is fine) and paste the link here, it will play right on the board.</p>
             </div>
           )}
 

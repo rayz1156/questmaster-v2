@@ -9,7 +9,7 @@ export const dynamic = 'force-dynamic';
 // pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
 export const fetchCache = 'force-no-store';
 
-/** POST /api/live/quizzes — cipta kuiz langsung. Badan: {classId?,title,description?}
+/** POST /api/live/quizzes, cipta kuiz langsung. Badan: {classId?,title,description?}
  *  classId pilihan (Fasa 2): kosong bermakna kuiz peribadi (class_id null). */
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
@@ -50,9 +50,9 @@ export async function POST(req: NextRequest) {
   return NextResponse.json({ data: quiz }, { status: 201 });
 }
 
-/** GET /api/live/quizzes — senarai kuiz langsung.
+/** GET /api/live/quizzes, senarai kuiz langsung.
  *  Dengan ?classId= : senarai kuiz bagi kelas itu (kelakuan asal).
- *  Tanpa classId   : semua kuiz yang boleh dihoskan oleh pengguna —
+ *  Tanpa classId   : semua kuiz yang boleh dihoskan oleh pengguna ,
  *  kuiz peribadi miliknya (class_id null) serta kuiz berkongsi dengan
  *  kelas yang jemputan pendidiknya sudah diterima. Termasuk nama kelas
  *  untuk label "Peribadi"/kelas pada senarai UI. */

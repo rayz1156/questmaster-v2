@@ -10,6 +10,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { url: "https://kuizen.fun", lastModified: now, changeFrequency: "weekly", priority: 1 },
     { url: "https://kuizen.fun/register", lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: "https://kuizen.fun/login", lastModified: now, changeFrequency: "monthly", priority: 0.5 },
+    { url: "https://kuizen.fun/panduan/cara-buat-kuiz-online", lastModified: now, changeFrequency: "monthly", priority: 0.9 },
     { url: "https://kuizen.fun/help", lastModified: now, changeFrequency: "monthly", priority: 0.6 },
     { url: "https://kuizen.fun/privacy", lastModified: now, changeFrequency: "yearly", priority: 0.3 },
     { url: "https://kuizen.fun/terms", lastModified: now, changeFrequency: "yearly", priority: 0.3 },

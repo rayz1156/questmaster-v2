@@ -1,5 +1,5 @@
 /**
- * GET /api/live/play/[code]/leaderboard — 20 teratas untuk peserta.
+ * GET /api/live/play/[code]/leaderboard, 20 teratas untuk peserta.
  * Tiada ID dalaman; hanya rank, nickname dan markah.
  */
 import { NextRequest, NextResponse } from 'next/server';

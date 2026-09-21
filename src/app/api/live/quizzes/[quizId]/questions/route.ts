@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
 export const fetchCache = 'force-no-store';
 
-/** POST /api/live/quizzes/[quizId]/questions — tambah soalan. */
+/** POST /api/live/quizzes/[quizId]/questions, tambah soalan. */
 export async function POST(req: NextRequest, { params }: { params: { quizId: string } }) {
   const host = await requireQuizHost(req, params.quizId);
   if (host.response) return host.response;

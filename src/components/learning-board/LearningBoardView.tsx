@@ -284,18 +284,18 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
           <p className="text-xs text-gray-600 mb-3">Copy columns and cards from another class you own or co-educate. File references are reused (no re-upload).</p>
           <label className="block text-xs font-medium text-gray-700 mb-1">Source class</label>
           <select value={impSourceId} onChange={(e)=>setImpSourceId(e.target.value)} disabled={impLoading || impBusy} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 bg-white">
-            <option value="">{impLoading ? 'Loading…' : '— Select a class —'}</option>
+            <option value="">{impLoading ? 'Loading…' : ', Select a class ,'}</option>
             {impClasses.map((c:any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
           </select>
           <label className="block text-xs font-medium text-gray-700 mb-1">Mode</label>
           <div className="space-y-1.5 mb-4">
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input type="radio" name="impmode" value="append" checked={impMode==='append'} onChange={()=>setImpMode('append')} className="mt-1"/>
-              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">— add source columns after existing ones (safe)</span></span>
+              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">, add source columns after existing ones (safe)</span></span>
             </label>
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input type="radio" name="impmode" value="replace" checked={impMode==='replace'} onChange={()=>setImpMode('replace')} className="mt-1"/>
-              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">— delete the current board on this class first</span></span>
+              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">, delete the current board on this class first</span></span>
             </label>
           </div>
           {impErr && <div className="text-xs text-red-600 mb-2">{impErr}</div>}
@@ -1686,7 +1686,7 @@ function MoodBoardGrid({
                 disabled={creatingUncat}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-dashed border-white/15 text-left disabled:opacity-60"
               >
-                <span className="inline-flex w-6 h-6 rounded-md items-center justify-center bg-slate-800 text-slate-300 text-xs">—</span>
+                <span className="inline-flex w-6 h-6 rounded-md items-center justify-center bg-slate-800 text-slate-300 text-xs">,</span>
                 <span className="text-sm">No topic <span className="text-slate-500">(Uncategorized)</span></span>
               </button>
               {snap.columns.map((c) => {
@@ -1718,7 +1718,7 @@ function MoodBoardGrid({
 
 
 // -----------------------------------------------------------------------------
-// AI Thumbnail Batch Button — drives the SSE stream from /ai-thumbnail-all.
+// AI Thumbnail Batch Button, drives the SSE stream from /ai-thumbnail-all.
 // -----------------------------------------------------------------------------
 function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: () => void }) {
   const [confirmOpen, setConfirmOpen] = useState(false);

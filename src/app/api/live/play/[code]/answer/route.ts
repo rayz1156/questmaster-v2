@@ -1,11 +1,11 @@
 /**
- * POST /api/live/play/[code]/answer — pemain menghantar jawapan.
+ * POST /api/live/play/[code]/answer, pemain menghantar jawapan.
  *
  * Keselamatan:
  * - playerToken disahkan padan dengan baris pemain.
  * - Ditolak 409 jika status bukan 'asking', questionId bukan soalan pada
  *   current_index, atau pemain sudah menjawab soalan itu.
- * - ms_taken dikira di pelayan daripada question_started_at sesi — masa dari
+ * - ms_taken dikira di pelayan daripada question_started_at sesi, masa dari
  *   badan permintaan TIDAK diterima.
  * - correct_key diambil dalam pertanyaan berasingan untuk pemarkahan pelayan
  *   sahaja dan TIDAK dikembalikan. Balasan hanya { ok, locked }.
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     streak_at: streakAfter,
   });
   if (insertErr) {
-    // 23505: kekangan unik (session_id, player_id, question_id) — jawapan berulang.
+    // 23505: kekangan unik (session_id, player_id, question_id), jawapan berulang.
     if (insertErr.code === '23505') {
       return NextResponse.json({ error: 'You have already answered this question.' }, { status: 409 });
     }

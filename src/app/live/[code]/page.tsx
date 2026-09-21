@@ -7,7 +7,7 @@ import { Trophy, Users, Timer, Check, X } from "lucide-react";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
 
 interface Pilihan { key: string; text: string }
-// Soalan dalam cache klien (daripada laluan /questions — tiada correct_key).
+// Soalan dalam cache klien (daripada laluan /questions, tiada correct_key).
 interface SoalanPemain { id: string; prompt: string; options: Pilihan[] }
 interface CacheSoalan { version: string; questions: SoalanPemain[] }
 interface Keadaan {
@@ -172,7 +172,7 @@ export default function SkrinMainLangsung() {
         if (j.serverNow) sorokRef.current = Date.now() - new Date(j.serverNow).getTime();
         setKeadaan(j as Keadaan);
         // Version berbeza bermakna guru menyunting soalan atau menekan set
-        // semula — muat semula cache soalan.
+        // semula, muat semula cache soalan.
         if (j.version && j.version !== versRef.current) muatSoalan();
       } catch { /* cuba lagi pada kitaran seterusnya */ }
     };
@@ -342,7 +342,7 @@ export default function SkrinMainLangsung() {
                 <Timer className="w-4 h-4" />{" "}
                 {k.useCountdown === false
                   ? "No countdown"
-                  : berbaki !== null ? `${berbaki}s` : "—"}
+                  : berbaki !== null ? `${berbaki}s` : ","}
               </span>
             </div>
             <div className="font-semibold mb-3">{soalanSemasa.prompt}</div>
@@ -410,7 +410,7 @@ export default function SkrinMainLangsung() {
               })}
             </div>
             <div className="text-center text-sm text-gray-600 border-t border-gray-100 pt-2">
-              Rank <strong>#{k.reveal?.rank ?? "—"}</strong> · Total points <strong>{k.reveal?.score ?? 0}</strong>
+              Rank <strong>#{k.reveal?.rank ?? ","}</strong> · Total points <strong>{k.reveal?.score ?? 0}</strong>
             </div>
           </div>
         )}

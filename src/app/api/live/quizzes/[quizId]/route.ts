@@ -8,7 +8,7 @@ export const dynamic = 'force-dynamic';
 // pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
 export const fetchCache = 'force-no-store';
 
-/** GET /api/live/quizzes/[quizId] — kuiz + soalan. Hos nampak correct_key. */
+/** GET /api/live/quizzes/[quizId], kuiz + soalan. Hos nampak correct_key. */
 export async function GET(req: NextRequest, { params }: { params: { quizId: string } }) {
   const host = await requireQuizHost(req, params.quizId);
   if (host.response) return host.response;
@@ -23,7 +23,7 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
   return NextResponse.json({ data: { quiz: host.quiz, questions: questions || [] } });
 }
 
-/** PATCH /api/live/quizzes/[quizId] — badan: {title?,description?} */
+/** PATCH /api/live/quizzes/[quizId], badan: {title?,description?} */
 export async function PATCH(req: NextRequest, { params }: { params: { quizId: string } }) {
   const host = await requireQuizHost(req, params.quizId);
   if (host.response) return host.response;

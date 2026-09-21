@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 
 /**
  * Full-screen lightbox that plays an Adilo-hosted video inside an iframe.
- * The student's URL bar stays at cendekia.airiz.tech — only the iframe
+ * The student's URL bar stays at cendekia.airiz.tech, only the iframe
  * content comes from adilo.bigcommand.com.
  */
 export default function VideoLightbox({

@@ -19,7 +19,7 @@ export default function Page() {
       <div className="space-y-2">{subs.map(s => (
         <div key={s.id} className="card">
           <div className="flex justify-between items-center">
-            <div className="font-mono text-sm">{s.answer || '—'}</div>
+            <div className="font-mono text-sm">{s.answer || ','}</div>
             <span className={`text-xs px-2 py-1 rounded-full ${s.status==='approved'?'bg-green-100 text-green-700':s.status==='rejected'?'bg-red-100 text-red-700':'bg-yellow-100 text-yellow-700'}`}>{s.status}</span>
           </div>
           <div className="text-xs text-gray-400 mt-1">{new Date(s.created_at).toLocaleString()}</div>

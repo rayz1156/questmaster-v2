@@ -459,11 +459,11 @@ export default function EditorKuizLangsung() {
         <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-3 text-xs text-gray-700">
           <div className="font-semibold mb-1">Columns</div>
           <ul className="list-disc ml-4 space-y-0.5">
-            <li><code className="font-mono">question</code> — the question text</li>
-            <li><code className="font-mono">option_a</code> to <code className="font-mono">option_d</code> — the choices. At least A and B are needed, filled in order.</li>
-            <li><code className="font-mono">correct</code> — the letter of the right answer, A to D</li>
-            <li><code className="font-mono">points</code> — optional, 1 to 10000. Blank means 1000.</li>
-            <li><code className="font-mono">seconds</code> — optional, 5 to 300. Blank means 20.</li>
+            <li><code className="font-mono">question</code>, the question text</li>
+            <li><code className="font-mono">option_a</code> to <code className="font-mono">option_d</code>, the choices. At least A and B are needed, filled in order.</li>
+            <li><code className="font-mono">correct</code>, the letter of the right answer, A to D</li>
+            <li><code className="font-mono">points</code>, optional, 1 to 10000. Blank means 1000.</li>
+            <li><code className="font-mono">seconds</code>, optional, 5 to 300. Blank means 20.</li>
           </ul>
           <div className="mt-2">
             Save the file as <strong>CSV UTF-8</strong> in Excel, and keep the header row exactly as

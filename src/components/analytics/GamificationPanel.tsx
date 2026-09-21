@@ -235,7 +235,7 @@ export default function GamificationPanel({ classId }: { classId: string | null 
                     <span className="text-xs text-gray-500">{s.badge_count} badge{s.badge_count===1?"":"s"}</span>
                   </div>
                   <div className="text-xs text-gray-500 mt-0.5">
-                    {s.approved_subs} approved · {s.rejected_subs} rejected · best streak {s.best_streak}d · best rank {s.best_rank ?? "—"}
+                    {s.approved_subs} approved · {s.rejected_subs} rejected · best streak {s.best_streak}d · best rank {s.best_rank ?? ","}
                   </div>
                   {s.badges.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1">

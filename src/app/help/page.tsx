@@ -19,14 +19,14 @@ const KB_ARTICLES = [
     items: [
       { t: "Creating a class", b: "Click '+ New Class' on the Classes page, give it a name and color, and Kuizen will auto-generate a join code. Share that code with your students." },
       { t: "Designing a quest", b: "Go to Activities → New Activity. Add a title, instructions, up to two reference links, an optional submission folder, point value, and active window. Save as Draft, then publish when ready." },
-      { t: "Reading the leaderboard", b: "The Rankings tab shows live team scores per class. Use it during lectures to drive engagement — students love seeing rankings update in real time." },
+      { t: "Reading the leaderboard", b: "The Rankings tab shows live team scores per class. Use it during lectures to drive engagement, and students love seeing rankings update in real time." },
       { t: "Inviting co-educators", b: "From your class's Manage page, use the Invites section to add a co-educator by email. They get the same edit access you do." },
     ],
   },
   {
     role: "For Students",
     items: [
-      { t: "Finding your team", b: "After joining a class, go to Teams and either join an existing team or create one. Some classes have teacher-assigned teams — in that case yours will already be set." },
+      { t: "Finding your team", b: "After joining a class, go to Teams and either join an existing team or create one. Some classes have teacher-assigned teams, and in that case yours will already be set." },
       { t: "Submitting a quest", b: "Open the quest from Activities, read the instructions, click the reference links if any, do the work, then upload your submission to the linked folder (if provided) and mark the quest done." },
       { t: "Tracking your progress", b: "The Home page shows active quests and deadlines. The Leaderboard tab shows your team’s rank. Your Profile shows total points earned." },
     ],
@@ -34,14 +34,14 @@ const KB_ARTICLES = [
 ];
 
 const FAQS = [
-  { q: "I forgot my password — what do I do?", a: "On the login page, click 'Forgot password'. You’ll get a reset link by email. If it doesn’t arrive within 5 minutes, check your spam folder." },
+  { q: "I forgot my password. What do I do?", a: "On the login page, click 'Forgot password'. You’ll get a reset link by email. If it doesn’t arrive within 5 minutes, check your spam folder." },
   { q: "My class code isn’t working.", a: "Class codes are case-sensitive 8-character codes. Make sure there are no spaces. If it still fails, ask your educator to confirm the class is active." },
   { q: "Can I be in more than one class?", a: "Yes. You can join as many classes as your educator(s) invite you to. Each class has its own teams, quests, and leaderboard." },
   { q: "I submitted a quest but didn’t get points.", a: "Points are awarded when your educator marks the quest complete for your team. If you submitted on time and still don’t see points after 48 hours, contact your educator." },
-  { q: "How do I switch the language?", a: "Click the language flag in the bottom-right corner of any page. Kuizen supports Bahasa Melayu, Mandarin, Arabic, Tamil, Hindi, Japanese, Korean, Indonesian, and English." },
-  { q: "Does Kuizen work on mobile?", a: "Yes. Kuizen is a Progressive Web App — open it in your browser and tap 'Install app' to add it to your home screen. It works offline for previously-viewed content." },
-  { q: "Is my data private?", a: "Your submissions, points, and activity are visible to your educator and classmates as part of the leaderboard. Personal info (email, phone) is not shared with classmates. Kuizen is hosted by UPSI and follows their data governance policies." },
-  { q: "How do I report a bug?", a: "Use the Feedback tab on this page — select 'Bug report' as the type. Include what you were doing when it happened." },
+  { q: "How do I switch the language?", a: "Click the language flag in the bottom-left corner of any page. Kuizen supports Bahasa Melayu, Mandarin, Arabic, Tamil, Hindi, Japanese, Korean, Indonesian, and English." },
+  { q: "Does Kuizen work on mobile?", a: "Yes. Kuizen is a Progressive Web App, so open it in your browser and tap 'Install app' to add it to your home screen. It works offline for previously-viewed content." },
+  { q: "Is my data private?", a: "Your submissions, points, and activity are visible to your educator and classmates as part of the leaderboard. Personal info (email, phone) is not shared with classmates. Kuizen runs on its own servers, operated by Veltrix Technology in collaboration with UPSI and AFK. What we collect and who can see it is set out on the Privacy page." },
+  { q: "How do I report a bug?", a: "Use the Feedback tab on this page and select 'Bug report' as the type. Include what you were doing when it happened." },
 ];
 
 type Hit = { section: string; q: string; a: string };
@@ -51,35 +51,46 @@ const ALL: Hit[] = [
   ...FAQS.map((f) => ({ section: "FAQ", q: f.q, a: f.a })),
 ];
 
-function Accordion({ items, openKey, onToggle }: { items: Hit[]; openKey: string | null; onToggle: (k: string) => void }) {
+function Accordion({ items }: { items: Hit[] }) {
   if (items.length === 0) {
     return <p className="text-sm text-ink-muted py-6">Nothing matches that yet. Try fewer words, or send us the question below.</p>;
   }
   return (
     <div>
-      {items.map((it) => {
-        const open = openKey === it.q;
-        return (
-          <div key={it.q} className="border-t border-hairline">
-            <button
-              onClick={() => onToggle(it.q)}
-              className="w-full flex items-start justify-between gap-6 py-4 text-left"
-            >
-              <span className="text-[15px] font-medium text-ink">{it.q}</span>
-              <ChevronDown className={`w-4 h-4 mt-1 shrink-0 text-ink-faint transition-transform ${open ? "rotate-180" : ""}`} />
-            </button>
-            {open && <p className="text-sm text-ink-muted leading-relaxed pb-5 pr-10">{it.a}</p>}
-          </div>
-        );
-      })}
+      {items.map((it) => (
+        <details key={it.q} className="group border-t border-hairline">
+          <summary className="w-full flex items-start justify-between gap-6 py-4 text-left cursor-pointer list-none">
+            <span className="text-[15px] font-medium text-ink">{it.q}</span>
+            <ChevronDown className="w-4 h-4 mt-1 shrink-0 text-ink-faint transition-transform group-open:rotate-180" />
+          </summary>
+          <p className="text-sm text-ink-muted leading-relaxed pb-5 pr-10">{it.a}</p>
+        </details>
+      ))}
     </div>
   );
+}
+
+/**
+ * Setiap soalan dan jawapan dihidangkan sebagai data berstruktur. Halaman
+ * bantuan ialah halaman jawapan, dan halaman jawapan itulah yang dipetik
+ * enjin carian jawapan.
+ */
+function helpJsonLd() {
+  return {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "@id": "https://kuizen.fun/help#faq",
+    mainEntity: ALL.map((it) => ({
+      "@type": "Question",
+      name: it.q,
+      acceptedAnswer: { "@type": "Answer", text: it.a },
+    })),
+  };
 }
 
 export default function HelpPage() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
-  const [openKey, setOpenKey] = useState<string | null>(null);
   const [showFb, setShowFb] = useState(false);
   const [fbType, setFbType] = useState<"bug" | "idea" | "question" | "other">("idea");
   const [fbSubject, setFbSubject] = useState("");
@@ -104,9 +115,9 @@ export default function HelpPage() {
     ? ALL.filter((it) => (it.q + " " + it.a).toLowerCase().includes(q))
     : category
     ? ALL.filter((it) => it.section === category)
-    : FAQS.map((f) => ({ section: "FAQ", q: f.q, a: f.a }));
+    : ALL;
 
-  const heading = q ? `${results.length} ${results.length === 1 ? "answer" : "answers"}` : category ? category : "Popular questions";
+  const heading = q ? `${results.length} ${results.length === 1 ? "answer" : "answers"}` : category ? category : "All answers";
 
   const submitFeedback = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,6 +155,10 @@ export default function HelpPage() {
 
   return (
     <div className="min-h-screen bg-canvas">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(helpJsonLd()) }}
+      />
       <div className="max-w-3xl mx-auto px-6">
         <div className="pt-6">
           <Link href="/" className="btn-quiet">
@@ -159,7 +174,7 @@ export default function HelpPage() {
           <Search className="w-[18px] h-[18px] text-ink-faint absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           <input
             value={query}
-            onChange={(e) => { setQuery(e.target.value); setOpenKey(null); }}
+            onChange={(e) => { setQuery(e.target.value); }}
             placeholder="Search help"
             aria-label="Search help"
             className="input pl-11 pr-4"
@@ -171,7 +186,7 @@ export default function HelpPage() {
           {KB_ARTICLES.map((s) => (
             <button
               key={s.role}
-              onClick={() => { setCategory(category === s.role ? null : s.role); setQuery(""); setOpenKey(null); }}
+              onClick={() => { setCategory(category === s.role ? null : s.role); setQuery(""); }}
               className={`text-sm font-medium rounded-full px-3.5 py-1.5 border transition ${
                 category === s.role && !q
                   ? "border-brand-purple text-brand-purple bg-[#F4F2FD]"
@@ -185,7 +200,7 @@ export default function HelpPage() {
 
         <div className="mt-12">
           <div className="section-title mb-1">{heading}</div>
-          <Accordion items={results} openKey={openKey} onToggle={(k) => setOpenKey(openKey === k ? null : k)} />
+          <Accordion items={results} />
         </div>
 
         <div className="mt-16 mb-20 border-t border-hairline pt-6">
