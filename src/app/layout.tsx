@@ -12,20 +12,23 @@ const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] }
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://kuizen.fun"),
-  title: "Kuizen",
+  title: {
+    default: "Kuizen: Platform Kuiz Interaktif dan Gamifikasi Bilik Darjah",
+    template: "%s | Kuizen",
+  },
   description:
-    "Kuizen — Learn. Compete. Conquer. Where classrooms become arenas and learners become champions.",
+    "Platform kuiz interaktif dan gamifikasi pembelajaran untuk pendidik. Cipta kuiz bilik darjah, jalankan sesi PdPc langsung, lihat markah serta merta.",
   applicationName: "Kuizen",
   manifest: "/manifest.json",
   openGraph: {
-    title: "Kuizen",
-    description: "Learn. Compete. Conquer.",
+    title: "Kuizen: Platform Kuiz Interaktif dan Gamifikasi Bilik Darjah",
+    description: "Cipta kuiz bilik darjah interaktif dan jalankan sesi PdPc langsung.",
     url: "https://kuizen.fun",
     siteName: "Kuizen",
     images: [{ url: "/icons/icon-512.png", width: 512, height: 512 }],
     type: "website",
   },
-  twitter: { card: "summary", title: "Kuizen", description: "Learn. Compete. Conquer.", images: ["/icons/icon-512.png"] },
+  twitter: { card: "summary", title: "Kuizen", description: "Platform kuiz interaktif dan gamifikasi bilik darjah.", images: ["/icons/icon-512.png"] },
   appleWebApp: {
     capable: true,
     title: "Kuizen",

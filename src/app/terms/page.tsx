@@ -1,7 +1,7 @@
 import LegalPage, { Section } from "@/components/LegalPage";
 
 export const metadata = {
-  title: "Terms — Kuizen",
+  title: "Terms",
   description: "The rules for using Kuizen, in plain language.",
 };
 

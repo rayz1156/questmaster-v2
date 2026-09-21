@@ -1,7 +1,7 @@
 import LegalPage, { Section } from "@/components/LegalPage";
 
 export const metadata = {
-  title: "Privacy — Kuizen",
+  title: "Privacy",
   description: "What Kuizen collects, who can see it, and what you can do about it.",
 };
 
@@ -34,6 +34,13 @@ export default function Privacy() {
           <strong className="text-ink">Basic usage records.</strong> Events such as signing in,
           opening an activity or submitting one, so educators can see whether a class is active and
           so we can find faults.
+        </p>
+        <p>
+          <strong className="text-ink">Visitor analytics.</strong> Public pages load a script from
+          VisitorTracking, a third party analytics service. It records the pages visited, the
+          referring site, and the visitor IP address, which it may use to identify the organisation
+          a visit came from. We use it to understand how people find Kuizen. It does not read
+          anything inside your class, and it is not linked to your account.
         </p>
       </Section>
 
