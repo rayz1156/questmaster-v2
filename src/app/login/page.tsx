@@ -194,5 +194,36 @@ function LoginInner() {
 }
 
 export default function LoginPage() {
-  return (<Suspense fallback={null}><LoginInner /></Suspense>);
+  return (
+    <Suspense fallback={<LoginShell />}>
+      <LoginInner />
+    </Suspense>
+  );
+}
+
+/**
+ * Rangka statik yang dihidangkan sebelum borang dihidrat.
+ *
+ * Fallback sebelum ini null, jadi HTML yang dihantar pelayan tiada tajuk dan
+ * hampir tiada teks. Perangkak membaca HTML itu, bukan skrin selepas
+ * JavaScript berjalan.
+ */
+function LoginShell() {
+  return (
+    <div className="min-h-screen flex flex-col" style={{ background: '#FCFBF9' }}>
+      <div className="px-8 pt-7">
+        <Logo size={30} />
+      </div>
+      <div className="flex-1 flex items-center justify-center px-6 py-10">
+        <div className="w-full max-w-[380px] text-center">
+          <h1 className="text-[40px] leading-[1.1] font-semibold tracking-tight text-ink">
+            Welcome back.
+          </h1>
+          <p className="text-[17px] text-ink-muted mt-2">
+            Your next great class starts here.
+          </p>
+        </div>
+      </div>
+    </div>
+  );
 }
