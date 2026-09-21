@@ -120,9 +120,10 @@ function jsonLd() {
         "@type": "BreadcrumbList",
         itemListElement: [
           { "@type": "ListItem", position: 1, name: "Kuizen", item: "https://kuizen.fun" },
+          { "@type": "ListItem", position: 2, name: "Panduan", item: "https://kuizen.fun/panduan" },
           {
             "@type": "ListItem",
-            position: 2,
+            position: 3,
             name: "Cara buat kuiz online",
             item: "https://kuizen.fun/panduan/cara-buat-kuiz-online",
           },
@@ -157,7 +158,7 @@ export default function Panduan() {
           <nav aria-label="Laluan" className="text-[13px] text-ink-faint">
             <Link href="/" className="hover:text-ink">Kuizen</Link>
             <span className="px-2">/</span>
-            <span>Panduan</span>
+            <Link href="/panduan" className="hover:text-ink">Panduan</Link>
           </nav>
 
           <h1
@@ -242,6 +243,7 @@ export default function Panduan() {
             <p className="mt-1.5 text-[13px] text-ink-faint">Pembelajaran lebih hidup.</p>
           </div>
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-muted">
+            <Link href="/panduan" className="hover:text-ink">Panduan</Link>
             <Link href="/privacy" className="hover:text-ink">Privasi</Link>
             <Link href="/terms" className="hover:text-ink">Terma</Link>
             <Link href="/help" className="hover:text-ink">Bantuan</Link>

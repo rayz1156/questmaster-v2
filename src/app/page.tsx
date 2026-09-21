@@ -267,8 +267,8 @@ export default function Home() {
             </div>
             <p className="mt-6 text-[15px] text-ink-muted">
               Baharu dengan kuiz dalam talian?{" "}
-              <Link href="/panduan/cara-buat-kuiz-online" className="text-brand-purple hover:underline">
-                Baca panduan tujuh langkah
+              <Link href="/panduan" className="text-brand-purple hover:underline">
+                Baca panduan untuk pendidik
               </Link>
               .
             </p>
@@ -285,7 +285,7 @@ export default function Home() {
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-muted">
             <Link href="/privacy" className="hover:text-ink">Privasi</Link>
             <Link href="/terms" className="hover:text-ink">Terma</Link>
-            <Link href="/panduan/cara-buat-kuiz-online" className="hover:text-ink">Panduan</Link>
+            <Link href="/panduan" className="hover:text-ink">Panduan</Link>
             <Link href="/help" className="hover:text-ink">Bantuan</Link>
           </nav>
         </div>
