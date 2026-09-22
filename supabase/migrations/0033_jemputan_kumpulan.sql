@@ -206,7 +206,6 @@ SET search_path TO 'public'
 AS $fn$
 DECLARE
   r jsonb;
-  e jsonb;
   v_row int;
   v_group text;
   v_gkey text;
@@ -268,7 +267,7 @@ BEGIN
   -- 2. Validasi kandungan fail. Setiap emel mesti unik, satu kumpulan
   --    satu ketua sahaja, medan wajib tidak boleh kosong.
   -- -----------------------------------------------------------------
-  FOR r IN SELECT e FROM jsonb_array_elements(p_rows) e LOOP
+  FOR r IN SELECT el.value FROM jsonb_array_elements(p_rows) AS el(value) LOOP
     v_row := COALESCE((r->>'row')::int, 0);
     v_group := btrim(COALESCE(r->>'group',''));
     v_email := lower(btrim(COALESCE(r->>'email','')));
@@ -321,7 +320,8 @@ BEGIN
   IF v_seen != '{}'::jsonb THEN
     FOR v_email IN SELECT jsonb_object_keys(v_seen) LOOP
       v_uid := public.qm_user_id_by_email(v_email);
-      v_email_uid := jsonb_set(v_email_uid, ARRAY[v_email], to_jsonb(v_uid));
+      v_email_uid := jsonb_set(v_email_uid, ARRAY[v_email],
+                               COALESCE(to_jsonb(v_uid), 'null'::jsonb));
     END LOOP;
 
     FOR r IN
@@ -339,7 +339,7 @@ BEGIN
   --    (sertai sekarang atau tunggu pendaftaran), termasuk semakan
   --    ahli yang sudah berada dalam kumpulan lain dalam kelas ini.
   -- -----------------------------------------------------------------
-  FOR r IN SELECT e FROM jsonb_array_elements(p_rows) e LOOP
+  FOR r IN SELECT el.value FROM jsonb_array_elements(p_rows) AS el(value) LOOP
     v_row := COALESCE((r->>'row')::int, 0);
     v_email := lower(btrim(COALESCE(r->>'email','')));
     v_group := btrim(COALESCE(r->>'group',''));
@@ -404,13 +404,6 @@ BEGIN
       'errors', v_errors, 'warnings', v_warnings);
   END IF;
 
-  IF p_dry_run THEN
-    RETURN jsonb_build_object('ok', true, 'dry_run', true,
-      'teams_created', v_created, 'teams_reused', v_reused,
-      'joined_now', v_joined, 'pending', v_pending,
-      'teams', v_teams_out, 'emails', v_emails_out, 'warnings', v_warnings);
-  END IF;
-
   -- -----------------------------------------------------------------
   -- 4. Sekatan pelan, dilaksanakan secara eksplisit kerana konteks
   --    SECURITY DEFINER membutakan penjaga qm_guard_plan_teams.
@@ -420,6 +413,13 @@ BEGIN
       USING ERRCODE = 'P0001';
   END IF;
 
+  IF p_dry_run THEN
+    RETURN jsonb_build_object('ok', true, 'dry_run', true,
+      'teams_created', v_created, 'teams_reused', v_reused,
+      'joined_now', v_joined, 'pending', v_pending,
+      'teams', v_teams_out, 'emails', v_emails_out, 'warnings', v_warnings);
+  END IF;
+
   -- -----------------------------------------------------------------
   -- 5. Tulisan. Semua di bawah berlaku dalam satu transaksi; ralat
   --    bila bila menggulung semula segalanya.
@@ -427,7 +427,7 @@ BEGIN
   -- Alih ahli antara kumpulan bila pendidik menanda "replace". Sekali
   -- sahaja untuk semua baris, bukan dalam gelung kumpulan.
   IF COALESCE(p_replace, false) THEN
-    FOR r IN SELECT e FROM jsonb_array_elements(p_rows) e LOOP
+    FOR r IN SELECT el.value FROM jsonb_array_elements(p_rows) AS el(value) LOOP
       v_email := lower(btrim(COALESCE(r->>'email','')));
       v_uid := (v_email_uid->>v_email)::uuid;
       IF v_uid IS NOT NULL THEN
@@ -460,7 +460,7 @@ BEGIN
     END IF;
   END LOOP;
 
-  FOR r IN SELECT e FROM jsonb_array_elements(p_rows) e LOOP
+  FOR r IN SELECT el.value FROM jsonb_array_elements(p_rows) AS el(value) LOOP
     v_row := COALESCE((r->>'row')::int, 0);
     v_email := lower(btrim(COALESCE(r->>'email','')));
     v_group := btrim(COALESCE(r->>'group',''));
@@ -479,19 +479,19 @@ BEGIN
 
       -- Jika kumpulan sudah ada ketua lain, gagalkan import dengan mesej
       -- yang jelas, bukan ralat kunci unik mentah.
-      IF COALESCE(r->>'leader', false)::boolean THEN
+      IF COALESCE((r->>'leader')::boolean, false) THEN
         IF EXISTS (
           SELECT 1 FROM public.qm_team_members tm
            WHERE tm.team_id = v_existing AND tm.role = 'leader' AND tm.user_id <> v_uid
         ) THEN
-          RAISE EXCEPTION 'QM_LEADER_CONFLICT: row %: team "%s" already has a leader. Remove one of the leaders and upload again.',
+          RAISE EXCEPTION 'QM_LEADER_CONFLICT: baris %: kumpulan "%" sudah mempunyai ketua. Buang salah seorang ketua dan muat naik semula.',
             v_row, v_team_name USING ERRCODE = 'P0001';
         END IF;
       END IF;
 
       INSERT INTO public.qm_team_members (team_id, user_id, role)
       VALUES (v_existing, v_uid,
-              CASE WHEN COALESCE(r->>'leader', false)::boolean
+              CASE WHEN COALESCE((r->>'leader')::boolean, false)
                    THEN 'leader' ELSE 'member' END)
       ON CONFLICT (team_id, user_id)
       DO UPDATE SET role = EXCLUDED.role;
@@ -503,7 +503,7 @@ BEGIN
       VALUES (
         p_class_id, v_existing, v_email,
         nullif(btrim(COALESCE(r->>'name','')), ''),
-        CASE WHEN COALESCE(r->>'leader', false)::boolean
+        CASE WHEN COALESCE((r->>'leader')::boolean, false)
              THEN 'leader' ELSE 'member' END,
         v_caller)
       ON CONFLICT (team_id, email) WHERE claimed_at IS NULL

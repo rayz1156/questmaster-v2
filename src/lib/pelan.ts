@@ -30,6 +30,9 @@ const MESEJ: Record<string, string> = {
   QM_LIMIT_PLAYERS: 'This session is full.',
   QM_FORBIDDEN: 'Only an administrator can do this.',
   QM_BAD_PLAN: 'Invalid plan.',
+  QM_LEADER_CONFLICT:
+    'One of the groups already has a leader. Remove the extra leader in your file and upload again.',
+  QM_NOT_FOUND: 'That class could not be found.',
 };
 
 /** Kod had yang terkandung dalam ralat, jika ada. */
