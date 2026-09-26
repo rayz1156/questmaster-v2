@@ -23,6 +23,8 @@ import {
   updateLiveQuestion,
   liveSessionLinks,
 } from "./live-quiz-tools";
+import { updateChallenge, deleteChallenge } from "./challenge-tools";
+import { importTeamsCsv, setTeamLeader, groupTeamsWithMembers } from "./team-tools";
 
 export interface ToolDef {
   name: string;
@@ -366,6 +368,161 @@ export const TOOLS: ToolDef[] = [
           .single(),
         "Cipta challenge"
       ),
+  },
+
+  {
+    name: "update_challenge",
+    title: "Kemas kini challenge",
+    description:
+      "Kemas kini medan challenge: title, prompt, answer, points atau order_idx. " +
+      "Hanya medan yang diberi akan diubah.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        challenge_id: { type: "string" },
+        title: { type: "string" },
+        prompt: { type: "string" },
+        answer: { type: "string", description: "Jawapan yang diterima" },
+        points: { type: "number" },
+        order_idx: { type: "number" },
+      },
+      required: ["challenge_id"],
+    },
+    handler: async (args, s) => updateChallenge(s.db, args),
+  },
+
+  {
+    name: "delete_challenge",
+    title: "Padam challenge",
+    description:
+      "Padam satu challenge daripada hunt. Memerlukan confirm: true. Penghantaran " +
+      "peserta yang dipautkan pada challenge itu turut terpadam.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        challenge_id: { type: "string" },
+        confirm: { type: "boolean", description: "Wajib true" },
+      },
+      required: ["challenge_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.challenge_id) throw new Error("challenge_id diperlukan");
+      return deleteChallenge(s.db, args.challenge_id, args.confirm);
+    },
+  },
+
+  {
+    name: "list_teams",
+    title: "Senarai kumpulan",
+    description:
+      "Kumpulan peringkat kelas (bukan kumpulan hunt lama) dengan ahli dan ketua. " +
+      "Ahli diambil daripada qm_team_members beserta peranannya; ketua ialah ahli " +
+      "dengan role 'leader'.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        limit: { type: "number", description: `Lalai ${LIMITS.default}` },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      const teams = unwrapList(
+        await s.db
+          .from("qm_teams")
+          .select("id, class_id, name, max_members, join_code, score, created_at")
+          .eq("class_id", args.class_id)
+          .is("hunt_id", null)
+          .order("name", { ascending: true })
+          .limit(clampLimit(args?.limit)),
+        "Senarai kumpulan"
+      ) as Array<{ id: string }>;
+
+      if (teams.length === 0) return { teams: [] };
+
+      // Satu pertanyaan berpagar RLS untuk semua kumpulan, bukan satu
+      // pertanyaan setiap kumpulan.
+      const members = unwrapList(
+        await s.db
+          .from("qm_team_members")
+          .select("team_id, user_id, role, joined_at")
+          .in("team_id", teams.map((t) => t.id)),
+        "Ahli kumpulan"
+      ) as Array<{ team_id: string; user_id: string; role: string; joined_at: string }>;
+
+      const grouped = groupTeamsWithMembers(teams, members);
+      return {
+        teams: teams.map((t) => {
+          const g = grouped[t.id];
+          return {
+            ...t,
+            member_count: g?.members.length ?? 0,
+            leader_user_id: g?.leader_user_id ?? null,
+            members: (g?.members ?? []).map((m) => ({
+              user_id: m.user_id,
+              role: m.role,
+              joined_at: m.joined_at,
+            })),
+          };
+        }),
+      };
+    },
+  },
+
+  {
+    name: "import_teams_csv",
+    title: "Import kumpulan CSV",
+    description:
+      "Import kumpulan dan ahli daripada teks CSV (templat Kuizen: " +
+      "nama_kumpulan,nama_ahli,emel,ketua). Guna mode preview dahulu untuk " +
+      "melihat hasil tanpa apa-apa tulisan, kemudian mode commit. Semua atau " +
+      "tiada: satu baris rosak bermakna tiada kumpulan dimasukkan. Had " +
+      "kira-kira 500 KB dan 500 baris. replace true memindahkan ahli yang " +
+      "sudah berada dalam kumpulan lain dalam kelas yang sama.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        mode: { type: "string", enum: ["preview", "commit"], description: "Lalai: preview" },
+        content: { type: "string", description: "Kandungan fail CSV sebagai teks" },
+        replace: { type: "boolean", description: "Pindahkan ahli antara kumpulan sedia ada" },
+      },
+      required: ["class_id", "content"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      return importTeamsCsv(s.accessToken, args.class_id, args);
+    },
+  },
+
+  {
+    name: "set_team_leader",
+    title: "Tetapkan ketua kumpulan",
+    description:
+      "Lantik seorang ahli kumpulan sebagai ketua dan turunkan ketua sedia ada " +
+      "(jika ada). Pengguna mesti sudah menjadi ahli kumpulan itu; gunakan " +
+      "import_teams_csv untuk menambah ahli.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        team_id: { type: "string" },
+        user_id: { type: "string" },
+      },
+      required: ["team_id", "user_id"],
+    },
+    handler: async (args, s) => {
+      return setTeamLeader(s.db, String(args.team_id ?? ""), String(args.user_id ?? ""));
+    },
   },
 
   {
