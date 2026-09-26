@@ -18,18 +18,27 @@
 const BASE = (process.env.MCP_PUBLIC_URL ?? "https://kuizen.fun").replace(/\/$/, "");
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) {
+  /**
+   * Badan JSON mentah daripada route yang gagal, bila ia boleh dihuraikan.
+   * Sesetengah pemanggil (contohnya import_teams_csv) memerlukan butiran
+   * seperti senarai errors:[{row,message}] yang tidak muat dalam mesej
+   * ringkas, jadi ia disimpan di sini tanpa mengubah kontrak lama.
+   */
+  public payload?: unknown;
+
+  constructor(public status: number, message: string, payload?: unknown) {
     super(message);
+    this.payload = payload;
   }
 }
 
-async function readError(res: Response): Promise<string> {
+async function readError(res: Response): Promise<{ text: string; payload?: unknown }> {
   const text = await res.text().catch(() => "");
   try {
     const j = JSON.parse(text);
-    return j.error ?? j.message ?? text ?? res.statusText;
+    return { text: j.error ?? j.message ?? text ?? res.statusText, payload: j };
   } catch {
-    return text || res.statusText;
+    return { text: text || res.statusText };
   }
 }
 
@@ -49,7 +58,10 @@ export async function callApi<T = any>(
     cache: "no-store",
   });
 
-  if (!res.ok) throw new ApiError(res.status, await readError(res));
+  if (!res.ok) {
+    const err = await readError(res);
+    throw new ApiError(res.status, err.text, err.payload);
+  }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
 }
@@ -81,6 +93,9 @@ export async function uploadFile(
     cache: "no-store",
   });
 
-  if (!res.ok) throw new ApiError(res.status, await readError(res));
+  if (!res.ok) {
+    const err = await readError(res);
+    throw new ApiError(res.status, err.text, err.payload);
+  }
   return await res.json();
 }
