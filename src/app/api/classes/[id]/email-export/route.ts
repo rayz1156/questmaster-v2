@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!pro) {
     return NextResponse.json(
       {
-        error: "This feature is not part of the free plan. The free plan covers quizzes only.",
+        error: "Email integration is available on the Pro plan.",
         code: "QM_PRO_ONLY",
       },
       { status: 403 },
