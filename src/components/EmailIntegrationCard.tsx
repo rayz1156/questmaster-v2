@@ -9,7 +9,6 @@
  */
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { Lock, Mail, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 

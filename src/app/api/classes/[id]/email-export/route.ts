@@ -54,7 +54,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!klass) {
     return NextResponse.json({ error: "Not found" }, { status: 404 });
   }
-  let dibenarkan = klass.owner_id === user.id;
+  const dibenarkan = klass.owner_id === user.id;
   if (!dibenarkan) {
     // Pendidik bersama: qm_class_educators dengan accepted_at tidak null.
     // JANGAN semak qm_class_members: itu jadual peserta.
