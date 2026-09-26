@@ -11,7 +11,6 @@ export type Pelan = 'free' | 'pro';
  */
 export const HAD_PERCUMA = {
   kelas: 3,
-  kuiz: 10,
   pemainSesi: 40,
 } as const;
 
@@ -26,7 +25,7 @@ const MESEJ: Record<string, string> = {
   QM_LIMIT_CLASSES:
     `You have reached your class limit. The free plan allows ${HAD_PERCUMA.kelas} classes.`,
   QM_LIMIT_QUIZZES:
-    `You have reached your quiz limit. The free plan allows ${HAD_PERCUMA.kuiz} quizzes. Delete an old quiz or upgrade.`,
+    'You have reached the quiz limit set for your account. Please contact the administrator.',
   QM_LIMIT_PLAYERS: 'This session is full.',
   QM_FORBIDDEN: 'Only an administrator can do this.',
   QM_BAD_PLAN: 'Invalid plan.',

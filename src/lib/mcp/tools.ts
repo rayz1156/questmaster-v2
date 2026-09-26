@@ -25,6 +25,30 @@ import {
 } from "./live-quiz-tools";
 import { updateChallenge, deleteChallenge } from "./challenge-tools";
 import { importTeamsCsv, setTeamLeader, groupTeamsWithMembers } from "./team-tools";
+import {
+  listPeerRounds,
+  createPeerRound,
+  updatePeerRound,
+  computePeerRound,
+  getPeerResults,
+  deletePeerRound,
+} from "./peer-tools";
+import { inviteEducator } from "./invite-tools";
+
+/** Had limit khusus list_live_quizzes: lalai 50, maksimum 200 (tiket KZ-004). */
+const LIVE_LIST_DEFAULT_LIMIT = 50;
+const LIVE_LIST_MAX_LIMIT = 200;
+
+/**
+ * Nilkan argumen limit list_live_quizzes. Sebelum ini limit diabaikan
+ * walaupun skema mengiklankannya; senarai penuh dihantar tanpa potongan.
+ * Bukan integer atau luar julat: jatuh ke lalai, bukan ralat.
+ */
+export function clampLiveQuizLimit(n: unknown): number {
+  const v = typeof n === "number" && Number.isFinite(n) ? Math.floor(n) : LIVE_LIST_DEFAULT_LIMIT;
+  if (v < 1) return LIVE_LIST_DEFAULT_LIMIT;
+  return Math.min(v, LIVE_LIST_MAX_LIMIT);
+}
 
 export interface ToolDef {
   name: string;
@@ -1249,14 +1273,18 @@ export const TOOLS: ToolDef[] = [
     inputSchema: {
       type: "object",
       properties: {
-        limit: { type: "number", description: `Lalai ${LIMITS.default}` },
+        limit: { type: "number", description: "Lalai 50, maksimum 200" },
       },
     },
     handler: async (args, s) => {
       // Route GET /api/live/quizzes sudah melaksanakan semakan pemilikan dan
       // pendidik kelas, termasuk kes kuiz berkongsi dengan kelas.
+      // Pembetulan KZ-004: argumen limit kini dihormati (lalai 50, maks 200);
+      // route tiada parameter limit, jadi potongan dibuat selepas bacaan.
+      const limit = clampLiveQuizLimit(args?.limit);
       const res = await callApi<{ data?: any[] }>(s.accessToken, "/api/live/quizzes");
-      const quizzes = (Array.isArray(res) ? res : res.data ?? []) as Array<Record<string, any>>;
+      const all = (Array.isArray(res) ? res : res.data ?? []) as Array<Record<string, any>>;
+      const quizzes = all.slice(0, limit);
 
       // Kiraan soalan: satu pertanyaan berpagar RLS untuk semua kuiz dalam
       // senarai, bukan satu pertanyaan setiap kuiz.
@@ -1536,6 +1564,183 @@ export const TOOLS: ToolDef[] = [
     handler: async (args, s) => {
       if (!args.session_id) throw new Error("session_id diperlukan");
       return controlLiveSession(s.accessToken, args.session_id, args);
+    },
+  },
+
+  /* ============================================================
+   * Penilaian rakan (peer review) dan jemputan pendidik (KZ-004)
+   * Semua tulisan melalui route /api/classes/** supaya semakan
+   * pendidik kelas dijalankan oleh route, bukan disalin di sini.
+   * ============================================================ */
+
+  {
+    name: "list_peer_rounds",
+    title: "Senarai pusingan penilaian rakan",
+    description:
+      "Senaraikan pusingan penilaian rakan (peer review) satu kelas: nama, jenis, minggu, " +
+      "tarikh buka dan tutup, serta tarikh pengiraan terakhir. Pendidik kelas sahaja.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: { class_id: { type: "string", description: "UUID kelas" } },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      return listPeerRounds(s.accessToken, args.class_id);
+    },
+  },
+
+  {
+    name: "create_peer_round",
+    title: "Cipta pusingan penilaian rakan",
+    description:
+      "Cipta pusingan penilaian rakan formatif untuk satu kelas. Badan: name, opens_at, " +
+      "closes_at (tarikh sah, tutup mesti selepas buka) dan week pilihan 1 hingga 52. " +
+      "Had enam pusingan dan sekatan pelan dikuatkuasakan oleh pangkalan data; ralatnya " +
+      "dihantar balik seperti sedia ada. Pusingan bermarkah (sumatif) belum disokong.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        name: { type: "string" },
+        opens_at: { type: "string", description: "Tarikh buka, contoh 2026-10-01T00:00:00Z" },
+        closes_at: { type: "string", description: "Tarikh tutup, mesti selepas opens_at" },
+        week: { type: "number", description: "Pilihan, 1 hingga 52" },
+      },
+      required: ["class_id", "name", "opens_at", "closes_at"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      return createPeerRound(s.accessToken, args.class_id, args);
+    },
+  },
+
+  {
+    name: "update_peer_round",
+    title: "Kemas kini pusingan penilaian rakan",
+    description:
+      "Sunting nama, minggu atau tarikh buka/tutup satu pusingan penilaian rakan. Hanya " +
+      "medan yang diberi akan diubah; tarikh sebelah sahaja dibandingkan dengan nilai sedia ada.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        round_id: { type: "string", description: "UUID pusingan" },
+        name: { type: "string" },
+        week: { type: "number", description: "1 hingga 52" },
+        opens_at: { type: "string" },
+        closes_at: { type: "string" },
+      },
+      required: ["class_id", "round_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      if (!args.round_id) throw new Error("round_id diperlukan");
+      const { class_id: classId, round_id: roundId, ...fields } = args;
+      return updatePeerRound(s.accessToken, classId, roundId, fields);
+    },
+  },
+
+  {
+    name: "compute_peer_round",
+    title: "Kira keputusan penilaian rakan",
+    description:
+      "Jalankan pengiraan keputusan satu pusingan penilaian rakan (RPC qm_peer_compute " +
+      "melalui route compute). Pulangkan bilangan baris keputusan yang ditulis. Sekatan " +
+      "pelan disemak di dalam fungsi pangkalan data itu sendiri.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        round_id: { type: "string", description: "UUID pusingan" },
+      },
+      required: ["class_id", "round_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      if (!args.round_id) throw new Error("round_id diperlukan");
+      return computePeerRound(s.accessToken, args.class_id, args.round_id);
+    },
+  },
+
+  {
+    name: "get_peer_results",
+    title: "Keputusan penilaian rakan",
+    description:
+      "Papan pemuka keputusan satu pusingan: markah setiap pelajar (P, F, Fmod, bendera, " +
+      "SEMAK, kumpulan berisiko), justifikasi mengikut pelajar yang dinilai, dan senarai " +
+      "ahli yang belum menghantar. Nama penilai TIDAK PERNAH dikongsi oleh sistem.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        round_id: { type: "string", description: "UUID pusingan" },
+      },
+      required: ["class_id", "round_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      if (!args.round_id) throw new Error("round_id diperlukan");
+      return getPeerResults(s.accessToken, args.class_id, args.round_id);
+    },
+  },
+
+  {
+    name: "delete_peer_round",
+    title: "Padam pusingan penilaian rakan",
+    description:
+      "Padam satu pusingan penilaian rakan. Hanya berjaya jika belum ada penilaian dihantar " +
+      "(route memulangkan 409 jika sudah ada). Memerlukan confirm: true.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        round_id: { type: "string", description: "UUID pusingan" },
+        confirm: { type: "boolean", description: "Wajib true" },
+      },
+      required: ["class_id", "round_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      if (!args.round_id) throw new Error("round_id diperlukan");
+      return deletePeerRound(s.accessToken, args.class_id, args.round_id, args.confirm);
+    },
+  },
+
+  {
+    name: "invite_educator",
+    title: "Jemput pendidik ke kelas",
+    description:
+      "Cipta jemputan pendidik (co-educator) untuk satu kelas melalui emel. Pemilik kelas " +
+      "sahaja; semakan dijalankan oleh route. send_email: true menghantar emel jemputan " +
+      "melalui route notify selepas jemputan dicipta (lalai false). Kod jemputan dan pautan " +
+      "dipulangkan supaya boleh dikongsi secara manual. Senarai, hantar semula atau batal " +
+      "jemputan tiada laluannya, jadi tidak disokong.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        email: { type: "string", description: "Emel pendidik yang dijemput" },
+        send_email: { type: "boolean", description: "Hantar emel jemputan, lalai false" },
+      },
+      required: ["class_id", "email"],
+    },
+    handler: async (args, s) => {
+      return inviteEducator(s.accessToken, args);
     },
   },
 ];
