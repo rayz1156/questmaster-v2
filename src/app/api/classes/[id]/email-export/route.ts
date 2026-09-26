@@ -22,15 +22,18 @@ async function kumpulEmel(
   svc: ReturnType<typeof getServiceSupabase>,
   ids: string[],
 ): Promise<Map<string, string>> {
+  // Ambil hanya pengguna yang diperlukan (getUserById), keserentakan 8,
+  // supaya data pengguna lain tidak dimuatkan ke dalam memori.
   const map = new Map<string, string>();
-  const set = new Set(ids);
-  for (let page = 1; page <= 10; page++) {
-    const { data, error } = await svc.auth.admin.listUsers({ page, perPage: 1000 });
-    if (error || !data) break;
-    for (const u of data.users) {
-      if (set.has(u.id)) map.set(u.id, u.email ?? "");
-    }
-    if (map.size >= set.size || data.users.length < 1000) break;
+  for (let i = 0; i < ids.length; i += 8) {
+    const kump = ids.slice(i, i + 8);
+    const hasil = await Promise.all(
+      kump.map((id) => svc.auth.admin.getUserById(id).catch(() => null)),
+    );
+    hasil.forEach((r, j) => {
+      const e = r && !r.error ? r.data?.user?.email : null;
+      if (e) map.set(kump[j], e);
+    });
   }
   return map;
 }
@@ -46,7 +49,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const dryRun = body?.dryRun === true;
 
   // --- Kelas dan kebenaran: pemilik ATAU pendidik bersama yang diterima ---
-  const { data: klass } = (await auth.supa
+  // Baca kelas melalui service role: pendidik bersama yang bukan ahli
+  // qm_class_members tidak nampak baris ini melalui RLS. Kebenaran disemak
+  // secara eksplisit di bawah.
+  const svcKelas = getServiceSupabase();
+  const { data: klass } = (await svcKelas
     .from("qm_classes")
     .select("id, name, owner_id")
     .eq("id", params.id)
@@ -58,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (!dibenarkan) {
     // Pendidik bersama: qm_class_educators dengan accepted_at tidak null.
     // JANGAN semak qm_class_members: itu jadual peserta.
-    const { data: ce } = await auth.supa
+    const { data: ce } = await svcKelas
       .from("qm_class_educators")
       .select("educator_id")
       .eq("class_id", params.id)

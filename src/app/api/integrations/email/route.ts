@@ -44,7 +44,7 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   return NextResponse.json({
-    plan: profil?.plan === "pro" ? "pro" : "free",
+    plan: bolehPro(profil) ? "pro" : "free",
     connected: !!row,
     provider: row?.provider ?? null,
     hint: row?.secret_hint ?? null,
@@ -97,6 +97,13 @@ export async function PUT(req: NextRequest) {
     );
   }
 
+  let disulit: string;
+  try {
+    disulit = encrypt(apiKey);
+  } catch {
+    return NextResponse.json({ error: "Could not save integration." }, { status: 500 });
+  }
+
   const now = new Date().toISOString();
   // Simpan melalui service role: jadual ini dicabut (REVOKE) daripada
   // anon/authenticated supaya klien tidak boleh menulis kunci terus.
@@ -107,7 +114,7 @@ export async function PUT(req: NextRequest) {
       {
         owner_id: user.id,
         provider,
-        secret_enc: encrypt(apiKey),
+        secret_enc: disulit,
         secret_hint: apiKey.slice(-4),
         connected_at: now,
         updated_at: now,
@@ -116,7 +123,7 @@ export async function PUT(req: NextRequest) {
     );
 
   if (ralatSimpan) {
-    return NextResponse.json({ error: ralatSimpan.message }, { status: 500 });
+    return NextResponse.json({ error: "Could not save integration." }, { status: 500 });
   }
 
   return NextResponse.json({ ok: true, connected: true, hint: apiKey.slice(-4) });
@@ -135,6 +142,6 @@ export async function DELETE(req: NextRequest) {
     .delete()
     .eq("owner_id", user.id);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return NextResponse.json({ error: "Could not disconnect." }, { status: 500 });
   return NextResponse.json({ ok: true });
 }
