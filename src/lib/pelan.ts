@@ -33,6 +33,11 @@ const MESEJ: Record<string, string> = {
   QM_LEADER_CONFLICT:
     'One of the groups already has a leader. Remove the extra leader in your file and upload again.',
   QM_NOT_FOUND: 'That class could not be found.',
+  QM_PEER_MAX_ROUNDS: 'A class can have at most six evaluation rounds.',
+  QM_PEER_CLOSED: 'This evaluation round is closed.',
+  QM_PEER_NOT_MEMBER: 'You are not a member of this group.',
+  QM_PEER_SELF: 'You cannot evaluate yourself.',
+  QM_PEER_JUSTIFY: 'Please explain any score of 0 or 1.',
 };
 
 /** Kod had yang terkandung dalam ralat, jika ada. */
