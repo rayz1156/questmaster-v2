@@ -59,7 +59,7 @@ peribadi (tanpa class_id) atau dikongsi dengan kelas.
 
 | Alat | Kegunaan |
 |---|---|
-| list_live_quizzes | Senarai kuiz yang boleh dihoskan pengguna, dengan bilangan soalan. |
+| list_live_quizzes | Senarai kuiz yang boleh dihoskan pengguna, dengan bilangan soalan. Argumen limit dihormati (lalai 50, maksimum 200). |
 | get_live_quiz | Satu kuiz dengan semua soalan, pilihan dan kunci jawapan. |
 | get_live_session | Keadaan penuh sesi dari sudut hos: status, kod, pautan sertai, pautan QR, pemain, soalan semasa, taburan jawapan. |
 | get_live_leaderboard | Kedudukan dan markah sesi (semasa atau selesai), 20 teratas. |
@@ -89,3 +89,33 @@ Aliran biasa satu sesi dari Claude:
 Had pelan dikuatkuasakan oleh pangkalan data: had kuiz milikan (pencetus pada
 `qm_live_quizzes`) dan had pemain sesi (`max_live_players`, dipetik pada masa
 sesi dicipta). Ralat daripada had itu dihantar balik seperti sedia ada.
+
+## Penilaian rakan (peer review)
+
+Semua alat penilaian rakan adalah untuk educator dan admin (STAFF) dan perlu
+class_id serta round_id. Semua tulisan melalui route
+`/api/classes/[id]/peer-rounds/**`, jadi semakan pendidik kelas dijalankan
+oleh route. Had enam pusingan dan sekatan pelan dikuatkuasakan oleh
+pangkalan data; ralatnya dihantar balik seperti sedia ada.
+
+| Alat | Peranan | Kegunaan |
+|---|---|---|
+| list_peer_rounds | STAFF | Senarai pusingan satu kelas: nama, jenis, minggu, tarikh buka/tutup, tarikh pengiraan. |
+| create_peer_round | STAFF, tulis | Cipta pusingan formatif: name, opens_at, closes_at, week pilihan 1..52. |
+| update_peer_round | STAFF, tulis | Sunting nama, minggu atau tarikh; hanya medan yang diberi. |
+| compute_peer_round | STAFF, tulis | Jalankan pengiraan keputusan (RPC qm_peer_compute); pulangkan written. |
+| get_peer_results | STAFF | Keputusan pelajar, justifikasi tanpa nama penilai, senarai belum menghantar. |
+| delete_peer_round | STAFF, tulis | Padam pusingan; gagal 409 jika sudah ada penilaian. WAJIB confirm: true. |
+
+Keprivasian terpelihara: nama penilai tidak pernah keluar daripada sistem
+(ralat ialah reka bentuk laluan results, bukan tapisan alat).
+
+## Jemputan pendidik
+
+| Alat | Peranan | Kegunaan |
+|---|---|---|
+| invite_educator | STAFF, tulis | Jemput pendidik (co-educator) ke kelas melalui emel. Pemilik kelas sahaja. send_email: true menghantar emel jemputan; jika emel gagal, jemputan tetap wujud dan ralat dilaporkan dalam email_error. |
+
+Senarai, hantar semula atau batal jemputan pendidik tiada laluannya di
+aplikasi, jadi tidak disokong oleh alat MCP. Google Form tiada ciri di
+platform, jadi tiada alatnya.
