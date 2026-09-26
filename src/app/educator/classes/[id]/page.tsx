@@ -2,7 +2,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ListChecks, Users, BarChart3, Zap, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity, Award, Plus, Minus, Trophy, EyeOff } from "lucide-react";
+import { ListChecks, Users, BarChart3, Zap, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity, Award, Plus, Minus, Trophy, EyeOff, ClipboardList } from "lucide-react";
 import Shell from "@/components/Shell";
 import ClassShell from "@/components/ClassShell";
 import { EDU_TABS } from '@/lib/eduTabs';
@@ -257,6 +257,22 @@ export default function ClassDetail() {
           </button>
         </div>
         {msg && <div className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-3 inline-flex items-center gap-2"><Check className="w-3.5 h-3.5"/>{msg}</div>}
+      </div>
+
+      {/* Peer review: pusingan penilaian rakan sebaya */}
+      <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5 mb-4">
+        <div className="flex items-start gap-3">
+          <div className="w-10 h-10 rounded-full bg-violet-50 flex items-center justify-center shrink-0">
+            <ClipboardList className="w-5 h-5 text-violet-600"/>
+          </div>
+          <div className="flex-1 min-w-0">
+            <div className="font-semibold text-gray-900">Peer review</div>
+            <p className="text-sm text-gray-500 mt-0.5">Confidential teammate evaluations for group assignments. See who is contributing below par while there is still time to fix it.</p>
+          </div>
+          <Link href={`/educator/classes/${klass.id}/peer-review`} className="shrink-0 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-95">
+            Open
+          </Link>
+        </div>
       </div>
 
       {/* Stats: Members + Active educators */}

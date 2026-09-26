@@ -27,6 +27,7 @@ import {
   type Klass,
 } from "@/lib/data";
 import { getBoardForClass } from "@/lib/boards";
+import PeerReviewBanner from "@/components/PeerReviewBanner";
 import { useSession } from "@/lib/session";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
@@ -203,6 +204,8 @@ function Inner() {
             ))}
           </select>
         </div>
+
+        <PeerReviewBanner />
 
         <div className="mt-8 flex flex-wrap items-start gap-x-10 gap-y-4">
           <form onSubmit={handleJoinByCode} className="min-w-0">

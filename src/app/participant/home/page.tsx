@@ -6,6 +6,7 @@ import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, Cli
 import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
+import PeerReviewBanner from "@/components/PeerReviewBanner";
 
 
 function initials(s: string) {
@@ -118,6 +119,8 @@ export default function Page() {
             <span className="font-medium">This class has ended.</span> You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.
           </div>
         )}
+
+        <PeerReviewBanner />
 
         {dataReady && classes.length === 0 ? (
           <div className="mt-10 max-w-md">
