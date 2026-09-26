@@ -19,6 +19,35 @@ begin;
 -- ============================================================
 
 -- Profil ujian. ID tetap supaya hasil mudah dirujuk.
+-- qm_profiles.id ialah FK ke auth.users, jadi baris auth.users disisip
+-- dahulu. session_replication_role = replica melumpuhkan pencetus supaya
+-- sisipan tanpa kata laluan/enkripsi diterima; dikembalikan ke origin
+-- selepas itu.
+set session_replication_role = replica;
+
+insert into auth.users (id, email, aud, role, created_at, updated_at) values
+  ('00000000-0000-0000-0000-0000000000e1', 'kz001-00e1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000a1', 'kz001-00a1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000b1', 'kz001-00b1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000c1', 'kz001-00c1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000d1', 'kz001-00d1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000e2', 'kz001-00e2@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000f1', 'kz001-00f1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000a2', 'kz001-00a2@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000b2', 'kz001-00b2@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000c2', 'kz001-00c2@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000b5', 'kz001-00b5@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000c5', 'kz001-00c5@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000d5', 'kz001-00d5@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000e5', 'kz001-00e5@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000f5', 'kz001-00f5@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000001b1', 'kz001-01b1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000001c1', 'kz001-01c1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000001d1', 'kz001-01d1@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-0000000000e9', 'kz001-00e9@ujian.invalid', 'authenticated', 'authenticated', now(), now());
+
+set session_replication_role = origin;
+
 insert into public.qm_profiles (id, role, display_name, plan, approved, suspended, created_at) values
   ('00000000-0000-0000-0000-0000000000e1', 'educator',    'Pensyarah Ujian', 'pro',        true, false, now()),
   ('00000000-0000-0000-0000-0000000000a1', 'participant', 'Aisyah',          'free',       true, false, now()),
@@ -224,6 +253,11 @@ select public.qm_peer_compute('00000000-0000-0000-0000-000000000d02'::uuid) as b
 -- r02 masih terbuka), kemudian kira semula r02.
 -- Matriks T6: setiap penilai memberi jumlah tetap: Aisyah 5, Baharu 6,
 -- Chong 9, Devi 9. Dua MERAH dijangka, jadi semua ahli T6 berisiko.
+-- Sisipan ini dibuat sebagai pentadbir: sesi masih dalam peranan
+-- authenticated daripada panggilan compute di atas, dan dasar INSERT RLS
+-- (rater_id = auth.uid()) yang betul akan menolak penilaian pihak lain.
+reset role;
+
 insert into public.qm_peer_ratings (round_id, team_id, rater_id, ratee_id, k1, k2, k3, k4, k5, justification) values
   ('00000000-0000-0000-0000-000000000d02', '00000000-0000-0000-0000-000000000b06', '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000a1', 1,1,1,1,1, 'Jarang hadir dan tidak menyumbang'),
   ('00000000-0000-0000-0000-000000000d02', '00000000-0000-0000-0000-000000000b06', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000a1', 1,1,1,1,1, 'Jarang hadir dan tidak menyumbang'),
@@ -237,6 +271,9 @@ insert into public.qm_peer_ratings (round_id, team_id, rater_id, ratee_id, k1, k
   ('00000000-0000-0000-0000-000000000d02', '00000000-0000-0000-0000-000000000b06', '00000000-0000-0000-0000-0000000000a1', '00000000-0000-0000-0000-0000000000d1', 2,2,2,2,1, 'Kadang kadang datang lewat'),
   ('00000000-0000-0000-0000-000000000d02', '00000000-0000-0000-0000-000000000b06', '00000000-0000-0000-0000-0000000000b1', '00000000-0000-0000-0000-0000000000d1', 2,2,2,2,1, 'Kadang kadang datang lewat'),
   ('00000000-0000-0000-0000-000000000d02', '00000000-0000-0000-0000-000000000b06', '00000000-0000-0000-0000-0000000000c1', '00000000-0000-0000-0000-0000000000d1', 2,2,2,2,1, 'Kadang kadang datang lewat');
+
+-- Kira semula r02 sebagai pendidik, seperti panggilan compute pertama.
+set local role authenticated;
 
 select public.qm_peer_compute('00000000-0000-0000-0000-000000000d02'::uuid) as baris_r02_kira_semula;
 
@@ -457,10 +494,11 @@ begin
     raise exception 'UJIAN 7 GAGAL: pelajar nampak % baris keputusan dirinya', v; end if;
 
   -- Kawalan positif: baris yang Devi TULIS sendiri masih kelihatan.
+  -- Devi menulis 6 baris: 3 dalam T1 (r01) dan 3 dalam T6 (r02).
   select count(*) into v from public.qm_peer_ratings
    where rater_id = '00000000-0000-0000-0000-0000000000d1';
-  if v <> 3 then
-    raise exception 'UJIAN 7 GAGAL: kawalan positif gagal, Devi nampak % baris tulisannya (jangka 3)', v; end if;
+  if v <> 6 then
+    raise exception 'UJIAN 7 GAGAL: kawalan positif gagal, Devi nampak % baris tulisannya (jangka 6)', v; end if;
 end $u$;
 
 -- Kembali sebagai pentadbir untuk ujian yang tinggal.

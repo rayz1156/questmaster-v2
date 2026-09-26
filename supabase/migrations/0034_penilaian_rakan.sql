@@ -311,10 +311,19 @@ begin
 
   -- Kumpulan peringkat kelas sahaja (hunt_id is null), sama dengan kumpulan
   -- daripada import CSV.
+  --
+  -- Susunan penting: kumpulan yang menerima penilaian dalam pusingan ini
+  -- diproses dahulu. Ahli yang berada dalam dua kumpulan (contoh Farid ahli
+  -- T2 dan T3) hanya diproses sekali, sebab kekangan unique (round_id,
+  -- user_id); kalau urutan mengikut nama, kumpulan tanpa penilaian boleh
+  -- diproses dahulu dan ahli itu kekal tanpa P walaupun kumpulan keduanya
+  -- menerima penilaian penuh.
   for v_team in
     select id from public.qm_teams
      where class_id = v_class and hunt_id is null
-     order by name
+     order by (select count(*) from public.qm_peer_ratings pr
+                where pr.team_id = qm_teams.id
+                  and pr.round_id = p_round) desc, name
   loop
     v_uids := '{}'; v_ts := '{}'; v_rs := '{}'; v_ps := '{}';
 
