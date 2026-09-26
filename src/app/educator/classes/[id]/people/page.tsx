@@ -15,6 +15,7 @@ import { Download, Search, Upload, Users } from "lucide-react";
 import Shell from "@/components/Shell";
 import ClassShell from "@/components/ClassShell";
 import EducatorsCard from "@/components/EducatorsCard";
+import EmailExportButton from "@/components/EmailExportButton";
 import { EDU_TABS } from "@/lib/eduTabs";
 import { listClassMembers, listTeamsByClass, listClassTeamScores } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
@@ -197,17 +198,20 @@ export default function ClassPeoplePage() {
             <SubTab k="educators" label="Educators" />
           </div>
 
-          {sub !== "educators" && (
-            <div className="relative w-full sm:w-72">
-              <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                className="input pl-9"
-                placeholder={sub === "students" ? "Search people..." : "Search teams..."}
-                value={q}
-                onChange={(e) => setQ(e.target.value)}
-              />
-            </div>
-          )}
+          <div className="flex items-center gap-3">
+            {sub !== "educators" && (
+              <div className="relative w-full sm:w-72">
+                <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  className="input pl-9"
+                  placeholder={sub === "students" ? "Search people..." : "Search teams..."}
+                  value={q}
+                  onChange={(e) => setQ(e.target.value)}
+                />
+              </div>
+            )}
+            <EmailExportButton classId={id} />
+          </div>
         </div>
 
         {err && <div className="text-sm text-red-600 mb-4">{err}</div>}
