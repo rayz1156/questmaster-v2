@@ -133,8 +133,14 @@ export async function POST(req: NextRequest) {
       instructions:
         "Kuizen ialah platform pendidikan berasaskan kelas. Setiap kelas mengandungi hunt " +
         "(aktiviti) dan board pembelajaran. Setiap hunt mengandungi challenge (soalan), dan " +
-        "peserta menghantar jawapan kepada challenge. Tools yang tersedia bergantung pada " +
-        "peranan pengguna. Panggil whoami dahulu jika anda tidak pasti apa yang boleh dilakukan.",
+        "peserta menghantar jawapan kepada challenge. Kuizen turut menyediakan Live Quiz " +
+        "(Kuiz Langsung) gaya Kahoot: educator mencipta kuiz Live Quiz dengan soalan aneka " +
+        "pilihan (alat list_live_quizzes, create_live_quiz, add_live_questions, " +
+        "import_live_questions, update_live_question, delete_live_question), kemudian mula " +
+        "sesi (start_live_session) dan mengawalnya soalan demi soalan (control_live_session, " +
+        "get_live_session, get_live_leaderboard) sementara pemain menyertai melalui kod atau " +
+        "QR. Tools yang tersedia bergantung pada peranan pengguna; alat Live Quiz hanya untuk " +
+        "educator dan admin. Panggil whoami dahulu jika anda tidak pasti apa yang boleh dilakukan.",
     });
   }
 

@@ -13,6 +13,16 @@
 import { McpSession, Role, canWrite } from "./session";
 import { TABLES, COLUMNS, LIMITS, REDACTED_COLUMNS } from "./schema";
 import { callApi, uploadFile } from "./api";
+import {
+  addLiveQuestions,
+  controlLiveSession,
+  createLiveQuiz,
+  deleteLiveQuestion,
+  importLiveQuestions,
+  startLiveSession,
+  updateLiveQuestion,
+  liveSessionLinks,
+} from "./live-quiz-tools";
 
 export interface ToolDef {
   name: string;
@@ -1060,6 +1070,315 @@ export const TOOLS: ToolDef[] = [
       // Jaring keselamatan: fetch ialah satu-satunya tool yang menggunakan
       // select("*"), jadi tapis lajur sensitif sebelum memulangkannya.
       return redact(row);
+    },
+  },
+
+  /* ============================================================
+   * Kuiz Langsung (Live Quiz)
+   * ============================================================
+   * Semua tulisan memanggil route /api/live/** sebagai pengguna, jadi
+   * semakan pemilik/pendidik dan had pelan (pencetus DB 0030) dijalankan
+   * oleh route dan pangkalan data, bukan disalin ke sini.
+   */
+
+  {
+    name: "list_live_quizzes",
+    title: "Senarai kuiz langsung",
+    description:
+      "Senaraikan kuiz Live Quiz yang boleh dihoskan oleh pengguna: kuiz peribadi miliknya dan " +
+      "kuiz kelas yang dia ajar. Termasuk bilangan soalan setiap kuiz.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        limit: { type: "number", description: `Lalai ${LIMITS.default}` },
+      },
+    },
+    handler: async (args, s) => {
+      // Route GET /api/live/quizzes sudah melaksanakan semakan pemilikan dan
+      // pendidik kelas, termasuk kes kuiz berkongsi dengan kelas.
+      const res = await callApi<{ data?: any[] }>(s.accessToken, "/api/live/quizzes");
+      const quizzes = (Array.isArray(res) ? res : res.data ?? []) as Array<Record<string, any>>;
+
+      // Kiraan soalan: satu pertanyaan berpagar RLS untuk semua kuiz dalam
+      // senarai, bukan satu pertanyaan setiap kuiz.
+      const ids = quizzes.map((q) => q.id).filter(Boolean);
+      const counts: Record<string, number> = {};
+      if (ids.length > 0) {
+        const rows = unwrapList(
+          await s.db.from(TABLES.liveQuestions).select("quiz_id").in("quiz_id", ids),
+          "Kiraan soalan kuiz langsung"
+        ) as Array<{ quiz_id: string }>;
+        for (const r of rows) counts[r.quiz_id] = (counts[r.quiz_id] ?? 0) + 1;
+      }
+
+      return {
+        quizzes: quizzes.map((q) => ({
+          id: q.id,
+          title: q.title,
+          description: q.description ?? null,
+          class_id: q.class_id ?? null,
+          class_name: q.class?.name ?? null,
+          question_count: counts[q.id] ?? 0,
+          created_at: q.created_at,
+        })),
+      };
+    },
+  },
+
+  {
+    name: "get_live_quiz",
+    title: "Butiran kuiz langsung",
+    description:
+      "Satu kuiz Live Quiz bersama semua soalan, pilihan jawapan dan kunci jawapan. " +
+      "Hanya pemilik kuiz, pendidik kelasnya atau admin boleh melihat kunci jawapan.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: { quiz_id: { type: "string", description: "UUID kuiz langsung" } },
+      required: ["quiz_id"],
+    },
+    handler: async (args, s) => {
+      const res = await callApi<{ data?: Record<string, unknown> } & Record<string, unknown>>(
+        s.accessToken,
+        `/api/live/quizzes/${args.quiz_id}`
+      );
+      return res.data ?? res;
+    },
+  },
+
+  {
+    name: "get_live_session",
+    title: "Keadaan sesi langsung",
+    description:
+      "Keadaan penuh sesi Live Quiz dari sudut hos: status, kod sertai, pautan sertai, pautan QR, " +
+      "bilangan pemain, senarai pemain, soalan semasa dan taburan jawapannya.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: { session_id: { type: "string", description: "UUID sesi" } },
+      required: ["session_id"],
+    },
+    handler: async (args, s) => {
+      const res = await callApi<{ data?: Record<string, any> } & Record<string, any>>(
+        s.accessToken,
+        `/api/live/sessions/${args.session_id}`
+      );
+      const data = res.data ?? res;
+      const code = data?.session?.code ?? data?.code ?? null;
+      return {
+        ...data,
+        ...(code ? liveSessionLinks(String(code)) : {}),
+      };
+    },
+  },
+
+  {
+    name: "get_live_leaderboard",
+    title: "Papan pendahulu langsung",
+    description:
+      "Kedudukan dan markah pemain bagi satu sesi Live Quiz (semasa atau sudah tamat). " +
+      "Dua puluh teratas, ikut markah kemudian masa.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: { session_id: { type: "string", description: "UUID sesi" } },
+      required: ["session_id"],
+    },
+    handler: async (args, s) => {
+      // Kod sesi diperlukan untuk laluan papan pendahulu; ambilnya daripada
+      // laluan hos supaya semakan pemilikan dijalankan dahulu.
+      const ses = await callApi<{ data?: { session?: { code?: string; status?: string } } }>(
+        s.accessToken,
+        `/api/live/sessions/${args.session_id}`
+      );
+      const sesData = (ses as any).data ?? ses;
+      const code = sesData?.session?.code;
+      if (!code) throw new Error("Sesi tidak dijumpai atau anda bukan hosnya");
+
+      const res = await callApi<{ leaderboard?: Array<Record<string, unknown>> }>(
+        s.accessToken,
+        `/api/live/play/${code}/leaderboard`
+      );
+      return {
+        session_id: args.session_id,
+        code,
+        status: sesData?.session?.status ?? null,
+        leaderboard: res.leaderboard ?? [],
+      };
+    },
+  },
+
+  {
+    name: "create_live_quiz",
+    title: "Cipta kuiz langsung",
+    description:
+      "Cipta kuiz Live Quiz baharu. Tanpa class_id ia menjadi kuiz peribadi milik anda. " +
+      "streak_bonus (lalai true) menghidupkan bonus rentetan markah. Had bilangan kuiz pelan " +
+      "dikuatkuasakan oleh pangkalan data.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        title: { type: "string" },
+        description: { type: "string" },
+        class_id: { type: "string", description: "Pilihan; kongsi kuiz dengan kelas ini" },
+        streak_bonus: { type: "boolean", description: "Lalai true" },
+      },
+      required: ["title"],
+    },
+    handler: async (args, s) => createLiveQuiz(s.accessToken, args),
+  },
+
+  {
+    name: "add_live_questions",
+    title: "Tambah soalan kuiz langsung",
+    description:
+      "Tambah satu atau banyak soalan aneka pilihan pada kuiz Live Quiz. Setiap soalan boleh " +
+      "memberi options [{key,text}] ATAU option_texts [teks1, teks2, ..] (kunci A,B,C dijana " +
+      "sendiri). points 1..10000 (lalai 1000), time_limit_sec 5..300 (lalai 20), use_countdown " +
+      "lalai true, double_points lalai false. Semua soalan disahkan dahulu: jika satu sahaja " +
+      "tidak sah, TIADA apa-apa ditambah.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        quiz_id: { type: "string" },
+        questions: {
+          type: "array",
+          description: "Maksimum 100 soalan setiap panggilan",
+          items: { type: "object" },
+        },
+      },
+      required: ["quiz_id", "questions"],
+    },
+    handler: async (args, s) => {
+      if (!args.quiz_id) throw new Error("quiz_id diperlukan");
+      return addLiveQuestions(s.accessToken, args.quiz_id, args.questions);
+    },
+  },
+
+  {
+    name: "import_live_questions",
+    title: "Import soalan CSV atau Aiken",
+    description:
+      "Import soalan daripada teks CSV (templat Kuizen) atau format Aiken. Guna mode preview " +
+      "dahulu untuk melihat hasil huraian tanpa apa-apa tulisan, kemudian mode commit untuk " +
+      "memasukkannya. CSV bersifat semua-atau-tiada; Aiken melangkau blok yang rosak. Had " +
+      "kira-kira 500 KB dan 100 soalan, sama seperti laluan aplikasi.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        quiz_id: { type: "string" },
+        format: { type: "string", enum: ["csv", "aiken"] },
+        mode: { type: "string", enum: ["preview", "commit"], description: "Lalai: preview" },
+        content: { type: "string", description: "Kandungan fail CSV atau Aiken sebagai teks" },
+      },
+      required: ["quiz_id", "format", "content"],
+    },
+    handler: async (args, s) => {
+      if (!args.quiz_id) throw new Error("quiz_id diperlukan");
+      return importLiveQuestions(s.accessToken, args.quiz_id, args);
+    },
+  },
+
+  {
+    name: "update_live_question",
+    title: "Kemas kini soalan langsung",
+    description:
+      "Kemas kini medan soalan Live Quiz: prompt, options, correct_key, points, time_limit_sec, " +
+      "use_countdown atau double_points. Hanya medan yang diberi akan diubah.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        question_id: { type: "string" },
+        prompt: { type: "string" },
+        options: { type: "array", items: { type: "object" }, description: "[{key, text}], 2 hingga 6 item" },
+        correct_key: { type: "string", description: "Mesti salah satu kunci pilihan" },
+        points: { type: "number" },
+        time_limit_sec: { type: "number" },
+        use_countdown: { type: "boolean" },
+        double_points: { type: "boolean" },
+      },
+      required: ["question_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.question_id) throw new Error("question_id diperlukan");
+      return updateLiveQuestion(s.accessToken, args.question_id, args);
+    },
+  },
+
+  {
+    name: "delete_live_question",
+    title: "Padam soalan langsung",
+    description: "Padam satu soalan daripada kuiz Live Quiz. Memerlukan confirm: true.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        question_id: { type: "string" },
+        confirm: { type: "boolean", description: "Wajib true" },
+      },
+      required: ["question_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.question_id) throw new Error("question_id diperlukan");
+      return deleteLiveQuestion(s.accessToken, args.question_id, args.confirm);
+    },
+  },
+
+  {
+    name: "start_live_session",
+    title: "Mula sesi langsung",
+    description:
+      "Cipta sesi Live Quiz baharu dalam lobi untuk satu kuiz. Kuiz perlu sekurang-kurangnya " +
+      "satu soalan. Pulangkan session_id, kod sertai 6 aksara, pautan sertai dan pautan QR. " +
+      "Selepas ini gunakan control_live_session dengan action start.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: { quiz_id: { type: "string" } },
+      required: ["quiz_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.quiz_id) throw new Error("quiz_id diperlukan");
+      return startLiveSession(s.accessToken, args.quiz_id);
+    },
+  },
+
+  {
+    name: "control_live_session",
+    title: "Kawal sesi langsung",
+    description:
+      "Kawal sesi Live Quiz: action start (lobi ke soalan pertama), next (soalan berikutnya), " +
+      "reveal (tunjuk jawapan), end (tamat, WAJIB confirm: true) atau reset (kembali ke lobi dan " +
+      "padam semua jawapan, WAJIB confirm: true).",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        session_id: { type: "string" },
+        action: { type: "string", enum: ["start", "next", "reveal", "end", "reset"] },
+        confirm: { type: "boolean", description: "Wajib true untuk action end dan reset" },
+      },
+      required: ["session_id", "action"],
+    },
+    handler: async (args, s) => {
+      if (!args.session_id) throw new Error("session_id diperlukan");
+      return controlLiveSession(s.accessToken, args.session_id, args);
     },
   },
 ];

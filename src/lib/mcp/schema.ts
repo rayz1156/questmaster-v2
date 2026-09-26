@@ -46,6 +46,14 @@ export const TABLES = {
   educatorUserIdColumn: "educator_id",
   /** Lajur dalam qm_class_members yang menyimpan auth.users.id */
   memberUserIdColumn: "user_id",
+
+  // Kuiz Langsung (migrasi 0017 hingga 0021). RLS: polisi owner_all dan
+  // educator_all, jadi klien terikat RLS boleh membacanya untuk hos.
+  liveQuizzes: "qm_live_quizzes",
+  liveQuestions: "qm_live_questions",
+  liveSessions: "qm_live_sessions",
+  livePlayers: "qm_live_players",
+  liveAnswers: "qm_live_answers",
 } as const;
 
 export const COLUMNS = {
