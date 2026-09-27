@@ -143,18 +143,18 @@ export default function LandingPage({ bahasa }: { bahasa: Bahasa }) {
       />
       <LandingSessionCheck />
 
-      <header className="px-6 sm:px-8 pt-6">
-        <div className="mx-auto w-full max-w-[1040px] flex items-center justify-between gap-4">
+      <header className="px-4 sm:px-8 pt-6">
+        <div className="mx-auto w-full max-w-[1040px] flex items-center justify-between gap-2 sm:gap-4">
           <Logo size={28} />
           <nav className="hidden sm:flex items-center gap-7 text-sm text-ink-muted">
             <Link href={`#${ciriId}`} className="hover:text-ink">{t.nav.ciri}</Link>
             <Link href="/blog" className="hover:text-ink">{t.nav.blog}</Link>
             <Link href="/help" className="hover:text-ink">{t.nav.bantuan}</Link>
           </nav>
-          <div className="flex items-center gap-3 sm:gap-4 text-sm">
+          <div className="flex items-center gap-2 sm:gap-4 text-sm">
             <PilihBahasa bahasa={bahasa} label={t.nav.tukarBahasa} />
-            <Link href="/login" className="btn-quiet">{t.nav.logMasuk}</Link>
-            <Link href="/register" className="btn-primary">{t.nav.daftar}</Link>
+            <Link href="/login" className="btn-quiet whitespace-nowrap">{t.nav.logMasuk}</Link>
+            <Link href="/register" className="btn-primary whitespace-nowrap">{t.nav.daftar}</Link>
           </div>
         </div>
       </header>
