@@ -3,6 +3,7 @@ import { useState, useEffect } from "react";
 import Link from "next/link";
 import { Search, ChevronDown, ArrowLeft, CheckCircle2, Send } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import TutorialVideo from "@/components/TutorialVideo";
 
 
 const KB_ARTICLES = [
@@ -196,6 +197,10 @@ export default function HelpPage() {
               {s.role}
             </button>
           ))}
+        </div>
+
+        <div className="mt-10">
+          <TutorialVideo bahasaAwal="en" />
         </div>
 
         <div className="mt-12">

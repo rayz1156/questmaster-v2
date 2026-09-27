@@ -193,7 +193,7 @@ export default function Home() {
 
         <section className="px-6 sm:px-8 pb-10">
           <div className="mx-auto w-full max-w-[960px]">
-            <HeroVideo />
+            <HeroVideo bahasa="ms" />
           </div>
         </section>
 

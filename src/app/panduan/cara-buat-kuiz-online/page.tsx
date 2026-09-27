@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import TutorialVideo from "@/components/TutorialVideo";
 
 /**
  * Panduan awam pertama.
@@ -174,6 +175,10 @@ export default function Panduan() {
             berharap pelajar menjawabnya di rumah. Tujuh langkah, dan kuiz pertama
             biasanya siap dalam kira kira sepuluh minit.
           </p>
+
+          <div className="mt-10">
+            <TutorialVideo bahasaAwal="ms" />
+          </div>
 
           <h2
             style={DISPLAY}

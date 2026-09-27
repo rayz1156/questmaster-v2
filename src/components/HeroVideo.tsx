@@ -1,76 +1,79 @@
 'use client';
 import { useState } from 'react';
 import HeroPreview from '@/components/HeroPreview';
+import { VIDEO_PENGENALAN, type BahasaVideo } from '@/lib/video-kuizen';
 
 /**
  * Blok media pada halaman utama.
  *
- * Iframe hanya dimuatkan selepas butang main ditekan. Corak itu
- * disengajakan: iframe pihak ketiga yang dimuatkan terus menarik beratus
- * kilobait dan membuat permintaan rangkaian sebelum pelawat meminta apa apa,
- * dan halaman utama ialah kesan pertama yang paling mahal untuk dilambatkan.
+ * Video hanya dimuatkan selepas butang main ditekan. Sebelum itu yang
+ * dipaparkan ialah HeroPreview, pratonton produk dalam HTML dan CSS yang
+ * boleh dibaca enjin carian dan tidak menarik apa apa bait video.
  *
- * Sebelum ditekan, yang dipaparkan ialah HeroPreview, iaitu pratonton produk
- * yang dibina dengan HTML dan CSS. Teks di dalamnya boleh dibaca enjin
- * carian, tidak seperti bingkai video.
- *
- * Nota tentang autoplay: Livid membaca parameter carian `autoplay` pada URL
- * embed. Ini sudah disahkan. Tanpa parameter itu pelawat terpaksa menekan
- * main dua kali, sekali pada muka depan kita dan sekali lagi dalam pemain.
+ * Bahasa video mengikut bahasa halaman: halaman BM memainkan video
+ * pengenalan ringkas BM, halaman Inggeris memainkan versi Inggeris.
  */
 
-/** Embed Livid. Nisbah asal video ialah 1280 x 632. */
-const VIDEO_EMBED_URL: string | null = 'https://livid.com/embed/v_fx4XKkYoaX';
+const TEKS: Record<BahasaVideo, { tajuk: string; main: string; sedang: string; label: string }> = {
+  ms: {
+    tajuk: 'Lihat Kuizen dalam aksi',
+    main: 'Tekan untuk main video pengenalan',
+    sedang: 'Video pengenalan',
+    label: 'Main video pengenalan Kuizen',
+  },
+  en: {
+    tajuk: 'See Kuizen in action',
+    main: 'Press play to watch the intro video',
+    sedang: 'Intro video',
+    label: 'Play the Kuizen intro video',
+  },
+};
 
-/** Nisbah bingkai video, diambil daripada kod embed asal. */
-const NISBAH = '1280 / 632';
-
-export default function HeroVideo() {
+export default function HeroVideo({ bahasa = 'ms' }: { bahasa?: BahasaVideo }) {
   const [main, setMain] = useState(false);
+  const video = VIDEO_PENGENALAN[bahasa];
+  const t = TEKS[bahasa];
 
   return (
     <div className="rounded-[22px] bg-[#EFEAFB] p-4 sm:p-8">
       <div className="relative">
-        {main && VIDEO_EMBED_URL ? (
-          <div
-            className="rounded-[18px] overflow-hidden bg-black"
-            style={{ aspectRatio: NISBAH }}
-          >
-            <iframe
-              src={VIDEO_EMBED_URL + (VIDEO_EMBED_URL.includes('?') ? '&' : '?') + 'autoplay=1'}
-              title="Video pengenalan Kuizen"
-              allow="autoplay; clipboard-write; encrypted-media; fullscreen; picture-in-picture; web-share"
-              allowFullScreen
-              referrerPolicy="strict-origin-when-cross-origin"
-              className="w-full h-full border-0"
-            />
+        {main ? (
+          <div className="rounded-[18px] overflow-hidden bg-black aspect-video">
+            <video
+              src={video.src}
+              poster={video.poster}
+              controls
+              autoPlay
+              playsInline
+              preload="auto"
+              className="w-full h-full"
+              aria-label={t.sedang}
+            >
+              <track kind="subtitles" src={video.sarikata} srcLang={bahasa} label={bahasa === 'ms' ? 'Bahasa Melayu' : 'English'} />
+            </video>
           </div>
         ) : (
           <>
             <HeroPreview />
-            {VIDEO_EMBED_URL && (
-              <button
-                type="button"
-                onClick={() => setMain(true)}
-                aria-label="Main video pengenalan Kuizen"
-                className="absolute inset-0 flex items-center justify-center group rounded-[18px] bg-ink/0 transition hover:bg-ink/10"
-              >
-                <span className="w-16 h-16 rounded-full bg-brand-purple text-white flex items-center justify-center shadow-lg transition group-hover:scale-105">
-                  <svg width="20" height="22" viewBox="0 0 20 22" fill="currentColor" aria-hidden="true">
-                    <path d="M19 9.27a2 2 0 0 1 0 3.46L3 21.99a2 2 0 0 1-3-1.73V1.74A2 2 0 0 1 3 .01l16 9.26Z" />
-                  </svg>
-                </span>
-              </button>
-            )}
+            <button
+              type="button"
+              onClick={() => setMain(true)}
+              aria-label={t.label}
+              className="absolute inset-0 flex items-center justify-center group rounded-[18px] bg-ink/0 transition hover:bg-ink/10"
+            >
+              <span className="w-16 h-16 rounded-full bg-brand-purple text-white flex items-center justify-center shadow-lg transition group-hover:scale-105">
+                <svg width="20" height="22" viewBox="0 0 20 22" fill="currentColor" aria-hidden="true">
+                  <path d="M19 9.27a2 2 0 0 1 0 3.46L3 21.99a2 2 0 0 1-3-1.73V1.74A2 2 0 0 1 3 .01l16 9.26Z" />
+                </svg>
+              </span>
+            </button>
           </>
         )}
       </div>
 
       <div className="mt-6 text-center">
-        <p className="text-[17px] text-ink">Lihat Kuizen dalam aksi</p>
-        <p className="text-[13px] text-ink-faint mt-1">
-          {main ? 'Video pengenalan' : 'Tekan untuk main video pengenalan'}
-        </p>
+        <p className="text-[17px] text-ink">{t.tajuk}</p>
+        <p className="text-[13px] text-ink-faint mt-1">{main ? t.sedang : t.main}</p>
       </div>
     </div>
   );
