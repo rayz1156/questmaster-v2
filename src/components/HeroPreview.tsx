@@ -8,20 +8,23 @@
  *
  * Data di dalamnya ialah contoh ilustrasi bagi antara muka Kuizen sendiri.
  */
-export default function HeroPreview() {
+import { TEKS_LANDING, type Bahasa } from "@/lib/landing-copy";
+
+export default function HeroPreview({ bahasa = "ms" }: { bahasa?: Bahasa }) {
+  const t = TEKS_LANDING[bahasa].pratonton;
   const pasukan = [
-    { n: 1, nama: "Pasukan Orion", skor: 920, warna: "#F5B301" },
-    { n: 2, nama: "Pasukan Nova", skor: 860, warna: "#9AA1B1" },
-    { n: 3, nama: "Pasukan Zenith", skor: 780, warna: "#C97B3C" },
-    { n: 4, nama: "Pasukan Delta", skor: 710, warna: "#D9D6E8" },
-    { n: 5, nama: "Pasukan Komet", skor: 680, warna: "#D9D6E8" },
+    { n: 1, nama: `${t.pasukan} Orion`, skor: 920, warna: "#F5B301" },
+    { n: 2, nama: `${t.pasukan} Nova`, skor: 860, warna: "#9AA1B1" },
+    { n: 3, nama: `${t.pasukan} Zenith`, skor: 780, warna: "#C97B3C" },
+    { n: 4, nama: `${t.pasukan} Delta`, skor: 710, warna: "#D9D6E8" },
+    { n: 5, nama: `${t.pasukan} Komet`, skor: 680, warna: "#D9D6E8" },
   ];
 
   const pilihan = [
-    { k: "A", teks: "Membina struktur halaman web", bg: "#EDE9FB", ring: "#7057D9" },
-    { k: "B", teks: "Mengurus pangkalan data", bg: "#F3F2F7", ring: "#8A8F9E" },
-    { k: "C", teks: "Mereka bentuk grafik", bg: "#E9F5EE", ring: "#3F9E6A" },
-    { k: "D", teks: "Mengendalikan rangkaian komputer", bg: "#FCEDE4", ring: "#D2743A" },
+    { k: "A", teks: t.pilihan[0], bg: "#EDE9FB", ring: "#7057D9" },
+    { k: "B", teks: t.pilihan[1], bg: "#F3F2F7", ring: "#8A8F9E" },
+    { k: "C", teks: t.pilihan[2], bg: "#E9F5EE", ring: "#3F9E6A" },
+    { k: "D", teks: t.pilihan[3], bg: "#FCEDE4", ring: "#D2743A" },
   ];
 
   return (
@@ -30,7 +33,7 @@ export default function HeroPreview() {
         <aside className="hidden sm:block w-[132px] shrink-0 border-r border-hairline p-3">
           <div className="text-[11px] font-semibold text-ink px-2 py-1.5">Kuizen</div>
           <ul className="mt-2 space-y-0.5 text-[11px] text-ink-muted">
-            {["Kelas", "Kuiz langsung", "Tugasan", "Bahan", "Pasukan", "Laporan"].map((m, i) => (
+            {t.menu.map((m, i) => (
               <li
                 key={m}
                 className={
@@ -46,11 +49,11 @@ export default function HeroPreview() {
 
         <div className="flex-1 min-w-0 p-4 sm:p-5">
           <div className="flex items-center justify-between text-[11px] text-ink-faint">
-            <span>Soalan 3 daripada 10</span>
+            <span>{t.soalanKe}</span>
             <span className="code-chip">PIN 472 918</span>
           </div>
           <p className="mt-3 text-[15px] sm:text-[17px] font-semibold text-ink">
-            Apakah fungsi HTML?
+            {t.soalan}
           </p>
           <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2">
             {pilihan.map((p) => (
@@ -73,25 +76,25 @@ export default function HeroPreview() {
 
         <aside className="hidden lg:block w-[196px] shrink-0 border-l border-hairline p-4">
           <div className="flex items-baseline justify-between">
-            <span className="text-[11px] font-semibold text-ink">Papan pendahulu</span>
-            <span className="text-[10px] text-ink-faint">12 peserta</span>
+            <span className="text-[11px] font-semibold text-ink">{t.papan}</span>
+            <span className="text-[10px] text-ink-faint">{t.peserta}</span>
           </div>
           <ul className="mt-3 space-y-2">
-            {pasukan.map((t) => (
-              <li key={t.n} className="flex items-center gap-2 text-[11px]">
+            {pasukan.map((p) => (
+              <li key={p.n} className="flex items-center gap-2 text-[11px]">
                 <span
                   className="w-4 h-4 rounded-full text-[9px] font-semibold text-white flex items-center justify-center"
-                  style={{ background: t.warna }}
+                  style={{ background: p.warna }}
                 >
-                  {t.n}
+                  {p.n}
                 </span>
-                <span className="flex-1 truncate text-ink">{t.nama}</span>
-                <span className="tabular-nums text-ink-muted">{t.skor}</span>
+                <span className="flex-1 truncate text-ink">{p.nama}</span>
+                <span className="tabular-nums text-ink-muted">{p.skor}</span>
               </li>
             ))}
           </ul>
           <div className="mt-4 rounded-lg bg-[#EDE9FB] p-2.5 text-[11px] leading-snug text-ink">
-            Kerja berpasukan membawa lebih jauh.
+            {t.moto}
           </div>
         </aside>
       </div>

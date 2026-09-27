@@ -54,7 +54,7 @@ export default function HeroVideo({ bahasa = 'ms' }: { bahasa?: BahasaVideo }) {
           </div>
         ) : (
           <>
-            <HeroPreview />
+            <HeroPreview bahasa={bahasa} />
             <button
               type="button"
               onClick={() => setMain(true)}

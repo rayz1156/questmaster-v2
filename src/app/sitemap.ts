@@ -16,7 +16,20 @@ export default function sitemap(): MetadataRoute.Sitemap {
   const now = new Date();
 
   const tetap: MetadataRoute.Sitemap = [
-    { url: TAPAK, lastModified: now, changeFrequency: "weekly", priority: 1 },
+    {
+      url: TAPAK,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 1,
+      alternates: { languages: { "ms-MY": TAPAK, en: `${TAPAK}/en` } },
+    },
+    {
+      url: `${TAPAK}/en`,
+      lastModified: now,
+      changeFrequency: "weekly",
+      priority: 0.9,
+      alternates: { languages: { "ms-MY": TAPAK, en: `${TAPAK}/en` } },
+    },
     { url: `${TAPAK}/register`, lastModified: now, changeFrequency: "monthly", priority: 0.8 },
     { url: `${TAPAK}/login`, lastModified: now, changeFrequency: "monthly", priority: 0.5 },
     { url: `${TAPAK}/blog`, lastModified: now, changeFrequency: "weekly", priority: 0.8 },
