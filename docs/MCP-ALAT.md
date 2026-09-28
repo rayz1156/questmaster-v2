@@ -124,3 +124,4 @@ platform, jadi tiada alatnya.
 
 - `set_class_status` (educator, admin): `class_id`, `status` = `active` | `ended` | `archived`, `confirm: true` untuk ended dan archived. ended menyekat hantaran dan penyertaan baharu; archived turut menyembunyikan kelas daripada `list_classes`.
 - `list_classes` dan `get_class` kini memulangkan medan `status` terbitan.
+- `update_class` (educator, admin): `class_id` dan sekurang-kurangnya satu daripada `name`, `description` (rentetan kosong mengosongkan), `color` (#RRGGBB).

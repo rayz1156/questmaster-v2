@@ -298,6 +298,58 @@ export const TOOLS: ToolDef[] = [
   },
 
   {
+    name: "update_class",
+    title: "Kemas kini kelas",
+    description:
+      "Sunting nama, penerangan atau warna kelas. Hanya medan yang diberi akan diubah. Hantar description sebagai " +
+      "rentetan kosong untuk mengosongkan penerangan. Hanya pemilik kelas, pendidik bersama atau admin. " +
+      "Untuk status (tamat, arkib) guna set_class_status.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        name: { type: "string", description: "1 hingga 120 aksara" },
+        description: { type: "string", description: "Maksimum 2000 aksara; rentetan kosong mengosongkan penerangan" },
+        color: { type: "string", description: "Warna hex, contoh #6366f1" },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      const patch: Record<string, unknown> = {};
+      if (args.name !== undefined) {
+        const nama = String(args.name).trim();
+        if (nama.length < 1 || nama.length > 120) throw new Error("name mesti 1 hingga 120 aksara");
+        patch.name = nama;
+      }
+      if (args.description !== undefined) {
+        const pen = args.description === null ? "" : String(args.description).trim();
+        if (pen.length > 2000) throw new Error("description maksimum 2000 aksara");
+        patch.description = pen.length ? pen : null;
+      }
+      if (args.color !== undefined) {
+        const warna = String(args.color).trim();
+        if (!/^#[0-9a-fA-F]{6}$/.test(warna)) throw new Error("color mesti format hex #RRGGBB");
+        patch.color = warna;
+      }
+      if (Object.keys(patch).length === 0) {
+        throw new Error("Beri sekurang-kurangnya satu medan: name, description atau color");
+      }
+
+      // Klien sesi pengguna: RLS qm_classes hanya membenarkan pemilik, pendidik kelas atau admin mengemas kini.
+      const baru = unwrapOne<Record<string, unknown>>(
+        await s.db.from(TABLES.classes).update(patch).eq("id", args.class_id).select(COLUMNS.classSummary).maybeSingle(),
+        "Kemas kini kelas"
+      );
+      if (!baru) {
+        throw new Error("Kelas tidak dapat dikemas kini: tidak dijumpai, atau hanya pemilik, pendidik bersama atau admin boleh menyuntingnya");
+      }
+      return { ...baru, status: statusKelas(baru) };
+    },
+  },
+
+  {
     name: "list_hunts",
     title: "Senarai hunt",
     description:
