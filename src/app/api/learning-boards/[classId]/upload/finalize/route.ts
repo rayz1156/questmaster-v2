@@ -85,8 +85,8 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     // yang tidak direkod. Kegagalan padam tidak menghalang penolakan.
     try {
       await s5DeleteObject(t.object_key);
-    } catch (e: any) {
-      console.error(`[upload-finalize] gagal padam objek selepas kuota menolak: ${e?.message || e}`);
+    } catch (e: unknown) {
+      console.error(`[upload-finalize] gagal padam objek selepas kuota menolak: ${e instanceof Error ? e.message : e}`);
     }
     return NextResponse.json(kuota.body, { status: kuota.status });
   }

@@ -184,7 +184,7 @@ export default function EduClasses() {
               : `Classes: ${pelan.kelasDigunakan} of ${pelan.hadKelas} used`}
           </span>
           {!tanpaHad(pelan.hadKelas) && pelan.kelasDigunakan >= (pelan.hadKelas ?? 0) && (
-            <span className="text-ink-faint">Delete a class or upgrade to add more.</span>
+            <HadPelanNotis pesan="Delete a class or upgrade to add more." />
           )}
         </div>
       )}

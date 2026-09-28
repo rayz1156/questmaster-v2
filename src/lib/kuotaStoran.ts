@@ -10,6 +10,8 @@
  * pemanggil yang sebenar dan RLS keahlian dikuatkuasakan.
  */
 
+import type { SupabaseClient } from '@supabase/supabase-js';
+
 export type RalatKuota = {
   status: number;
   body: { error: string; code: string };
@@ -27,7 +29,7 @@ function statusKod(kod: string): number {
  * dibalas terus oleh laluan; kejayaan memulangkan null.
  */
 export async function reserveMuatNaik(
-  supa: any,
+  supa: SupabaseClient,
   pClass: string | null,
   bytes: number,
   mime: string,
@@ -53,7 +55,7 @@ export async function reserveMuatNaik(
  * gagal ialah ketidakselakuan yang perlu dibaiki, bukan ralat pengguna.
  */
 export async function rekodMuatNaik(
-  supa: any,
+  supa: SupabaseClient,
   pClass: string | null,
   fileCode: string,
   bytes: number,
