@@ -666,7 +666,13 @@ DECLARE
   u_unl uuid := '11111111-1111-1111-1111-111111111701';
   v_c1  uuid;
 BEGIN
-  SELECT c.id INTO v_c1 FROM public.qm_classes c WHERE c.owner_id = u_unl ORDER BY c.name LIMIT 1;
+  -- Kelas benih yang tepat ('Kelas Unlimited 1', 30 aktiviti benih).
+  -- Jangan guna ORDER BY name: kelas 'Kelas ke-31 Unlimited' yang
+  -- dicipta semakan m1 boleh tersusun lebih awal; kelas itu tiada
+  -- aktiviti (semakan tidak menguji apa-apa) dan tiada baris pendidik
+  -- (RLS menolak sisipan, kegagalan m3 CTO 29 Sep).
+  SELECT c.id INTO v_c1 FROM public.qm_classes c
+    WHERE c.owner_id = u_unl AND c.name = 'Kelas Unlimited 1';
   PERFORM pg_temp.qm_test_as(u_unl);
   BEGIN
     INSERT INTO public.qm_hunts (owner_id, class_id, title) VALUES (u_unl, v_c1, 'Hunt Unlimited ke-31');
@@ -685,7 +691,12 @@ DECLARE
   v_c1  uuid;
   v_h   uuid;
 BEGIN
-  SELECT c.id INTO v_c1 FROM public.qm_classes c WHERE c.owner_id = u_unl ORDER BY c.name LIMIT 1;
+  -- Kelas benih yang tepat ('Kelas Unlimited 1'): u_unl ada baris
+  -- pendidik (RLS sb_edu_all lulus) dan kelas itu ada 15 hunt benih.
+  -- ORDER BY name boleh memilih kelas ciptaan m1 yang tiada pendidik
+  -- (RLS menolak, kegagalan m3 CTO 29 Sep) dan tiada hunt (v_h NULL).
+  SELECT c.id INTO v_c1 FROM public.qm_classes c
+    WHERE c.owner_id = u_unl AND c.name = 'Kelas Unlimited 1';
   -- Hunt ketiga dalam kelas itu: berbeza daripada dua hunt papan benih
   -- (kekangan unik activity_id, class_id).
   SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = v_c1 ORDER BY h.title LIMIT 1 OFFSET 2;
@@ -708,9 +719,23 @@ DECLARE
   v_m    uuid;
   v_c4   uuid;
 BEGIN
-  SELECT c.id INTO v_c4 FROM public.qm_classes c WHERE c.owner_id = u_unl ORDER BY c.name LIMIT 1 OFFSET 3;
-  INSERT INTO public.qm_profiles (id, role) VALUES (gen_random_uuid(), 'participant')
+  -- Kelas benih yang tepat: 'Kelas Unlimited 4' mempunyai 150 ahli
+  -- benih, jadi ahli seterusnya benar-benar ahli ke-151. OFFSET atas
+  -- susunan nama tidak deterministik (kelas ciptaan m1 boleh tersusun
+  -- lebih awal dan kelas itu kosong).
+  SELECT c.id INTO v_c4 FROM public.qm_classes c
+    WHERE c.owner_id = u_unl AND c.name = 'Kelas Unlimited 4';
+  -- qm_profiles.id merujuk auth.users(id) (qm_profiles_id_fkey): cipta
+  -- baris auth.users dahulu, corak benih KZ-001. replica melumpuhkan
+  -- pencetus dan FK semasa benih; dikembalikan ke origin selepas itu.
+  PERFORM set_config('session_replication_role', 'replica', true);
+  INSERT INTO auth.users (id, email, aud, role, created_at, updated_at)
+    VALUES (gen_random_uuid(),
+            'v2-002a-m4-' || gen_random_uuid()::text || '@ujian.invalid',
+            'authenticated', 'authenticated', now(), now())
     RETURNING id INTO v_m;
+  INSERT INTO public.qm_profiles (id, role, plan) VALUES (v_m, 'participant', 'free');
+  PERFORM set_config('session_replication_role', 'origin', true);
   PERFORM pg_temp.qm_test_as(v_m);
   BEGIN
     INSERT INTO public.qm_class_members (class_id, user_id) VALUES (v_c4, v_m);
