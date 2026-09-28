@@ -8,6 +8,7 @@ import ClassShell from "@/components/ClassShell";
 import { EDU_TABS } from '@/lib/eduTabs';
 import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, endClass, reopenClass, addStudentScoreAdjustment, listStudentScoreAdjustments, deleteStudentScoreAdjustment, Klass, ClassInvite, StudentScoreAdjustment } from "@/lib/data";
 import EducatorsCard from "@/components/EducatorsCard";
+import InviteParticipantsModal from "@/components/InviteParticipantsModal";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const AVATAR_PALETTE = [
@@ -70,6 +71,8 @@ export default function ClassDetail() {
   const [marksReason, setMarksReason] = useState('');
   const [marksSign, setMarksSign] = useState(1);
   const [marksBusy, setMarksBusy] = useState(false);
+  // Modal jemputan peserta (QR, salin pautan, WhatsApp).
+  const [inviteOpen, setInviteOpen] = useState(false);
 
   async function openMarks(m: any) {
     const name = m.qm_profiles?.display_name || ('User ' + String(m.user_id).slice(0,8));
@@ -255,9 +258,19 @@ export default function ClassDetail() {
           <button onClick={()=>{ navigator.clipboard.writeText(klass.join_code); setMsg('Code copied'); }} className="inline-flex items-center justify-center gap-2 px-5 rounded-xl text-white text-sm font-medium bg-gradient-to-br from-violet-600 to-indigo-600 hover:from-violet-700 hover:to-indigo-700 shadow-sm">
             <Copy className="w-4 h-4"/> Copy
           </button>
+          <button onClick={()=>setInviteOpen(true)} className="inline-flex items-center justify-center gap-2 px-5 rounded-xl border border-violet-200 bg-violet-50 text-violet-700 text-sm font-medium hover:bg-violet-100">
+            <UserPlus className="w-4 h-4"/> Invite participants
+          </button>
         </div>
         {msg && <div className="text-xs text-indigo-700 bg-indigo-50 border border-indigo-100 rounded-lg px-3 py-2 mt-3 inline-flex items-center gap-2"><Check className="w-3.5 h-3.5"/>{msg}</div>}
       </div>
+
+      <InviteParticipantsModal
+        open={inviteOpen}
+        onClose={() => setInviteOpen(false)}
+        joinCode={klass.join_code}
+        className={klass.name}
+      />
 
       {/* Peer review: pusingan penilaian rakan sebaya */}
       <div className="rounded-2xl border border-gray-200 bg-white shadow-sm p-5 mb-4">

@@ -98,7 +98,9 @@ function CallbackInner() {
       }
 
       const next = sp?.get('next');
-      const safe = !!next && next.startsWith('/') && !next.startsWith('//');
+      // Hanya laluan relatif dibenarkan: tolak // (protocol-relative), /\ dan
+      // URL luar supaya pautan /j/ tidak boleh dipakai untuk redirect terbuka.
+      const safe = !!next && next.startsWith('/') && !next.startsWith('//') && !next.startsWith('/\\');
       window.location.href = safe ? (next as string) : destFor(role);
     })();
 

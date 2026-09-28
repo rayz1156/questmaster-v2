@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound, BookOpen } from "lucide-react";
 import { useSession } from "@/lib/session";
-import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
+import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, normalizeClassCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
 import PeerReviewBanner from "@/components/PeerReviewBanner";
 
@@ -31,12 +31,13 @@ export default function Page() {
     if (!joinCode.trim()) return;
     setJoinErr(null); setJoinOk(null); setJoinBusy(true);
     try {
-      await joinClassByCode(joinCode.trim().toUpperCase());
+      // Kod dinormalisasi supaya jarak, sengkang dan huruf O/I/L diterima.
+      await joinClassByCode(normalizeClassCode(joinCode));
       setJoinOk("Joined! Reloading…");
       setTimeout(() => { window.location.reload(); }, 700);
     } catch (err: any) {
       const msg = String(err?.message || "Failed");
-      setJoinErr(/Invalid class code/i.test(msg) ? `Invalid code "${joinCode.trim().toUpperCase()}". Please check with your educator.` : msg);
+      setJoinErr(/Invalid class code/i.test(msg) ? "Code not found. Please check the code with your educator." : msg);
     } finally {
       setJoinBusy(false);
     }

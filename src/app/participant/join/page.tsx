@@ -1,7 +1,7 @@
 "use client";
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { joinClassByCode } from "@/lib/data";
+import { joinClassByCode, normalizeClassCode } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 
 function Inner() {
@@ -23,17 +23,11 @@ function Inner() {
         router.replace(`/login?next=${encodeURIComponent('/participant/join' + (code ? `?code=${code}` : ''))}`);
       } else {
         setAuthChecked(true);
-        // Auto-submit if we already have a code in the URL (group/invite link)
+        // Satu aliran sahaja: jika kod ada di URL, alih ke /j/<kod
+        // dinormalisasi> (tiket V2-004). Tiada penyertaan automatik di sini.
         if (code && code.trim()) {
-          setBusy(true); setErr(null); setOk(null);
-          try {
-            await joinClassByCode(code.trim().toUpperCase());
-            setOk('Joined! Redirecting…');
-            setTimeout(() => router.replace('/participant/home'), 600);
-          } catch (e:any) {
-            const msg = String(e?.message || 'Failed');
-            setErr(/Invalid class code/i.test(msg) ? `Invalid code \"${code.trim().toUpperCase()}\". Please check the code with your educator.` : msg);
-          } finally { setBusy(false); }
+          router.replace(`/j/${normalizeClassCode(code.trim())}`);
+          return;
         }
       }
     })();
@@ -42,8 +36,10 @@ function Inner() {
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null); setOk(null); setBusy(true);
-    try { await joinClassByCode(code.trim().toUpperCase()); setOk("Joined! Redirecting…"); setTimeout(() => router.replace('/participant/home'), 800); }
-    catch (e: any) { const m=String(e?.message||'Failed'); setErr(/Invalid class code/i.test(m) ? `Invalid code \"${code.trim().toUpperCase()}\". Please check with your educator.` : m); } finally { setBusy(false); }
+    // Kod dinormalisasi sebelum dihantar supaya jarak, sengkang dan
+    // huruf O/I/L tidak menghalang penyertaan.
+    try { await joinClassByCode(normalizeClassCode(code)); setOk("Joined! Redirecting…"); setTimeout(() => router.replace('/participant/home'), 800); }
+    catch (e: any) { const m=String(e?.message||'Failed'); setErr(/Invalid class code/i.test(m) ? "Code not found. Please check the code with your educator." : m); } finally { setBusy(false); }
   };
   return (
     <form onSubmit={onSubmit} className="card w-full max-w-sm space-y-3">
