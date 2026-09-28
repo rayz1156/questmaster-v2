@@ -559,10 +559,10 @@ BEGIN
   UPDATE public.qm_profiles
      SET plan                     = p_plan,
          plan_expires_at          = p_expires,
-         max_classes_owned        = (v_limits ->> 'classes')::int,
-         max_classes_as_coeducator = (v_limits ->> 'coeducator_classes')::int,
+         max_classes_owned        = COALESCE((v_limits ->> 'classes')::int, 1000000),
+         max_classes_as_coeducator = COALESCE((v_limits ->> 'coeducator_classes')::int, 1000000),
          max_quizzes_owned        = NULL,
-         max_live_players         = (v_limits ->> 'live_players')::int,
+         max_live_players         = COALESCE((v_limits ->> 'live_players')::int, 1000000),
          can_upload_files         = true,
          can_upload_videos        = COALESCE((v_limits ->> 'video')::boolean, false)
    WHERE id = p_user;
@@ -655,17 +655,17 @@ UPDATE public.qm_profiles
 
 -- Akaun unlimited (Boss Hariz, 29 Sep). Diletakkan SELEPAS langkah 16
 -- akaun supaya tidak ditimpa. Semua had NULL (tanpa had) dan boleh muat
--- naik video. max_live_players dibiarkan NULL dengan sengaja: kod
--- aplikasi merawat NULL sebagai tanpa had (src/lib/pelan.ts:101,
--- tanpaHad(null) = true) dan had sesi langsung yang sebenar datang
--- daripada pelan berkesan dalam qm_live_slot_left, bukan lajur ini.
+-- naik video. Lajur had adalah NOT NULL di production, jadi tanpa had
+-- disimpan sebagai 1000000 (tanpaHad() dalam src/lib/pelan.ts menganggap
+-- >= 1000000 sebagai tanpa had). Had sesi langsung sebenar datang daripada
+-- pelan berkesan dalam qm_live_slot_left.
 UPDATE public.qm_profiles p
    SET plan                     = 'unlimited',
        plan_expires_at          = NULL,
-       max_classes_owned        = NULL,
-       max_classes_as_coeducator = NULL,
+       max_classes_owned        = 1000000,
+       max_classes_as_coeducator = 1000000,
        max_quizzes_owned        = NULL,
-       max_live_players         = NULL,
+       max_live_players         = 1000000,
        can_upload_files         = true,
        can_upload_videos        = true
   FROM auth.users au
