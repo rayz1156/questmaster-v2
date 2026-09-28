@@ -656,6 +656,49 @@ export async function listMyEducatorClasses(): Promise<EducatorClassRow[]> {
 }
 
 /* ============================================================
+ * Pin kelas dan aktiviti terkini (V2-005)
+ * ============================================================ */
+
+// Satu baris daripada RPC qm_my_class_activity().
+export type MyClassActivityRow = {
+  class_id: string;
+  last_activity_at: string | null;
+  pinned: boolean;
+};
+
+// Aktiviti terkini dan status pin untuk setiap kelas pengguna
+// (pemilik, educator diterima, atau ahli).
+export async function listMyClassActivity(): Promise<MyClassActivityRow[]> {
+  const { data, error } = await supabase.rpc('qm_my_class_activity');
+  if (error) throw error;
+  return (data || []) as MyClassActivityRow[];
+}
+
+// Semat kelas di atas senarai. Had 3 pin dikuatkuasakan pencetus di
+// pangkalan data; ralatnya (Pin limit reached (3)) dipulangkan terus
+// kepada pemanggil untuk dipaparkan.
+export async function pinClass(id: string): Promise<void> {
+  const uidSendiri = await uid();
+  if (!uidSendiri) throw new Error('not authed');
+  const { error } = await supabase
+    .from('qm_class_pins')
+    .insert({ user_id: uidSendiri, class_id: id });
+  if (error) throw error;
+}
+
+// Tanggalkan sematan kelas pengguna semasa.
+export async function unpinClass(id: string): Promise<void> {
+  const uidSendiri = await uid();
+  if (!uidSendiri) throw new Error('not authed');
+  const { error } = await supabase
+    .from('qm_class_pins')
+    .delete()
+    .eq('class_id', id)
+    .eq('user_id', uidSendiri);
+  if (error) throw error;
+}
+
+/* ============================================================
  * Class duplication & learning-board import (added 2026-05-11)
  * ============================================================ */
 
