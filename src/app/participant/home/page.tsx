@@ -4,7 +4,8 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound, BookOpen } from "lucide-react";
 import { useSession } from "@/lib/session";
-import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, normalizeClassCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
+import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, normalizeClassCode, leaveClassAsStudent, listMyClassActivity, type Hunt } from "@/lib/data";
+import { statusKelas, susunKelas, type AktivitiKelas, type KelasUntukStatus } from "@/lib/kelasStatus";
 import { supabase } from "@/lib/supabaseClient";
 import PeerReviewBanner from "@/components/PeerReviewBanner";
 
@@ -18,6 +19,7 @@ export default function Page() {
   const { user } = useSession('participant');
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
+  const [aktiviti, setAktiviti] = useState<AktivitiKelas[]>([]);
   const [name, setName] = useState<string>("");
   const [dataReady, setDataReady] = useState(false);
   const [activeClassId, setActiveClassId] = useState<string>("");
@@ -46,15 +48,21 @@ export default function Page() {
   const [scoresLoading, setScoresLoading] = useState(false);
 
   useEffect(() => { if (!user) return; (async () => {
-    const [h, c, p] = await Promise.all([
+    const [h, c, p, ak] = await Promise.all([
       listQuestsForParticipant(),
       listEnrolledClasses(),
       getMyProfile(),
+      listMyClassActivity().catch(() => [] as AktivitiKelas[]),
     ]);
     setHunts(h);
     setClasses(c);
+    setAktiviti(ak);
     setName(p?.display_name || "");
-    if (c && c.length > 0) setActiveClassId((c[0] as any).id);
+    // Kelas lalai: kelas aktif pertama ikut susunKelas; jika tiada kelas
+    // aktif, kelas tamat pertama.
+    const urutan = susunKelas(c, ak);
+    const lalai = urutan.find(k => statusKelas(k) === "aktif") ?? urutan[0];
+    if (lalai) setActiveClassId(lalai.id);
     setDataReady(true);
   })(); }, [user]);
 
@@ -110,7 +118,17 @@ export default function Page() {
               aria-label="Active class"
               className="input w-auto min-w-[220px]"
             >
-              {classes.map((c: any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+              {/* Pemilih mengasingkan kelas aktif dan kelas tamat (V2-005). */}
+              <optgroup label="Active">
+                {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "aktif"), aktiviti).map((c: KelasUntukStatus) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </optgroup>
+              <optgroup label="Ended">
+                {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "tamat"), aktiviti).map((c: KelasUntukStatus) => (
+                  <option key={c.id} value={c.id}>{c.name}</option>
+                ))}
+              </optgroup>
             </select>
           )}
         </div>
@@ -257,7 +275,10 @@ export default function Page() {
                       await leaveClassAsStudent(activeClassId);
                       const remaining = classes.filter((c: any) => c.id !== activeClassId);
                       setClasses(remaining);
-                      setActiveClassId(remaining[0]?.id || "");
+                      // Pilih semula kelas lalai: aktif dahulu, kemudian tamat.
+                      const urutanBaki = susunKelas(remaining, aktiviti);
+                      const lalai = urutanBaki.find(k => statusKelas(k) === "aktif") ?? urutanBaki[0];
+                      setActiveClassId(lalai ? lalai.id : "");
                     } catch (err: any) {
                       alert(err?.message || "Failed to leave class");
                     }
