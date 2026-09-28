@@ -257,7 +257,7 @@ BEGIN
   INSERT INTO public.qm_live_quizzes (id, owner_id, class_id, title)
     VALUES (q2, u_unl, v_uc[1], 'Kuiz Live Unlimited');
   INSERT INTO public.qm_live_sessions (id, quiz_id, host_id, code, status, max_players)
-    VALUES (s2, q2, u_unl, 'UNL123', 'lobby', 40);
+    VALUES (s2, q2, u_unl, 'UNLQRS', 'lobby', 40);
   FOR v_i IN 1..300 LOOP
     INSERT INTO public.qm_live_players (session_id, nickname, player_token)
       VALUES (s2, 'U' || lpad(v_i::text, 4, '0'), md5('unl' || v_i::text));
