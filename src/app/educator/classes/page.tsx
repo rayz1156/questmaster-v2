@@ -2,10 +2,11 @@
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from '@/lib/eduTabs';
-import { useEffect, useState } from "react";
-import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus, Activity} from "lucide-react";
-import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass, leaveClassAsEducator } from "@/lib/data";
+import { useEffect, useMemo, useState } from "react";
+import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus, Activity, Pin, PinOff} from "lucide-react";
+import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass, leaveClassAsEducator, listMyClassActivity, pinClass, unpinClass, type MyClassActivityRow } from "@/lib/data";
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
+import { statusKelas, susunKelas, tapisKelas } from "@/lib/kelasStatus";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import RowMenu from "@/components/ui/RowMenu";
 import { pelanSaya, mesejHad, tanpaHad, type RingkasanPelan } from "@/lib/pelan";
@@ -31,13 +32,24 @@ export default function EduClasses() {
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
   const [inviteMsg, setInviteMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [pelan, setPelan] = useState<RingkasanPelan | null>(null);
+  // V2-005: pin, tab Aktif/Tamat dan carian
+  const [aktiviti, setAktiviti] = useState<MyClassActivityRow[]>([]);
+  const [tab, setTab] = useState<"aktif" | "tamat">("aktif");
+  const [cari, setCari] = useState("");
+  const [pinMsg, setPinMsg] = useState<string | null>(null);
 
   const reload = async () => {
     try {
-      const [cls, inv, pl] = await Promise.all([listMyEducatorClasses(), listMyClassEducatorInvites(), pelanSaya()]);
+      const [cls, inv, pl, ak] = await Promise.all([
+        listMyEducatorClasses(),
+        listMyClassEducatorInvites(),
+        pelanSaya(),
+        listMyClassActivity().catch(() => [] as MyClassActivityRow[]),
+      ]);
       setClasses(cls);
       setInvites(inv);
       setPelan(pl);
+      setAktiviti(ak);
     } catch (e: any) {
       setErr(e.message || "Failed to load");
     } finally {
@@ -121,6 +133,27 @@ export default function EduClasses() {
     }
   };
 
+  // V2-005: semat atau tanggalkan sematan kelas. Had 3 pin dikira daripada
+// baris aktiviti; pada had, item Pin masih dipaparkan tetapi mesej jelas
+// ditunjukkan. Ralat pangkalan data (contoh perlumbaan pada had) dipaparkan
+// juga kerana pencetus mungkin menolak walaupun kiraan klien belum sampai 3.
+const onPinToggle = async (k: EducatorClassRow) => {
+    const sudahPin = aktiviti.some(a => a.class_id === k.id && a.pinned);
+    if (!sudahPin && aktiviti.filter(a => a.pinned).length >= 3) {
+      setPinMsg("You can pin up to 3 classes.");
+      return;
+    }
+    try {
+      if (sudahPin) { await unpinClass(k.id); } else { await pinClass(k.id); }
+      setPinMsg(null);
+      setAktiviti(await listMyClassActivity());
+    } catch (e: any) {
+      setPinMsg(/Pin limit reached/i.test(e?.message || "")
+        ? "You can pin up to 3 classes."
+        : e?.message || "Failed to update pin");
+    }
+  };
+
   const onAcceptInvite = async (code: string) => {
     setInviteBusy(code);
     setInviteMsg(null);
@@ -134,6 +167,15 @@ export default function EduClasses() {
       setInviteBusy(null);
     }
   };
+
+  // Terbitan V2-005: pin, kelas mengikut status, tapisan carian.
+  const pinnedIds = useMemo(() => new Set(aktiviti.filter(a => a.pinned).map(a => a.class_id)), [aktiviti]);
+  const kelasAktif = useMemo(() => susunKelas(classes.filter(k => statusKelas(k) === "aktif"), aktiviti), [classes, aktiviti]);
+  const kelasTamat = useMemo(() => susunKelas(classes.filter(k => statusKelas(k) === "tamat"), aktiviti), [classes, aktiviti]);
+  // Medan carian hanya muncul apabila jumlah semua kelas melebihi 8.
+  const carianAktif = classes.length > 8;
+  const senaraiTab = tab === "aktif" ? kelasAktif : kelasTamat;
+  const senaraiPapar = carianAktif ? tapisKelas(senaraiTab, cari) : senaraiTab;
 
   return (
     <Shell tabs={EDU_TABS}>
@@ -220,21 +262,72 @@ export default function EduClasses() {
           <button onClick={() => setShowNew(true)} className="btn-primary">Create your first class</button>
         </div>
       ) : (
+        <>
+          {/* Tab Active/Ended dan mesej pin (V2-005) */}
+          <div className="flex items-center gap-2 mb-4 flex-wrap">
+            <button
+              onClick={() => setTab("aktif")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                tab === "aktif"
+                  ? "bg-violet-50 border border-violet-200 text-brand-purple"
+                  : "bg-white border-hairline text-ink-muted hover:text-ink"
+              }`}
+            >
+              Active ({kelasAktif.length})
+            </button>
+            <button
+              onClick={() => setTab("tamat")}
+              className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                tab === "tamat"
+                  ? "bg-violet-50 border border-violet-200 text-brand-purple"
+                  : "bg-white border-hairline text-ink-muted hover:text-ink"
+              }`}
+            >
+              Ended ({kelasTamat.length})
+            </button>
+            {pinMsg && <span className="text-sm text-ink-muted">{pinMsg}</span>}
+          </div>
+
+          {carianAktif && (
+            <input
+              className="input mb-4"
+              placeholder="Search classes"
+              value={cari}
+              onChange={e => setCari(e.target.value)}
+            />
+          )}
+
+          {senaraiPapar.length === 0 ? (
+            <div className="surface py-12 text-center text-sm text-ink-muted">
+              No classes match &quot;{cari}&quot;.
+            </div>
+          ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {classes.map(k => (
-            <div key={k.id} className="card hover:border-[#D8D9E0] transition">
+          {senaraiPapar.map(k => {
+            const tamat = statusKelas(k) === "tamat";
+            const dipin = pinnedIds.has(k.id);
+            return (
+            <div key={k.id} className={`card hover:border-[#D8D9E0] transition ${tamat ? "opacity-75 bg-[#F7F7F9]" : ""}`}>
               <div className="flex items-start gap-3">
                 <span className="w-9 h-9 rounded-xl shrink-0 mt-0.5" style={{ background: k.color || "#7057D9" }}/>
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 min-w-0">
                     <Link href={`/educator/classes/${k.id}`} className="font-semibold text-ink truncate hover:text-brand-purple transition">{k.name}</Link>
-                    {k.ended_at && <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">Ended</span>}
+                    {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label="Pinned"/>}
+                    {tamat && (
+                      <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
+                        Ended · {new Date(k.ended_at || k.created_at).toLocaleDateString()}
+                      </span>
+                    )}
                   </div>
                   {k.description
                     ? <div className="text-sm text-ink-muted truncate mt-0.5">{k.description}</div>
                     : <div className="text-sm text-ink-faint mt-0.5">{roleLabel(k.role)}</div>}
                 </div>
                 <RowMenu items={[
+                  ...(dipin
+                    ? [{ label: "Unpin", icon: <PinOff className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]
+                    : [{ label: "Pin to top", icon: <Pin className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]),
                   ...(k.role === "owner" ? [
                     { label: "Duplicate class", icon: <CopyPlus className="w-4 h-4"/>, onSelect: () => openDuplicate(k) },
                     { label: "Delete class", icon: <Trash2 className="w-4 h-4"/>, danger: true, onSelect: () => onDelete(k) },
@@ -246,12 +339,18 @@ export default function EduClasses() {
 
               <div className="flex items-center gap-2 mt-4 pt-3 border-t border-hairline">
                 <code className="code-chip text-xs">{k.join_code}</code>
-                <button onClick={() => navigator.clipboard.writeText(k.join_code)} className="btn-quiet text-brand-purple"><Copy className="w-3.5 h-3.5"/>Copy</button>
+                {!tamat && (
+                  <button onClick={() => navigator.clipboard.writeText(k.join_code)} className="btn-quiet text-brand-purple"><Copy className="w-3.5 h-3.5"/>Copy</button>
+                )}
                 <Link href={`/educator/classes/${k.id}`} className="ml-auto btn-quiet text-brand-purple">Open →</Link>
               </div>
             </div>
-          ))}
-        </div>      )}
+            );
+          })}
+        </div>
+          )}
+        </>
+      )}
       {dupTarget && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !dupBusy && setDupTarget(null)}>
           <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
