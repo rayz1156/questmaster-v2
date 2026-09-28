@@ -115,7 +115,7 @@ BEGIN
     VALUES (u_part, 'participant', 'free');
   -- Unlimited: semua had NULL (tanpa had), boleh muat naik video.
   INSERT INTO public.qm_profiles (id, role, plan, max_classes_owned, max_classes_as_coeducator, max_live_players, can_upload_files, can_upload_videos)
-    VALUES (u_unl, 'educator', 'unlimited', NULL, NULL, NULL, true, true);
+    VALUES (u_unl, 'educator', 'unlimited', 1000000, 1000000, 1000000, true, true);
 
   -- Kelas: 3 milik u_free, 1 milik u_free2, 3 milik u_pro, 3 milik u_exp.
   INSERT INTO public.qm_classes (id, owner_id, name) VALUES
