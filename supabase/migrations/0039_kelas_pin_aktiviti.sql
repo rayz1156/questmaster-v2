@@ -110,9 +110,12 @@ create or replace function public.qm_guard_pin_limit()
 returns trigger
 language plpgsql
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $f$
 begin
+  -- Pengunci transaksi per pengguna: elak perlumbaan dua INSERT serentak
+  -- melepasi kiraan had 3 pin (kzsec V2-005 Penemuan #1).
+  perform pg_advisory_xact_lock(hashtext('qm_class_pins:' || new.user_id::text));
   if (select count(*) from public.qm_class_pins where user_id = new.user_id) >= 3 then
     raise exception 'Pin limit reached (3)';
   end if;
@@ -137,7 +140,7 @@ returns table (class_id uuid, last_activity_at timestamptz, pinned boolean)
 language sql
 stable
 security definer
-set search_path = public
+set search_path = public, pg_temp
 as $f$
   with kelas_saya as (
     select c.id as kelas_id, c.created_at as dicipta

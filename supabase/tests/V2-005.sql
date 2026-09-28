@@ -64,7 +64,9 @@ insert into public.qm_hunts (id, owner_id, class_id, title, created_at) values
 set local role authenticated;
 
 -- ============================================================
--- 1. Pin keempat ditolak (A mempunyai empat kelas sendiri)
+-- 1. Pin keempat ditolak (A sudah ada tiga pin; pin keempat menyasarkan
+--    c102 milik B tetapi pencetus had menyala sebelum semakan polisi,
+--    jadi mesej yang dijangka ialah had pin, bukan RLS)
 -- ============================================================
 set local request.jwt.claims = '{"sub": "00000000-0000-0000-0000-00000000a001", "role": "authenticated"}';
 
@@ -82,7 +84,7 @@ begin
   -- yang sama dan mencipta lulus palsu.
   begin
     insert into public.qm_class_pins (user_id, class_id)
-    values ('00000000-0000-0000-0000-00000000c102');
+    values ('00000000-0000-0000-0000-00000000a001', '00000000-0000-0000-0000-00000000c102');
     v_ralat := null;
   exception
     when others then
