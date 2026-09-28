@@ -66,7 +66,8 @@ export async function signInWithGoogle(opts?: { role?: 'participant' | 'educator
   setRememberMe(true);
   const params = new URLSearchParams();
   if (opts?.role === 'educator') params.set('role', 'educator');
-  if (opts?.next && opts.next.startsWith('/') && !opts.next.startsWith('//')) params.set('next', opts.next);
+  // Tolak // (protocol-relative) dan /\, sama seperti semakan di /auth/callback.
+  if (opts?.next && opts.next.startsWith('/') && !opts.next.startsWith('//') && !opts.next.startsWith('/\\')) params.set('next', opts.next);
   const qs = params.toString();
   const redirectTo = `${window.location.origin}/auth/callback${qs ? `?${qs}` : ''}`;
   return supabase.auth.signInWithOAuth({

@@ -10,7 +10,7 @@
 
 -- ---------------------------------------------------------------------------
 -- 1. Normalisasi kod kelas
--- IMMUTABLE supaya boleh diguna dalam ungkapan indeks pada masa depan.
+-- IMMUTABLE supaya boleh diguna dalam ungkapan indeks (lihat 1b di bawah).
 -- translate('OIL' -> '011'): O jadi 0, I dan L jadi 1.
 -- ---------------------------------------------------------------------------
 create or replace function public.qm_normalize_class_code(p text)
@@ -27,6 +27,17 @@ as $f$
     ''
   )
 $f$;
+
+-- ---------------------------------------------------------------------------
+-- 1b. Indeks unik atas kod ternormal
+-- Dua kod berbeza yang mengandungi O/I/L boleh ternormal sama (contoh
+-- AB0ICD34 dan ABO1CD34, kedua dua jadi AB01CD34). Tanpa indeks ini,
+-- SELECT ... INTO dalam qm_join_class_by_code gagal dengan ralat
+-- "more than one row" yang tidak mesra pengguna. Semua 58 kod production
+-- padan ^[0-9A-F]{8}$ dan unik antara satu sama lain, jadi selamat.
+-- ---------------------------------------------------------------------------
+create unique index if not exists qm_classes_join_code_norm_uidx
+  on public.qm_classes (public.qm_normalize_class_code(join_code));
 
 -- ---------------------------------------------------------------------------
 -- 2. Pratonton kelas melalui kod

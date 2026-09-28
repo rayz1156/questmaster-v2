@@ -8,6 +8,11 @@
 -- "UJIAN N LULUS" atau "UJIAN N GAGAL" melalui RAISE NOTICE; jika ada
 -- kegagalan, ralat dibangkitkan pada hujung blok supaya exit code mengambil
 -- kira kegagalan. Corak pengguna palsu ikut supabase/tests/KZ-001.sql.
+--
+-- Nota pembaikan 29 Sep: dalam plpgsql, `select set_config(...)` tanpa INTO
+-- gagal dengan "query has no destination for result data" kerana set_config
+-- memulangkan text. Di dalam blok DO guna PERFORM; di peringkat psql biasa
+-- select set_config masih dibenarkan.
 
 \set ON_ERROR_STOP on
 
@@ -228,7 +233,9 @@ begin
   end if;
 
   -- Aisyah: sudah ahli selepas Ujian 2, true. Guna kod dengan O juga.
-  select set_config('request.jwt.claims', '{"sub": "00000000-0000-0000-0000-0000000000a1"}', true);
+  -- PERFORM, bukan select: set_config memulangkan nilai dan plpgsql
+  -- menuntut destination (punca ralat asal "query has no destination").
+  perform set_config('request.jwt.claims', '{"sub": "00000000-0000-0000-0000-0000000000a1"}', true);
   select * into r from public.qm_class_preview_by_code('abo1cd34');
   if r.already_member = true then
     raise notice 'UJIAN 7b LULUS: ahli sedia ada already_member true';
@@ -260,13 +267,15 @@ end $u$;
 
 -- ============================================================
 -- UJIAN 8: pratonton tidak mendedahkan lajur lain
--- select * dipetakan kedudukan ke enam pembolehubah: jika fungsi
--- memulangkan lajur tambahan (emel, owner_id dan sebagainya), pilih masuk
--- enam pembolehubah gagal pada masa jalan. Nilai disemak satu persatu.
+-- 8a hingga 8f menyemak nilai enam lajur mengikut nama. Untuk bilangan
+-- lajur, UJIAN 8g mengira lajur hasil secara eksplisit: target record
+-- menerima sebarang bilangan lajur tanpa ralat, jadi kiraan itu satu
+-- satunya cara sebenar mengesan lajur bocor (emel, owner_id dan sebagainya).
 -- ============================================================
 do $u$
 declare
   r record;
+  v int;
   v_gagal int := 0;
 begin
   select * into r from public.qm_class_preview_by_code('AB01CD34');
@@ -313,13 +322,71 @@ begin
     raise notice 'UJIAN 8f GAGAL: nilai berbentuk emel ditemui dalam pratonton';
   end if;
 
+  -- Kiraan lajur hasil mesti tepat enam. Temp table dibuang pada commit,
+  -- dan transaksi ini digulung semula pada hujung fail.
+  create temp table ujian8_pratonton on commit drop as
+    select * from public.qm_class_preview_by_code('AB01CD34');
+  select count(*) into v
+    from pg_attribute
+   where attrelid = 'ujian8_pratonton'::regclass
+     and attnum > 0
+     and not attisdropped;
+  if v = 6 then
+    raise notice 'UJIAN 8g LULUS: hasil pratonton tepat enam lajur';
+  else
+    v_gagal := v_gagal + 1;
+    raise notice 'UJIAN 8g GAGAL: hasil pratonton ada % lajur (jangka 6)', v;
+  end if;
+
   if v_gagal > 0 then raise exception 'UJIAN 8: % semakan gagal', v_gagal; end if;
 end $u$;
 
+-- Kembali ke pentadbir: sisipan langsung tidak tertakluk RLS, sama seperti
+-- penyediaan data di bahagian 0.
 reset role;
-select set_config('request.jwt.claims', '', true);
+
+-- ============================================================
+-- UJIAN 9: indeks unik atas kod ternormal (temuan kzsec P2, 0038 bahagian 1b)
+-- Kelas kedua yang ternormal sama (ab-cd12o1 -> ABCD1201) mesti ditolak,
+-- manakala kelas dengan kod ternormal berbeza mesti diterima.
+-- ============================================================
+do $u$
+declare
+  v_constraint text;
+begin
+  -- Kelas pertama dengan kod ABCD1201: mesti berjaya, tiada pertembungan
+  -- dengan AB01CD34, FFFF0000 atau DEADBEEF.
+  begin
+    insert into public.qm_classes (id, owner_id, name, color, join_code) values
+      ('00000000-0000-0000-0000-000000004c04', '00000000-0000-0000-0000-0000000000e1', 'Kelas Sertai ABCD1201', '#22c55e', 'ABCD1201');
+  exception when others then
+    raise exception 'UJIAN 9a GAGAL: kelas pertama ABCD1201 gagal: %', sqlerrm;
+  end;
+  raise notice 'UJIAN 9a LULUS: kelas dengan kod ternormal berbeza diterima';
+
+  -- Kelas kedua ab-cd12o1 ternormal kepada ABCD1201: mesti ditolak oleh
+  -- indeks unik qm_classes_join_code_norm_uidx (kod mentah berbeza, jadi
+  -- kekangan unique join_code biasa tidak terganggu).
+  begin
+    insert into public.qm_classes (id, owner_id, name, color, join_code) values
+      ('00000000-0000-0000-0000-000000004c05', '00000000-0000-0000-0000-0000000000e1', 'Kelas Sertai Duplikat', '#ef4444', 'ab-cd12o1');
+    raise exception 'UJIAN 9b GAGAL: kelas kedua dengan kod ternormal sama diterima';
+  exception
+    when unique_violation then
+      get stacked diagnostics v_constraint = CONSTRAINT_NAME;
+      if v_constraint = 'qm_classes_join_code_norm_uidx' then
+        raise notice 'UJIAN 9b LULUS: kod ternormal sama ditolak oleh indeks unik';
+      else
+        raise exception 'UJIAN 9b GAGAL: ditolak oleh %, bukan indeks ternormal', v_constraint;
+      end if;
+    when others then
+      if sqlerrm like 'UJIAN 9b GAGAL%' then raise; end if;
+      raise exception 'UJIAN 9b GAGAL: ralat lain: %', sqlerrm;
+  end;
+end $u$;
 
 -- ============================================================
 -- Hujung: transaksi digulung semula, tiada data kekal.
 -- ============================================================
+select set_config('request.jwt.claims', '', true);
 rollback;

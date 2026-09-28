@@ -69,7 +69,9 @@ function LoginInner() {
     try { await supabase.auth.getUser(); } catch {}
     setBusy(false);
     const nextParam = searchParams?.get('next');
-    const isSafeNext = !!nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//');
+    // Hanya laluan relatif dibenarkan: tolak // (protocol-relative) dan /\,
+    // sama seperti semakan di /auth/callback, supaya next tidak jadi redirect terbuka.
+    const isSafeNext = !!nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\');
     const defaultDest = role === 'educator'
       ? '/educator/classes'
       : (role === 'admin' || role === 'superadmin') ? '/admin/overview' : '/participant/home';
