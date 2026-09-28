@@ -22,16 +22,16 @@ import { HARGA_PELAN } from "@/lib/pelan";
 const DISPLAY = { fontFamily: "var(--font-display), Georgia, serif" } as const;
 
 const IKON = [
-  <>
+  <g key="main">
     <circle cx="12" cy="12" r="9" />
     <path d="M10 8.5l5.5 3.5L10 15.5V8.5Z" fill="currentColor" stroke="none" />
-  </>,
-  <>
+  </g>,
+  <g key="doc">
     <path d="M6 3h8l4 4v14H6V3Z" />
     <path d="M14 3v4h4" />
     <path d="M9 12h6M9 16h6" />
-  </>,
-  <path d="M5 19V11M12 19V5M19 19v-6" />,
+  </g>,
+  <path key="chart" d="M5 19V11M12 19V5M19 19v-6" />,
 ];
 
 function urlPenuh(bahasa: Bahasa) {

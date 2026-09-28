@@ -14,7 +14,7 @@ export type Bil = "tahunan" | "bulanan";
 
 const BilContext = createContext<Bil>("tahunan");
 
-export function gunaBil(): Bil {
+export function useBil(): Bil {
   return useContext(BilContext);
 }
 
@@ -77,7 +77,7 @@ export function HargaProBil({
   dibilkan: string;
   sebulan: string;
 }) {
-  const bil = gunaBil();
+  const bil = useBil();
   if (bil === "tahunan") {
     return (
       <div>
