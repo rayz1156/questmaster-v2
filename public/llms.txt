@@ -1,0 +1,12 @@
+# Kuizen
+
+> Kuizen is an interactive quiz and gamified learning platform for school teachers and university lecturers. Educators create classes, build quizzes and activities, run live quiz sessions in the classroom, and see scores and leaderboards instantly. Content can be prepared in Bahasa Melayu or English.
+
+## Harga
+
+- Free: RM0. 3 classes, 150 participants per class, 60 players per live quiz session, 30 activities (quizzes and quests), 5 boards, 100 MB storage, 10 MB per file.
+- Pro: RM19 per month, billed RM228 a year (or RM29 per month on monthly billing). 30 classes, unlimited participants per class, 300 players per live quiz session, unlimited activities and boards, 1 GB storage, 20 MB per file, peer evaluation, Google Form bridge, reports, and MCP (Claude) access.
+- Institution: RM1,500 a year for 10 educators. Everything in Pro, with 10 GB storage shared across the institution, plus an admin dashboard and invoices.
+
+Plans and limits: https://kuizen.fun/#harga
+English site: https://kuizen.fun/en

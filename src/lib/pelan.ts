@@ -73,6 +73,7 @@ export const HAD_PELAN: Record<Pelan, {
 /** Harga pelan, mata wang MYR. Sumber tunggal untuk UI dan landing page.
  *  Pelan unlimited TIDAK dijual: pelan dalaman, jadi tiada harga. */
 export const HARGA_PELAN = {
+  free: { tahunan: 0 },
   pro: { bulanan: 29, tahunanSebulan: 19, tahunan: 228 },
   institution: { tahunan: 1500, kerusi: 10 },
 } as const;

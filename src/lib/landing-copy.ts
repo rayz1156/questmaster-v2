@@ -17,14 +17,48 @@ export type TeksLanding = {
   inLanguage: string;
   meta: { title: string; description: string; ogDescription: string };
   orgDescription: string;
-  nav: { ciri: string; blog: string; bantuan: string; logMasuk: string; daftar: string; tukarBahasa: string };
+  nav: { ciri: string; harga: string; blog: string; bantuan: string; logMasuk: string; daftar: string; tukarBahasa: string };
   hero: { eyebrow: string; tajuk1: string; tajuk2: string; sub: string; cta: string; nota: string };
   ciriTajuk: string;
   ciri: Array<{ tajuk: string; teks: string }>;
+  harga: {
+    tajuk: string;
+    sub: string;
+    suis: { tahunan: string; bulanan: string };
+    popular: string;
+    sebulan: string;
+    seTahun: string;
+    dibilkanTahunan: string;
+    untukKerusi: string;
+    tanpaHad: string;
+    ya: string;
+    tidak: string;
+    pelanNama: { free: string; pro: string; institution: string };
+    barisLabel: {
+      kelas: string;
+      pesertaSeKelas: string;
+      pemainSeSesi: string;
+      aktiviti: string;
+      papan: string;
+      pasukan: string;
+      storan: string;
+      saizFail: string;
+      sijil: string;
+      penilaianRakan: string;
+      googleForm: string;
+      laporan: string;
+      aksesMcp: string;
+      adminInvois: string;
+    };
+    templat: { kelas: string; peserta: string; aktiviti: string; papan: string };
+    sijilNilai: { free: string; pro: string; institution: string };
+    butang: { mula: string; pro: string; institusi: string };
+    notaVideo: string;
+  };
   faqTajuk: string;
   faq: Array<{ q: string; a: string }>;
   penutup: { tajuk: string; cta: string; blogSoalan: string; blogPautan: string };
-  kaki: { slogan: string; privasi: string; terma: string; blog: string; bantuan: string };
+  kaki: { slogan: string; privasi: string; terma: string; harga: string; blog: string; bantuan: string };
   pratonton: {
     menu: string[];
     soalanKe: string;
@@ -50,7 +84,7 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
     },
     orgDescription:
       "Platform kuiz interaktif dan gamifikasi pembelajaran untuk pendidik sekolah dan institusi pengajian tinggi.",
-    nav: { ciri: "Ciri", blog: "Blog", bantuan: "Bantuan", logMasuk: "Log masuk", daftar: "Daftar", tukarBahasa: "Pilih bahasa" },
+    nav: { ciri: "Ciri", harga: "Harga", blog: "Blog", bantuan: "Bantuan", logMasuk: "Log masuk", daftar: "Daftar", tukarBahasa: "Pilih bahasa" },
     hero: {
       eyebrow: "Untuk guru dan pensyarah",
       tajuk1: "Hidupkan",
@@ -65,6 +99,44 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
       { tajuk: "Satukan aktiviti kelas", teks: "Bahan, tugasan dan pasukan tersusun." },
       { tajuk: "Lihat kemajuan bersama", teks: "Markah terkumpul dalam papan pendahulu." },
     ],
+    harga: {
+      tajuk: "Pelan dan harga",
+      sub: "Mula percuma. Naik taraf apabila kelas anda mahu lebih.",
+      suis: { tahunan: "Tahunan", bulanan: "Bulanan" },
+      popular: "Paling popular",
+      sebulan: "/ bulan",
+      seTahun: "/ tahun",
+      dibilkanTahunan: "Dibilkan {harga} setahun",
+      untukKerusi: "untuk {n} educator",
+      tanpaHad: "Tanpa had",
+      ya: "Ya",
+      tidak: "Tidak",
+      pelanNama: { free: "Percuma", pro: "Pro", institution: "Institusi" },
+      barisLabel: {
+        kelas: "Kelas dimiliki",
+        pesertaSeKelas: "Peserta setiap kelas",
+        pemainSeSesi: "Peserta setiap sesi Live Quiz",
+        aktiviti: "Aktiviti (quiz dan quest)",
+        papan: "Papan",
+        pasukan: "Pasukan dan papan pendahulu",
+        storan: "Storan",
+        saizFail: "Saiz setiap fail",
+        sijil: "Sijil peserta",
+        penilaianRakan: "Penilaian rakan",
+        googleForm: "Jambatan Google Form",
+        laporan: "Laporan",
+        aksesMcp: "Akses MCP (Claude)",
+        adminInvois: "Papan pemuka admin dan invois",
+      },
+      templat: { kelas: "{n} kelas", peserta: "{n} peserta", aktiviti: "{n} aktiviti", papan: "{n} papan" },
+      sijilNilai: {
+        free: "Templat lalai dengan tera Kuizen",
+        pro: "Latar dan logo sendiri, tanpa tera, emel pukal",
+        institution: "Seperti Pro, dengan logo institusi",
+      },
+      butang: { mula: "Mula percuma", pro: "Naik taraf ke Pro", institusi: "Hubungi kami" },
+      notaVideo: "Video dibenamkan melalui pautan YouTube atau Google Drive.",
+    },
     faqTajuk: "Soalan ringkas. Jawapan jelas.",
     faq: [
       {
@@ -91,6 +163,26 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
         q: "Apakah bezanya berbanding platform kuiz konvensional?",
         a: "Kuizen menggabungkan kuiz langsung, aktiviti yang dinilai, papan pembelajaran dan papan pendahulu kelas dalam satu tempat, jadi markah daripada semua aktiviti itu terkumpul dalam papan pendahulu yang sama. Kandungan juga boleh disediakan sepenuhnya dalam Bahasa Melayu.",
       },
+      {
+        q: "Apakah beza pelan Percuma dan Pro?",
+        a: "Percuma memberi anda 3 kelas, 150 peserta setiap kelas, 60 peserta setiap sesi Live Quiz, 30 aktiviti, 5 papan dan 100 MB storan. Pro membuka 30 kelas tanpa had peserta, 300 peserta setiap sesi, aktiviti dan papan tanpa had, 1 GB storan, serta penilaian rakan, jambatan Google Form, laporan dan akses MCP.",
+      },
+      {
+        q: "Apakah yang berlaku apabila had pelan saya dicapai?",
+        a: "Penciptaan baharu disekat sehingga anda membuang yang lama atau menaik taraf pelan. Data sedia ada tidak dipadam dan kelas yang sedang berjalan kekal berfungsi seperti biasa.",
+      },
+      {
+        q: "Bagaimana bil tahunan Pro berfungsi?",
+        a: "Bil tahunan Pro ialah RM228 setahun, bersamaan RM19 sebulan, berbanding RM29 sebulan untuk bil bulanan. Anda menjimatkan lebih daripada satu pertiga dengan bil tahunan.",
+      },
+      {
+        q: "Untuk siapa pelan Institusi?",
+        a: "Pelan Institusi sesuai untuk sekolah dan institusi pengajian tinggi yang mahu satu akaun tengah: RM1,500 setahun untuk 10 educator, dengan storan 10 GB dikongsi merentas semua educator dalam institusi anda.",
+      },
+      {
+        q: "Adakah data saya kekal jika saya turun taraf pelan?",
+        a: "Ya, data anda kekal. Selepas turun taraf, hanya penciptaan baharu yang melebihi had pelan baharu disekat, contohnya kelas keempat pada pelan Percuma. Kelas dan aktiviti sedia ada tidak dipadam.",
+      },
     ],
     penutup: {
       tajuk: "Kelas seterusnya, lebih bermakna.",
@@ -98,7 +190,7 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
       blogSoalan: "Baharu dengan kuiz dalam talian?",
       blogPautan: "Baca blog Kuizen",
     },
-    kaki: { slogan: "Pembelajaran lebih hidup.", privasi: "Privasi", terma: "Terma", blog: "Blog", bantuan: "Bantuan" },
+    kaki: { slogan: "Pembelajaran lebih hidup.", privasi: "Privasi", terma: "Terma", harga: "Harga", blog: "Blog", bantuan: "Bantuan" },
     pratonton: {
       menu: ["Kelas", "Kuiz langsung", "Tugasan", "Bahan", "Pasukan", "Laporan"],
       soalanKe: "Soalan 3 daripada 10",
@@ -127,7 +219,7 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
     },
     orgDescription:
       "An interactive quiz and gamified learning platform for school and higher education educators.",
-    nav: { ciri: "Features", blog: "Blog", bantuan: "Help", logMasuk: "Log in", daftar: "Sign up", tukarBahasa: "Choose language" },
+    nav: { ciri: "Features", harga: "Pricing", blog: "Blog", bantuan: "Help", logMasuk: "Log in", daftar: "Sign up", tukarBahasa: "Choose language" },
     hero: {
       eyebrow: "For teachers and lecturers",
       tajuk1: "Bring your",
@@ -142,6 +234,44 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
       { tajuk: "Bring class activities together", teks: "Materials, tasks and teams, organised." },
       { tajuk: "See progress together", teks: "Scores add up on one leaderboard." },
     ],
+    harga: {
+      tajuk: "Plans and pricing",
+      sub: "Start free. Upgrade when your class wants more.",
+      suis: { tahunan: "Yearly", bulanan: "Monthly" },
+      popular: "Most popular",
+      sebulan: "/ month",
+      seTahun: "/ year",
+      dibilkanTahunan: "Billed {harga} a year",
+      untukKerusi: "for {n} educators",
+      tanpaHad: "Unlimited",
+      ya: "Yes",
+      tidak: "No",
+      pelanNama: { free: "Free", pro: "Pro", institution: "Institution" },
+      barisLabel: {
+        kelas: "Classes you own",
+        pesertaSeKelas: "Participants per class",
+        pemainSeSesi: "Players per live quiz session",
+        aktiviti: "Activities (quizzes and quests)",
+        papan: "Boards",
+        pasukan: "Teams and leaderboard",
+        storan: "Storage",
+        saizFail: "Size per file",
+        sijil: "Participant certificates",
+        penilaianRakan: "Peer evaluation",
+        googleForm: "Google Form bridge",
+        laporan: "Reports",
+        aksesMcp: "MCP access (Claude)",
+        adminInvois: "Admin dashboard and invoices",
+      },
+      templat: { kelas: "{n} classes", peserta: "{n} participants", aktiviti: "{n} activities", papan: "{n} boards" },
+      sijilNilai: {
+        free: "Default template with the Kuizen watermark",
+        pro: "Your own background and logo, no watermark, bulk email",
+        institution: "Like Pro, plus your institution logo",
+      },
+      butang: { mula: "Start free", pro: "Upgrade to Pro", institusi: "Contact us" },
+      notaVideo: "Videos are embedded via YouTube or Google Drive links.",
+    },
     faqTajuk: "Short questions. Clear answers.",
     faq: [
       {
@@ -168,6 +298,26 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
         q: "How is it different from a conventional quiz platform?",
         a: "Kuizen brings live quizzes, graded activities, learning boards and a class leaderboard into one place, so scores from every activity add up on the same leaderboard. Content can also be prepared entirely in Bahasa Melayu or English.",
       },
+      {
+        q: "What is the difference between Free and Pro?",
+        a: "Free gives you 3 classes, 150 participants per class, 60 players per live quiz session, 30 activities, 5 boards and 100 MB of storage. Pro opens up 30 classes with unlimited participants, 300 players per session, unlimited activities and boards, 1 GB of storage, plus peer evaluation, the Google Form bridge, reports and MCP access.",
+      },
+      {
+        q: "What happens when I reach my plan limit?",
+        a: "Creating new items is blocked until you delete old ones or upgrade. Existing data is never deleted, and classes already running keep working as usual.",
+      },
+      {
+        q: "How does Pro yearly billing work?",
+        a: "Pro yearly billing is RM228 a year, which works out to RM19 per month, compared with RM29 per month on monthly billing. Yearly billing saves you more than a third.",
+      },
+      {
+        q: "Who is the Institution plan for?",
+        a: "The Institution plan suits schools and higher education institutions that want one central account: RM1,500 a year for 10 educators, with 10 GB of storage shared across every educator in your institution.",
+      },
+      {
+        q: "Does my data stay if I downgrade my plan?",
+        a: "Yes, your data stays. After a downgrade, only creating new items beyond the new plan limit is blocked, for example a fourth class on the Free plan. Existing classes and activities are not deleted.",
+      },
     ],
     penutup: {
       tajuk: "Make your next class count.",
@@ -175,7 +325,7 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
       blogSoalan: "New to online quizzes?",
       blogPautan: "Read the Kuizen blog (in Bahasa Melayu)",
     },
-    kaki: { slogan: "Learning, brought to life.", privasi: "Privacy", terma: "Terms", blog: "Blog", bantuan: "Help" },
+    kaki: { slogan: "Learning, brought to life.", privasi: "Privacy", terma: "Terms", harga: "Pricing", blog: "Blog", bantuan: "Help" },
     pratonton: {
       menu: ["Classes", "Live quiz", "Tasks", "Materials", "Teams", "Reports"],
       soalanKe: "Question 3 of 10",
