@@ -119,3 +119,8 @@ Keprivasian terpelihara: nama penilai tidak pernah keluar daripada sistem
 Senarai, hantar semula atau batal jemputan pendidik tiada laluannya di
 aplikasi, jadi tidak disokong oleh alat MCP. Google Form tiada ciri di
 platform, jadi tiada alatnya.
+
+## Status kelas
+
+- `set_class_status` (educator, admin): `class_id`, `status` = `active` | `ended` | `archived`, `confirm: true` untuk ended dan archived. ended menyekat hantaran dan penyertaan baharu; archived turut menyembunyikan kelas daripada `list_classes`.
+- `list_classes` dan `get_class` kini memulangkan medan `status` terbitan.

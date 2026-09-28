@@ -159,6 +159,14 @@ function fileRedirectUrl(classId: string, fileCode?: string): string | null {
   return fileCode ? `/api/learning-boards/${classId}/file-redirect/${fileCode}` : null;
 }
 
+/** Status kelas terbitan: archived > ended > active. */
+type StatusKelas = "active" | "ended" | "archived";
+function statusKelas(r: { is_archived?: unknown; ended_at?: unknown }): StatusKelas {
+  if (r.is_archived === true) return "archived";
+  if (r.ended_at) return "ended";
+  return "active";
+}
+
 export const TOOLS: ToolDef[] = [
   {
     name: "whoami",
@@ -198,7 +206,10 @@ export const TOOLS: ToolDef[] = [
         .order("created_at", { ascending: false })
         .limit(clampLimit(args?.limit));
       if (!args?.include_archived) q = q.eq("is_archived", false);
-      return unwrapList(await q, "Senarai kelas");
+      return unwrapList<Record<string, unknown>>(await q, "Senarai kelas").map((c) => ({
+        ...c,
+        status: statusKelas(c),
+      }));
     },
   },
 
@@ -222,6 +233,7 @@ export const TOOLS: ToolDef[] = [
 
       return {
         ...cls,
+        status: statusKelas(cls),
         counts: {
           hunts: await countBy(s, TABLES.hunts, "id", args.class_id),
           boards: await countBy(s, TABLES.boards, "id", args.class_id),
@@ -229,6 +241,59 @@ export const TOOLS: ToolDef[] = [
           members: await countBy(s, TABLES.members, "class_id", args.class_id),
         },
       };
+    },
+  },
+
+  {
+    name: "set_class_status",
+    title: "Tukar status kelas",
+    description:
+      "Tukar status kelas. active: buka semula kelas. ended: tamatkan kelas; hantaran jawapan dan penyertaan baharu disekat " +
+      "(sama seperti butang End class di UI) tetapi kelas masih dipaparkan. archived: tamatkan dan sembunyikan kelas daripada " +
+      "senarai kelas (list_classes dengan include_archived: true masih memaparkannya). Hanya pemilik kelas, pendidik bersama " +
+      "atau admin. Status ended dan archived memerlukan confirm: true. Tarikh tamat asal dikekalkan jika kelas sudah tamat.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        status: { type: "string", enum: ["active", "ended", "archived"] },
+        confirm: { type: "boolean", description: "Wajib true untuk ended dan archived" },
+      },
+      required: ["class_id", "status"],
+    },
+    handler: async (args, s) => {
+      const status = String(args.status ?? "") as StatusKelas;
+      if (!["active", "ended", "archived"].includes(status)) {
+        throw new Error("status mesti active, ended atau archived");
+      }
+      if (status !== "active" && args.confirm !== true) {
+        throw new Error("Tetapkan confirm: true untuk menamatkan atau mengarkib kelas");
+      }
+      const semasa = unwrapOne<{ ended_at: string | null }>(
+        await s.db.from(TABLES.classes).select("ended_at").eq("id", args.class_id).maybeSingle(),
+        "Dapatkan kelas"
+      );
+      if (!semasa) throw new Error("Kelas tidak dijumpai atau anda tiada akses kepadanya");
+
+      const tamat = semasa.ended_at ?? new Date().toISOString();
+      const patch =
+        status === "active"
+          ? { is_archived: false, ended_at: null }
+          : status === "ended"
+            ? { is_archived: false, ended_at: tamat }
+            : { is_archived: true, ended_at: tamat };
+
+      // Klien sesi pengguna: RLS qm_classes hanya membenarkan pemilik, pendidik kelas atau admin mengemas kini.
+      const baru = unwrapOne<Record<string, unknown>>(
+        await s.db.from(TABLES.classes).update(patch).eq("id", args.class_id).select(COLUMNS.classSummary).maybeSingle(),
+        "Tukar status kelas"
+      );
+      if (!baru) {
+        throw new Error("Status tidak dapat ditukar: hanya pemilik kelas, pendidik bersama atau admin boleh berbuat demikian");
+      }
+      return { ...baru, status: statusKelas(baru) };
     },
   },
 
