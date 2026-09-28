@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fileluUpload } from '@/lib/filelu';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,6 +23,11 @@ export async function POST(req: NextRequest) {
   const mime = file.type || 'application/octet-stream';
   if (!mime.startsWith('image/')) return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
 
+  // Kuota foto profil dikira dalam kuota PENGGUNA SENDIRI, bukan kelas
+  // mana-mana (p_class NULL; tiket V2-002b). Disemak SEBELUM bait dihantar.
+  const kuota = await reserveMuatNaik(auth.supa, null, file.size, mime);
+  if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
+
   const buf = Buffer.from(await file.arrayBuffer());
   let uploaded;
   try {
@@ -29,6 +35,8 @@ export async function POST(req: NextRequest) {
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
+
+  await rekodMuatNaik(auth.supa, null, uploaded.fileCode, uploaded.sizeBytes ?? file.size, mime, 'profile');
 
   // Persist on profile (and clear any existing video fields).
   const { error: upErr } = await admin.from('qm_profiles').update({

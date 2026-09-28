@@ -2,14 +2,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { assertCapability } from '@/lib/capabilities';
 import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
+import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-const MAX_BYTES = 150 * 1024 * 1024; // 150 MB
+// Had tetap 150MB digugurkan (tiket V2-002b): had sebenar kini datang
+// daripada pelan berkesan pemilik kelas melalui qm_reserve_upload.
 const ALLOWED_MIME_PREFIXES = [
   'image/',
-  'video/',
   'audio/',
   'application/pdf',
   'application/msword',
@@ -36,13 +37,15 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   const file = form.get('file');
   if (!(file instanceof File)) return NextResponse.json({ error: 'file field missing' }, { status: 400 });
   if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
-  if (file.size > MAX_BYTES) {
-    return NextResponse.json({ error: `File too large. Max ${Math.round(MAX_BYTES / 1024 / 1024)} MB` }, { status: 413 });
-  }
   const mime = file.type || 'application/octet-stream';
   if (!ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p))) {
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
   }
+
+  // Kuota disemak SEBELUM bait dihantar ke FileLu (tiket V2-002b). Had fail
+  // dan jumlah storan mengikut pelan berkesan pemilik kelas.
+  const kuota = await reserveMuatNaik(auth.supa, params.classId, file.size, mime);
+  if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
 
   const ext = extOf(file.name);
   const bytes = Buffer.from(await file.arrayBuffer());
@@ -52,6 +55,8 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
+
+  await rekodMuatNaik(auth.supa, params.classId, uploaded.fileCode, uploaded.sizeBytes, mime, 'submission_board');
 
   const fileluFileUrl = `/api/submission-boards/${params.huntId}/${params.classId}/file-redirect/${uploaded.fileCode}`;
   return NextResponse.json({

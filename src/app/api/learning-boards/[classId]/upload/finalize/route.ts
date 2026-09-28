@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { admin } from '@/lib/mcp/db';
-import { s5HeadObject, s5FileCode } from '@/lib/s5';
+import { s5HeadObject, s5FileCode, s5DeleteObject } from '@/lib/s5';
 import { fileluShareUrl } from '@/lib/filelu';
+import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -75,6 +76,22 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
 
   const fileCode = s5FileCode(t.object_key);
   const mime = head.contentType || t.mime_type || 'application/octet-stream';
+
+  // Kuota disemak dengan saiz SEBENAR yang diterima di storan (head.size),
+  // bukan saiz yang diisytihar klien (tiket V2-002b, risiko kzsec).
+  const kuota = await reserveMuatNaik(owner.supa, params.classId, size, mime);
+  if (kuota) {
+    // Tolak dan kemas objek supaya storan tidak bertambah dengan fail
+    // yang tidak direkod. Kegagalan padam tidak menghalang penolakan.
+    try {
+      await s5DeleteObject(t.object_key);
+    } catch (e: any) {
+      console.error(`[upload-finalize] gagal padam objek selepas kuota menolak: ${e?.message || e}`);
+    }
+    return NextResponse.json(kuota.body, { status: kuota.status });
+  }
+
+  await rekodMuatNaik(owner.supa, params.classId, fileCode, size, mime, 'learning_board');
 
   console.log(
     `[upload-finalize] user=${owner.user!.id} class=${params.classId} key=${t.object_key} bytes=${size}`

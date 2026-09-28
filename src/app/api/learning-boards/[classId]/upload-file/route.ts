@@ -4,6 +4,7 @@ import { assertCapability } from '@/lib/capabilities';
 import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
 import { fetchRemoteToDisk, checkRateLimit, readTmp, UploadGuardError } from '@/lib/upload-guard';
 import { s5ObjectKey, s5PutStream, s5FileCode } from '@/lib/s5';
+import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -47,8 +48,9 @@ const ALLOWED_MIME_PREFIXES = [
   'text/',
   'image/',
   'audio/',
-  'video/',
 ];
+// Video disekat pada tahap pelan v2 (tiket V2-002b). Penolakan dilakukan
+// oleh qm_reserve_upload di pangkalan data; senarai ini hanya penapis pertama.
 
 function extOf(name: string): string {
   const i = name.lastIndexOf('.');
@@ -84,6 +86,16 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       );
     }
 
+    // Kuota disemak SEBELUM apa-apa bait diambil (tiket V2-002b). Saiz
+    // jauh tidak diketahui lagi, jadi Content-Length dipercayai untuk
+    // prasemakan sahaja; qm_record_upload menyemak semula dengan saiz
+    // sebenar selepas muat naik.
+    const declaredBytes = Number(body.size) || 0;
+    if (declaredBytes > 0) {
+      const kuota = await reserveMuatNaik(owner.supa, params.classId, declaredBytes, String(body.mimeType || ''));
+      if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
+    }
+
     let remote;
     try {
       remote = await fetchRemoteToDisk(sourceUrl, {
@@ -100,12 +112,18 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       return NextResponse.json({ error: e?.message || 'Fetch failed' }, { status });
     }
 
+    // Semakan kuota dengan saiz sebenar yang diterima (bukan yang diisytihar).
+    const kuotaSebenar = await reserveMuatNaik(owner.supa, params.classId, remote.bytes, remote.mimeType);
+    if (kuotaSebenar) return NextResponse.json(kuotaSebenar.body, { status: kuotaSebenar.status });
+
     try {
       const fileName =
         (typeof body.fileName === 'string' && body.fileName.trim()) || fileNameFromUrl(remote.finalUrl);
       const key = s5ObjectKey(fileName);
       await s5PutStream(key, readTmp(remote.tmpPath), remote.bytes, remote.mimeType);
       const fileCode = s5FileCode(key);
+
+      await rekodMuatNaik(owner.supa, params.classId, fileCode, remote.bytes, remote.mimeType, 'learning_board');
 
       console.log(
         `[upload-file/source_url] user=${owner.user!.id} class=${params.classId} ` +
@@ -150,6 +168,10 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
   }
 
+  // Kuota disemak SEBELUM bait dihantar ke FileLu (tiket V2-002b).
+  const kuota = await reserveMuatNaik(owner.supa, params.classId, file.size, mime);
+  if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
+
   const ext = extOf(file.name);
   const arrayBuf = await file.arrayBuffer();
   const bytes = Buffer.from(arrayBuf);
@@ -160,6 +182,8 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
+
+  await rekodMuatNaik(owner.supa, params.classId, uploaded.fileCode, uploaded.sizeBytes, mime, 'learning_board');
 
   // Stable URL that streams the file through our server (sets correct content-type so <img>/<video> can render).
   const fileluFileUrl = `/api/learning-boards/${params.classId}/file-redirect/${uploaded.fileCode}`;

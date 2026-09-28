@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fileluUpload } from '@/lib/filelu';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,6 +38,12 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   const mime = file.type || 'application/octet-stream';
   if (!mime.startsWith('image/')) return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
 
+  // Kuota disemak SEBELUM bait dihantar (tiket V2-002b). Pemilik kuota
+  // ialah pemilik kelas papan ini; 15MB MAX_BYTES dikekalkan sebagai injap
+  // operasi di hadapan had pelan.
+  const kuota = await reserveMuatNaik(auth.supa, board.class_id, file.size, mime);
+  if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
+
   const buf = Buffer.from(await file.arrayBuffer());
   let uploaded;
   try {
@@ -44,6 +51,8 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
+
+  await rekodMuatNaik(auth.supa, board.class_id, uploaded.fileCode, uploaded.sizeBytes ?? file.size, mime, 'intro_board');
 
   const url = `/api/intro-boards/${params.boardId}/image/${uploaded.fileCode}`;
   return NextResponse.json({ url, path: uploaded.fileCode, fileCode: uploaded.fileCode });
