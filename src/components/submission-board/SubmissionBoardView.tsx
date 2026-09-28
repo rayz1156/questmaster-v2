@@ -8,6 +8,7 @@ import { buildVideoEmbedUrl, parseYouTubeId, type VideoProvider } from '@/lib/vi
 import { useCapabilities } from '@/lib/useCapabilities';
 import { uploadToBunny } from '@/lib/bunny-upload';
 import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem, SubmissionItemType, SubmissionVisibility } from '@/lib/submission-boards';
+import { mampatImej } from '@/lib/mampatImej';
 
 import { supabase } from '@/lib/supabase';
 import { ConfirmDialog } from '@/components/ui/PromptDialog';
@@ -702,7 +703,7 @@ function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { ap
       } else if (tab === 'image' || tab === 'file') {
         if (!file) throw new Error('Please choose a file');
         const fd = new FormData();
-        fd.append('file', file);
+        fd.append('file', tab === 'image' ? await mampatImej(file) : file);
         const ur = await authedFetch(`${apiBase}/upload-file`, { method: 'POST', body: fd });
         if (!ur.ok) throw new Error((await ur.json()).error || 'Upload failed');
         const uj = await ur.json();

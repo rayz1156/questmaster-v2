@@ -11,6 +11,7 @@ import { uploadToBunny } from "@/lib/bunny-upload";
 import { parseYouTubeId } from "@/lib/video-embed";
 // VideoLightbox not used here - intro videos use IntroVideoLightbox below
 import ImageLightbox from "@/components/learning-board/ImageLightbox";
+import { mampatImej } from "@/lib/mampatImej";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 interface Props {
@@ -268,7 +269,7 @@ function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
       let imagePath = existing?.image_path ?? undefined;
       if (file) {
         const fd = new FormData();
-        fd.append('file', file);
+        fd.append('file', await mampatImej(file));
         const r = await fetch(`/api/intro-boards/${boardId}/upload-image`, { method: 'POST', body: fd, credentials: 'include' });
         if (!r.ok) {
           const j = await r.json().catch(() => ({}));

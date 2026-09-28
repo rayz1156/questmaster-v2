@@ -12,6 +12,7 @@ import {
   softDeleteMyAccount,
 } from "@/lib/data";
 import type { Profile } from "@/lib/types";
+import { mampatImej } from "@/lib/mampatImej";
 
 /**
  * Profil, semakan reka bentuk September 2026.
@@ -161,7 +162,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     setMediaBusy(true);
     try {
       const fd = new FormData();
-      fd.append("file", f);
+      fd.append("file", await mampatImej(f));
       const r = await fetch("/api/profile/intro/upload-image", { method: "POST", body: fd, headers: await authHeaders() });
       if (!r.ok) throw new Error(await r.text());
       await reloadProfile();

@@ -1,31 +1,88 @@
 import { supabase } from '@/lib/supabase';
 
-export type Pelan = 'free' | 'pro';
+export type Pelan = 'free' | 'pro' | 'institution';
 
 /**
- * Had pelan percuma.
+ * Had pelan: SATU sumber untuk UI dan landing page. Angka di sini MESTI
+ * selari dengan qm_plan_limits dalam supabase/migrations/0040_pelan_v2.sql
+ * (baris 87 hingga 89). Null bermakna tanpa had praktikal. Jangan guna
+ * nilai ini sebagai sekatan: kuatkuasa sebenar berada di pangkalan data.
  *
- * Nilai sebenar bagi setiap pengguna disimpan dalam qm_profiles dan
- * dikuatkuasakan oleh pencetus pangkalan data. Nilai di sini hanya untuk
- * paparan dan mesej, jadi jangan sekali kali jadikannya sebagai sekatan.
+ * file_mb / storage_mb dalam MB.
  */
-export const HAD_PERCUMA = {
-  kelas: 3,
-  pemainSesi: 40,
+export const HAD_PELAN: Record<Pelan, {
+  kelas: number;
+  kelasKoPendidik: number;
+  ahliSeKelas: number | null;
+  pemainSesi: number;
+  aktiviti: number | null;
+  papan: number | null;
+  fileMb: number;
+  storageMb: number;
+  penilaianRakan: boolean;
+}> = {
+  free: {
+    kelas: 3,
+    kelasKoPendidik: 3,
+    ahliSeKelas: 150,
+    pemainSesi: 60,
+    aktiviti: 30,
+    papan: 5,
+    fileMb: 10,
+    storageMb: 100,
+    penilaianRakan: false,
+  },
+  pro: {
+    kelas: 30,
+    kelasKoPendidik: 30,
+    ahliSeKelas: null,
+    pemainSesi: 300,
+    aktiviti: null,
+    papan: null,
+    fileMb: 20,
+    storageMb: 1024,
+    penilaianRakan: true,
+  },
+  institution: {
+    kelas: 30,
+    kelasKoPendidik: 30,
+    ahliSeKelas: null,
+    pemainSesi: 300,
+    aktiviti: null,
+    papan: null,
+    fileMb: 20,
+    storageMb: 10240,
+    penilaianRakan: true,
+  },
+};
+
+/** Harga pelan, mata wang MYR. Sumber tunggal untuk UI dan landing page. */
+export const HARGA_PELAN = {
+  pro: { bulanan: 29, tahunanSebulan: 19, tahunan: 228 },
+  institution: { tahunan: 1500, kerusi: 10 },
 } as const;
 
 // Nota bahasa: bahagian dalam aplikasi pendidik sudah diterjemah ke Bahasa
 // Inggeris dalam kerja terdahulu, jadi mesej di sini mengikut bahasa skrin
 // tempat ia muncul. Mesej pangkalan data kekal Bahasa Melayu dan tidak
 // pernah dipaparkan mentah kepada pengguna. Untuk menukar bahasa UI, cukup
-// ubah fail ini sahaja.
+// ubah fail ini sahaja. Angka dibaca daripada HAD_PELAN supaya mesej tidak
+// pernah berbeza dengan kuatkuasa sebenar.
 const MESEJ: Record<string, string> = {
-  QM_PLAN_FREE:
-    'This feature is not part of the free plan. The free plan covers quizzes only.',
+  QM_PLAN_FREE: 'This feature is not available on the free plan. Upgrade to unlock more.',
+  QM_PLAN_PRO: 'Peer evaluation is available on the Pro plan. Upgrade to unlock it.',
   QM_LIMIT_CLASSES:
-    `You have reached your class limit. The free plan allows ${HAD_PERCUMA.kelas} classes.`,
+    `You have reached your class limit. Your plan allows ${HAD_PELAN.free.kelas} classes on the free plan.`,
   QM_LIMIT_QUIZZES:
     'You have reached the quiz limit set for your account. Please contact the administrator.',
+  QM_LIMIT_ACTIVITIES:
+    `You have reached the activity limit (quests and quizzes). The free plan allows ${HAD_PELAN.free.aktiviti}. Delete old ones or upgrade.`,
+  QM_LIMIT_BOARDS:
+    `You have reached the board limit. The free plan allows ${HAD_PELAN.free.papan} boards. Delete old ones or upgrade.`,
+  QM_LIMIT_MEMBERS: 'This class is full. Remove a participant or upgrade your plan.',
+  QM_LIMIT_STORAGE: 'Your storage is full. Delete old files or upgrade your plan.',
+  QM_LIMIT_FILE_SIZE: 'This file exceeds the per-file size limit of your plan.',
+  QM_VIDEO_BLOCKED: 'Video files are not supported. Paste a YouTube or Google Drive link instead.',
   QM_LIMIT_PLAYERS: 'This session is full.',
   QM_FORBIDDEN: 'Only an administrator can do this.',
   QM_BAD_PLAN: 'Invalid plan.',
@@ -46,7 +103,7 @@ export function kodHad(e: unknown): string | null {
   return null;
 }
 
-/** Tukar ralat pangkalan data kepada ayat Bahasa Melayu yang boleh dibaca. */
+/** Tukar ralat pangkalan data kepada ayat yang boleh dibaca pengguna. */
 export function mesejHad(e: unknown, lalai = 'Something went wrong.'): string {
   const kod = kodHad(e);
   if (kod) return MESEJ[kod];
@@ -60,39 +117,46 @@ export type RingkasanPelan = {
   hadKuiz: number | null;
   hadPemain: number | null;
   kelasDigunakan: number;
+  aktivitiDigunakan: number | null;
+  papanDigunakan: number | null;
+  storageDigunakanBytes: number | null;
+  tamatTempoh: string | null;
 };
 
-/** Pelan dan penggunaan kuota semasa pengguna yang log masuk. */
+type JsonPelan = {
+  plan?: string;
+  effective_plan?: string;
+  expires_at?: string | null;
+  limits?: Record<string, unknown> | null;
+  usage?: {
+    classes?: number;
+    activities?: number;
+    boards?: number;
+    storage_bytes?: number;
+  } | null;
+};
+
+/** Pelan dan penggunaan kuota semasa pengguna yang log masuk (RPC 0040/0041). */
 export async function pelanSaya(): Promise<RingkasanPelan | null> {
   const { data: sesi } = await supabase.auth.getSession();
-  const uid = sesi.session?.user?.id;
-  if (!uid) return null;
+  if (!sesi.session) return null;
 
-  const [{ data: profil }, { count }] = await Promise.all([
-    supabase
-      .from('qm_profiles')
-      .select('plan, max_classes_owned, max_quizzes_owned, max_live_players')
-      .eq('id', uid)
-      .maybeSingle(),
-    supabase
-      .from('qm_classes')
-      .select('id', { count: 'exact', head: true })
-      .eq('owner_id', uid),
-  ]);
+  const { data, error } = await supabase.rpc('qm_my_plan_usage');
+  if (error || !data) return null;
 
-  if (!profil) return null;
-  const p = profil as {
-    plan?: string;
-    max_classes_owned?: number | null;
-    max_quizzes_owned?: number | null;
-    max_live_players?: number | null;
-  };
+  const j = data as JsonPelan;
+  const plan = (j.plan === 'pro' || j.plan === 'institution') ? j.plan : 'free';
+  const had = j.limits || {};
   return {
-    pelan: p.plan === 'pro' ? 'pro' : 'free',
-    hadKelas: p.max_classes_owned ?? null,
-    hadKuiz: p.max_quizzes_owned ?? null,
-    hadPemain: p.max_live_players ?? null,
-    kelasDigunakan: count ?? 0,
+    pelan: plan,
+    hadKelas: (had.classes as number | null) ?? null,
+    hadKuiz: null,
+    hadPemain: (had.live_players as number | null) ?? null,
+    kelasDigunakan: j.usage?.classes ?? 0,
+    aktivitiDigunakan: j.usage?.activities ?? null,
+    papanDigunakan: j.usage?.boards ?? null,
+    storageDigunakanBytes: j.usage?.storage_bytes ?? null,
+    tamatTempoh: j.expires_at ?? null,
   };
 }
 

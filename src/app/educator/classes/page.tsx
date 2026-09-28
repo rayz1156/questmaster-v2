@@ -8,7 +8,9 @@ import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInv
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 import RowMenu from "@/components/ui/RowMenu";
-import { pelanSaya, mesejHad, tanpaHad, type RingkasanPelan } from "@/lib/pelan";
+import { pelanSaya, mesejHad, tanpaHad, HAD_PELAN, type RingkasanPelan } from "@/lib/pelan";
+import HadPelanNotis from "@/components/HadPelanNotis";
+import { HardDrive } from "lucide-react";
 
 function roleLabel(role: string): string {
   if (role === "owner") return "Owner";
@@ -173,8 +175,8 @@ export default function EduClasses() {
 
       {pelan && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
-          <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${pelan.pelan === "pro" ? "bg-violet-50 text-brand-purple border border-violet-200" : "bg-[#F3F2F7] text-ink-muted border border-hairline"}`}>
-            {pelan.pelan === "pro" ? "Pro plan" : "Free plan"}
+          <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${pelan.pelan === "free" ? "bg-[#F3F2F7] text-ink-muted border border-hairline" : "bg-violet-50 text-brand-purple border border-violet-200"}`}>
+            {pelan.pelan === "pro" ? "Pro plan" : pelan.pelan === "institution" ? "Institution plan" : "Free plan"}
           </span>
           <span className="text-ink-muted">
             {tanpaHad(pelan.hadKelas)
@@ -186,6 +188,10 @@ export default function EduClasses() {
           )}
         </div>
       )}
+
+      {/* Kad Storage (tiket V2-002b): bar kemajuan kuota, amaran jingga pada
+          80%, dan senarai had kelas, aktiviti dan papan pelan semasa. */}
+      {pelan && <KadStoran pelan={pelan} />}
 
       {showNew && (
         <div className="surface p-5 mb-6">
@@ -284,5 +290,42 @@ export default function EduClasses() {
       )}
 
     </Shell>
+  );
+}
+
+/** Bar kemajuan kuota storan + senarai had pelan (tiket V2-002b). */
+function KadStoran({ pelan }: { pelan: RingkasanPelan }) {
+  const had = HAD_PELAN[pelan.pelan];
+  const usedMb = (pelan.storageDigunakanBytes ?? 0) / (1024 * 1024);
+  const pct = Math.min(100, had.storageMb > 0 ? (usedMb / had.storageMb) * 100 : 0);
+  const hampirPenuh = pct >= 80;
+  const fmt = (n: number) => (n >= 100 ? Math.round(n).toString() : n.toFixed(1).replace(/\.0$/, ""));
+
+  return (
+    <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6">
+      <div className="flex items-center gap-2 mb-2">
+        <HardDrive className="w-4 h-4 text-brand-purple" />
+        <div className="font-semibold text-ink text-sm">Storage</div>
+        <span className="ml-auto text-xs text-ink-muted">
+          {fmt(usedMb)} MB of {had.storageMb} MB used
+        </span>
+      </div>
+      <div className="w-full h-2 rounded-full bg-white border border-violet-100 overflow-hidden">
+        <div
+          className={`h-full rounded-full transition-all ${hampirPenuh ? "bg-amber-500" : "bg-gradient-to-r from-violet-600 to-indigo-600"}`}
+          style={{ width: `${pct}%` }}
+        />
+      </div>
+      {hampirPenuh && (
+        <div className="text-xs text-amber-600 mt-2">
+          You have used {Math.round(pct)}% of your storage. Delete old files or upgrade.
+        </div>
+      )}
+      <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-xs text-ink-muted">
+        <span>Classes: {pelan.kelasDigunakan} of {tanpaHad(pelan.hadKelas) ? "unlimited" : pelan.hadKelas}</span>
+        <span>Activities: {pelan.aktivitiDigunakan ?? 0} of {had.aktiviti === null ? "unlimited" : had.aktiviti}</span>
+        <span>Boards: {pelan.papanDigunakan ?? 0} of {had.papan === null ? "unlimited" : had.papan}</span>
+      </div>
+    </div>
   );
 }

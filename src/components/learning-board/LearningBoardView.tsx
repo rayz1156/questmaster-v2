@@ -8,6 +8,7 @@ import { uploadToBunny } from '@/lib/bunny-upload';
 import { useCapabilities } from '@/lib/useCapabilities';
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
+import { mampatImej } from '@/lib/mampatImej';
 import { FolderInput } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
@@ -1150,7 +1151,7 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
     if (!file) return;
     setUploading(true); setErr(null);
     try {
-      const fd = new FormData(); fd.append('file', file);
+      const fd = new FormData(); fd.append('file', await mampatImej(file));
       const r = await authedFetch(`/api/learning-boards/${classId}/upload-file`, { method: 'POST', body: fd });
       const data = await r.json();
       if (!r.ok) throw new Error(data.error || 'Upload failed');
@@ -1308,7 +1309,7 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
     setBusy(true); setErr(null); setProgress(0);
     try {
       const fd = new FormData();
-      fd.append('file', file);
+      fd.append('file', await mampatImej(file));
       const upRes = await authedFetch(`/api/learning-boards/${classId}/upload-file`, {
         method: 'POST',
         body: fd,
