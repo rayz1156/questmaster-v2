@@ -235,8 +235,33 @@ export async function createClassInvite(classId: string, email: string | null = 
   const { data, error } = await supabase.from('qm_class_invites').insert({ class_id: classId, email, invited_by: me }).select().single();
   if (error) throw error; return data as ClassInvite;
 }
+// Normalisasi kod kelas di sisi klien, logik sama dengan SQL
+// public.qm_normalize_class_code (migrasi 0038): upper, buang jarak,
+// sengkang dan garis bawah, O -> 0, I dan L -> 1.
+export function normalizeClassCode(s: string): string {
+  return s.toUpperCase().replace(/[\s\-_]/g, '').replace(/O/g, '0').replace(/[IL]/g, '1');
+}
+
+// Jenis baris yang dipulangkan RPC qm_class_preview_by_code. Fungsi SQL
+// hanya memulangkan enam lajur ini, tiada emel atau owner_id.
+export type ClassPreview = {
+  class_id: string;
+  class_name: string;
+  educator_name: string;
+  class_color: string;
+  is_ended: boolean;
+  already_member: boolean;
+};
+
+export async function previewClassByCode(code: string): Promise<ClassPreview | null> {
+  const { data, error } = await supabase.rpc('qm_class_preview_by_code', { p_code: normalizeClassCode(code) });
+  if (error) throw error;
+  return (data && data.length > 0 ? (data[0] as ClassPreview) : null);
+}
 export async function joinClassByCode(code: string): Promise<string> {
-  const { data, error } = await supabase.rpc('qm_join_class_by_code', { p_code: code });
+  // Hantar kod yang sudah dinormalisasi supaya kod acak seperti
+  // "ab-cd 12o1" tetap menemui kelas yang betul.
+  const { data, error } = await supabase.rpc('qm_join_class_by_code', { p_code: normalizeClassCode(code) });
   if (error) throw error; return data as string;
 }
 export async function acceptClassInvite(token: string): Promise<string> {
