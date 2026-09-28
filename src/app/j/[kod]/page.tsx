@@ -40,8 +40,8 @@ export default function JoinByCodePage({ params }: { params: { kod: string } }) 
         setPreview(p);
         setState("preview");
       }
-    } catch (e: any) {
-      setErr(String(e?.message || "Something went wrong. Please try again."));
+    } catch (e) {
+      setErr(String((e as Error)?.message || "Something went wrong. Please try again."));
     } finally {
       setBusy(false);
     }
@@ -70,8 +70,8 @@ export default function JoinByCodePage({ params }: { params: { kod: string } }) 
       await joinClassByCode(activeCode || normalizeClassCode(kod));
       setOk("You have joined " + preview.class_name + "!");
       setTimeout(() => router.replace("/participant/home"), 700);
-    } catch (e: any) {
-      const msg = String(e?.message || "Failed");
+    } catch (e) {
+      const msg = String((e as Error)?.message || "Failed");
       setErr(/Invalid class code/i.test(msg) ? "Code not found. Please check the code with your educator." : msg);
     } finally { setBusy(false); }
   };
