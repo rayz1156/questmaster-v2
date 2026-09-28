@@ -36,7 +36,7 @@ insert into public.qm_profiles (id, role, display_name, plan, approved, suspende
 
 -- Kelas aktif: kod hex sah lapan aksara, warna terkenal.
 insert into public.qm_classes (id, owner_id, name, color, join_code) values
-  ('00000000-0000-0000-0000-000000004c01', '00000000-0000-0000-0000-0000000000e1', 'Kelas Sertai Aktif', '#6366f1', 'AB12CD34');
+  ('00000000-0000-0000-0000-000000004c01', '00000000-0000-0000-0000-0000000000e1', 'Kelas Sertai Aktif', '#6366f1', 'AB01CD34');
 
 -- Kelas tamat: kod berbeza, ended_at diisi selepas sisipan.
 insert into public.qm_classes (id, owner_id, name, color, join_code) values
@@ -103,7 +103,7 @@ end $u$;
 
 -- ============================================================
 -- UJIAN 2: sertai dengan kod huruf kecil bersambung sengkang
--- Aisyah belum ahli; kod 'ab12-cd34' menemui kelas AB12CD34.
+-- Aisyah belum ahli; kod 'ab01-cd34' menemui kelas AB01CD34.
 -- ============================================================
 select set_config('request.jwt.claims', '{"sub": "00000000-0000-0000-0000-0000000000a1"}', true);
 set local role authenticated;
@@ -112,7 +112,7 @@ do $u$
 declare
   v_id uuid;
 begin
-  v_id := public.qm_join_class_by_code('ab12-cd34');
+  v_id := public.qm_join_class_by_code('ab01-cd34');
   if v_id = '00000000-0000-0000-0000-000000004c01' then
     raise notice 'UJIAN 2 LULUS: kod huruf kecil dengan sengkang berjaya sertai';
   else
@@ -122,7 +122,7 @@ end $u$;
 
 -- ============================================================
 -- UJIAN 3: sertai dengan O menggantikan 0
--- Baharu menaip AB12CD3O (huruf O, bukan digit 0).
+-- Baharu menaip ABO1CD34 (huruf O, bukan digit 0).
 -- ============================================================
 select set_config('request.jwt.claims', '{"sub": "00000000-0000-0000-0000-0000000000b1"}', true);
 
@@ -130,7 +130,7 @@ do $u$
 declare
   v_id uuid;
 begin
-  v_id := public.qm_join_class_by_code('AB12CD3O');
+  v_id := public.qm_join_class_by_code('ABO1CD34');
   if v_id = '00000000-0000-0000-0000-000000004c01' then
     raise notice 'UJIAN 3 LULUS: kod dengan huruf O berjaya sertai kelas yang betul';
   else
@@ -193,7 +193,7 @@ set local role anon;
 do $u$
 begin
   begin
-    perform * from public.qm_class_preview_by_code('AB12CD34');
+    perform * from public.qm_class_preview_by_code('AB01CD34');
     raise exception 'UJIAN 6 GAGAL: anon berjaya panggil pratonton';
   exception when others then
     if sqlerrm like 'UJIAN 6 GAGAL%' then raise; end if;
@@ -219,7 +219,7 @@ declare
   v_gagal int := 0;
 begin
   -- Chong: belum ahli, false.
-  select * into r from public.qm_class_preview_by_code('ab12 cd34');
+  select * into r from public.qm_class_preview_by_code('ab01 cd34');
   if r.already_member = false then
     raise notice 'UJIAN 7a LULUS: bukan ahli already_member false';
   else
@@ -229,7 +229,7 @@ begin
 
   -- Aisyah: sudah ahli selepas Ujian 2, true. Guna kod dengan O juga.
   select set_config('request.jwt.claims', '{"sub": "00000000-0000-0000-0000-0000000000a1"}', true);
-  select * into r from public.qm_class_preview_by_code('ab12cd3o');
+  select * into r from public.qm_class_preview_by_code('abo1cd34');
   if r.already_member = true then
     raise notice 'UJIAN 7b LULUS: ahli sedia ada already_member true';
   else
@@ -269,7 +269,7 @@ declare
   r record;
   v_gagal int := 0;
 begin
-  select * into r from public.qm_class_preview_by_code('AB12CD34');
+  select * into r from public.qm_class_preview_by_code('AB01CD34');
   if r.class_id = '00000000-0000-0000-0000-000000004c01' then
     raise notice 'UJIAN 8a LULUS: class_id betul';
   else
