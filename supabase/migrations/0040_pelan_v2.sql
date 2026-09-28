@@ -1,11 +1,21 @@
 -- 0040_pelan_v2.sql
 --
--- Pelan Kuizen v2 (diluluskan Boss Hariz, 29 Sep 2026):
---   - plan bernilai free | pro | institution
+-- Pelan Kuizen v2 (diluluskan Boss Hariz, 29 Sep 2026; dikemas kini selepas
+-- ujian CTO dan semakan kzqa/kzsec, 29 Sep 2026):
+--   - plan bernilai free, pro, institution atau unlimited
 --   - tarikh tamat pelan (plan_expires_at)
 --   - quest, papan dan pasukan dibuka kepada pelan percuma dengan kuota
 --   - penilaian rakan kekal Pro
 --   - had angka datang daripada SATU sumber: qm_plan_limits(text)
+--   - pelan unlimited: semua tanpa had, boleh muat naik video
+--
+-- Pembetulan pusingan baiki:
+--   - auto_created dipaksa oleh pencetus kuota papan, bukan dipercayai
+--     daripada pelanggan (tutup pintasan kzqa P1), dan UPDATE lajur itu
+--     dipin kepada nilai lama oleh pencetus BEFORE UPDATE.
+--   - pg_advisory_xact_lock(hashtext('qm_quota:' || pemilik)) pada
+--     pencetus kuota aktiviti, papan, ahli dan kelas (kzsec S1).
+--   - qm_live_slot_left ditarik balik daripada anon (kzsec S2).
 --
 -- Jalankan dengan: psql -1 -v ON_ERROR_STOP=1 -f 0040_pelan_v2.sql
 -- Tiada BEGIN/COMMIT dalam fail ini; psql -1 membalut satu transaksi.
@@ -17,24 +27,27 @@
 --      perlu disekat semula kelak.
 --   2. Papan yang dicipta secara automatik oleh pencetus (papan pengenalan
 --      kelas dan papan penghantaran quest) TIDAK disekat dan TIDAK dikira.
---      Pembeza: lajur auto_created. Pencetus kuota papan menanda
---      NEW.auto_created := true apabila pg_trigger_depth() > 1, dan kiraan
---      hanya mengira baris auto_created = false. Ini boleh diuji terus dan
---      selamat walaupun pencetus automatik memasukkan ke jadual lain.
+--      Pembeza: lajur auto_created. Pencetus kuota papan MEMAKSA
+--      NEW.auto_created := (pg_trigger_depth() > 1) tanpa mengira nilai
+--      yang dihantar pelanggan (tutup pintasan P1), dan kiraan hanya
+--      mengira baris auto_created = false. Pencetus BEFORE UPDATE memin
+--      lajur itu kepada nilai lama supaya ia tidak boleh diubah kemudian.
+--      Ini boleh diuji terus dan selamat walaupun pencetus automatik
+--      memasukkan ke jadual lain.
 --   3. Kuota aktiviti dan papan mengecualikan qm_caller_is_privileged()
 --      (corak had kelas 0030) kerana laluan pendua kelas memasukkan baris
 --      dengan service-role. Had pemain sesi KEKAL tanpa pengecualian
 --      (pelajaran 0031: had kapasiti tidak boleh dipintas).
 
 -- ---------------------------------------------------------------------
--- 1. CHECK plan: free, pro, institution
+-- 1. CHECK plan: free, pro, institution, unlimited
 -- ---------------------------------------------------------------------
 ALTER TABLE public.qm_profiles DROP CONSTRAINT IF EXISTS qm_profiles_plan_chk;
 
 DO $$
 BEGIN
   ALTER TABLE public.qm_profiles
-    ADD CONSTRAINT qm_profiles_plan_chk CHECK (plan IN ('free','pro','institution'));
+    ADD CONSTRAINT qm_profiles_plan_chk CHECK (plan IN ('free','pro','institution','unlimited'));
 EXCEPTION WHEN duplicate_object THEN NULL;
 END $$;
 
@@ -84,14 +97,17 @@ LANGUAGE sql
 IMMUTABLE
 AS $fn$
   SELECT CASE p_plan
-    WHEN 'pro' THEN '{"classes":30,"coeducator_classes":30,"members_per_class":null,"live_players":300,"activities":null,"boards":null,"file_mb":20,"storage_mb":1024,"peer_review":true,"teams":true}'::jsonb
-    WHEN 'institution' THEN '{"classes":30,"coeducator_classes":30,"members_per_class":null,"live_players":300,"activities":null,"boards":null,"file_mb":20,"storage_mb":10240,"peer_review":true,"teams":true}'::jsonb
-    ELSE '{"classes":3,"coeducator_classes":3,"members_per_class":150,"live_players":60,"activities":30,"boards":5,"file_mb":10,"storage_mb":100,"peer_review":false,"teams":true}'::jsonb
+    WHEN 'pro' THEN '{"classes":30,"coeducator_classes":30,"members_per_class":null,"live_players":300,"activities":null,"boards":null,"file_mb":20,"storage_mb":1024,"peer_review":true,"teams":true,"video":false}'::jsonb
+    WHEN 'institution' THEN '{"classes":30,"coeducator_classes":30,"members_per_class":null,"live_players":300,"activities":null,"boards":null,"file_mb":20,"storage_mb":10240,"peer_review":true,"teams":true,"video":false}'::jsonb
+    WHEN 'unlimited' THEN '{"classes":null,"coeducator_classes":null,"members_per_class":null,"live_players":null,"activities":null,"boards":null,"file_mb":null,"storage_mb":null,"peer_review":true,"teams":true,"video":true}'::jsonb
+    ELSE '{"classes":3,"coeducator_classes":3,"members_per_class":150,"live_players":60,"activities":30,"boards":5,"file_mb":10,"storage_mb":100,"peer_review":false,"teams":true,"video":false}'::jsonb
   END;
 $fn$;
 
 -- ---------------------------------------------------------------------
 -- 4. Pelan berkesan: tamat tempoh turun ke free; pentadbir sentiasa pro.
+--    unlimited kekal unlimited selagi tiada tamat tempoh (plan_expires_at
+--    NULL), jadi tiada cabang khas diperlukan di sini.
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.qm_effective_plan(p_user uuid)
 RETURNS text
@@ -187,6 +203,35 @@ AS $fn$
    WHERE p.id = p_user;
 $fn$;
 
+-- Had kelas: fungsi pencetus daripada 0030 ditulis semula di sini untuk
+-- menambah pg_advisory_xact_lock (kzsec S1). Tingkah laku lama dikekalkan:
+-- baki NULL bermaksud tanpa had (contoh pelan unlimited) dan dibenarkan.
+CREATE OR REPLACE FUNCTION public.qm_enforce_class_owner_limit()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $fn$
+DECLARE
+  v_left integer;
+BEGIN
+  IF pg_trigger_depth() > 1 THEN RETURN NEW; END IF;
+  IF public.qm_caller_is_privileged() THEN RETURN NEW; END IF;
+
+  -- Kunci perakaun pemilik supaya dua penciptaan serentak tidak
+  -- berdua-duanya membaca kiraan yang sama (TOCTOU).
+  PERFORM pg_advisory_xact_lock(hashtext('qm_quota:' || NEW.owner_id::text));
+
+  v_left := public.qm_class_quota_left(NEW.owner_id);
+  IF v_left IS NULL THEN RETURN NEW; END IF;
+
+  IF v_left <= 0 THEN
+    RAISE EXCEPTION 'QM_LIMIT_CLASSES: Had bilangan kelas sudah dicapai. Naik taraf pelan untuk menambah kelas.'
+      USING ERRCODE = 'P0001';
+  END IF;
+  RETURN NEW;
+END;
+$fn$;
+
 -- ---------------------------------------------------------------------
 -- 7. Bendera papan automatik: mesti wujud sebelum fungsi kiraan di bawah
 --    (fungsi LANGUAGE sql disemak pada masa dicipta)
@@ -274,6 +319,8 @@ BEGIN
   IF public.qm_caller_is_privileged() THEN RETURN NEW; END IF;
 
   v_owner := public.qm_plan_owner_of(to_jsonb(NEW));
+  -- Kunci perakaun pemilik sebelum kiraan (kzsec S1, anti TOCTOU).
+  PERFORM pg_advisory_xact_lock(hashtext('qm_quota:' || v_owner::text));
   v_count := public.qm_activity_count(v_owner);
   v_limit := COALESCE(
     (public.qm_plan_limits(public.qm_effective_plan(v_owner)) ->> 'activities')::int,
@@ -302,7 +349,23 @@ CREATE TRIGGER qm_activity_quota_live_quizzes
 -- ---------------------------------------------------------------------
 -- 10. Kuota papan gabungan. Papan pada kedalaman pencetus > 1 (dicipta
 --     oleh pencetus lain) ditanda automatik: dibenarkan dan tidak dikira.
+--     auto_created DIPAKSA di sini tanpa mengira nilai yang dihantar
+--     pelanggan (kzqa penemuan 1): kedalaman 1 sentiasa false, kedalaman
+--     lebih daripada 1 sentiasa true. Pencetus BEFORE UPDATE di bawah
+--     memin lajur itu supaya UPDATE tidak boleh mengubahnya.
 -- ---------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.qm_pin_auto_created()
+RETURNS trigger
+LANGUAGE plpgsql
+SET search_path TO 'public'
+AS $fn$
+BEGIN
+  -- Nilai lama kekal: lajur ini hanyalah bendera dalaman pangkalan data.
+  NEW.auto_created := OLD.auto_created;
+  RETURN NEW;
+END;
+$fn$;
+
 CREATE OR REPLACE FUNCTION public.qm_enforce_board_quota()
 RETURNS trigger
 LANGUAGE plpgsql
@@ -313,13 +376,14 @@ DECLARE
   v_count integer;
   v_limit integer;
 BEGIN
-  IF pg_trigger_depth() > 1 THEN
-    NEW.auto_created := true;
-    RETURN NEW;
-  END IF;
+  -- Bendera dipaksa dahulu, sebelum apa-apa cabang.
+  NEW.auto_created := (pg_trigger_depth() > 1);
+  IF pg_trigger_depth() > 1 THEN RETURN NEW; END IF;
   IF public.qm_caller_is_privileged() THEN RETURN NEW; END IF;
 
   v_owner := public.qm_plan_owner_of(to_jsonb(NEW));
+  -- Kunci perakaun pemilik sebelum kiraan (kzsec S1, anti TOCTOU).
+  PERFORM pg_advisory_xact_lock(hashtext('qm_quota:' || v_owner::text));
   v_count := public.qm_board_count(v_owner);
   v_limit := COALESCE(
     (public.qm_plan_limits(public.qm_effective_plan(v_owner)) ->> 'boards')::int,
@@ -343,6 +407,17 @@ CREATE TRIGGER qm_board_quota_submission
   BEFORE INSERT ON public.qm_submission_boards
   FOR EACH ROW EXECUTE FUNCTION public.qm_enforce_board_quota();
 
+-- Pin auto_created pada UPDATE: nilai yang dihantar pelanggan dibuang.
+DROP TRIGGER IF EXISTS qm_board_pin_auto_created_learning ON public.qm_learning_boards;
+CREATE TRIGGER qm_board_pin_auto_created_learning
+  BEFORE UPDATE ON public.qm_learning_boards
+  FOR EACH ROW EXECUTE FUNCTION public.qm_pin_auto_created();
+
+DROP TRIGGER IF EXISTS qm_board_pin_auto_created_submission ON public.qm_submission_boards;
+CREATE TRIGGER qm_board_pin_auto_created_submission
+  BEFORE UPDATE ON public.qm_submission_boards
+  FOR EACH ROW EXECUTE FUNCTION public.qm_pin_auto_created();
+
 -- ---------------------------------------------------------------------
 -- 11. Had peserta setiap kelas. Pentadbir dan pemanggil istimewa
 --     dikecualikan (corak 0030); kiraan melalui pembantu DEFINER.
@@ -360,6 +435,8 @@ BEGIN
   IF public.qm_caller_is_privileged() THEN RETURN NEW; END IF;
 
   v_owner := public.qm_plan_owner_of(to_jsonb(NEW));
+  -- Kunci perakaun pemilik sebelum kiraan (kzsec S1, anti TOCTOU).
+  PERFORM pg_advisory_xact_lock(hashtext('qm_quota:' || v_owner::text));
   v_limit := COALESCE(
     (public.qm_plan_limits(public.qm_effective_plan(v_owner)) ->> 'members_per_class')::int,
     2147483647);
@@ -382,6 +459,8 @@ CREATE TRIGGER qm_member_limit_trg
 --     pelan berkesan pemilik kuiz. TIADA pengecualian peranan istimewa
 --     (pelajaran 0031). Pencetus sedia ada (0031) tidak diubah; ia sudah
 --     memanggil qm_live_slot_left tanpa pintasan.
+--     Pelan unlimited (had live_players NULL) TIDAK dihadkan langsung:
+--     jangan jatuh ke lalai max_players 40 (keputusan Boss Hariz).
 -- ---------------------------------------------------------------------
 CREATE OR REPLACE FUNCTION public.qm_live_slot_left(p_session uuid)
 RETURNS integer
@@ -390,12 +469,13 @@ STABLE
 SECURITY DEFINER
 SET search_path TO 'public'
 AS $fn$
-  SELECT LEAST(
-           COALESCE(s.max_players, 40),
-           COALESCE(
-             (public.qm_plan_limits(public.qm_effective_plan(q.owner_id)) ->> 'live_players')::int,
-             2147483647)
-         )
+  SELECT CASE
+           WHEN (public.qm_plan_limits(public.qm_effective_plan(q.owner_id)) ->> 'live_players') IS NULL
+             THEN 2147483647
+           ELSE LEAST(
+                  COALESCE(s.max_players, 40),
+                  (public.qm_plan_limits(public.qm_effective_plan(q.owner_id)) ->> 'live_players')::int)
+         END
        - (SELECT count(*)::int FROM public.qm_live_players pl WHERE pl.session_id = s.id)
     FROM public.qm_live_sessions s
     JOIN public.qm_live_quizzes q ON q.id = s.quiz_id
@@ -449,11 +529,12 @@ END;
 $fn$;
 
 -- ---------------------------------------------------------------------
--- 14. qm_set_plan: free | pro | institution, dengan pilihan tarikh tamat.
---     Tandatangan lama (uuid, text) kekal berfungsi melalui DEFAULT.
---     Had diambil daripada qm_plan_limits tanpa GREATEST supaya
+-- 14. qm_set_plan: free | pro | institution | unlimited, dengan pilihan
+--     tarikh tamat. Tandatangan lama (uuid, text) kekal berfungsi melalui
+--     DEFAULT. Had diambil daripada qm_plan_limits tanpa GREATEST supaya
 --     penurunan taraf benar-benar menurunkan had; langkah data satu kali
 --     di bawah menggunakan GREATEST untuk mengekalkan had lebih tinggi.
+--     unlimited: semua had NULL (tanpa had) dan boleh muat naik video.
 -- ---------------------------------------------------------------------
 DROP FUNCTION IF EXISTS public.qm_set_plan(uuid, text);
 
@@ -469,8 +550,8 @@ BEGIN
   IF NOT public.qm_is_admin() THEN
     RAISE EXCEPTION 'QM_FORBIDDEN: hanya pentadbir boleh menukar pelan' USING ERRCODE = 'P0001';
   END IF;
-  IF p_plan NOT IN ('free','pro','institution') THEN
-    RAISE EXCEPTION 'QM_BAD_PLAN: pelan mesti free, pro atau institution' USING ERRCODE = 'P0001';
+  IF p_plan NOT IN ('free','pro','institution','unlimited') THEN
+    RAISE EXCEPTION 'QM_BAD_PLAN: pelan mesti free, pro, institution atau unlimited' USING ERRCODE = 'P0001';
   END IF;
 
   v_limits := public.qm_plan_limits(p_plan);
@@ -483,7 +564,7 @@ BEGIN
          max_quizzes_owned        = NULL,
          max_live_players         = (v_limits ->> 'live_players')::int,
          can_upload_files         = true,
-         can_upload_videos        = false
+         can_upload_videos        = COALESCE((v_limits ->> 'video')::boolean, false)
    WHERE id = p_user;
 END;
 $fn$;
@@ -540,7 +621,11 @@ GRANT EXECUTE ON FUNCTION public.qm_activity_count(uuid)         TO authenticate
 GRANT EXECUTE ON FUNCTION public.qm_board_count(uuid)            TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.qm_member_count(uuid)           TO authenticated, service_role;
 GRANT EXECUTE ON FUNCTION public.qm_quest_features_allowed(uuid) TO authenticated, anon, service_role;
-GRANT EXECUTE ON FUNCTION public.qm_live_slot_left(uuid)         TO authenticated, anon, service_role;
+-- kzsec S2: had sesi langsung bukan data awam. anon tidak lagi boleh
+-- meninjau slot sesi; authenticated dan service_role dikekalkan kerana
+-- pencetus qm_live_players dan laluan aplikasi memanggilnya.
+REVOKE ALL ON FUNCTION public.qm_live_slot_left(uuid) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.qm_live_slot_left(uuid)         TO authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- 17. Langkah data satu kali: 16 akaun bukan peserta naik ke Pro.
@@ -567,6 +652,25 @@ UPDATE public.qm_profiles
        can_upload_files          = true,
        can_upload_videos         = false
  WHERE role IN ('educator','admin','superadmin');
+
+-- Akaun unlimited (Boss Hariz, 29 Sep). Diletakkan SELEPAS langkah 16
+-- akaun supaya tidak ditimpa. Semua had NULL (tanpa had) dan boleh muat
+-- naik video. max_live_players dibiarkan NULL dengan sengaja: kod
+-- aplikasi merawat NULL sebagai tanpa had (src/lib/pelan.ts:101,
+-- tanpaHad(null) = true) dan had sesi langsung yang sebenar datang
+-- daripada pelan berkesan dalam qm_live_slot_left, bukan lajur ini.
+UPDATE public.qm_profiles p
+   SET plan                     = 'unlimited',
+       plan_expires_at          = NULL,
+       max_classes_owned        = NULL,
+       max_classes_as_coeducator = NULL,
+       max_quizzes_owned        = NULL,
+       max_live_players         = NULL,
+       can_upload_files         = true,
+       can_upload_videos        = true
+  FROM auth.users au
+ WHERE p.id = au.id
+   AND lower(au.email) = 'mhariz@meta.upsi.edu.my';
 
 SET LOCAL session_replication_role = origin;
 

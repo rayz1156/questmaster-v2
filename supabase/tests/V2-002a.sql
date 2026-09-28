@@ -77,6 +77,7 @@ DECLARE
   u_exp   uuid := '11111111-1111-1111-1111-111111111301';
   u_coed  uuid := '11111111-1111-1111-1111-111111111501';
   u_part  uuid := '11111111-1111-1111-1111-111111111601';
+  u_unl   uuid := '11111111-1111-1111-1111-111111111701';
   c_f1    uuid := '22222222-2222-2222-2222-222222222101';
   c_f2    uuid := '22222222-2222-2222-2222-222222222102';
   c_f3    uuid := '22222222-2222-2222-2222-222222222103';
@@ -86,16 +87,20 @@ DECLARE
   c_e2    uuid := '22222222-2222-2222-2222-222222222302';
   c_e3    uuid := '22222222-2222-2222-2222-222222222303';
   q1      uuid := '33333333-3333-3333-3333-333333333101';
+  q2      uuid := '33333333-3333-3333-3333-333333333201';
   s1      uuid := '44444444-4444-4444-4444-444444444101';
+  s2      uuid := '44444444-4444-4444-4444-444444444201';
   inst1   uuid := '55555555-5555-5555-5555-555555555101';
   v_i     int;
   v_m     uuid;
   v_h     uuid;
+  v_c     uuid;
+  v_uc    uuid[] := ARRAY[]::uuid[];
 BEGIN
   PERFORM set_config('session_replication_role', 'replica', true);
 
   -- Pengguna: educator free, educator free kedua, pro, pro tamat tempoh,
-  -- ko-pendidik free, peserta.
+  -- ko-pendidik free, peserta, educator unlimited.
   INSERT INTO public.qm_profiles (id, role, plan, max_classes_owned, max_classes_as_coeducator, max_live_players, can_upload_files)
     VALUES (u_free, 'educator', 'free', 3, 3, 60, true);
   INSERT INTO public.qm_profiles (id, role, plan, max_classes_owned, max_classes_as_coeducator, max_live_players, can_upload_files)
@@ -108,6 +113,9 @@ BEGIN
     VALUES (u_coed, 'educator', 'free', 3, 3, 60, true);
   INSERT INTO public.qm_profiles (id, role, plan)
     VALUES (u_part, 'participant', 'free');
+  -- Unlimited: semua had NULL (tanpa had), boleh muat naik video.
+  INSERT INTO public.qm_profiles (id, role, plan, max_classes_owned, max_classes_as_coeducator, max_live_players, can_upload_files, can_upload_videos)
+    VALUES (u_unl, 'educator', 'unlimited', NULL, NULL, NULL, true, true);
 
   -- Kelas: 3 milik u_free, 1 milik u_free2, 3 milik u_pro, 3 milik u_exp.
   INSERT INTO public.qm_classes (id, owner_id, name) VALUES
@@ -115,6 +123,22 @@ BEGIN
     (c_f3, u_free, 'Kelas Free 3'), (c_f2b, u_free2, 'Kelas Free2 A'),
     (c_p, u_pro, 'Kelas Pro 1'), (c_e, u_exp, 'Kelas Tamat 1'),
     (c_e2, u_exp, 'Kelas Tamat 2'), (c_e3, u_exp, 'Kelas Tamat 3');
+
+  -- Baris pendidik pemilik untuk setiap kelas benih, mengikut corak
+  -- backfill 0009 (setiap kelas ada satu baris role 'owner' dengan
+  -- accepted_at). Perlu untuk dasar RLS sebenar seperti
+  -- p_pr_educator_write pada qm_peer_rounds (0034), yang menyemak
+  -- qm_is_class_educator: tanpa baris ini, sisipan pengguna sah akan
+  -- ditolak RLS sebelum penjaga pelan sempat dinilai.
+  INSERT INTO public.qm_class_educators (class_id, educator_id, role, invited_by, accepted_at)
+    VALUES (c_f1, u_free, 'owner', u_free, now()),
+           (c_f2, u_free, 'owner', u_free, now()),
+           (c_f3, u_free, 'owner', u_free, now()),
+           (c_f2b, u_free2, 'owner', u_free2, now()),
+           (c_p, u_pro, 'owner', u_pro, now()),
+           (c_e, u_exp, 'owner', u_exp, now()),
+           (c_e2, u_exp, 'owner', u_exp, now()),
+           (c_e3, u_exp, 'owner', u_exp, now());
 
   -- Ko-pendidik free dalam kelas pemilik Pro (diterima).
   INSERT INTO public.qm_class_educators (class_id, educator_id, role, invited_by, accepted_at)
@@ -155,10 +179,15 @@ BEGIN
 
   -- 5 papan manual milik u_free: 3 papan pembelajaran + 2 papan penghantaran.
   INSERT INTO public.qm_learning_boards (class_id) VALUES (c_f1), (c_f2), (c_f3);
-  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = c_f1 ORDER BY h.created_at LIMIT 1;
+  -- Pilih hunt dengan ORDER BY title (nilai unik) supaya dua papan ini
+  -- PASTI berbeza (activity_id, class_id) ialah kekangan unik pada
+  -- qm_submission_boards; ORDER BY created_at mempunyai seri kerana
+  -- now() ialah masa transaksi yang sama, dan OFFSET 1 boleh memulangkan
+  -- baris yang sama (kegagalan CTO 29 Sep).
+  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = c_f1 ORDER BY h.title LIMIT 1;
   INSERT INTO public.qm_submission_boards (activity_id, class_id, title, created_by)
     VALUES (v_h, c_f1, 'Papan Ujian 1', u_free);
-  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = c_f1 ORDER BY h.created_at LIMIT 1 OFFSET 1;
+  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = c_f1 ORDER BY h.title LIMIT 1 OFFSET 1;
   INSERT INTO public.qm_submission_boards (activity_id, class_id, title, created_by)
     VALUES (v_h, c_f1, 'Papan Ujian 2', u_free);
 
@@ -178,6 +207,60 @@ BEGIN
   FOR v_i IN 1..60 LOOP
     INSERT INTO public.qm_live_players (session_id, nickname, player_token)
       VALUES (s1, 'P' || lpad(v_i::text, 4, '0'), md5(random()::text));
+  END LOOP;
+
+  -- ------------------------------------------------------------------
+  -- Benih akaun unlimited: 30 kelas, 30 aktiviti, 5 papan, 150 ahli
+  -- dalam satu kelas, 300 pemain dalam satu sesi (max_players sengaja
+  -- 40: pemain ke-301 mesti tetap dibenarkan walaupun sesi "penuh").
+  FOR v_i IN 1..30 LOOP
+    INSERT INTO public.qm_classes (owner_id, name)
+      VALUES (u_unl, 'Kelas Unlimited ' || v_i)
+      RETURNING id INTO v_c;
+    v_uc := array_append(v_uc, v_c);
+  END LOOP;
+
+  -- Baris pendidik pemilik untuk kelas unlimited (corak backfill 0009).
+  INSERT INTO public.qm_class_educators (class_id, educator_id, role, invited_by, accepted_at)
+    SELECT x, u_unl, 'owner', u_unl, now() FROM unnest(v_uc) AS x;
+
+  -- 30 aktiviti campuran dalam kelas pertama (15 hunt + 14 kuiz + 1 kuiz
+  -- sesi langsung di bawah).
+  FOR v_i IN 1..15 LOOP
+    INSERT INTO public.qm_hunts (owner_id, class_id, title)
+      VALUES (u_unl, v_uc[1], 'Hunt Unlimited ' || v_i);
+  END LOOP;
+  FOR v_i IN 1..14 LOOP
+    INSERT INTO public.qm_live_quizzes (owner_id, class_id, title)
+      VALUES (u_unl, v_uc[1], 'Kuiz Unlimited ' || v_i);
+  END LOOP;
+
+  -- 5 papan: 3 papan pembelajaran (satu per kelas sahaja, kekangan unik
+  -- qm_learning_boards.class_id) dan 2 papan penghantaran (hunt berbeza).
+  INSERT INTO public.qm_learning_boards (class_id) VALUES (v_uc[1]), (v_uc[2]), (v_uc[3]);
+  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = v_uc[1] ORDER BY h.title LIMIT 1;
+  INSERT INTO public.qm_submission_boards (activity_id, class_id, title, created_by)
+    VALUES (v_h, v_uc[1], 'Papan Unlimited 1', u_unl);
+  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = v_uc[1] ORDER BY h.title LIMIT 1 OFFSET 1;
+  INSERT INTO public.qm_submission_boards (activity_id, class_id, title, created_by)
+    VALUES (v_h, v_uc[1], 'Papan Unlimited 2', u_unl);
+
+  -- 150 ahli dalam kelas keempat.
+  FOR v_i IN 1..150 LOOP
+    INSERT INTO public.qm_profiles (id, role) VALUES (gen_random_uuid(), 'participant')
+      RETURNING id INTO v_m;
+    INSERT INTO public.qm_class_members (class_id, user_id) VALUES (v_uc[4], v_m);
+  END LOOP;
+
+  -- Kuiz dan sesi unlimited. max_players 40 sengaja kecil supaya semakan
+  -- m5 membuktikan pelan unlimited tidak dihadkan oleh max_players.
+  INSERT INTO public.qm_live_quizzes (id, owner_id, class_id, title)
+    VALUES (q2, u_unl, v_uc[1], 'Kuiz Live Unlimited');
+  INSERT INTO public.qm_live_sessions (id, quiz_id, host_id, code, status, max_players)
+    VALUES (s2, q2, u_unl, 'UNL123', 'lobby', 40);
+  FOR v_i IN 1..300 LOOP
+    INSERT INTO public.qm_live_players (session_id, nickname, player_token)
+      VALUES (s2, 'U' || lpad(v_i::text, 4, '0'), md5('unl' || v_i::text));
   END LOOP;
 
   PERFORM set_config('session_replication_role', 'origin', true);
@@ -260,7 +343,9 @@ DECLARE
   v_h    uuid;
 BEGIN
   PERFORM pg_temp.qm_test_as(u_free);
-  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = c_f1 ORDER BY h.created_at LIMIT 1 OFFSET 2;
+  -- OFFSET 2 atas susunan title: hunt yang berbeza daripada dua hunt
+  -- yang sudah dipakai papan benih (kekangan unik activity_id, class_id).
+  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = c_f1 ORDER BY h.title LIMIT 1 OFFSET 2;
   BEGIN
     INSERT INTO public.qm_submission_boards (activity_id, class_id, title, created_by)
       VALUES (v_h, c_f1, 'Papan ke-6', u_free);
@@ -342,8 +427,8 @@ END;
 $chk$;
 
 -- ---------------------------------------------------------------------
--- f. Pengguna gagal menukar plan, plan_expires_at atau institution_id
---    sendiri melalui UPDATE sebagai authenticated
+-- f. Pengguna gagal menukar plan (pro dan unlimited), plan_expires_at
+--    atau institution_id sendiri melalui UPDATE sebagai authenticated
 -- ---------------------------------------------------------------------
 DO $chk$
 DECLARE
@@ -359,6 +444,15 @@ BEGIN
   EXCEPTION
     WHEN OTHERS THEN NULL; -- RLS mungkin menolak; nilai tetap disemak di bawah
   END;
+  -- Percubaan kedua: pelan unlimited (keputusan Boss Hariz, 29 Sep).
+  BEGIN
+    UPDATE public.qm_profiles
+       SET plan = 'unlimited',
+           can_upload_videos = true
+     WHERE id = u_free;
+  EXCEPTION
+    WHEN OTHERS THEN NULL;
+  END;
   PERFORM pg_temp.qm_test_reset();
 END;
 $chk$;
@@ -369,14 +463,15 @@ DECLARE
   v_plan text;
   v_exp  timestamptz;
   v_inst uuid;
+  v_vid  boolean;
 BEGIN
-  SELECT plan, plan_expires_at, institution_id
-    INTO v_plan, v_exp, v_inst
+  SELECT plan, plan_expires_at, institution_id, can_upload_videos
+    INTO v_plan, v_exp, v_inst, v_vid
     FROM public.qm_profiles WHERE id = u_free;
-  IF v_plan = 'free' AND v_exp IS NULL AND v_inst IS NULL THEN
-    PERFORM pg_temp.qm_verdict('f', true, 'pengguna tidak dapat menukar plan, plan_expires_at atau institution_id sendiri');
+  IF v_plan = 'free' AND v_exp IS NULL AND v_inst IS NULL AND COALESCE(v_vid, false) = false THEN
+    PERFORM pg_temp.qm_verdict('f', true, 'pengguna tidak dapat menukar plan (pro dan unlimited), plan_expires_at, institution_id atau can_upload_videos sendiri');
   ELSE
-    PERFORM pg_temp.qm_verdict('f', false, 'profil berubah: ' || v_plan || ' ' || COALESCE(v_exp::text, 'null') || ' ' || COALESCE(v_inst::text, 'null'));
+    PERFORM pg_temp.qm_verdict('f', false, 'profil berubah: ' || v_plan || ' ' || COALESCE(v_exp::text, 'null') || ' ' || COALESCE(v_inst::text, 'null') || ' video=' || COALESCE(v_vid::text, 'null'));
   END IF;
 END;
 $chk$;
@@ -514,8 +609,9 @@ BEGIN
   IF v_limits ->> 'classes' = '3'
      AND v_limits ->> 'activities' = '30'
      AND v_limits ->> 'boards' = '5'
-     AND (v_limits ->> 'peer_review')::boolean = false THEN
-    PERFORM pg_temp.qm_verdict('j', true, 'qm_plan_limits(xyz) pulangkan had free');
+     AND (v_limits ->> 'peer_review')::boolean = false
+     AND (v_limits ->> 'video')::boolean = false THEN
+    PERFORM pg_temp.qm_verdict('j', true, 'qm_plan_limits(xyz) pulangkan had free dengan video false');
   ELSE
     PERFORM pg_temp.qm_verdict('j', false, 'qm_plan_limits(xyz): ' || v_limits::text);
   END IF;
@@ -542,6 +638,206 @@ BEGIN
       END;
   END;
   PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+-- ---------------------------------------------------------------------
+-- m. Akaun unlimited: tiada had (kelas ke-31, aktiviti ke-31, papan ke-6,
+--    ahli ke-151, pemain sesi ke-301) dan kunci video = true
+-- ---------------------------------------------------------------------
+DO $chk$
+DECLARE
+  u_unl uuid := '11111111-1111-1111-1111-111111111701';
+BEGIN
+  PERFORM pg_temp.qm_test_as(u_unl);
+  BEGIN
+    INSERT INTO public.qm_classes (owner_id, name) VALUES (u_unl, 'Kelas ke-31 Unlimited');
+    PERFORM pg_temp.qm_verdict('m1', true, 'kelas ke-31 unlimited dibenarkan');
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_temp.qm_verdict('m1', false, 'unlimited disekat secara salah (kelas): ' || sqlerrm);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+DO $chk$
+DECLARE
+  u_unl uuid := '11111111-1111-1111-1111-111111111701';
+  v_c1  uuid;
+BEGIN
+  SELECT c.id INTO v_c1 FROM public.qm_classes c WHERE c.owner_id = u_unl ORDER BY c.name LIMIT 1;
+  PERFORM pg_temp.qm_test_as(u_unl);
+  BEGIN
+    INSERT INTO public.qm_hunts (owner_id, class_id, title) VALUES (u_unl, v_c1, 'Hunt Unlimited ke-31');
+    PERFORM pg_temp.qm_verdict('m2', true, 'aktiviti ke-31 unlimited dibenarkan');
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_temp.qm_verdict('m2', false, 'unlimited disekat secara salah (aktiviti): ' || sqlerrm);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+DO $chk$
+DECLARE
+  u_unl uuid := '11111111-1111-1111-1111-111111111701';
+  v_c1  uuid;
+  v_h   uuid;
+BEGIN
+  SELECT c.id INTO v_c1 FROM public.qm_classes c WHERE c.owner_id = u_unl ORDER BY c.name LIMIT 1;
+  -- Hunt ketiga dalam kelas itu: berbeza daripada dua hunt papan benih
+  -- (kekangan unik activity_id, class_id).
+  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = v_c1 ORDER BY h.title LIMIT 1 OFFSET 2;
+  PERFORM pg_temp.qm_test_as(u_unl);
+  BEGIN
+    INSERT INTO public.qm_submission_boards (activity_id, class_id, title, created_by)
+      VALUES (v_h, v_c1, 'Papan Unlimited ke-6', u_unl);
+    PERFORM pg_temp.qm_verdict('m3', true, 'papan ke-6 unlimited dibenarkan');
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_temp.qm_verdict('m3', false, 'unlimited disekat secara salah (papan): ' || sqlerrm);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+DO $chk$
+DECLARE
+  u_unl  uuid := '11111111-1111-1111-1111-111111111701';
+  v_m    uuid;
+  v_c4   uuid;
+BEGIN
+  SELECT c.id INTO v_c4 FROM public.qm_classes c WHERE c.owner_id = u_unl ORDER BY c.name LIMIT 1 OFFSET 3;
+  INSERT INTO public.qm_profiles (id, role) VALUES (gen_random_uuid(), 'participant')
+    RETURNING id INTO v_m;
+  PERFORM pg_temp.qm_test_as(v_m);
+  BEGIN
+    INSERT INTO public.qm_class_members (class_id, user_id) VALUES (v_c4, v_m);
+    PERFORM pg_temp.qm_verdict('m4', true, 'ahli ke-151 unlimited dibenarkan');
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_temp.qm_verdict('m4', false, 'unlimited disekat secara salah (ahli): ' || sqlerrm);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+-- Pemain ke-301 dalam sesi unlimited yang max_players sudah tercapai.
+-- Dijalankan TANPA set role (peranan sesi) seperti semakan d: pencetus
+-- 0031 tiada pintasan peranan, jadi laluan ini ialah yang paling curiga.
+DO $chk$
+DECLARE
+  s2 uuid := '44444444-4444-4444-4444-444444444201';
+BEGIN
+  BEGIN
+    INSERT INTO public.qm_live_players (session_id, nickname, player_token)
+      VALUES (s2, 'U0301', md5('unl301'));
+    PERFORM pg_temp.qm_verdict('m5', true, 'pemain ke-301 unlimited dibenarkan walaupun max_players = 40');
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_temp.qm_verdict('m5', false, 'pemain ke-301 unlimited disekat secara salah: ' || sqlerrm);
+  END;
+END;
+$chk$;
+
+DO $chk$
+DECLARE
+  v_limits jsonb;
+BEGIN
+  v_limits := public.qm_plan_limits('unlimited');
+  IF (v_limits ->> 'video')::boolean = true
+     AND v_limits ->> 'classes' IS NULL
+     AND v_limits ->> 'members_per_class' IS NULL
+     AND v_limits ->> 'live_players' IS NULL
+     AND (v_limits ->> 'peer_review')::boolean = true THEN
+    PERFORM pg_temp.qm_verdict('m6', true, 'qm_plan_limits(unlimited): semua had null, video true');
+  ELSE
+    PERFORM pg_temp.qm_verdict('m6', false, 'qm_plan_limits(unlimited): ' || v_limits::text);
+  END IF;
+END;
+$chk$;
+
+-- ---------------------------------------------------------------------
+-- n. Adversarial auto_created (kzqa penemuan 1): nilai yang dihantar
+--    pelanggan mesti diabaikan dan UPDATE mesti dipin
+-- ---------------------------------------------------------------------
+-- n1: educator free dengan 5 papan manual cuba memintas kuota dengan
+--     auto_created = true. Dengan pepijat lama, sisipan ini LULUS.
+DO $chk$
+DECLARE
+  u_free uuid := '11111111-1111-1111-1111-111111111101';
+  c_f1   uuid := '22222222-2222-2222-2222-222222222101';
+  v_h    uuid;
+BEGIN
+  PERFORM pg_temp.qm_test_as(u_free);
+  SELECT h.id INTO v_h FROM public.qm_hunts h WHERE h.class_id = c_f1 ORDER BY h.title LIMIT 1 OFFSET 3;
+  BEGIN
+    INSERT INTO public.qm_submission_boards (activity_id, class_id, title, created_by, auto_created)
+      VALUES (v_h, c_f1, 'Papan Bypass', u_free, true);
+    PERFORM pg_temp.qm_verdict('n1', false, 'bypass auto_created = true TIDAK disekat');
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF sqlerrm LIKE 'QM_LIMIT_BOARDS:%' THEN
+        PERFORM pg_temp.qm_verdict('n1', true, 'bypass auto_created = true disekat oleh kuota papan');
+      ELSE
+        PERFORM pg_temp.qm_verdict('n1', false, 'ralat lain: ' || sqlerrm);
+      END IF;
+  END;
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+-- n2: papan yang berjaya dicipta dengan auto_created = true mesti
+--     disimpan sebagai false (bendera dipaksa, bukan dipercayai).
+DO $chk$
+DECLARE
+  u_pro  uuid := '11111111-1111-1111-1111-111111111201';
+  c_p    uuid := '22222222-2222-2222-2222-222222222201';
+  v_flag boolean;
+BEGIN
+  PERFORM pg_temp.qm_test_as(u_pro);
+  BEGIN
+    INSERT INTO public.qm_learning_boards (class_id, auto_created)
+      VALUES (c_p, true);
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_temp.qm_test_reset();
+      PERFORM pg_temp.qm_verdict('n2', false, 'papan pembelajaran pro gagal: ' || sqlerrm);
+      RETURN;
+  END;
+  PERFORM pg_temp.qm_test_reset();
+  SELECT auto_created INTO v_flag FROM public.qm_learning_boards WHERE class_id = c_p;
+  IF v_flag = false THEN
+    PERFORM pg_temp.qm_verdict('n2', true, 'papan auto_created = true disimpan sebagai false');
+  ELSE
+    PERFORM pg_temp.qm_verdict('n2', false, 'auto_created = true diterima terus (bypass masih ada)');
+  END IF;
+END;
+$chk$;
+
+-- n3: UPDATE auto_created = true mesti dipin kembali ke nilai lama.
+DO $chk$
+DECLARE
+  u_pro  uuid := '11111111-1111-1111-1111-111111111201';
+  c_p    uuid := '22222222-2222-2222-2222-222222222201';
+  v_flag boolean;
+BEGIN
+  PERFORM pg_temp.qm_test_as(u_pro);
+  BEGIN
+    UPDATE public.qm_learning_boards
+       SET auto_created = true
+     WHERE class_id = c_p AND auto_created = false;
+  EXCEPTION
+    WHEN OTHERS THEN NULL; -- RLS mungkin menolak; nilai tetap disemak di bawah
+  END;
+  PERFORM pg_temp.qm_test_reset();
+  SELECT auto_created INTO v_flag FROM public.qm_learning_boards WHERE class_id = c_p;
+  IF v_flag = false THEN
+    PERFORM pg_temp.qm_verdict('n3', true, 'UPDATE auto_created dipin: kekal false');
+  ELSE
+    PERFORM pg_temp.qm_verdict('n3', false, 'UPDATE auto_created berjaya diubah pelanggan');
+  END IF;
 END;
 $chk$;
 
