@@ -893,6 +893,13 @@ export async function adminListParticipantClasses(userId: string): Promise<any[]
 
 // === ADMIN V2-011c: ahli kelas dan ahli pasukan ===
 
+// Baris yang dipulangkan RPC qm_user_directory (hanya medan yang diguna).
+interface BarisDirektori {
+  user_id: string;
+  display_name: string | null;
+  email: string | null;
+}
+
 /** Ahli kelas dengan nama dan emel (pentadbir mendapat emel daripada qm_user_directory). */
 export interface AhliKelasAdmin {
   user_id: string;
@@ -920,8 +927,8 @@ export async function adminListClassMembers(classId: string): Promise<AhliKelasA
     p_ids: list.map((r) => r.user_id),
   });
   if (e2) console.warn('qm_user_directory failed', e2);
-  const byId = new Map<string, any>(
-    (((profs as any[]) || []) as any[]).map((p: any) => [p.user_id, p]),
+  const byId = new Map<string, BarisDirektori>(
+    ((profs || []) as BarisDirektori[]).map((p) => [p.user_id, p]),
   );
   return list.map((r) => ({
     user_id: r.user_id,
@@ -952,8 +959,8 @@ export async function adminListTeamMembers(teamId: string): Promise<AhliPasukanA
     p_ids: list.map((r) => r.user_id),
   });
   if (e2) console.warn('qm_user_directory failed', e2);
-  const byId = new Map<string, any>(
-    (((profs as any[]) || []) as any[]).map((p: any) => [p.user_id, p]),
+  const byId = new Map<string, BarisDirektori>(
+    ((profs || []) as BarisDirektori[]).map((p) => [p.user_id, p]),
   );
   return list.map((r) => ({
     user_id: r.user_id,
