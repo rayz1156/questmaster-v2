@@ -17,24 +17,26 @@ import { dalamHad } from '@/lib/hadKadar';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
-/** Kriteria templat yang diterima dari UI (badan camelCase atau snake_case). */
+/** Kriteria templat yang diterima dari UI; mesti sepadan dengan
+ * qm_certificate_eligibility (0042): all_members, hunt_completed, min_score
+ * atau live_attended dengan kunci hunt_id, min_score dan quiz_id. */
 type KriteriaMasuk = {
   type?: string;
   hunt_id?: string;
   min_score?: number;
-  quiz_session_id?: string;
+  quiz_id?: string;
 };
 
 function bacaKriteria(body: Record<string, unknown>): KriteriaMasuk | null {
   const k = (body.criteria ?? {}) as Record<string, unknown>;
   const type = typeof k.type === 'string' ? k.type : '';
-  if (!['all_members', 'activity_completed', 'min_score', 'quiz_attendance'].includes(type)) {
+  if (!['all_members', 'hunt_completed', 'min_score', 'live_attended'].includes(type)) {
     return null;
   }
   const out: KriteriaMasuk = { type };
-  if (type === 'activity_completed' && typeof k.hunt_id === 'string') out.hunt_id = k.hunt_id;
-  if (type === 'quiz_attendance' && typeof k.quiz_session_id === 'string') {
-    out.quiz_session_id = k.quiz_session_id;
+  if (type === 'hunt_completed' && typeof k.hunt_id === 'string') out.hunt_id = k.hunt_id;
+  if (type === 'live_attended' && typeof k.quiz_id === 'string') {
+    out.quiz_id = k.quiz_id;
   }
   if (type === 'min_score' && typeof k.min_score === 'number') out.min_score = k.min_score;
   return out;
@@ -79,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const criteria = bacaKriteria(body);
   if (!criteria) {
     return NextResponse.json(
-      { error: 'criteria.type must be all_members, activity_completed, min_score or quiz_attendance.' },
+      { error: 'criteria.type must be all_members, hunt_completed, min_score or live_attended.' },
       { status: 400 },
     );
   }
