@@ -30,7 +30,11 @@ async function profilPemanggil(
 async function pelanBerkesan(
   supa: NonNullable<Awaited<ReturnType<typeof requireUser>>["supa"]>,
 ): Promise<string | null> {
-  const { data, error } = await supa.rpc("qm_effective_plan");
+  // qm_effective_plan(p_user uuid) mewajibkan argumen (0040); tanpanya
+  // PostgREST memulangkan PGRST202 dan semua pengguna dianggap tidak berbayar.
+  const uid = (await supa.auth.getUser()).data.user?.id;
+  if (!uid) return null;
+  const { data, error } = await supa.rpc("qm_effective_plan", { p_user: uid });
   if (error || typeof data !== "string") return null;
   return data;
 }

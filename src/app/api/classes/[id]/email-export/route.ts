@@ -90,7 +90,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const pentadbir = profil?.role === "admin" || profil?.role === "superadmin";
   let berkesan: string | null = null;
   if (!pentadbir) {
-    const { data: rpcPlan, error: rpcErr } = await auth.supa.rpc("qm_effective_plan");
+    const { data: rpcPlan, error: rpcErr } = await auth.supa.rpc("qm_effective_plan", { p_user: user.id });
     berkesan = !rpcErr && typeof rpcPlan === "string" ? rpcPlan : null;
   }
   const pro = pentadbir || pelanBerbayar(berkesan);
