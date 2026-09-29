@@ -19,7 +19,12 @@
 --      pro aktif => pro; pro tamat tempoh => free; pro dengan
 --      plan_expires_at NULL => pro; institution => institution;
 --      unlimited => unlimited; free => free; admin/superadmin dengan
---      plan free => pro; plan NULL => NULL; profil tiada => NULL.
+--      plan free => pro; free tamat tempoh => free; profil tiada => NULL.
+--      (Kes "plan NULL" dibuang: skema production menetapkan
+--      qm_profiles.plan NOT NULL dengan lalai 'free' (skema-production.sql
+--      baris 5257), jadi kes itu mustahil wujud. Kes gantinya menguji niat
+--      yang sama: nilai yang tidak berbayar kekal tidak berbayar walaupun
+--      plan_expires_at lepas, iaitu tamat tempoh tidak meningkatkan pelan.)
 --   4. qm_set_plan menerima unlimited dan menulis plan_expires_at.
 
 begin;
@@ -38,7 +43,7 @@ insert into auth.users (id, email, aud, role, created_at, updated_at) values
   ('00000000-0000-0000-0000-00000000d006', 'v2-008-free@ujian.invalid',       'authenticated', 'authenticated', now(), now()),
   ('00000000-0000-0000-0000-00000000d007', 'v2-008-admin@ujian.invalid',      'authenticated', 'authenticated', now(), now()),
   ('00000000-0000-0000-0000-00000000d008', 'v2-008-superadmin@ujian.invalid', 'authenticated', 'authenticated', now(), now()),
-  ('00000000-0000-0000-0000-00000000d009', 'v2-008-plan-null@ujian.invalid',  'authenticated', 'authenticated', now(), now()),
+  ('00000000-0000-0000-0000-00000000d009', 'v2-008-free-tamat@ujian.invalid','authenticated', 'authenticated', now(), now()),
   ('00000000-0000-0000-0000-00000000d00a', 'v2-008-tiada-profil@ujian.invalid','authenticated', 'authenticated', now(), now());
 
 set session_replication_role = origin;
@@ -52,7 +57,11 @@ insert into public.qm_profiles (id, role, display_name, plan, plan_expires_at, a
   ('00000000-0000-0000-0000-00000000d006', 'participant', 'Free',           'free',        null,                       true, false),
   ('00000000-0000-0000-0000-00000000d007', 'admin',       'Admin',          'free',        null,                       true, false),
   ('00000000-0000-0000-0000-00000000d008', 'superadmin',  'Superadmin',     'free',        null,                       true, false),
-  ('00000000-0000-0000-0000-00000000d009', 'educator',    'Plan Null',      null,          null,                       true, false);
+  -- d009: pelan 'free' yang tamat tempoh. Pengganti kes "plan NULL" yang
+  -- mustahil (qm_profiles.plan NOT NULL, skema-production.sql baris 5257):
+  -- menguji bahawa plan_expires_at lepas tidak meningkatkan pelan yang
+  -- tidak berbayar, jadi pelayan tetap menganggapnya tidak berbayar.
+  ('00000000-0000-0000-0000-00000000d009', 'educator',    'Free Tamat',     'free',        now() - interval '1 day',   true, false);
 -- d00a: berdaftar dalam auth.users TIADA baris qm_profiles (kes senarai kosong).
 
 -- ============================================================
@@ -176,10 +185,10 @@ begin
   end if;
 
   v_plan := public.qm_effective_plan('00000000-0000-0000-0000-00000000d009');
-  if v_plan is null then
-    raise notice 'LULUS UJIAN 3i: plan NULL => NULL (jatuh ke tidak berbayar di pelayan)';
+  if v_plan = 'free' then
+    raise notice 'LULUS UJIAN 3i: free tamat tempoh kekal free (tidak berbayar)';
   else
-    raise notice 'GAGAL UJIAN 3i: jangka NULL, dapat %', v_plan;
+    raise notice 'GAGAL UJIAN 3i: jangka free, dapat %', v_plan;
     raise exception 'henti selepas gagal';
   end if;
 
@@ -194,7 +203,15 @@ end $$;
 
 -- ============================================================
 -- 4. qm_set_plan menerima unlimited dan menulis tamat tempoh
+--    Panggilan dibuat SEBAGAI pentadbir (d007) melalui claims JWT:
+--    qm_set_plan memerlukan qm_is_admin(), iaitu auth.uid() berperanan
+--    admin/superadmin (skema-production.sql baris 4292 dan 1240). Tanpa
+--    claims, auth.uid() ialah NULL dan panggilan ditolak QM_FORBIDDEN
+--    walaupun pada psql VPS.
 -- ============================================================
+select set_config('request.jwt.claims',
+  '{"sub":"00000000-0000-0000-0000-00000000d007","role":"authenticated"}', false);
+
 do $$
 declare
   v_plan text;
@@ -252,5 +269,8 @@ begin
     raise exception 'henti selepas gagal';
   end if;
 end $$;
+
+-- Bersihkan konteks pentadbir supaya tiada kebocoran ke semakan lain.
+select set_config('request.jwt.claims', '', false);
 
 rollback;
