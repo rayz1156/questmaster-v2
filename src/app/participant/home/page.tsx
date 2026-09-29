@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
 import PeerReviewBanner from "@/components/PeerReviewBanner";
+import CertificateNameBanner from "@/components/CertificateNameBanner";
 
 
 function initials(s: string) {
@@ -120,6 +121,7 @@ export default function Page() {
           </div>
         )}
 
+        <CertificateNameBanner />
         <PeerReviewBanner />
 
         {dataReady && classes.length === 0 ? (
