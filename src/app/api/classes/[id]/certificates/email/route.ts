@@ -46,16 +46,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
   if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
 
-  // Semakan pelan DI PELAYAN: profil sendiri dibaca melalui klien Bearer
-  // (RLS membenarkan baca sendiri). Pelan tamat tempoh jatuh ke free.
-  const { data: profil } = await auth.supa
-    .from('qm_profiles')
-    .select('plan, plan_expires_at')
-    .eq('id', userId)
+  // Semakan pelan DI PELAYAN (kzsec S1): emel pukal ialah keistimewaan
+  // KELAS, jadi pelan berkesan PEMILIK kelas yang mengawal, bukan pelan
+  // pendidik yang memanggil. qm_effective_plan (0040) mengendalikan tamat
+  // tempoh (jatuh ke free) dan pentadbir.
+  const { data: kelas } = await auth.supa
+    .from('qm_classes')
+    .select('owner_id')
+    .eq('id', classId)
     .maybeSingle();
-  const tamat = profil?.plan_expires_at ? new Date(profil.plan_expires_at) : null;
-  const luput = tamat !== null && tamat.getTime() <= Date.now();
-  const pelan = luput ? 'free' : (profil?.plan ?? 'free');
+  const ownerId = (kelas as { owner_id?: string } | null)?.owner_id;
+  let pelan = 'free';
+  if (ownerId) {
+    const { data: rpcPlan, error: rpcErr } = await auth.supa.rpc('qm_effective_plan', { p_user: ownerId });
+    if (!rpcErr && typeof rpcPlan === 'string') pelan = rpcPlan;
+  }
   if (pelan !== 'pro' && pelan !== 'institution' && pelan !== 'unlimited') {
     return NextResponse.json(
       { error: 'Bulk certificate email is available on Pro and Institution plans.' },
