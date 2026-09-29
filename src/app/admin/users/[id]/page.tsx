@@ -47,6 +47,21 @@ import {
 
 type MukaTab = "profile" | "classes" | "activity";
 
+/**
+ * Baris kelas mentah daripada adminListParticipantClasses /
+ * adminListEducatorClasses. Medan pilihan kerana dua sumber berbeza;
+ * panggilan balas map tidak lagi memerlukan any.
+ */
+type KelasMentah = {
+  id: string;
+  name: string;
+  color?: string | null;
+  is_archived?: boolean | null;
+  ended_at?: string | null;
+  created_at?: string | null;
+  joined_at?: string | null;
+};
+
 function fmt(d: string | null | undefined) {
   if (!d) return "Never";
   try {
@@ -148,30 +163,31 @@ export default function Page({ params }: { params: { id: string } }) {
           if (u.role === "participant") {
             const baris = await adminListParticipantClasses(id);
             setKelas(
-              (baris || []).map((c: any) => ({
+              (baris || []).map((c: KelasMentah) => ({
                 id: c.id,
                 nama: c.name,
                 peranan: "Participant",
                 status: c.is_archived ? "Archived" : c.ended_at ? "Ended" : "Active",
-                tarikh: c.joined_at,
+                // Normalisasi rentetan kosong: fmt() memaparkan "Never".
+                tarikh: c.joined_at || "",
               })),
             );
           } else {
             const { owned, coEducator } = await adminListEducatorClasses(id);
             setKelas([
-              ...(owned || []).map((c: any) => ({
+              ...(owned || []).map((c: KelasMentah) => ({
                 id: c.id,
                 nama: c.name,
                 peranan: "Owner",
                 status: c.is_archived ? "Archived" : c.ended_at ? "Ended" : "Active",
-                tarikh: c.created_at,
+                tarikh: c.created_at || "",
               })),
-              ...(coEducator || []).map((c: any) => ({
+              ...(coEducator || []).map((c: KelasMentah) => ({
                 id: c.id,
                 nama: c.name,
                 peranan: "Co-educator",
                 status: c.is_archived ? "Archived" : c.ended_at ? "Ended" : "Active",
-                tarikh: c.created_at,
+                tarikh: c.created_at || "",
               })),
             ]);
           }

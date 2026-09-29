@@ -35,6 +35,15 @@ interface BarisPerhatian {
   ikon: React.ComponentType<{ className?: string }>;
 }
 
+/** Baris qm_classes yang diperlukan oleh kad Recent classes. */
+interface KelasRingkas {
+  id: string;
+  name: string;
+  color: string | null;
+  created_at: string;
+  owner_id: string;
+}
+
 export default function Page() {
   const [muat, setMuat] = useState(true);
   const [users, setUsers] = useState<Profile[]>([]);
@@ -43,7 +52,7 @@ export default function Page() {
   const [jumlahAktiviti, setJumlahAktiviti] = useState(0);
   const [pendingSemak, setPendingSemak] = useState(0);
   const [maklumbalas, setMaklumbalas] = useState(0);
-  const [kelas, setKelas] = useState<any[]>([]);
+  const [kelas, setKelas] = useState<KelasRingkas[]>([]);
   const [ahliKelas, setAhliKelas] = useState<Record<string, number>>({});
   const [audit, setAudit] = useState<AuditLogRow[]>([]);
 
