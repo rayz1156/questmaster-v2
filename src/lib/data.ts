@@ -1,4 +1,5 @@
 import { supabase } from './supabase';
+import { kiraKemasKiniNamaIntro } from './namaProfil';
 import type { Hunt, Challenge, Team, Submission, Profile, Membership } from './types';
 
 export type { Hunt, Challenge, Team, Submission, Profile, Membership };
@@ -533,9 +534,11 @@ export async function updateMyBio(bio: string): Promise<void> {
 }
 export async function updateMyIntroDisplayName(name: string): Promise<void> {
   const id = await uid(); if (!id) throw new Error('not authed');
-  const trimmed = (name || '').trim();
-  const value = trimmed.length === 0 ? null : trimmed.slice(0, 80);
-  const { error } = await supabase.from('qm_profiles').update({ intro_display_name: value }).eq('id', id);
+  // V2-009: nama bukan kosong turut menulis display_name (nama akaun) supaya
+  // People, papan pendahulu, Kuiz Langsung dan sijil menunjukkan nama sama.
+  // Nama kosong: kosongkan kad Intro sahaja, nama akaun dikekalkan.
+  const payload = kiraKemasKiniNamaIntro(name);
+  const { error } = await supabase.from('qm_profiles').update(payload).eq('id', id);
   if (error) throw error;
 }
 
