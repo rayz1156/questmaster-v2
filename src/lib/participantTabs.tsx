@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Home, BookOpen, Compass, Users, Trophy, User as UserIcon } from "lucide-react";
+import { Home, BookOpen, Compass, Users, Trophy, Award, User as UserIcon } from "lucide-react";
 import { listEnrolledClasses } from "@/lib/data";
 
 export const LEADERBOARD_HREF = "/participant/leaderboard";
@@ -15,6 +15,7 @@ export const PARTICIPANT_TABS = [
   { href: "/participant/activities",  label: "Activities", icon: <Compass className="w-5 h-5" /> },
   { href: "/participant/teams",       label: "Teams",      icon: <Users className="w-5 h-5" /> },
   { href: LEADERBOARD_HREF,           label: "Ranking",    icon: <Trophy className="w-5 h-5" /> },
+  { href: "/participant/certificates", label: "Certificates", icon: <Award className="w-5 h-5" /> },
   { href: "/participant/profile",     label: "Profile",    icon: <UserIcon className="w-5 h-5" /> },
 ];
 

@@ -8,6 +8,7 @@ import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassT
 import { statusKelas, susunKelas, type AktivitiKelas, type KelasUntukStatus } from "@/lib/kelasStatus";
 import { supabase } from "@/lib/supabaseClient";
 import PeerReviewBanner from "@/components/PeerReviewBanner";
+import CertificateNameBanner from "@/components/CertificateNameBanner";
 
 
 function initials(s: string) {
@@ -139,6 +140,7 @@ export default function Page() {
           </div>
         )}
 
+        <CertificateNameBanner />
         <PeerReviewBanner />
 
         {dataReady && classes.length === 0 ? (

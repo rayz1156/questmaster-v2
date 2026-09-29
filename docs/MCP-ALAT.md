@@ -125,3 +125,16 @@ platform, jadi tiada alatnya.
 - `set_class_status` (educator, admin): `class_id`, `status` = `active` | `ended` | `archived`, `confirm: true` untuk ended dan archived. ended menyekat hantaran dan penyertaan baharu; archived turut menyembunyikan kelas daripada `list_classes`.
 - `list_classes` dan `get_class` kini memulangkan medan `status` terbitan.
 - `update_class` (educator, admin): `class_id` dan sekurang-kurangnya satu daripada `name`, `description` (rentetan kosong mengosongkan), `color` (#RRGGBB).
+
+## Sijil
+
+| Alat | Peranan | Kegunaan |
+|---|---|---|
+| create_certificate_template | STAFF, tulis | Cipta templat sijil kelas. criteria.type: all_members, hunt_completed (perlu hunt_id), min_score (min_score, pilihan hunt_id) atau live_attended (perlu quiz_id). |
+| issue_certificates | STAFF, tulis | Tanpa confirm: pratonton kelayakan (nama, layak, sebab, sudah dikeluarkan). Dengan confirm: true: keluarkan sijil sebenar kepada participant_ids yang diberi, atau semua yang layak jika tiada senarai. Fungsi pelayan yang sama dengan laluan API. |
+| list_certificates | STAFF, baca | Senarai sijil kelas: kod, nama, program, tarikh, status, sebab pembatalan dan emailed_at. |
+| revoke_certificate | STAFF, tulis | Batalkan sijil dengan sebab (wajib). Halaman awam /sijil/<kod> menunjukkan Dibatalkan. |
+
+Muat naik imej latar dan logo templat tiada laluannya dalam alat MCP; ia
+dibuat melalui UI pendidik (bucket certificate-assets). Emel pukal sijil
+juga hanya melalui UI pendidik.

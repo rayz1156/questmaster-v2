@@ -29,7 +29,8 @@ export type ClassTabKey =
   | "activities"
   | "quizzes"
   | "people"
-  | "rankings";
+  | "rankings"
+  | "certificates";
 
 export default function ClassShell({
   classId,
@@ -64,6 +65,7 @@ export default function ClassShell({
     { key: "quizzes", label: "Quizzes", href: `/educator/live?classId=${classId}` },
     { key: "people", label: "People", href: `/educator/classes/${classId}/people` },
     { key: "rankings", label: "Rankings", href: `/educator/rankings?classId=${classId}` },
+    { key: "certificates", label: "Certificates", href: `/educator/classes/${classId}/certificates` },
   ];
 
   const copyCode = async () => {
