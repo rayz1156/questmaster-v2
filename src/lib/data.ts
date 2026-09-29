@@ -155,7 +155,19 @@ export interface AdminAuditLogPagedOpts {
   sinceIso?: string;
 }
 
-export async function adminListAuditLogPaged(opts: AdminAuditLogPagedOpts = {}): Promise<any[]> {
+// Baris qm_audit_log: id bigint (nombor), actor_id boleh NULL kerana FK
+// ON DELETE SET NULL, meta jsonb dibiarkan unknown untuk pemformat.
+export interface AuditLogRow {
+  id: number;
+  actor_id: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  meta: unknown;
+  created_at: string;
+}
+
+export async function adminListAuditLogPaged(opts: AdminAuditLogPagedOpts = {}): Promise<AuditLogRow[]> {
   // Had lalai 50, maksimum 500 supaya pertanyaan besar tidak membebankan pelayan.
   const limit = Math.max(1, Math.min(opts.limit ?? 50, 500));
   let q = supabase
@@ -172,7 +184,7 @@ export async function adminListAuditLogPaged(opts: AdminAuditLogPagedOpts = {}):
   return data || [];
 }
 
-export async function adminAuditForUser(userId: string, limit = 50): Promise<any[]> {
+export async function adminAuditForUser(userId: string, limit = 50): Promise<AuditLogRow[]> {
   // Rekod di mana pengguna ialah pelaku (actor_id) atau sasaran (target_id).
   const { data, error } = await supabase
     .from('qm_audit_log')
