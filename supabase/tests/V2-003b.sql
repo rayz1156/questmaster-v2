@@ -273,6 +273,7 @@ BEGIN
   PERFORM pg_temp.qm_test_reset();
   INSERT INTO auth.users (id, email, encrypted_password, aud, role, email_confirmed_at, created_at, updated_at)
     VALUES ('11111111-0000-0000-0000-0000000001b5', 'p5@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now());
+  DELETE FROM public.qm_profiles WHERE id = '11111111-0000-0000-0000-0000000001b5';
   INSERT INTO public.qm_profiles (id, role, plan, display_name)
     VALUES ('11111111-0000-0000-0000-0000000001b5', 'participant', 'free', 'Peserta Baru');
   INSERT INTO public.qm_class_members (class_id, user_id)
