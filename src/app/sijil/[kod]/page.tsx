@@ -10,6 +10,7 @@ import Link from 'next/link';
 import { createClient } from '@supabase/supabase-js';
 
 export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
 
 export const metadata = {
   title: 'Sahkan Sijil | Verify Certificate - Kuizen',

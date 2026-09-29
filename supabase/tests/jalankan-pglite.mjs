@@ -3,7 +3,11 @@
  *
  * Guna: node supabase/tests/jalankan-pglite.mjs <fail.sql>
  * Skema dimuat: skema-production.sql (dump) + 0040, 0041, 0042, 0043.
- * PGlite ialah superuser tunggal; set_config('role', ...) dijalan seperti biasa.
+ * Penemuan 2 (kzqa): db.onNotice TIDAK menangkap RAISE NOTICE pada pglite
+ * 0.5.8, jadi keputusan LULUS/GAGAL dibaca terus dari pg_temp.qm_verdicts
+ * SEBELUM ROLLBACK (pelari membuang ROLLBACK terakhir fail ujian, membaca
+ * jadual keputusan, mencetak ringkasan, kemudian membatalkan sendiri).
+ * Kod keluar 1 jika ada semakan GAGAL.
  */
 import { PGlite } from '@electric-sql/pglite';
 import { readFileSync } from 'node:fs';
@@ -22,12 +26,7 @@ if (!fail) {
 
 const db = new PGlite();
 
-// Kumpul RAISE NOTICE dari setiap pernyataan untuk laporan LULUS/GAGAL.
-const notis = [];
-db.onNotice = (n) => notis.push(n.message ?? String(n));
-
 async function jalankan(sql, label) {
-  notis.length = 0;
   try {
     await db.exec(sql);
   } catch (e) {
@@ -47,10 +46,8 @@ async function jalankan(sql, label) {
     if (n > 0) {
       console.error(`   ${n}: ${baris[n - 1] ?? ''}`);
     }
-    for (const t of notis) console.log('NOTIS:', t);
     process.exit(1);
   }
-  for (const t of notis) console.log('NOTIS:', t);
 }
 
 // PGlite sudah ada skema public; buang CREATE SCHEMA public pendua dalam dump.
@@ -107,6 +104,37 @@ await jalankan(skema, 'skema');
 for (const m of ['0040_pelan_v2.sql', '0041_kuota_storan.sql', '0042_sijil.sql', '0043_minat_pelan.sql']) {
   await jalankan(readFileSync(path.join(repo, 'supabase', 'migrations', m), 'utf8'), m);
 }
-await jalankan(readFileSync(path.join(repo, 'supabase', 'tests', fail), 'utf8'), fail);
-console.log('SELESAI: semua SQL dijalankan tanpa ralat');
+// Buang ROLLBACK terakhir fail ujian supaya jadual keputusan masih boleh
+// dibaca; pelari membatalkan transaksi sendiri pada akhir.
+const barisAsal = readFileSync(path.join(repo, 'supabase', 'tests', fail), 'utf8').split('\n');
+let akhir = barisAsal.length - 1;
+while (akhir >= 0 && barisAsal[akhir].trim() === '') akhir--;
+if (akhir >= 0 && /^ROLLBACK\b/i.test(barisAsal[akhir].trim())) {
+  barisAsal.splice(akhir, 1);
+}
+await jalankan(barisAsal.join('\n'), fail);
+
+// Baca keputusan LULUS/GAGAL dari pg_temp.qm_verdicts (dibuat oleh fail ujian).
+let gagal = 0;
+try {
+  const hasil = await db.query(
+    'select k, ok, detail from pg_temp.qm_verdicts order by k');
+  for (const r of hasil.rows) {
+    if (!r.ok) gagal++;
+    console.log(`${r.ok ? 'LULUS' : 'GAGAL'} ${r.k}: ${r.detail}`);
+  }
+  if (hasil.rows.length === 0) {
+    console.log('RINGKASAN: tiada keputusan dalam pg_temp.qm_verdicts');
+  } else if (gagal === 0) {
+    console.log(`RINGKASAN: semua ${hasil.rows.length} semakan LULUS`);
+  } else {
+    console.log(`RINGKASAN: ${gagal} daripada ${hasil.rows.length} semakan GAGAL`);
+  }
+} catch (e) {
+  console.log('RINGKASAN: tiada jadual pg_temp.qm_verdicts (' + e.message + ')');
+}
+
+await db.exec('ROLLBACK');
 await db.close();
+if (gagal > 0) process.exit(1);
+console.log('SELESAI: transaksi dibatalkan, tiada data kekal');

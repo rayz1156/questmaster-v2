@@ -105,6 +105,9 @@ begin
 end;
 $fn$;
 
+-- Kod sijil dijana di dalam fungsi pengeluaran sahaja; tiada sebab ia awam.
+revoke all on function public.qm_certificate_code() from public, anon;
+
 -- ---------------------------------------------------------------------
 -- 5. Pembantu pendidik kelas: pemilik ATAU pendidik jemputan diterima
 --    (pendidik ada dalam qm_class_educators, BUKAN qm_class_members).
@@ -126,7 +129,9 @@ as $fn$
        and accepted_at is not null
   );
 $fn$;
-grant execute on function public.qm_certificate_is_educator(uuid) to authenticated, anon;
+-- L1: auth.uid() sentiasa NULL untuk anon, jadi tiada gunanya ia awam.
+revoke all on function public.qm_certificate_is_educator(uuid) from public, anon;
+grant execute on function public.qm_certificate_is_educator(uuid) to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 6. RLS templat: pendidik kelas SELECT/INSERT/UPDATE.
@@ -209,6 +214,104 @@ $fn$;
 grant execute on function public.qm_verify_certificate(text) to anon, authenticated;
 
 -- ---------------------------------------------------------------------
+-- 8b. Kelayakan untuk SEORANG peserta. Dipanggil oleh kelayakan senarai
+--     (seksyen 9) dan pengeluaran (seksyen 10) supaya pengeluaran tidak
+--     menggelung semua ahli bagi setiap peserta (temuan L3). Juga boleh
+--     dipanggil terus melalui RPC, jadi ia menyemak pendidik kelas.
+-- ---------------------------------------------------------------------
+create or replace function public.qm_certificate_participant_eligible(
+  p_template    uuid,
+  p_participant uuid
+)
+returns boolean
+language plpgsql
+stable
+security definer
+set search_path = public
+as $fn$
+declare
+  v_class_id uuid;
+  v_criteria jsonb;
+  v_hunt_id  uuid;
+  v_quiz_id  uuid;
+  v_min      numeric := 0;
+  v_score    numeric;
+  v_flag     boolean;
+  v_uid      uuid;
+begin
+  select t.class_id, t.criteria
+    into v_class_id, v_criteria
+    from public.qm_certificate_templates t
+   where t.id = p_template;
+  if v_class_id is null then
+    raise exception 'Certificate template not found.';
+  end if;
+  if not public.qm_certificate_is_educator(v_class_id) then
+    raise exception 'Only the class educator can check certificate eligibility.';
+  end if;
+
+  v_uid := p_participant;
+  if v_criteria->>'type' = 'hunt_completed' then
+    v_hunt_id := (v_criteria->>'hunt_id')::uuid;
+    select exists(
+      select 1 from public.qm_submissions s
+       join public.qm_challenges ch on ch.id = s.challenge_id
+      where ch.hunt_id = v_hunt_id
+        and s.user_id = v_uid
+        and s.status = 'approved'
+    ) into v_flag;
+  elsif v_criteria->>'type' = 'min_score' then
+    v_min := coalesce((v_criteria->>'min_score')::numeric, 0);
+    if v_criteria ? 'hunt_id' then
+      v_hunt_id := (v_criteria->>'hunt_id')::uuid;
+    end if;
+    -- Skor individu kelas
+    select i.total_score::numeric into v_score
+      from public.qm_class_individual_scores i
+     where i.class_id = v_class_id
+       and i.user_id = v_uid;
+    -- Skor pasukan terbaik (jika lebih tinggi); hunt disekat jika diberi
+    declare
+      v_team numeric;
+    begin
+      select max(ts.total_score)::numeric into v_team
+        from public.qm_team_scores ts
+        join public.qm_team_members tm on tm.team_id = ts.team_id
+       where tm.user_id = v_uid
+         and exists (
+           select 1 from public.qm_teams t2
+            where t2.id = ts.team_id
+              and t2.hunt_id = coalesce(v_hunt_id, t2.hunt_id)
+              and t2.hunt_id in (select h.id from public.qm_hunts h where h.class_id = v_class_id)
+         );
+      if v_team is not null and (v_score is null or v_team > v_score) then
+        v_score := v_team;
+      end if;
+    end;
+    v_score := greatest(coalesce(v_score, 0), 0);
+  elsif v_criteria->>'type' = 'live_attended' then
+    v_quiz_id := (v_criteria->>'quiz_id')::uuid;
+    select exists(
+      select 1
+        from public.qm_live_players lp
+        join public.qm_live_sessions s on s.id = lp.session_id
+       where s.quiz_id = v_quiz_id
+         and lp.user_id = v_uid
+    ) into v_flag;
+  end if;
+
+  return case
+    when v_criteria->>'type' = 'all_members' then true
+    when v_criteria->>'type' = 'min_score' then coalesce(v_score, 0) >= v_min
+    else v_flag
+  end;
+end;
+$fn$;
+
+revoke all on function public.qm_certificate_participant_eligible(uuid, uuid) from public, anon;
+grant execute on function public.qm_certificate_participant_eligible(uuid, uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------
 -- 9. Kelayakan: semua ahli kelas + status kelayakan ikut criteria templat.
 --    criteria jenis:
 --      all_members                  -> semua ahli
@@ -236,12 +339,8 @@ as $fn$
 declare
   v_class_id  uuid;
   v_criteria  jsonb;
-  v_hunt_id   uuid;
-  v_quiz_id   uuid;
-  v_min       numeric := 0;
+  v_elig      boolean;
   r           record;
-  v_score     numeric;
-  v_flag      boolean;
 begin
   select t.class_id, t.criteria
     into v_class_id, v_criteria
@@ -249,6 +348,11 @@ begin
    where t.id = p_template;
   if v_class_id is null then
     raise exception 'Certificate template not found.';
+  end if;
+  -- C1: fungsi ini mendedahkan nama ahli kelas, jadi ia hanya untuk pemilik
+  -- kelas atau pendidik diterima kelas itu.
+  if not public.qm_certificate_is_educator(v_class_id) then
+    raise exception 'Only the class educator can view certificate eligibility.';
   end if;
 
   for r in
@@ -259,59 +363,9 @@ begin
       join public.qm_profiles p on p.id = m.user_id
      where m.class_id = v_class_id
   loop
-    v_score := null;
-    v_flag := null;
-    if v_criteria->>'type' = 'hunt_completed' then
-      v_hunt_id := (v_criteria->>'hunt_id')::uuid;
-      select exists(
-        select 1 from public.qm_submissions s
-         join public.qm_challenges ch on ch.id = s.challenge_id
-        where ch.hunt_id = v_hunt_id
-          and s.user_id = r.user_id
-          and s.status = 'approved'
-      ) into v_flag;
-      v_score := case when v_flag then 1 else 0 end;
-    elsif v_criteria->>'type' = 'min_score' then
-      v_min := coalesce((v_criteria->>'min_score')::numeric, 0);
-      v_hunt_id := null;
-      if v_criteria ? 'hunt_id' then
-        v_hunt_id := (v_criteria->>'hunt_id')::uuid;
-      end if;
-      -- Skor individu kelas
-      select i.total_score::numeric into v_score
-        from public.qm_class_individual_scores i
-       where i.class_id = v_class_id
-         and i.user_id = r.user_id;
-      -- Skor pasukan terbaik (jika lebih tinggi); hunt disekat jika diberi
-      declare
-        v_team numeric;
-      begin
-        select max(ts.total_score)::numeric into v_team
-          from public.qm_team_scores ts
-          join public.qm_team_members tm on tm.team_id = ts.team_id
-         where tm.user_id = r.user_id
-           and exists (
-             select 1 from public.qm_teams t2
-              where t2.id = ts.team_id
-                and t2.hunt_id = coalesce(v_hunt_id, t2.hunt_id)
-                and t2.hunt_id in (select h.id from public.qm_hunts h where h.class_id = v_class_id)
-           );
-        if v_team is not null and (v_score is null or v_team > v_score) then
-          v_score := v_team;
-        end if;
-      end;
-      v_score := greatest(coalesce(v_score, 0), 0);
-    elsif v_criteria->>'type' = 'live_attended' then
-      v_quiz_id := (v_criteria->>'quiz_id')::uuid;
-      select exists(
-        select 1
-          from public.qm_live_players lp
-          join public.qm_live_sessions s on s.id = lp.session_id
-         where s.quiz_id = v_quiz_id
-           and lp.user_id = r.user_id
-      ) into v_flag;
-      v_score := case when v_flag then 1 else 0 end;
-    end if;
+    -- L3: kelayakan untuk seorang peserta, bukan gelung semua ahli bagi
+    -- setiap panggilan.
+    v_elig := public.qm_certificate_participant_eligible(p_template, r.user_id);
 
     return query
     select
@@ -319,16 +373,12 @@ begin
       r.display_name,
       r.certificate_name,
       r.certificate_name is not null,
-      case
-        when v_criteria->>'type' = 'all_members' then true
-        when v_criteria->>'type' = 'min_score' then coalesce(v_score, 0) >= v_min
-        else v_flag
-      end,
+      v_elig,
       case
         when v_criteria->>'type' = 'all_members' then 'All members are eligible.'
         when v_criteria->>'type' = 'min_score' then
-          case when coalesce(v_score, 0) >= v_min then 'Meets the minimum score.' else 'Score below the minimum required.' end
-        else case when v_flag then 'Attended the live quiz.' else 'Did not attend the live quiz.' end
+          case when v_elig then 'Meets the minimum score.' else 'Score below the minimum required.' end
+        else case when v_elig then 'Attended the live quiz.' else 'Did not attend the live quiz.' end
       end,
       exists(
         select 1 from public.qm_certificates c2
@@ -339,6 +389,11 @@ begin
   end loop;
 end;
 $fn$;
+
+-- C1: REVOKE daripada PUBLIC/anon; hanya pendidik melalui laluan app yang
+-- memanggilnya, dan fungsi itu sendiri sudah menyemak pendidik kelas.
+revoke all on function public.qm_certificate_eligibility(uuid) from public, anon;
+grant execute on function public.qm_certificate_eligibility(uuid) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- 10. Pengeluaran sijil: pendidik kelas sahaja. Layak DAN nama disahkan.
@@ -360,6 +415,7 @@ declare
   v_prog      text;
   v_code      text;
   v_new_id    uuid;
+  v_existing  uuid;
   v_ok        boolean;
   v_criteria  jsonb;
   r           record;
@@ -382,46 +438,68 @@ begin
 
   for r in
     select m.user_id,
-           p.certificate_name,
-           exists(
-             select 1 from public.qm_certificates c2
-              where c2.template_id = p_template
-                and c2.participant_id = m.user_id
-           ) as sudah
+           p.certificate_name
       from public.qm_class_members m
       join public.qm_profiles p on p.id = m.user_id
      where m.class_id = v_class_id
        and (p_participants is null or m.user_id = any (p_participants))
   loop
-    if r.sudah then
-      continue;
-    end if;
     if r.certificate_name is null then
       continue;
     end if;
     -- Semak kelayakan semula untuk senarai yang diberi (semua atau tiada
-    -- kenaikan kadar: yang tidak layak dilangkau, tidak dihentikan).
-    perform 1 from public.qm_certificate_eligibility(p_template) e
-      where e.participant_id = r.user_id and e.eligible;
-    if not found then
+    -- kenaikan kadar: yang tidak layak dilangkau, tidak dihentikan). L3:
+    -- semakan seorang peserta, bukan gelung semua ahli bagi setiap panggilan.
+    if not public.qm_certificate_participant_eligible(p_template, r.user_id) then
       continue;
     end if;
+    -- Sijil aktif sedia ada: langkau (tiada pendua). Sijil yang DIBATALKAN
+    -- boleh dikeluarkan semula (M2) dengan mengemas kini baris yang sama,
+    -- kerana kekangan unik (template_id, participant_id) menghalang sisipan
+    -- baharu selagi baris lama ada.
+    select c.id into v_existing
+      from public.qm_certificates c
+     where c.template_id = p_template
+       and c.participant_id = r.user_id
+       and c.revoked_at is null;
+    if found then
+      continue;
+    end if;
+    select c.id into v_existing
+      from public.qm_certificates c
+     where c.template_id = p_template
+       and c.participant_id = r.user_id
+       and c.revoked_at is not null;
 
     v_code := public.qm_certificate_code();
-    insert into public.qm_certificates
-      (template_id, class_id, participant_id, name_snapshot, program_snapshot, code, issued_by)
-    values
-      (p_template, v_class_id, r.user_id, r.certificate_name, v_prog, v_code, auth.uid())
-    returning qm_certificates.id into v_new_id;
-    issued_count := issued_count + 1;
-    issued_ids := issued_ids || v_new_id;
+    if v_existing is not null then
+      update public.qm_certificates
+         set code = v_code,
+             name_snapshot = r.certificate_name,
+             program_snapshot = v_prog,
+             issued_at = now(),
+             issued_by = auth.uid(),
+             revoked_at = null,
+             revoked_reason = null
+       where id = v_existing;
+      issued_count := issued_count + 1;
+      issued_ids := issued_ids || v_existing;
+    else
+      insert into public.qm_certificates
+        (template_id, class_id, participant_id, name_snapshot, program_snapshot, code, issued_by)
+      values
+        (p_template, v_class_id, r.user_id, r.certificate_name, v_prog, v_code, auth.uid())
+      returning qm_certificates.id into v_new_id;
+      issued_count := issued_count + 1;
+      issued_ids := issued_ids || v_new_id;
+    end if;
   end loop;
   return next;
 end;
 $fn$;
 
-revoke all on function public.qm_issue_certificates(uuid, uuid[]) from anon, authenticated;
-grant execute on function public.qm_issue_certificates(uuid, uuid[]) to authenticated;
+revoke all on function public.qm_issue_certificates(uuid, uuid[]) from public, anon, authenticated;
+grant execute on function public.qm_issue_certificates(uuid, uuid[]) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- 11. Pembatalan: pendidik kelas sahaja. Tiada DELETE sijil.
@@ -452,8 +530,8 @@ begin
 end;
 $fn$;
 
-revoke all on function public.qm_revoke_certificate(uuid, text) from anon, authenticated;
-grant execute on function public.qm_revoke_certificate(uuid, text) to authenticated;
+revoke all on function public.qm_revoke_certificate(uuid, text) from public, anon, authenticated;
+grant execute on function public.qm_revoke_certificate(uuid, text) to authenticated, service_role;
 
 -- ---------------------------------------------------------------------
 -- 12. Bucket Storage peribadi. certificates: tiada polisi langsung untuk
@@ -494,6 +572,10 @@ begin
   return public.qm_certificate_is_educator(v_class);
 end;
 $fn$;
+
+-- Dipanggil dalam polisi Storage untuk authenticated sahaja; ia TIDAK awam.
+revoke all on function public.qm_certificate_asset_allowed(text) from public, anon;
+grant execute on function public.qm_certificate_asset_allowed(text) to authenticated;
 
 drop policy if exists p_cert_assets_educator_read on storage.objects;
 create policy p_cert_assets_educator_read on storage.objects

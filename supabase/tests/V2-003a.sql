@@ -388,6 +388,108 @@ END;
 $chk$;
 
 -- ---------------------------------------------------------------------
+-- 9. C1: qm_certificate_eligibility hanya untuk pendidik kelas
+--    (anon ditolak, peserta ditolak, pendidik kelas lain ditolak,
+--    pendidik kelas dibenarkan). Semakan privileges diwarisi REVOKE
+--    PUBLIC/anon dan RAISE di dalam fungsi.
+-- ---------------------------------------------------------------------
+DO $chk$
+DECLARE
+  v_n int;
+  v_baik boolean;
+BEGIN
+  -- anon: ditolak (tiada EXECUTE atau RAISE dalam fungsi).
+  PERFORM pg_temp.qm_test_as_anon();
+  BEGIN
+    PERFORM 1 FROM public.qm_certificate_eligibility('33333333-0000-0000-0000-000000000001');
+    PERFORM pg_temp.qm_verdict('i', false, 'anon berjaya memanggil qm_certificate_eligibility');
+  EXCEPTION WHEN OTHERS THEN
+    PERFORM pg_temp.qm_verdict('i', true, 'anon ditolak: ' || SQLERRM);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+
+  -- Peserta kelas: ditolak walaupun ada EXECUTE.
+  PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000000b1');
+  BEGIN
+    PERFORM 1 FROM public.qm_certificate_eligibility('33333333-0000-0000-0000-000000000001');
+    PERFORM pg_temp.qm_verdict('i2', false, 'peserta berjaya memanggil qm_certificate_eligibility');
+  EXCEPTION WHEN OTHERS THEN
+    PERFORM pg_temp.qm_verdict('i2', SQLERRM LIKE '%educator%',
+      'peserta ditolak: ' || SQLERRM);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+
+  -- Pendidik kelas lain: ditolak oleh RAISE dalam fungsi.
+  PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000000a2');
+  BEGIN
+    PERFORM 1 FROM public.qm_certificate_eligibility('33333333-0000-0000-0000-000000000001');
+    PERFORM pg_temp.qm_verdict('i3', false, 'pendidik kelas lain berjaya memanggil kelayakan');
+  EXCEPTION WHEN OTHERS THEN
+    PERFORM pg_temp.qm_verdict('i3', SQLERRM LIKE '%educator%',
+      'pendidik kelas lain ditolak: ' || SQLERRM);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+
+  -- Pendidik kelas: dibenarkan, nampak 3 ahli (p1, p2, p3).
+  PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000000a1');
+  SELECT count(*) INTO v_n FROM public.qm_certificate_eligibility('33333333-0000-0000-0000-000000000001');
+  PERFORM pg_temp.qm_verdict('i4', v_n = 3,
+    'pendidik kelas nampak ' || v_n::text || ' baris kelayakan');
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+-- ---------------------------------------------------------------------
+-- 10. M2: sijil yang dibatalkan boleh dikeluarkan semula (baris yang sama
+--     dikemas kini, kod baharu, tiada pendua, tiada ralat kekangan unik).
+-- ---------------------------------------------------------------------
+DO $chk$
+DECLARE
+  v_terbit record;
+  v_n int;
+  v_kod_lama text;
+  v_kod_baru text;
+BEGIN
+  PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000000a1');
+  -- Batalkan sijil p1 untuk templat 001 (dikeluarkan dalam blok 5). Blok 6
+  -- mungkin sudah membatalkannya (LIMIT 1 tanpa ORDER), jadi batalkan
+  -- hanya jika masih aktif.
+  SELECT code INTO v_kod_lama FROM public.qm_certificates
+    WHERE template_id = '33333333-0000-0000-0000-000000000001'
+      AND participant_id = '11111111-0000-0000-0000-0000000000b1';
+  IF EXISTS (
+    SELECT 1 FROM public.qm_certificates
+     WHERE template_id = '33333333-0000-0000-0000-000000000001'
+       AND participant_id = '11111111-0000-0000-0000-0000000000b1'
+       AND revoked_at IS NULL
+  ) THEN
+    PERFORM public.qm_revoke_certificate(
+      (SELECT id FROM public.qm_certificates
+        WHERE template_id = '33333333-0000-0000-0000-000000000001'
+          AND participant_id = '11111111-0000-0000-0000-0000000000b1'
+          AND revoked_at IS NULL),
+      'Ujian keluar semula');
+  END IF;
+
+  -- Keluarkan semula untuk seorang peserta itu: BERJAYA, bukan dilangkau.
+  SELECT * INTO v_terbit FROM public.qm_issue_certificates(
+    '33333333-0000-0000-0000-000000000001',
+    ARRAY['11111111-0000-0000-0000-0000000000b1']::uuid[]);
+  SELECT count(*) INTO v_n FROM public.qm_certificates
+    WHERE template_id = '33333333-0000-0000-0000-000000000001'
+      AND participant_id = '11111111-0000-0000-0000-0000000000b1';
+  SELECT code INTO v_kod_baru FROM public.qm_certificates
+    WHERE template_id = '33333333-0000-0000-0000-000000000001'
+      AND participant_id = '11111111-0000-0000-0000-0000000000b1';
+  PERFORM pg_temp.qm_verdict('j',
+    v_terbit.issued_count = 1 AND v_n = 1 AND v_kod_baru <> v_kod_lama,
+    'keluar semula selepas batal: ' || v_terbit.issued_count::text ||
+    ' dikeluarkan, ' || v_n::text || ' baris, kod bertukar');
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+-- ---------------------------------------------------------------------
 -- Ringkasan
 -- ---------------------------------------------------------------------
 DO $sum$
