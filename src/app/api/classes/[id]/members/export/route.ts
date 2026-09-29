@@ -89,7 +89,8 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('class_id', params.id)
     .is('accepted_at', null)
     .not('email', 'is', null)
-    .or('expires_at.is.null,expires_at.gt.now()');
+    // PostgREST tidak menilai fungsi SQL dalam penapis; guna cap masa ISO.
+    .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
   if (invitesErr) {
     return NextResponse.json({ error: invitesErr.message }, { status: 500 });
   }
