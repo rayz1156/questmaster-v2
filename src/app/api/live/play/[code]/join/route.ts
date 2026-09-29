@@ -18,6 +18,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, getRouteSupabase, bearerFromReq } from '@/lib/supabase-route';
+import { namaBerdaftar, ahliKelas } from '@/lib/live-quiz';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,65 +37,6 @@ interface JoinRpcRow { player_id: string; player_token: string }
 
 interface JoinError { code?: string; message: string }
 
-// Potong nama kepada 24 aksara, mengikut had nickname qm_live_players.
-function potongNama(v: unknown): string | null {
-  if (typeof v !== 'string') return null;
-  const bersih = v.trim();
-  if (bersih.length === 0) return null;
-  return bersih.slice(0, 24);
-}
-
-// Nama berdaftar: display_name, jika tiada bahagian emel sebelum @.
-async function namaBerdaftar(
-  supa: ReturnType<typeof getServiceSupabase>,
-  userId: string,
-): Promise<string | null> {
-  const { data: profil } = await supa
-    .from('qm_profiles')
-    .select('display_name, email')
-    .eq('id', userId)
-    .limit(1)
-    .maybeSingle();
-  const emel = typeof profil?.email === 'string' ? profil.email : '';
-  return (
-    potongNama(profil?.display_name) ??
-    (emel.includes('@') ? potongNama(emel.split('@')[0]) : null)
-  );
-}
-
-// Pengguna ahli kelas, educator diterima, atau pemilik kelas (service role).
-async function keahlian(
-  supa: ReturnType<typeof getServiceSupabase>,
-  classId: string,
-  userId: string,
-): Promise<boolean> {
-  const { data: member } = await supa
-    .from('qm_class_members')
-    .select('user_id')
-    .eq('class_id', classId)
-    .eq('user_id', userId)
-    .limit(1)
-    .maybeSingle();
-  if (member) return true;
-  const { data: educator } = await supa
-    .from('qm_class_educators')
-    .select('educator_id')
-    .eq('class_id', classId)
-    .eq('educator_id', userId)
-    .not('accepted_at', 'is', null)
-    .limit(1)
-    .maybeSingle();
-  if (educator) return true;
-  const { data: owner } = await supa
-    .from('qm_classes')
-    .select('id')
-    .eq('id', classId)
-    .eq('owner_id', userId)
-    .limit(1)
-    .maybeSingle();
-  return !!owner;
-}
-
 // "<nama> 2" hingga "<nama> 9", tetap 24 aksara maksimum.
 function namaAkhiran(nama: string, i: number): string {
   const akhiran = ' ' + String(i);
@@ -109,12 +51,32 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   // Badan pilihan bagi pengguna berdaftar (klien masih menghantar nickname
   // terkunci, tetapi nilai itu tidak dipercayai).
-  let nickname = '';
+  // Temuan R3 (V2-007-sec): bezakan badan TERLALU BESAR (413) daripada JSON
+  // rosak (400). Badan kosong dibenarkan: pengguna berdaftar boleh POST
+  // tanpa badan, dan nickname kekal kosong tanpa mesej mengelirukan.
+  const HAD_BADAN = 1_000_000; // selari client_max_body_size nginx 1 MB
+  const panjangBadan = Number(req.headers.get('content-length') || 0);
+  if (panjangBadan > HAD_BADAN) {
+    return NextResponse.json({ error: 'Request body too large.' }, { status: 413 });
+  }
+  let raw = '';
   try {
-    const body = (await req.json()) as { nickname?: unknown };
-    if (typeof body?.nickname === 'string') nickname = body.nickname.trim();
+    raw = await req.text();
   } catch {
-    // Tiada badan dibenarkan: nickname kosong sahaja.
+    raw = '';
+  }
+  if (raw.length > HAD_BADAN) {
+    return NextResponse.json({ error: 'Request body too large.' }, { status: 413 });
+  }
+  let nickname = '';
+  if (raw.trim() !== '') {
+    try {
+      const body = JSON.parse(raw) as { nickname?: unknown };
+      if (typeof body?.nickname === 'string') nickname = body.nickname.trim();
+    } catch {
+      // Badan bukan JSON: ralat yang jujur, bukan "nama mesti 1 hingga 24".
+      return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
+    }
   }
 
   const supa = getServiceSupabase();
@@ -149,9 +111,15 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
         .limit(1)
         .maybeSingle();
       const classId = (quiz?.class_id as string | null) || null;
-      if (classId && (await keahlian(supa, classId, user.id))) {
-        const nama = await namaBerdaftar(supa, user.id);
-        if (nama) daftar = { userId: user.id, nama };
+      if (classId) {
+        // Temuan R1 (V2-007-sec): semakan keahlian kongsi dengan whoami
+        // (src/lib/live-quiz.ts). Pendidik diterima dan pemilik kelas turut
+        // diterima; qm_class_members ialah jadual PESERTA sahaja.
+        const k = await ahliKelas(supa, classId, user.id);
+        if (k.member || k.educator || k.owner) {
+          const nama = await namaBerdaftar(supa, user.id);
+          if (nama) daftar = { userId: user.id, nama };
+        }
       }
     }
   }

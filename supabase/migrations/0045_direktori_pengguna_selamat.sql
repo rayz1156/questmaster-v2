@@ -63,17 +63,20 @@ AS $$
          CASE
            WHEN (SELECT public.qm_is_admin()) THEN u.email::text
            WHEN EXISTS (
-             -- Pemanggil pendidik kelas kongsi: emel diberi
+             -- Pemanggil pendidik kelas kongsi: emel diberi. Setiap subkueri
+             -- diberi alias lajur (kp/ka/ta/te): rujukan `id` tanpa kualifikasi
+             -- bercanggah dengan sasaran.id dan qm_profiles.id pada masa jalan
+             -- (ralat "column reference id is ambiguous", temuan CTO VPS).
              SELECT 1
-             FROM public.qm_class_members tm
-             WHERE tm.user_id = s.id
-               AND tm.class_id IN (SELECT id FROM kelas_pendidik)
+             FROM public.qm_class_members ta
+             WHERE ta.user_id = s.id
+               AND ta.class_id IN (SELECT kp.id FROM kelas_pendidik kp)
            ) OR EXISTS (
              SELECT 1
              FROM public.qm_class_educators te
              WHERE te.educator_id = s.id
                AND te.accepted_at IS NOT NULL
-               AND te.class_id IN (SELECT id FROM kelas_pendidik)
+               AND te.class_id IN (SELECT kp.id FROM kelas_pendidik kp)
            ) THEN u.email::text
            ELSE NULL
          END
@@ -84,16 +87,16 @@ AS $$
      OR EXISTS (
        -- Kongsi kelas sebagai pendidik pemanggil: ahli atau educator sasaran
        SELECT 1
-       FROM public.qm_class_members tm
-       WHERE tm.user_id = s.id
-         AND (tm.class_id IN (SELECT id FROM kelas_pendidik)
-              OR tm.class_id IN (SELECT id FROM kelas_ahli))
+       FROM public.qm_class_members ta
+       WHERE ta.user_id = s.id
+         AND (ta.class_id IN (SELECT kp.id FROM kelas_pendidik kp)
+              OR ta.class_id IN (SELECT ka.class_id FROM kelas_ahli ka))
      ) OR EXISTS (
        SELECT 1
        FROM public.qm_class_educators te
        WHERE te.educator_id = s.id
-         AND (te.class_id IN (SELECT id FROM kelas_pendidik)
-              OR te.class_id IN (SELECT id FROM kelas_ahli))
+         AND (te.class_id IN (SELECT kp.id FROM kelas_pendidik kp)
+              OR te.class_id IN (SELECT ka.class_id FROM kelas_ahli ka))
      );
 $$;
 

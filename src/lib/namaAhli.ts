@@ -14,6 +14,12 @@
  */
 
 // UUID v4 yang biasa: 8-4-4-4-12 aksara heksadesimal.
+// Temuan R4 (V2-007-sec): nama yang SAH secara tak sengaja berbentuk UUID
+// juga akan ditolak oleh CORAK_UUID dan jatuh kepada emel atau "Student".
+// Ini disengajakan dan didokumenkan: UUID pengguna tidak sepatutnya
+// dipaparkan sebagai nama (ia mendedahkan user_id), jadi sebarang rentetan
+// berbentuk UUID dianggap data identiti, bukan nama, walau pun ia mungkin
+// memang nama pilihan pengguna itu sendiri.
 const CORAK_UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Tapis nilai nama: mesti rentetan bukan kosong dan bukan UUID. */
