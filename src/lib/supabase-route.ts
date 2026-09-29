@@ -15,7 +15,8 @@ import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
 
-function bearerFromReq(req?: NextRequest | Request | null): string | null {
+/** Baca token daripada header Authorization: Bearer <token>. */
+export function bearerFromReq(req?: NextRequest | Request | null): string | null {
   if (!req) return null;
   const h = req.headers.get('authorization') || req.headers.get('Authorization');
   if (!h) return null;
