@@ -74,6 +74,47 @@ export default function ClassPeoplePage() {
     const [importErr, setImportErr] = useState<string | null>(null);
     const fileRef = useRef<HTMLInputElement>(null);
 
+    // Eksport CSV peserta (V2-010): muat turun fail daripada laluan export.
+    const [exportBusy, setExportBusy] = useState(false);
+    const [exportErr, setExportErr] = useState<string | null>(null);
+    const eksportCsv = async () => {
+        setExportErr(null);
+        setExportBusy(true);
+        try {
+            const { data: ses } = await supabase.auth.getSession();
+            const res = await fetch(`/api/classes/${id}/members/export`, {
+                headers: ses.session ? { Authorization: `Bearer ${ses.session.access_token}` } : {},
+                cache: "no-store",
+            });
+            if (!res.ok) {
+                let msg = "Export failed.";
+                try {
+                    const j = await res.json();
+                    if (j?.error) msg = j.error;
+                } catch { /* badan bukan JSON: guna mesej lalai */ }
+                setExportErr(msg);
+                return;
+            }
+            // Nama fail diambil daripada content-disposition pelayan supaya
+            // slug nama kelas dikira satu tempat sahaja.
+            const blob = await res.blob();
+            const cd = res.headers.get("content-disposition") || "";
+            const m = /filename="([^"]+)"/.exec(cd);
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement("a");
+            a.href = url;
+            a.download = m ? m[1] : "kuizen-participants.csv";
+            document.body.appendChild(a);
+            a.click();
+            a.remove();
+            URL.revokeObjectURL(url);
+        } catch {
+            setExportErr("Export failed.");
+        } finally {
+            setExportBusy(false);
+        }
+    };
+
     // Muat semula senarai kumpulan dan baris tunggu selepas import.
     const loadTeams = async () => {
       const [ts, iv] = await Promise.all([
@@ -212,11 +253,22 @@ export default function ClassPeoplePage() {
                 />
               </div>
             )}
+            {sub === "students" && (
+              <button
+                type="button"
+                onClick={eksportCsv}
+                disabled={exportBusy}
+                className="btn-quiet text-brand-purple inline-flex items-center gap-1.5 disabled:opacity-50"
+              >
+                <Download className="w-4 h-4" /> {exportBusy ? "Exporting..." : "Export CSV"}
+              </button>
+            )}
             <EmailExportButton classId={id} />
           </div>
         </div>
 
         {err && <div className="text-sm text-red-600 mb-4">{err}</div>}
+        {exportErr && <div className="text-sm text-red-600 mb-4">{exportErr}</div>}
         {loading && <p className="text-sm text-ink-muted">Loading…</p>}
 
         {!loading && sub === "students" && (
