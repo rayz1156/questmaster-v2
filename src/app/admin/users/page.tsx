@@ -25,8 +25,8 @@ function fmt(d: string | null | undefined) {
 
 /** Pelan tersimpan profil; apa-apa nilai lain dianggap free untuk paparan. */
 function pelanProfil(u: Profile): PelanAdmin {
-  const p = (u as any).plan;
-  return PELAN_ADMIN.includes(p) ? p : 'free';
+  const p: string | undefined = u.plan;
+  return PELAN_ADMIN.includes(p as PelanAdmin) ? (p as PelanAdmin) : 'free';
 }
 
 export default function Page() {
@@ -275,8 +275,8 @@ export default function Page() {
                   <option key={p} value={p}>{LABEL_PELAN[p]}</option>
                 ))}
               </select>
-              {(u as any).plan_expires_at && (
-                <span className="text-gray-400">Expires: {fmt((u as any).plan_expires_at)}</span>
+              {u.plan_expires_at && (
+                <span className="text-gray-400">Expires: {fmt(u.plan_expires_at)}</span>
               )}
               <span className="text-gray-400">Switching the plan also resets the limits below.</span>
             </div>
