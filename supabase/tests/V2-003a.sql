@@ -42,6 +42,10 @@ RETURNS void
 LANGUAGE plpgsql
 AS $fn$
 BEGIN
+  -- Untuk meniru production (row_security = on secara lalai): PGlite lalai
+  -- row_security = off, dan itu menyebabkan SELECT tertakluk RLS membuang
+  -- ralat 42501 "query would be affected" bukannya menapis secara senyap.
+  PERFORM set_config('row_security', 'on', true);
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims',
     '{"sub":"' || p_user::text || '","role":"authenticated"}', true);
@@ -53,6 +57,7 @@ RETURNS void
 LANGUAGE plpgsql
 AS $fn$
 BEGIN
+  PERFORM set_config('row_security', 'on', true);
   PERFORM set_config('role', 'anon', true);
   PERFORM set_config('request.jwt.claims', NULL, true);
 END;
@@ -134,11 +139,14 @@ BEGIN
   INSERT INTO public.qm_certificate_templates (id, class_id, title, criteria)
     VALUES ('33333333-0000-0000-0000-000000000001', c1, 'Templat Semua', '{"type":"all_members"}'::jsonb);
   INSERT INTO public.qm_certificate_templates (id, class_id, title, criteria)
-    VALUES ('33333333-0000-0000-0000-000000000002', c1, 'Templat Hunt', '{"type":"hunt_completed","hunt_id":"' || h1::text || '"}'::jsonb);
+    VALUES ('33333333-0000-0000-0000-000000000002', c1, 'Templat Hunt',
+            jsonb_build_object('type', 'hunt_completed', 'hunt_id', h1));
   INSERT INTO public.qm_certificate_templates (id, class_id, title, criteria)
-    VALUES ('33333333-0000-0000-0000-000000000003', c1, 'Templat Skor', '{"type":"min_score","hunt_id":"' || h1::text || '","min_score":80}'::jsonb);
+    VALUES ('33333333-0000-0000-0000-000000000003', c1, 'Templat Skor',
+            jsonb_build_object('type', 'min_score', 'hunt_id', h1, 'min_score', 80));
   INSERT INTO public.qm_certificate_templates (id, class_id, title, criteria)
-    VALUES ('33333333-0000-0000-0000-000000000004', c1, 'Templat Kuiz', '{"type":"live_attended","quiz_id":"' || qz1::text || '"}'::jsonb);
+    VALUES ('33333333-0000-0000-0000-000000000004', c1, 'Templat Kuiz',
+            jsonb_build_object('type', 'live_attended', 'quiz_id', qz1));
   -- Templat kedua untuk ujian pengeluaran asas (blok 1).
   INSERT INTO public.qm_certificate_templates (id, class_id, title, criteria)
     VALUES ('33333333-0000-0000-0000-000000000005', c1, 'Templat Semua Kedua', '{"type":"all_members"}'::jsonb);
@@ -248,6 +256,8 @@ $chk$;
 DO $chk$
 DECLARE
   r record;
+  v_latar text;
+  v_logo  text;
   v_p1 bool; v_p2 bool; v_p3 bool;
   v_terbit record;
   v_terbit_dua record;
@@ -293,9 +303,9 @@ BEGIN
   INSERT INTO public.qm_certificate_templates (id, class_id, title, criteria, background_path, logo_path)
     VALUES ('33333333-0000-0000-0000-000000000009', '22222222-0000-0000-0000-0000000000c1',
             'Templat Free Latar', '{"type":"all_members"}'::jsonb, 'c1/latar.png', 'c1/logo.png');
-  SELECT background_path INTO r FROM public.qm_certificate_templates
+  SELECT background_path, logo_path INTO v_latar, v_logo FROM public.qm_certificate_templates
     WHERE id = '33333333-0000-0000-0000-000000000009';
-  PERFORM pg_temp.qm_verdict('e6', r.background_path IS NULL AND r.logo_path IS NULL,
+  PERFORM pg_temp.qm_verdict('e6', v_latar IS NULL AND v_logo IS NULL,
     'free: latar dan logo dipaksa NULL');
 
   PERFORM pg_temp.qm_test_reset();
