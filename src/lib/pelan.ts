@@ -6,6 +6,15 @@ export type Pelan = 'free' | 'pro' | 'institution' | 'unlimited';
 export type PelanAwam = Exclude<Pelan, 'unlimited'>;
 
 /**
+ * Pelan berbayar = pro, institution atau unlimited (tiket V2-008).
+ * Satu sumber untuk SEMUA semakan akses ciri berbayar, klien mahupun pelayan.
+ * free dan pelan yang tidak dikenali mengembalikan false.
+ */
+export function pelanBerbayar(p: string | null | undefined): boolean {
+  return p === 'pro' || p === 'institution' || p === 'unlimited';
+}
+
+/**
  * Had pelan: SATU sumber untuk UI dan landing page. Angka di sini MESTI
  * selari dengan qm_plan_limits dalam supabase/migrations/0040_pelan_v2.sql
  * (baris 87 hingga 89). Null bermakna tanpa had (pelan unlimited atau
@@ -165,11 +174,9 @@ export async function pelanSaya(): Promise<RingkasanPelan | null> {
 
   const j = data as JsonPelan;
   // 'unlimited' ialah pelan keempat yang sah (V2-002b-baiki); apa-apa nilai
-  // lain yang tidak dikenali jatuh ke free seperti sebelum ini.
-  const plan: Pelan =
-    j.plan === 'pro' || j.plan === 'institution' || j.plan === 'unlimited'
-      ? j.plan
-      : 'free';
+  // lain yang tidak dikenali jatuh ke free seperti sebelum ini. Semakan
+  // disatukan dalam pelanBerbayar (V2-008).
+  const plan: Pelan = pelanBerbayar(j.plan) ? (j.plan as Pelan) : 'free';
   const had = j.limits || {};
   return {
     pelan: plan,
