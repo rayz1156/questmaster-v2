@@ -280,7 +280,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
               </div>
             </div>
 
-            <Field label="Display name" hint="Leave blank to use your username.">
+            <Field label="Display name" hint="Leave blank to show your username instead. This name appears in classes, on leaderboards and in Live Quiz.">
               <input
                 value={introName}
                 onChange={e => setIntroName(e.target.value)}
