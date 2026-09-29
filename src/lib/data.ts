@@ -649,7 +649,9 @@ export async function adminDeleteTeam(id: string): Promise<void> {
   const { error } = await supabase.from('qm_teams').delete().eq('id', id); if (error) throw error;
 }
 export async function adminListAllChallenges(): Promise<Challenge[]> {
-  const { data, error } = await supabase.from('qm_challenges').select('*').order('order_idx', { ascending: true });
+  // Tanpa lajur 'answer' (temuan kzsec V2-011c S1): kunci jawapan tidak perlu
+  // berada di pelayar admin untuk mana-mana halaman ruang kerja.
+  const { data, error } = await supabase.from('qm_challenges').select('id, hunt_id, title, prompt, points, order_idx').order('order_idx', { ascending: true });
   if (error) throw error; return (data || []) as Challenge[];
 }
 export async function adminUpdateChallenge(id: string, patch: Partial<Challenge>): Promise<void> {

@@ -235,7 +235,12 @@ export default function Page({ params }: { params: { id: string } }) {
   };
 
   /** Eksport CSV ahli: Name, Email, Joined. */
-  const exportAhli = () => {
+  const exportAhli = async () => {
+    const ok = await confirm({
+      title: `Export ${ahli.length} members with their email addresses? This is recorded in Audit.`,
+    });
+    if (!ok) return;
+    await logAudit("members_export", "class", id, { count: ahli.length });
     const tajuk = "Name,Email,Joined";
     const baris = ahli.map((a) =>
       [

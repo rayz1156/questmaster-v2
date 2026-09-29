@@ -34,6 +34,8 @@ const LABELS: Record<string, AuditLabel> = {
   moderation_override: { label: 'Overrode review', tone: 'warn' },
   password_reset_sent: { label: 'Sent password reset', tone: 'neutral' },
   users_export: { label: 'Exported users', tone: 'warn' },
+  members_export: { label: 'Exported class members', tone: 'warn' },
+  hunt_status: { label: 'Changed activity status', tone: 'neutral' },
   class_archive: { label: 'Archived class', tone: 'neutral' },
   class_unarchive: { label: 'Restored class', tone: 'good' },
 };
