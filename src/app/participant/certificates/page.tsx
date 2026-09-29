@@ -16,6 +16,7 @@ import { Download, ShieldCheck } from "lucide-react";
 import ParticipantShell from "@/components/ParticipantShell";
 import { supabase } from "@/lib/supabase";
 import { authHeader } from "@/lib/peer-client";
+import { statusSijil } from "@/lib/sijil/ui";
 
 type Sijil = {
   id: string;
@@ -27,13 +28,6 @@ type Sijil = {
 };
 
 type KelasNama = { class_id: string; class_name: string };
-
-/** Status sijil dalam Bahasa Inggeris untuk UI. */
-export function statusSijil(revoked_at: string | null): { label: string; kelas: string } {
-  return revoked_at
-    ? { label: "Revoked", kelas: "text-red-600" }
-    : { label: "Active", kelas: "text-emerald-600" };
-}
 
 export default function CertificatesPage() {
   const [loading, setLoading] = useState(true);

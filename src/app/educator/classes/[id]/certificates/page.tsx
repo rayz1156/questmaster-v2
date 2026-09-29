@@ -26,6 +26,7 @@ import { supabase } from "@/lib/supabase";
 import { authHeader } from "@/lib/peer-client";
 import { pelanSaya } from "@/lib/pelan";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { tickLayak } from "@/lib/sijil/ui";
 
 type Templat = {
   id: string;
@@ -253,9 +254,7 @@ export default function CertificatesPage() {
   };
 
   const keluarkan = async () => {
-    const ids = layak
-      .filter((r) => tick[r.participant_id] && r.eligible && !r.already_issued)
-      .map((r) => r.participant_id);
+    const ids = tickLayak(layak, tick);
     if (ids.length === 0) return;
     const ok = await confirm({
       title: "Issue certificates",
@@ -348,7 +347,7 @@ export default function CertificatesPage() {
   }
 
   const templatDipilih = templat.find((t) => t.id === pilihTemplat) ?? null;
-  const bilanganTick = layak.filter((r) => tick[r.participant_id] && r.eligible && !r.already_issued).length;
+  const bilanganTick = tickLayak(layak, tick).length;
 
   return (
     <Shell tabs={EDU_TABS}>
