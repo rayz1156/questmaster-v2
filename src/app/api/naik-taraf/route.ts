@@ -7,6 +7,9 @@ import { requireUser } from '@/lib/supabase-route';
 // kuasa: baris miliki auth.uid() sahaja.
 
 export const dynamic = 'force-dynamic';
+// S2: force-dynamic sahaja tidak cukup untuk mencegah Next.js men-cache panggilan
+// fetch klien Supabase di dalam route handler (CLAUDE.md, bahagian live quiz).
+export const fetchCache = 'force-no-store';
 
 type Bil = 'bulanan' | 'tahunan';
 
@@ -32,6 +35,27 @@ export async function POST(req: NextRequest) {
         : null;
     const mesej = body?.message ? String(body.message).trim().slice(0, 2000) : '';
     const page_url = body?.page_url ? String(body.page_url).slice(0, 500) : null;
+
+    // R1: had kadar ringkas. Pengguna yang sama tidak boleh menghantar minat pelan
+    // dua kali dalam 10 minit. Semakan dibaca melalui klien pengguna itu sendiri,
+    // jadi RLS qm_feedback_select_own (auth.uid() = user_id) mengehadkan SELECT
+    // kepada baris sendiri sahaja; baris orang lain tidak pernah nampak. Kalau
+    // bacaan gagal, kami langkau had kadar dan catat di log, bukan menyekat
+    // hantaran yang sah.
+    const sepuluhMinitLalu = new Date(Date.now() - 10 * 60 * 1000).toISOString();
+    const { count, error: errSemak } = await supa
+      .from('qm_feedback')
+      .select('id', { count: 'exact', head: true })
+      .eq('type', 'plan_interest')
+      .gte('created_at', sepuluhMinitLalu);
+    if (errSemak) {
+      console.error('naik-taraf rate check failed, skipping', errSemak);
+    } else if (count && count > 0) {
+      return NextResponse.json(
+        { error: 'You already sent a request recently. Please wait 10 minutes.' },
+        { status: 429 },
+      );
+    }
 
     // Ringkasan medan dibina di pelayan supaya subject dan message konsisten.
     const baris: string[] = [`Plan: ${pelan === 'pro' ? 'Pro' : 'Institution'}`];
@@ -59,7 +83,9 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
-    const msg = e instanceof Error ? e.message : 'Unknown error';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    // S1: jangan pulangkan mesej ralat dalaman kepada klien; log di pelayan
+    // sahaja dan balas dengan mesej umum, sama seperti laluan insert gagal.
+    console.error('naik-taraf unexpected', e);
+    return NextResponse.json({ error: 'Could not save your request.' }, { status: 500 });
   }
 }

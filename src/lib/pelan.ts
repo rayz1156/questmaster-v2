@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase';
 
 export type Pelan = 'free' | 'pro' | 'institution' | 'unlimited';
 
+/** Pelan yang dipaparkan di landing page (unlimited ialah pelan dalaman). */
+export type PelanAwam = Exclude<Pelan, 'unlimited'>;
+
 /**
  * Had pelan: SATU sumber untuk UI dan landing page. Angka di sini MESTI
  * selari dengan qm_plan_limits dalam supabase/migrations/0040_pelan_v2.sql

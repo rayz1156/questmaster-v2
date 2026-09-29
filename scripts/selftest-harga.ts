@@ -38,12 +38,14 @@ check('formatRM 19', formatRM(HARGA_PELAN.pro.tahunanSebulan) === 'RM19', format
 check('formatRM 29', formatRM(HARGA_PELAN.pro.bulanan) === 'RM29', formatRM(HARGA_PELAN.pro.bulanan));
 check('formatRM 228', formatRM(HARGA_PELAN.pro.tahunan) === 'RM228', formatRM(HARGA_PELAN.pro.tahunan));
 check('formatRM 1500', formatRM(HARGA_PELAN.institution.tahunan) === 'RM1,500', formatRM(HARGA_PELAN.institution.tahunan));
-check('formatStoran 100', formatStoran(HAD_PELAN.free.storageMb) === '100 MB', formatStoran(HAD_PELAN.free.storageMb));
-check('formatStoran 1024', formatStoran(HAD_PELAN.pro.storageMb) === '1 GB', formatStoran(HAD_PELAN.pro.storageMb));
-check('formatStoran 10240', formatStoran(HAD_PELAN.institution.storageMb) === '10 GB', formatStoran(HAD_PELAN.institution.storageMb));
+check('formatStoran 100', formatStoran(HAD_PELAN.free.storageMb!) === '100 MB', formatStoran(HAD_PELAN.free.storageMb!));
+check('formatStoran 1024', formatStoran(HAD_PELAN.pro.storageMb!) === '1 GB', formatStoran(HAD_PELAN.pro.storageMb!));
+check('formatStoran 10240', formatStoran(HAD_PELAN.institution.storageMb!) === '10 GB', formatStoran(HAD_PELAN.institution.storageMb!));
 
 /* ===== Bahagian 2: baris kad sepadan dengan HAD_PELAN ===== */
-const JANGKA: Record<Pelan, Record<string, number | boolean | null>> = {
+// Hanya tiga pelan awam diuji; unlimited ialah pelan dalaman yang tidak
+// dipaparkan, jadi tiada jangkaan kad untuknya.
+const JANGKA: Record<Exclude<Pelan, 'unlimited'>, Record<string, number | boolean | null>> = {
   free: {
     kelas: 3, pesertaSeKelas: 150, pemainSeSesi: 60,
     aktiviti: 30, papan: 5, pasukan: true,
@@ -64,7 +66,7 @@ const JANGKA: Record<Pelan, Record<string, number | boolean | null>> = {
   },
 };
 
-for (const p of ['free', 'pro', 'institution'] as Pelan[]) {
+for (const p of ['free', 'pro', 'institution'] as const) {
   const baris = barisKad(p);
   const h = HAD_PELAN[p];
   check(`${p}: bilangan baris 14`, baris.length === 14, baris.length);
@@ -87,7 +89,7 @@ for (const p of ['free', 'pro', 'institution'] as Pelan[]) {
   // silang semak terus dengan HAD_PELAN
   check(`${p}: kelas daripada HAD_PELAN`, barisKad(p)[0].angka === String(h.kelas));
   check(`${p}: pemain sesi daripada HAD_PELAN`, baris.find((x) => x.kunci === 'pemainSeSesi')?.angka === String(h.pemainSesi));
-  check(`${p}: storan daripada HAD_PELAN`, baris.find((x) => x.kunci === 'storan')?.angka === formatStoran(h.storageMb));
+  check(`${p}: storan daripada HAD_PELAN`, baris.find((x) => x.kunci === 'storan')?.angka === formatStoran(h.storageMb!));
 }
 
 /* ===== Bahagian 3: teks dwibahasa lengkap dan sijil ===== */

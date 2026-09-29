@@ -13,14 +13,14 @@
  */
 import Link from "next/link";
 import { TEKS_LANDING, type Bahasa } from "@/lib/landing-copy";
-import { HARGA_PELAN, type Pelan } from "@/lib/pelan";
+import { HARGA_PELAN, type PelanAwam } from "@/lib/pelan";
 import { barisKad, formatRM, type BarisKad } from "@/lib/kadHarga";
 import SuisBil, { HargaProBil } from "./SuisBil";
 
 const DISPLAY = { fontFamily: "var(--font-display), Georgia, serif" } as const;
 
 /** Teks nilai untuk satu baris kad, dalam bahasa halaman. */
-function teksBaris(b: BarisKad, pelan: Pelan, bahasa: Bahasa): string {
+function teksBaris(b: BarisKad, pelan: PelanAwam, bahasa: Bahasa): string {
   const t = TEKS_LANDING[bahasa].harga;
   if (b.kunci === "sijil") return t.sijilNilai[pelan];
   if (b.angka !== null) {
@@ -63,7 +63,7 @@ function IkonSemak({ ok }: { ok: boolean }) {
   );
 }
 
-function BarisKadView({ b, pelan, bahasa }: { b: BarisKad; pelan: Pelan; bahasa: Bahasa }) {
+function BarisKadView({ b, pelan, bahasa }: { b: BarisKad; pelan: PelanAwam; bahasa: Bahasa }) {
   const t = TEKS_LANDING[bahasa].harga;
   const nilai = teksBaris(b, pelan, bahasa);
   const semak = b.termasuk !== null;
@@ -83,7 +83,7 @@ function BarisKadView({ b, pelan, bahasa }: { b: BarisKad; pelan: Pelan; bahasa:
   );
 }
 
-function KadHarga({ pelan, bahasa }: { pelan: Pelan; bahasa: Bahasa }) {
+function KadHarga({ pelan, bahasa }: { pelan: PelanAwam; bahasa: Bahasa }) {
   const t = TEKS_LANDING[bahasa].harga;
   const baris = barisKad(pelan);
   const pro = pelan === "pro";
@@ -157,7 +157,7 @@ function KadHarga({ pelan, bahasa }: { pelan: Pelan; bahasa: Bahasa }) {
 
 export default function BahagianHarga({ bahasa }: { bahasa: Bahasa }) {
   const t = TEKS_LANDING[bahasa].harga;
-  const pelanKad: Pelan[] = ["free", "pro", "institution"];
+  const pelanKad: PelanAwam[] = ["free", "pro", "institution"];
   return (
     <section id="harga" className="px-6 sm:px-8 pt-14 pb-16 border-t border-hairline">
       <div className="mx-auto w-full max-w-[960px]">
