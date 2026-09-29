@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trophy, Users, Timer, Check, X } from "lucide-react";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
+import { supabase } from "@/lib/supabase";
 
 interface Pilihan { key: string; text: string }
 // Soalan dalam cache klien (daripada laluan /questions, tiada correct_key).
@@ -51,6 +52,10 @@ export default function SkrinMainLangsung() {
   const [nama, setNama] = useState("");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Tiket V2-007: nama berdaftar pengguna log masuk (daripada whoami).
+  // null = belum semak; "" = semak selesai, tiada nama berdaftar; rentetan
+  // tak kosong = nama berdaftar untuk dipapar pada skrin masuk.
+  const [namaBerdaftar, setNamaBerdaftar] = useState<string | null>(null);
 
   const [keadaan, setKeadaan] = useState<Keadaan | null>(null);
   const [papan, setPapan] = useState<BarisPapan[] | null>(null);
@@ -113,6 +118,33 @@ export default function SkrinMainLangsung() {
   useEffect(() => {
     if (identiti) muatSoalan();
   }, [identiti, muatSoalan]);
+
+  // Tiket V2-007: semak nama berdaftar sekali sahaja semasa tiada identiti.
+  // Jika sesi Supabase wujud, GET whoami dengan Bearer; jika ada nama,
+  // skrin masuk memaparkan "Joining as <nama>" dengan medan nama dikunci.
+  useEffect(() => {
+    if (identiti || namaBerdaftar !== null) return;
+    let hidup = true;
+    const semak = async () => {
+      try {
+        const ses = await supabase.auth.getSession();
+        if (!ses.data.session) { if (hidup) setNamaBerdaftar(""); return; }
+        const r = await fetch(`/api/live/play/${kod}/whoami`, {
+          headers: { Authorization: `Bearer ${ses.data.session.access_token}` },
+        });
+        const j = await r.json();
+        const nama = typeof j?.registeredName === "string" && j.registeredName ? j.registeredName : "";
+        if (hidup) {
+          setNamaBerdaftar(nama);
+          if (nama) setNama(nama);
+        }
+      } catch {
+        if (hidup) setNamaBerdaftar("");
+      }
+    };
+    semak();
+    return () => { hidup = false; };
+  }, [identiti, kod, namaBerdaftar]);
 
   // Kira masa berbaki soalan semasa.
   useEffect(() => {
@@ -191,14 +223,23 @@ export default function SkrinMainLangsung() {
     }
     setBusy(true);
     try {
+      // Tiket V2-007: hantar Bearer bersama POST join jika pengguna log masuk,
+      // supaya pelayan boleh menetapkan nama berdaftar dan user_id pemain.
+      const ses = await supabase.auth.getSession();
+      const auth: Record<string, string> = ses.data.session
+        ? { Authorization: `Bearer ${ses.data.session.access_token}` }
+        : {};
       const r = await fetch(`/api/live/play/${kod}/join`, {
         method: "POST",
-        headers: { "content-type": "application/json" },
+        headers: { "content-type": "application/json", ...auth },
         body: JSON.stringify({ nickname: bersih }),
       });
       const j = await r.json();
       if (!r.ok) { setErr(j.error || "Could not join the session."); return; }
-      const id: Identiti = { playerId: j.playerId, playerToken: j.playerToken, nickname: bersih };
+      // Nama sebenar pemain datang daripada pelayan (boleh berbeza, cth
+      // akhiran "<nama> 2" bila nama berdaftar sudah diambil).
+      const namaSebenar = typeof j.nickname === "string" && j.nickname ? j.nickname : bersih;
+      const id: Identiti = { playerId: j.playerId, playerToken: j.playerToken, nickname: namaSebenar };
       window.localStorage.setItem("kuizen-live-" + kod, JSON.stringify(id));
       identitiRef.current = id;
       setIdentiti(id);
@@ -247,17 +288,25 @@ export default function SkrinMainLangsung() {
   if (!dimuat) return null;
 
   if (!identiti) {
+    const berdaftar = !!namaBerdaftar;
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="card w-full max-w-sm">
           <h1 className="text-xl font-bold text-center mb-1">Join Session {kod}</h1>
-          <p className="text-sm text-gray-500 text-center mb-4">Choose your player name.</p>
+          {berdaftar ? (
+            <p className="text-sm text-gray-500 text-center mb-4">
+              Joining as <span className="font-semibold text-gray-800">{namaBerdaftar}</span>
+            </p>
+          ) : (
+            <p className="text-sm text-gray-500 text-center mb-4">Choose your player name.</p>
+          )}
           <form onSubmit={onSertai}>
             <input
               className="input w-full mb-3"
               placeholder="Player name"
               maxLength={24}
               value={nama}
+              disabled={berdaftar}
               onChange={(e) => setNama(e.target.value)}
               autoFocus
             />

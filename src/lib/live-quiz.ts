@@ -3,7 +3,9 @@
  *
  * Keselamatan: semua tulisan hos mesti melalui semakan pendidik di sini.
  * Kunci jawapan (correct_key) TIDAK PERNAH dilog. Laluan peserta berada di
- * src/app/api/live/play/ dan tidak menggunakan fail ini.
+ * src/app/api/live/play/ dan hanya menggunakan bahagian "Nama dan keahlian
+ * peserta" di bawah (dikongsi oleh whoami dan join, temuan R1 V2-007-sec);
+ * semakan hos di bahagian ini tidak digunakan oleh laluan peserta.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import type { User } from '@supabase/supabase-js';
@@ -192,10 +194,9 @@ export async function requireLiveHost(
   };
 }
 
-/**
- * Semak peranan admin dalam qm_profiles. Dibetulkan sebelum ini: JANGAN
- * sekali-kali semak qm_class_members; itu jadual PESERTA dan menyemaknya
- * memberi setiap pelajar hak mengawal sesi kuiz.
+/** Semak peranan admin dalam qm_profiles. Dibetulkan sebelum ini: JANGAN
+ *  sekali-kali semak qm_class_members; itu jadual PESERTA dan menyemaknya
+ *  memberi setiap pelajar hak mengawal sesi kuiz.
  */
 export async function isLiveAdmin(supa: SupaClient, userId: string): Promise<boolean> {
   const { data: profile } = await supa
@@ -205,6 +206,88 @@ export async function isLiveAdmin(supa: SupaClient, userId: string): Promise<boo
     .maybeSingle();
   const me = profile as ProfileRef | null;
   return !!(me && !me.suspended && ADMIN_ROLES.includes(me.role));
+}
+
+/* ============================================================
+ * Nama dan keahlian peserta (temuan R1 V2-007-sec)
+ * ============================================================
+ * Dikongsi oleh laluan peserta whoami dan join
+ * (src/app/api/live/play/[code]/...). Sebelum ini logik yang sama dibawa
+ * berasingan dalam kedua-dua laluan dan boleh bercapah apabila satu
+ * dibetulkan tanpa yang satu lagi.
+ */
+
+/** Potong nama kepada 24 aksara, mengikut had nickname qm_live_players. */
+export function potongNama(v: unknown): string | null {
+  if (typeof v !== 'string') return null;
+  const bersih = v.trim();
+  if (bersih.length === 0) return null;
+  return bersih.slice(0, 24);
+}
+
+/** Nama berdaftar pengguna: display_name, jika tiada bahagian emel sebelum @. */
+export async function namaBerdaftar(
+  supa: SupaClient,
+  userId: string,
+): Promise<string | null> {
+  const { data: profil } = await supa
+    .from('qm_profiles')
+    .select('display_name, email')
+    .eq('id', userId)
+    .limit(1)
+    .maybeSingle();
+  const emel = typeof profil?.email === 'string' ? profil.email : '';
+  return (
+    potongNama(profil?.display_name) ??
+    (emel.includes('@') ? potongNama(emel.split('@')[0]) : null)
+  );
+}
+
+export interface KeahlianKelas {
+  member: { user_id: string } | null;
+  educator: { educator_id: string } | null;
+  owner: { id: string } | null;
+}
+
+/**
+ * Semak kedudukan pengguna dalam satu kelas (service role): ahli
+ * (qm_class_members), educator diterima (qm_class_educators dengan
+ * accepted_at), atau pemilik kelas (qm_classes.owner_id). Ketiga-tiga
+ * pertanyaan dijalankan tanpa jalan pintas supaya masa respons whoami
+ * seragam untuk semua pemanggil (temuan R2 V2-007-sec).
+ */
+export async function ahliKelas(
+  supa: SupaClient,
+  classId: string,
+  userId: string,
+): Promise<KeahlianKelas> {
+  const { data: member } = await supa
+    .from('qm_class_members')
+    .select('user_id')
+    .eq('class_id', classId)
+    .eq('user_id', userId)
+    .limit(1)
+    .maybeSingle();
+  const { data: educator } = await supa
+    .from('qm_class_educators')
+    .select('educator_id')
+    .eq('class_id', classId)
+    .eq('educator_id', userId)
+    .not('accepted_at', 'is', null)
+    .limit(1)
+    .maybeSingle();
+  const { data: owner } = await supa
+    .from('qm_classes')
+    .select('id')
+    .eq('id', classId)
+    .eq('owner_id', userId)
+    .limit(1)
+    .maybeSingle();
+  return {
+    member: (member as { user_id: string } | null) ?? null,
+    educator: (educator as { educator_id: string } | null) ?? null,
+    owner: (owner as { id: string } | null) ?? null,
+  };
 }
 
 /** Muat kuiz dan sahkan pemanggil ialah hos kuiz itu (Fasa 2, class_id nullable):
