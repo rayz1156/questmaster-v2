@@ -8,9 +8,25 @@ import { useConfirm } from '@/components/ui/ConfirmProvider';
 import { supabase } from '@/lib/supabaseClient';
 import { mesejHad } from '@/lib/pelan';
 
+// Empat-empat pelan yang sah untuk qm_set_plan (0040) (V2-008).
+type PelanAdmin = 'free' | 'pro' | 'institution' | 'unlimited';
+const PELAN_ADMIN: PelanAdmin[] = ['free', 'pro', 'institution', 'unlimited'];
+const LABEL_PELAN: Record<PelanAdmin, string> = {
+  free: 'Free (quizzes only)',
+  pro: 'Pro (all features)',
+  institution: 'Institution (all features)',
+  unlimited: 'Unlimited (internal)',
+};
+
 function fmt(d: string | null | undefined) {
   if (!d) return "Never";
   try { return new Date(d).toLocaleString(); } catch { return String(d); }
+}
+
+/** Pelan tersimpan profil; apa-apa nilai lain dianggap free untuk paparan. */
+function pelanProfil(u: Profile): PelanAdmin {
+  const p = (u as any).plan;
+  return PELAN_ADMIN.includes(p) ? p : 'free';
 }
 
 export default function Page() {
@@ -52,12 +68,25 @@ export default function Page() {
       } catch (e: any) { alert('Failed to load classes: ' + (e?.message || e)); }
     }
   };
-  const setPlan = async (u: Profile, plan: 'free' | 'pro') => {
-    if (plan === ((u as any).plan === 'pro' ? 'pro' : 'free')) return;
+  /**
+   * Tukar pelan pengguna (V2-008). Semua empat pelan boleh dipilih.
+   * Menurunkan pelan unlimited sentiasa minta pengesahan dahulu: satu klik
+   * tersilap pada pemilih ini boleh memotong semua had akaun tersebut.
+   */
+  const setPlan = async (u: Profile, plan: PelanAdmin) => {
+    const semasa = pelanProfil(u);
+    if (plan === semasa) return;
+    if (semasa === 'unlimited') {
+      const ok = await confirm({
+        title: `Downgrade "${u.display_name || u.id.slice(0, 8)}" from Unlimited to ${LABEL_PELAN[plan]}? All limits will be re-applied immediately.`,
+        tone: 'danger',
+      });
+      if (!ok) { reload(); return; }
+    }
     try {
       const { error } = await supabase.rpc('qm_set_plan', { p_user: u.id, p_plan: plan });
       if (error) throw error;
-      await logAudit('set_plan', 'profile', u.id, { plan });
+      await logAudit('set_plan', 'profile', u.id, { from: semasa, to: plan });
       reload();
     } catch (e: any) { alert(mesejHad(e, 'Failed to change plan.')); }
   };
@@ -240,11 +269,15 @@ export default function Page() {
             <div className="mt-2 flex items-center gap-2 flex-wrap text-xs">
               <span className="text-gray-500">Plan</span>
               <select className="border rounded px-2 py-1"
-                value={(u as any).plan === 'pro' ? 'pro' : 'free'}
-                onChange={e=>setPlan(u, e.target.value as 'free' | 'pro')}>
-                <option value="free">Free (quizzes only)</option>
-                <option value="pro">Pro (all features)</option>
+                value={pelanProfil(u)}
+                onChange={e=>setPlan(u, e.target.value as PelanAdmin)}>
+                {PELAN_ADMIN.map(p => (
+                  <option key={p} value={p}>{LABEL_PELAN[p]}</option>
+                ))}
               </select>
+              {(u as any).plan_expires_at && (
+                <span className="text-gray-400">Expires: {fmt((u as any).plan_expires_at)}</span>
+              )}
               <span className="text-gray-400">Switching the plan also resets the limits below.</span>
             </div>
           )}
