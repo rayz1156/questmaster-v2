@@ -44,6 +44,10 @@ RETURNS void
 LANGUAGE plpgsql
 AS $fn$
 BEGIN
+  -- PGlite lalai row_security = off (dump production turut set off);
+  -- tanpa on, pertanyaan RLS sebagai bukan pemilik membuang ralat 42501
+  -- dan bukannya menapis baris seperti production.
+  PERFORM set_config('row_security', 'on', true);
   PERFORM set_config('role', 'authenticated', true);
   PERFORM set_config('request.jwt.claims',
     '{"sub":"' || p_user::text || '","role":"authenticated"}', true);
@@ -80,17 +84,22 @@ DECLARE
   u_noem uuid := '11111111-0000-0000-0000-0000000001b4';
   c1     uuid := '22222222-0000-0000-0000-0000000001c1';
   c2     uuid := '22222222-0000-0000-0000-0000000001c2';
-  t1     uuid := '33333333-0000-0000-0000-0000000001t1';
-  t2     uuid := '33333333-0000-0000-0000-0000000001t2';
+  t1     uuid := '33333333-0000-0000-0000-0000000001d1';
+  t2     uuid := '33333333-0000-0000-0000-0000000001d2';
 BEGIN
   PERFORM set_config('session_replication_role', 'replica', true);
 
-  -- Baris auth.users: kunci id merujuk qm_profiles.id. p2 sengaja tanpa
-  -- baris auth.users supaya ujian juga meliputi sertai kiri yang selamat.
+  -- Baris auth.users: kunci id merujuk qm_profiles.id (FK
+  -- qm_profiles_id_fkey, skema-production.sql:8964). SETIAP baris
+  -- qm_profiles mesti ada induk sah kerana FK dikuatkuasakan di luar mod
+  -- replica (lihat blok 1: UPDATE baris tanpa induk melempar 23503).
+  -- u_noem sengaja dengan email NULL supaya ujian penapisan emel meliputi
+  -- sijil pemilik yang tiada emel.
   INSERT INTO auth.users (id, email, encrypted_password, aud, role, email_confirmed_at, created_at, updated_at)
     VALUES (u_ed, 'ed1@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now()),
            (u_ed2, 'ed2@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now()),
            (p1, 'p1@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now()),
+           (p2, 'p2@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now()),
            (p3, 'p3@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now()),
            (u_noem, NULL, 'x', 'authenticated', 'authenticated', now(), now(), now());
 
@@ -197,16 +206,23 @@ BEGIN
 
   -- Pendidik sahaja: keluarkan sijil dahulu supaya ada sijil belum emel.
   PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000001a1');
-  PERFORM public.qm_issue_certificates('33333333-0000-0000-0000-0000000001t1', NULL);
+  PERFORM public.qm_issue_certificates('33333333-0000-0000-0000-0000000001d1', NULL);
+  -- Sasaran emel hanya sijil yang PDFnya sudah dijana (pdf_path bukan NULL,
+  -- 0044_sijil_emel.sql:62). Pengeluaran SQL tidak menjana PDF, jadi
+  -- simulasi hasil janaan PDF laluan API sebelum menguji sasaran.
+  UPDATE public.qm_certificates SET pdf_path = 'certificate-assets/simulasi.pdf'
+   WHERE class_id = '22222222-0000-0000-0000-0000000001c1';
   SELECT count(*) INTO v_n FROM public.qm_certificate_email_targets('22222222-0000-0000-0000-0000000001c1', NULL);
-  -- p1 dan p3 layak dan bernama; p2 tidak disahkan, u_noem tiada emel.
-  PERFORM pg_temp.qm_verdict('d', v_n = 2,
-    'sasaran emel: ' || v_n::text || ' baris (jangka 2: p1 dan p3)');
+  -- p1, p3 dan p2 layak (nama p2 disahkan dalam blok 1); u_noem juga
+  -- menerima sijil tetapi emelnya NULL, jadi ditapis keluar oleh join
+  -- auth.users (u.email is not null). Jangka 3 daripada 4 sijil.
+  PERFORM pg_temp.qm_verdict('d', v_n = 3,
+    'sasaran emel: ' || v_n::text || ' baris (jangka 3: p1, p2, p3; u_noem ditapis)');
 
   -- Emel yang dipulangkan datang daripada auth.users.
   SELECT count(*) INTO v_n FROM public.qm_certificate_email_targets('22222222-0000-0000-0000-0000000001c1', NULL)
     WHERE email LIKE '%@test.local';
-  PERFORM pg_temp.qm_verdict('d2', v_n = 2, 'emel sasaran dari auth.users: ' || v_n::text);
+  PERFORM pg_temp.qm_verdict('d2', v_n = 3, 'emel sasaran dari auth.users: ' || v_n::text);
 
   -- p_limit dihormati: hanya satu baris walaupun dua yang layak.
   SELECT count(*) INTO v_n FROM public.qm_certificate_email_targets('22222222-0000-0000-0000-0000000001c1', 1);
@@ -222,7 +238,7 @@ $chk$;
 DO $chk$
 DECLARE
   v_n int;
-  v_n2 int;
+  v_nama text;
 BEGIN
   -- p2 sudah mengesahkan nama dalam blok 1, jadi dia TIADA kelas perlu sahkan.
   PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000001b2');
@@ -244,19 +260,24 @@ BEGIN
     'p1 (nama disahkan): ' || v_n::text || ' kelas (jangka 0)');
 
   -- Peserta baharu tanpa nama disahkan dalam kelas bertemplat: satu baris,
-  -- dengan nama kelas.
+  -- dengan nama kelas. Kembali kepada admin dahulu (masih authenticated
+  -- semasa semakan e3; schema auth tidak boleh disisip sebagai authenticated)
+  -- dan FK qm_profiles.id ke auth.users (skema-production.sql:8964)
+  -- dikuatkuasakan di luar mod replica, jadi baris auth.users mesti
+  -- diisipkan DAHULU.
+  PERFORM pg_temp.qm_test_reset();
+  INSERT INTO auth.users (id, email, encrypted_password, aud, role, email_confirmed_at, created_at, updated_at)
+    VALUES ('11111111-0000-0000-0000-0000000001b5', 'p5@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now());
   INSERT INTO public.qm_profiles (id, role, plan, display_name)
     VALUES ('11111111-0000-0000-0000-0000000001b5', 'participant', 'free', 'Peserta Baru');
   INSERT INTO public.qm_class_members (class_id, user_id)
     VALUES ('22222222-0000-0000-0000-0000000001c1', '11111111-0000-0000-0000-0000000001b5');
-  INSERT INTO auth.users (id, email, encrypted_password, aud, role, email_confirmed_at, created_at, updated_at)
-    VALUES ('11111111-0000-0000-0000-0000000001b5', 'p5@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now());
 
   PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000001b5');
   SELECT count(*) INTO v_n FROM public.qm_certificate_classes_needing_name();
-  SELECT class_name INTO v_r.class_name FROM public.qm_certificate_classes_needing_name() LIMIT 1;
-  PERFORM pg_temp.qm_verdict('e4', v_n = 1 AND v_r.class_name = 'Kelas Emel Satu',
-    'peserta baru: ' || v_n::text || ' kelas, nama=' || coalesce(v_r.class_name, 'NULL'));
+  SELECT class_name INTO v_nama FROM public.qm_certificate_classes_needing_name() LIMIT 1;
+  PERFORM pg_temp.qm_verdict('e4', v_n = 1 AND v_nama = 'Kelas Emel Satu',
+    'peserta baru: ' || v_n::text || ' kelas, nama=' || coalesce(v_nama, 'NULL'));
   PERFORM pg_temp.qm_test_reset();
 END;
 $chk$;

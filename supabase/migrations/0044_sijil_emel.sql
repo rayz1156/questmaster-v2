@@ -101,6 +101,8 @@ as $fn$
 $fn$;
 
 grant execute on function public.qm_certificate_classes_needing_name() to authenticated;
-revoke all on function public.qm_certificate_classes_needing_name() from anon;
+-- EXECUTE diberikan kepada PUBLIC secara lalai; revoke daripada anon sahaja
+-- TIDAK menyekat anon yang mewarisi keistimewaan PUBLIC. Revok PUBLIC juga.
+revoke all on function public.qm_certificate_classes_needing_name() from public, anon;
 
 notify pgrst, 'reload schema';

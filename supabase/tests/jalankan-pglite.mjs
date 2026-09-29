@@ -2,7 +2,7 @@
  * Menjalankan fail SQL ujian terhadap PGlite (Postgres dalam WASM).
  *
  * Guna: node supabase/tests/jalankan-pglite.mjs <fail.sql>
- * Skema dimuat: skema-production.sql (dump) + 0040, 0041, 0042, 0043.
+ * Skema dimuat: skema-production.sql (dump) + 0040, 0041, 0042, 0043, 0044.
  * Penemuan 2 (kzqa): db.onNotice TIDAK menangkap RAISE NOTICE pada pglite
  * 0.5.8, jadi keputusan LULUS/GAGAL dibaca terus dari pg_temp.qm_verdicts
  * SEBELUM ROLLBACK (pelari membuang ROLLBACK terakhir fail ujian, membaca
@@ -80,8 +80,18 @@ CREATE OR REPLACE FUNCTION auth.uid() RETURNS uuid
       substr(v_claims, position('"sub"' in v_claims) + 7, 36)::uuid, NULL);
   END;
   $fn$ LANGUAGE plpgsql STABLE;
--- Jadual auth.users minimum (FK qm_profiles merujuknya).
-CREATE TABLE IF NOT EXISTS auth.users (id uuid primary key, email text);
+-- Jadual auth.users minimum (FK qm_profiles merujuknya). Lajur pelengkap
+-- dipadankan dengan INSERT seed ujian sijil (V2-003b.sql) supaya seed yang
+-- sama boleh lari di psql VPS dan di PGlite.
+CREATE TABLE IF NOT EXISTS auth.users (
+  id uuid primary key,
+  email text,
+  encrypted_password text,
+  aud text,
+  role text,
+  email_confirmed_at timestamptz,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now());
 INSERT INTO auth.users (id, email) VALUES
   ('11111111-0000-0000-0000-0000000000a1', 'ed@u.t'),
   ('11111111-0000-0000-0000-0000000000a2', 'ed2@u.t'),
@@ -101,7 +111,7 @@ CREATE TABLE IF NOT EXISTS storage.objects (
   updated_at timestamptz default now());
 ALTER TABLE storage.objects ENABLE ROW LEVEL SECURITY;`, 'skema-extensions');
 await jalankan(skema, 'skema');
-for (const m of ['0040_pelan_v2.sql', '0041_kuota_storan.sql', '0042_sijil.sql', '0043_minat_pelan.sql']) {
+for (const m of ['0040_pelan_v2.sql', '0041_kuota_storan.sql', '0042_sijil.sql', '0043_minat_pelan.sql', '0044_sijil_emel.sql']) {
   await jalankan(readFileSync(path.join(repo, 'supabase', 'migrations', m), 'utf8'), m);
 }
 // Buang ROLLBACK terakhir fail ujian supaya jadual keputusan masih boleh
