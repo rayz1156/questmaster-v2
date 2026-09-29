@@ -129,6 +129,61 @@ export async function logAudit(action: string, target_type?: string, target_id?:
   await supabase.from('qm_audit_log').insert({ actor_id: id, action, target_type, target_id, meta });
 }
 
+// Tindakan admin beralasan: panggilan RPC SECURITY DEFINER (migrasi 0047).
+// Ralat dilontar supaya halaman admin memaparkannya kepada pengguna.
+export async function adminSetSuspended(userId: string, suspended: boolean, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('qm_admin_set_suspended', { p_user: userId, p_suspended: suspended, p_reason: reason });
+  if (error) throw error;
+}
+
+export async function adminSetChallengePoints(challengeId: string, points: number, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('qm_admin_set_challenge_points', { p_challenge: challengeId, p_points: points, p_reason: reason });
+  if (error) throw error;
+}
+
+export async function adminOverrideSubmission(submissionId: string, status: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('qm_admin_override_submission', { p_submission: submissionId, p_status: status, p_reason: reason });
+  if (error) throw error;
+}
+
+export interface AdminAuditLogPagedOpts {
+  limit?: number;
+  offset?: number;
+  action?: string;
+  actorId?: string;
+  targetId?: string;
+  sinceIso?: string;
+}
+
+export async function adminListAuditLogPaged(opts: AdminAuditLogPagedOpts = {}): Promise<any[]> {
+  // Had lalai 50, maksimum 500 supaya pertanyaan besar tidak membebankan pelayan.
+  const limit = Math.max(1, Math.min(opts.limit ?? 50, 500));
+  let q = supabase
+    .from('qm_audit_log')
+    .select('id, actor_id, action, target_type, target_id, meta, created_at')
+    .order('created_at', { ascending: false })
+    .range(opts.offset ?? 0, (opts.offset ?? 0) + limit - 1);
+  if (opts.action) q = q.eq('action', opts.action);
+  if (opts.actorId) q = q.eq('actor_id', opts.actorId);
+  if (opts.targetId) q = q.eq('target_id', opts.targetId);
+  if (opts.sinceIso) q = q.gte('created_at', opts.sinceIso);
+  const { data, error } = await q;
+  if (error) throw error;
+  return data || [];
+}
+
+export async function adminAuditForUser(userId: string, limit = 50): Promise<any[]> {
+  // Rekod di mana pengguna ialah pelaku (actor_id) atau sasaran (target_id).
+  const { data, error } = await supabase
+    .from('qm_audit_log')
+    .select('id, actor_id, action, target_type, target_id, meta, created_at')
+    .or(`target_id.eq.${userId},actor_id.eq.${userId}`)
+    .order('created_at', { ascending: false })
+    .limit(Math.max(1, Math.min(limit, 500)));
+  if (error) throw error;
+  return data || [];
+}
+
 // ---- White-label / Branding ----
 export async function getProfileById(id: string): Promise<Profile | null> {
   const { data, error } = await supabase.from('qm_profiles').select('*').eq('id', id).single();
