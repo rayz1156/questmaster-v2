@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fileluUpload } from '@/lib/filelu';
+import { fileluUpload, fileluDelete } from '@/lib/filelu';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,9 +19,17 @@ export async function POST(req: NextRequest) {
   const file = form.get('file');
   if (!(file instanceof File)) return NextResponse.json({ error: 'file field missing' }, { status: 400 });
   if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: `File too large. Max ${Math.round(MAX_BYTES/1024/1024)} MB` }, { status: 413 });
   const mime = file.type || 'application/octet-stream';
   if (!mime.startsWith('image/')) return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
+
+  // Kuota foto profil dikira dalam kuota PENGGUNA SENDIRI, bukan kelas
+  // mana-mana (p_class NULL). Disemak SEBELUM bait dihantar dan SEBELUM
+  // injap 15MB (kzsec 4) supaya mesej had pelan yang tepat dipaparkan;
+  // 15MB kekal sebagai injap operasi.
+  const kuota = await reserveMuatNaik(auth.supa, null, file.size, mime);
+  if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
+
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: `File too large. Max ${Math.round(MAX_BYTES/1024/1024)} MB` }, { status: 413 });
 
   const buf = Buffer.from(await file.arrayBuffer());
   let uploaded;
@@ -28,6 +37,15 @@ export async function POST(req: NextRequest) {
     uploaded = await fileluUpload(buf, file.name || `profile.${(mime.split('/')[1]||'jpg')}`, mime);
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
+  }
+
+  const rekod = await rekodMuatNaik(auth.supa, null, uploaded.fileCode, uploaded.sizeBytes ?? file.size, mime, 'profile_intro');
+  if (rekod) {
+    // Rekod gagal selepas muat naik (kzsec 2/3): cuba padam fail daripada
+    // storan supaya tiada fail yatim di luar kuota, kemudian balas ralat.
+    const padam = await fileluDelete(uploaded.fileCode);
+    console.error(`[profile-upload-image] rekod gagal, padam=${padam} code=${uploaded.fileCode}`);
+    return NextResponse.json(rekod.body, { status: rekod.status });
   }
 
   // Persist on profile (and clear any existing video fields).

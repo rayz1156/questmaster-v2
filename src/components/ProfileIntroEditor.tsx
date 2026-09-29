@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Save, Image as ImageIcon, Trash2, Loader2 } from 'lucide-react';
 import { getMyProfile, updateMyIntroDisplayName, type Profile } from '@/lib/data';
+import { mampatImej } from '@/lib/mampatImej';
 
 const MAX_IMAGE_BYTES = 15 * 1024 * 1024; // 15 MB
 
@@ -40,7 +41,7 @@ export default function ProfileIntroEditor() {
     if (file.size > MAX_IMAGE_BYTES) { setErr(`Image too large. Max ${MAX_IMAGE_BYTES/1024/1024} MB`); return; }
     setBusy(true); setErr(null); setProgress('Uploading image...');
     try {
-      const fd = new FormData(); fd.append('file', file);
+      const fd = new FormData(); fd.append('file', await mampatImej(file));
       const r = await fetch('/api/profile/intro/upload-image', { method: 'POST', body: fd, credentials: 'include' });
       if (!r.ok) throw new Error((await r.json().catch(()=>({}))).error || `HTTP ${r.status}`);
       await reload();
