@@ -22,29 +22,6 @@
 BEGIN;
 
 -- ---------------------------------------------------------------------
--- 1. Audit tambah sahaja -----------------------------------------------
--- ---------------------------------------------------------------------
-
-DROP POLICY IF EXISTS qm_audit_log_admin_all ON public.qm_audit_log;
-
-CREATE POLICY qm_audit_log_admin_select
-  ON public.qm_audit_log
-  FOR SELECT
-  TO authenticated
-  USING (public.qm_admin_aktif());
-
-CREATE POLICY qm_audit_log_admin_insert
-  ON public.qm_audit_log
-  FOR INSERT
-  TO authenticated
-  WITH CHECK (public.qm_admin_aktif() AND actor_id = auth.uid());
-
--- Baca sahaja. UPDATE dan DELETE disekat pada dua peringkat: kebenaran
--- jadual dan ketiadaan polisi. TRUNCATE juga ditarik supaya log tidak
--- boleh dikosongkan.
-REVOKE UPDATE, DELETE, TRUNCATE ON public.qm_audit_log FROM anon, authenticated;
-
--- ---------------------------------------------------------------------
 -- 2. Pentadbir aktif ----------------------------------------------------
 -- ---------------------------------------------------------------------
 
@@ -66,6 +43,31 @@ $fn$;
 
 REVOKE ALL ON FUNCTION public.qm_admin_aktif() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.qm_admin_aktif() TO authenticated;
+
+-- Nota CTO: fungsi ini dicipta dahulu kerana polisi audit di bawah merujuknya.
+
+-- ---------------------------------------------------------------------
+-- 1. Audit tambah sahaja -----------------------------------------------
+-- ---------------------------------------------------------------------
+
+DROP POLICY IF EXISTS qm_audit_log_admin_all ON public.qm_audit_log;
+
+CREATE POLICY qm_audit_log_admin_select
+  ON public.qm_audit_log
+  FOR SELECT
+  TO authenticated
+  USING (public.qm_admin_aktif());
+
+CREATE POLICY qm_audit_log_admin_insert
+  ON public.qm_audit_log
+  FOR INSERT
+  TO authenticated
+  WITH CHECK (public.qm_admin_aktif() AND actor_id = auth.uid());
+
+-- Baca sahaja. UPDATE dan DELETE disekat pada dua peringkat: kebenaran
+-- jadual dan ketiadaan polisi. TRUNCATE juga ditarik supaya log tidak
+-- boleh dikosongkan.
+REVOKE UPDATE, DELETE, TRUNCATE ON public.qm_audit_log FROM anon, authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. Gantung dan buka gantungan akaun ----------------------------------
