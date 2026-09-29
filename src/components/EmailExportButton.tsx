@@ -12,8 +12,11 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { Lock, Send, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { pelanBerbayar } from "@/lib/pelan";
 
-type Status = { plan: "free" | "pro"; connected: boolean };
+// Pelan berkesan dari GET /api/integrations/email; 'unlimited' dipaparkan
+// sebagai 'pro' oleh pelayan, jadi jenis ini cukup.
+type Status = { plan: string; connected: boolean };
 type DryRun = { total: number; withEmail: number; withoutEmail: number; tags: string[]; provider: string };
 type Hasil = { sent: number; skipped: number; failed: number; errors: string[] };
 
@@ -35,7 +38,7 @@ export default function EmailExportButton({ classId }: { classId: string }) {
       });
       if (!res.ok) return;
       const data = await res.json();
-      setStatus({ plan: data.plan === "pro" ? "pro" : "free", connected: !!data.connected });
+      setStatus({ plan: typeof data.plan === "string" ? data.plan : "free", connected: !!data.connected });
     } catch {
       /* senyap: butang kekal dalam keadaan lalai */
     }
@@ -102,8 +105,8 @@ export default function EmailExportButton({ classId }: { classId: string }) {
   // Belum tahu status: jangan papar butang setengah masak.
   if (!status) return null;
 
-  // Bukan Pro: butang terkunci dengan tooltip.
-  if (status.plan !== "pro") {
+  // Bukan pelan berbayar: butang terkunci dengan tooltip (V2-008).
+  if (!pelanBerbayar(status.plan)) {
     return (
       <button
         type="button"

@@ -11,9 +11,12 @@
 import { useCallback, useEffect, useState } from "react";
 import { Lock, Mail, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { pelanBerbayar } from "@/lib/pelan";
 
+// Pelan berkesan dari GET /api/integrations/email; 'unlimited' dipaparkan
+// sebagai 'pro' oleh pelayan, jadi jenis ini cukup.
 type StatusIntegrasi = {
-  plan: "free" | "pro";
+  plan: string;
   connected: boolean;
   provider: string | null;
   hint: string | null;
@@ -122,7 +125,7 @@ export default function EmailIntegrationCard() {
         <div className="flex items-center gap-2 text-ink font-semibold">
           <Mail className="w-4 h-4 text-brand-purple" /> Email integration
         </div>
-        {status && status.plan !== "pro" && (
+        {status && !pelanBerbayar(status.plan) && (
           <span className="text-[11px] font-bold uppercase tracking-wide text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full px-2.5 py-1">
             Pro
           </span>
@@ -134,8 +137,8 @@ export default function EmailIntegrationCard() {
         <p className="text-sm text-ink-muted">{ralat || "Loading..."}</p>
       )}
 
-      {/* Bukan Pro: terkunci, tiada medan. */}
-      {status && status.plan !== "pro" && (
+      {/* Bukan pelan berbayar: terkunci, tiada medan (V2-008). */}
+      {status && !pelanBerbayar(status.plan) && (
         <div className="flex items-start gap-2 text-sm text-ink-muted">
           <Lock className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
@@ -144,8 +147,8 @@ export default function EmailIntegrationCard() {
         </div>
       )}
 
-      {/* Pro, belum sambung. */}
-      {status && status.plan === "pro" && !status.connected && (
+      {/* Pelan berbayar, belum sambung (V2-008). */}
+      {status && pelanBerbayar(status.plan) && !status.connected && (
         <div>
           <p className="text-sm text-ink-muted mb-3">
             Connect your email marketing provider, then send a whole class to it in one click from the People page.
@@ -187,8 +190,8 @@ export default function EmailIntegrationCard() {
         </div>
       )}
 
-      {/* Sudah sambung. */}
-      {status && status.plan === "pro" && status.connected && (
+      {/* Pelan berbayar, sudah sambung (V2-008). */}
+      {status && pelanBerbayar(status.plan) && status.connected && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm text-ink">
             Connected to Encharge · ••••{status.hint || "••••"}
