@@ -1837,6 +1837,143 @@ export const TOOLS: ToolDef[] = [
   },
 
   {
+    name: "create_certificate_template",
+    title: "Cipta templat sijil",
+    description:
+      "Cipta templat sijil untuk kelas. Kriteria jenis: all_members (semua ahli), " +
+      "hunt_completed (siap aktiviti tertentu, perlu hunt_id), min_score (skor minimum, " +
+      "pilihan hunt_id) atau live_attended (hadir kuiz langsung tertentu, perlu quiz_id). " +
+      "Hanya pendidik kelas. Latar dan logo ditetapkan melalui UI, bukan alat ini.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        title: { type: "string", description: "Tajuk sijil, 1 hingga 120 aksara" },
+        criteria: {
+          type: "object",
+          description: "Kriteria kelayakan: type (wajib), hunt_id, quiz_id, min_score",
+          properties: {
+            type: { type: "string", enum: ["all_members", "hunt_completed", "min_score", "live_attended"] },
+            hunt_id: { type: "string" },
+            quiz_id: { type: "string" },
+            min_score: { type: "number" },
+          },
+          required: ["type"],
+        },
+      },
+      required: ["class_id", "title", "criteria"],
+    },
+    handler: async (args, s) => {
+      // Klien sesi pengguna: RLS qm_certificate_templates hanya membenarkan
+      // pendidik kelas menulis.
+      const baris = unwrapOne<Record<string, unknown>>(
+        await s.db
+          .from("qm_certificate_templates")
+          .insert({
+            class_id: args.class_id,
+            title: String(args.title ?? "").trim(),
+            criteria: args.criteria,
+          })
+          .select("id, class_id, title, criteria, background_path, logo_path")
+          .maybeSingle(),
+        "Cipta templat sijil"
+      );
+      return baris;
+    },
+  },
+
+  {
+    name: "issue_certificates",
+    title: "Keluarkan sijil",
+    description:
+      "Keluarkan sijil kepada peserta layak. Tanpa confirm: pulangkan pratonton " +
+      "kelayakan (nama, layak, sebab, sudah dikeluarkan). Dengan confirm: true, " +
+      "keluarkan sijil kepada participant_ids yang diberi (atau semua yang layak " +
+      "jika tiada). Guna fungsi pelayan yang sama dengan laluan API.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        participant_ids: { type: "array", items: { type: "string" }, description: "Pilihan; UUID peserta" },
+        confirm: { type: "boolean", description: "Wajib true untuk mengeluarkan sebenar" },
+      },
+      required: ["class_id", "template_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.template_id) throw new Error("template_id diperlukan");
+      return callApi(s.accessToken, `/api/classes/${args.class_id}/certificates/issue`, {
+        method: "POST",
+        body: {
+          template_id: args.template_id,
+          ...(Array.isArray(args.participant_ids) ? { participant_ids: args.participant_ids } : {}),
+          confirm: args.confirm === true,
+        },
+      });
+    },
+  },
+
+  {
+    name: "list_certificates",
+    title: "Senarai sijil kelas",
+    description:
+      "Senaraikan sijil yang dikeluarkan untuk satu kelas: kod, nama, program, tarikh, " +
+      "status dan sebab pembatalan. Hanya pendidik kelas.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      // Klien sesi pengguna: polisi p_cert_educator_read menapis mengikut kelas.
+      const { data, error } = await s.db
+        .from("qm_certificates")
+        .select("id, code, name_snapshot, program_snapshot, issued_at, revoked_at, revoked_reason, emailed_at")
+        .eq("class_id", args.class_id)
+        .order("issued_at", { ascending: false });
+      if (error) {
+        throw new Error(error.message || "Senarai sijil tidak dapat dibaca; hanya pendidik kelas dibenarkan");
+      }
+      return { certificates: data ?? [] };
+    },
+  },
+
+  {
+    name: "revoke_certificate",
+    title: "Batalkan sijil",
+    description:
+      "Batalkan sijil dengan sebab. Halaman awam /sijil/<kod> akan menunjukkan " +
+      "Dibatalkan. Hanya pendidik kelas.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        certificate_id: { type: "string", description: "UUID sijil" },
+        reason: { type: "string", description: "Sebab pembatalan (wajib)" },
+      },
+      required: ["certificate_id", "reason"],
+    },
+    handler: async (args, s) => {
+      const reason = String(args.reason ?? "").trim();
+      if (!args.certificate_id) throw new Error("certificate_id diperlukan");
+      if (!reason) throw new Error("reason diperlukan");
+      return callApi(s.accessToken, `/api/certificates/${args.certificate_id}/revoke`, {
+        method: "POST",
+        body: { reason },
+      });
+    },
+  },
+
+  {
     name: "invite_educator",
     title: "Jemput pendidik ke kelas",
     description:
