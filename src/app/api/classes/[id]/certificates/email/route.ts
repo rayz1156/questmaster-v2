@@ -93,13 +93,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ sent: 0, failed: [], message: 'No certificates waiting for email.' });
   }
 
-  // Nama kelas = program pada subjek emel.
-  const { data: kelas } = await auth.supa
-    .from('qm_classes')
-    .select('name')
-    .eq('id', classId)
-    .maybeSingle();
-  const program = kelas?.name ?? 'your class';
+  // Nama kelas tidak diperlukan: subjek dibina daripada program_snapshot
+  // setiap sijil.
 
   const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || req.nextUrl.origin;
   const transporter = nodemailer.createTransport({

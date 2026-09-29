@@ -346,7 +346,6 @@ export default function CertificatesPage() {
     );
   }
 
-  const templatDipilih = templat.find((t) => t.id === pilihTemplat) ?? null;
   const bilanganTick = tickLayak(layak, tick).length;
 
   return (
