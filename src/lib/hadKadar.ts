@@ -25,10 +25,11 @@ function kemas(): void {
 const pengemas: { unref?: () => void } = setInterval(kemas, 5 * 60_000);
 pengemas.unref?.();
 
-/** Pulangkan true jika panggilan dibenarkan (belum melebihi had). */
-export function dalamHad(kunci: string): boolean {
+/** Pulangkan true jika panggilan dibenarkan (belum melebihi had).
+ *  `maks` pilihan: had permintaan dalam tetingkap, lalai KADAR_MAKS (5). */
+export function dalamHad(kunci: string, maks: number = KADAR_MAKS): boolean {
   const senarai = (tabung.get(kunci) ?? []).filter((t) => t > Date.now() - TETINGKAP_MS);
-  if (senarai.length >= KADAR_MAKS) {
+  if (senarai.length >= maks) {
     tabung.set(kunci, senarai);
     return false;
   }
