@@ -103,6 +103,11 @@ BEGIN
            (p3, 'p3@test.local', 'x', 'authenticated', 'authenticated', now(), now(), now()),
            (u_noem, NULL, 'x', 'authenticated', 'authenticated', now(), now(), now());
 
+  -- CTO: di production, pencetus auth.users (qm_handle_new_user) boleh
+  -- mencipta baris qm_profiles secara automatik; buang baris automatik itu
+  -- supaya benih di bawah menentukan data ujian sepenuhnya.
+  DELETE FROM public.qm_profiles WHERE id IN (u_ed, u_ed2, p1, p2, p3, u_noem);
+
   INSERT INTO public.qm_profiles (id, role, plan, display_name, certificate_name, certificate_name_confirmed_at)
     VALUES (u_ed, 'educator', 'free', 'Encik Edukator', 'Encik Edukator', now());
   INSERT INTO public.qm_profiles (id, role, plan, display_name)
