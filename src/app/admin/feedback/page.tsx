@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import { supabase } from '@/lib/supabaseClient';
+import AdminShell from '@/components/admin/AdminShell';
 
 type FeedbackItem = {
   id: string;
@@ -70,14 +71,18 @@ export default function AdminFeedbackPage() {
   const counts = items.reduce((acc, it) => { acc[it.status] = (acc[it.status] ?? 0) + 1; return acc; }, {} as Record<string, number>);
 
   return (
-    <div className="max-w-6xl mx-auto p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold">Feedback Inbox</h1>
-          <p className="text-sm text-gray-500">Submissions from the /help page.</p>
-        </div>
-        <button onClick={load} className="px-3 py-1.5 text-sm rounded-md border bg-white hover:bg-gray-50">Refresh</button>
-      </div>
+    <AdminShell
+      title="Feedback"
+      actions={
+        <button
+          onClick={load}
+          className="px-4 py-2 text-sm font-medium rounded-xl border border-hairline bg-white text-ink hover:bg-[#F7F7F9]"
+        >
+          Refresh
+        </button>
+      }
+    >
+      <p className="text-sm text-gray-500 mb-6">Submissions from the /help page.</p>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
         {STATUS_OPTIONS.map(s => (
@@ -126,6 +131,6 @@ export default function AdminFeedbackPage() {
           <div className="text-center text-sm text-gray-500 py-12">No feedback yet.</div>
         )}
       </div>
-    </div>
+    </AdminShell>
   );
 }

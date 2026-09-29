@@ -27,6 +27,29 @@ export const TAB_PENGGUNA: { key: TabPengguna; label: string }[] = [
   { key: 'suspended', label: 'Suspended' },
 ];
 
+/** Empat pelan sah untuk qm_set_plan (0040, V2-008). */
+export type PelanAdmin = 'free' | 'pro' | 'institution' | 'unlimited';
+export const PELAN_ADMIN: PelanAdmin[] = ['free', 'pro', 'institution', 'unlimited'];
+export const LABEL_PELAN: Record<PelanAdmin, string> = {
+  free: 'Free (quizzes only)',
+  pro: 'Pro (all features)',
+  institution: 'Institution (all features)',
+  unlimited: 'Unlimited (internal)',
+};
+/** Label pendek untuk sel jadual. */
+export const LABEL_PELAN_PENDEK: Record<PelanAdmin, string> = {
+  free: 'Free',
+  pro: 'Pro',
+  institution: 'Institution',
+  unlimited: 'Unlimited',
+};
+
+/** Pelan tersimpan profil; nilai lain dianggap free untuk paparan. */
+export function pelanProfil(u: Profile): PelanAdmin {
+  const p: string | undefined = u.plan;
+  return PELAN_ADMIN.includes(p as PelanAdmin) ? (p as PelanAdmin) : 'free';
+}
+
 export interface PilihanTapis {
   tab: TabPengguna;
   q?: string;

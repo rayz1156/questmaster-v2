@@ -1,6 +1,5 @@
 "use client";
-import Shell from "@/components/Shell";
-import { adminTabs } from "@/lib/adminTabs";
+import AdminShell from "@/components/admin/AdminShell";
 import { useEffect, useState } from "react";
 import { adminListAllChallenges, adminUpdateChallenge, logAudit, type Challenge } from "@/lib/data";
 import { Search, Save } from "lucide-react";
@@ -13,8 +12,7 @@ export default function Page() {
   const filtered = rows.filter(r => !q || (r.title||'').toLowerCase().includes(q.toLowerCase()));
   async function save(c: Challenge) { const p = Number(draft[c.id]); if (Number.isNaN(p)) return; await adminUpdateChallenge(c.id, { points: p }); await logAudit('challenge_points','challenge',c.id,{ points: p }); reload(); }
   return (
-    <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">Points (Challenges)</h2>
+    <AdminShell title="Points">
       <div className="relative mb-3"><Search className="absolute left-3 top-3 w-4 h-4 text-gray-400"/><input className="input pl-9" placeholder="Search challenges..." value={q} onChange={e=>setQ(e.target.value)}/></div>
       <div className="space-y-2">{filtered.map(c => (
         <div key={c.id} className="card">
@@ -26,6 +24,6 @@ export default function Page() {
             <button onClick={()=>save(c)} className="px-3 py-2 rounded-xl bg-black text-white text-sm flex items-center gap-1"><Save className="w-4 h-4"/>Save</button>
           </div>
         </div>))}</div>
-    </Shell>
+    </AdminShell>
   );
 }

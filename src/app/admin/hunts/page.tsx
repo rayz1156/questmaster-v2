@@ -1,6 +1,5 @@
 "use client";
-import Shell from "@/components/Shell";
-import { adminTabs } from "@/lib/adminTabs";
+import AdminShell from "@/components/admin/AdminShell";
 import { useEffect, useState } from "react";
 import { adminListAllHunts, adminUpdateHunt, deleteHunt, logAudit, type Hunt, adminListAllTeams, listQuestCompletions, markTeamCompletion, unmarkTeamCompletion, type QuestCompletion } from "@/lib/data";
 import { ChevronDown, ChevronRight, CheckCircle, Circle } from "lucide-react";
@@ -41,8 +40,7 @@ export default function Page() {
   };
 
   return (
-    <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">All Activities</h2>
+    <AdminShell title="Activities">
       <div className="space-y-2">{hunts.map(h => {
         const isDone = (tid: string) => completions.some(c => c.team_id === tid);
         return (
@@ -84,6 +82,6 @@ export default function Page() {
           </div>
         );
       })}</div>
-    </Shell>
+    </AdminShell>
   );
 }

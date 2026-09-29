@@ -1,366 +1,436 @@
 "use client";
-import Shell from "@/components/Shell";
-import { adminTabs } from "@/lib/adminTabs";
-import { useEffect, useState } from "react";
-import { adminListProfiles, adminUpdateProfile, adminListUsersMeta, adminDeleteUser, logAudit, adminSetClassLimits, adminListEducatorClasses, adminListParticipantClasses, type Profile, type UserMeta } from "@/lib/data";
-import { Search } from "lucide-react";
-import { useConfirm } from '@/components/ui/ConfirmProvider';
-import { supabase } from '@/lib/supabaseClient';
-import { mesejHad } from '@/lib/pelan';
 
-// Empat-empat pelan yang sah untuk qm_set_plan (0040) (V2-008).
-type PelanAdmin = 'free' | 'pro' | 'institution' | 'unlimited';
-const PELAN_ADMIN: PelanAdmin[] = ['free', 'pro', 'institution', 'unlimited'];
-const LABEL_PELAN: Record<PelanAdmin, string> = {
-  free: 'Free (quizzes only)',
-  pro: 'Pro (all features)',
-  institution: 'Institution (all features)',
-  unlimited: 'Unlimited (internal)',
-};
+// Users ruang kerja admin (V2-011b). Jadual carian: tab, carian dan
+// penapis status dibaca daripada ?tab= ?q= ?status= supaya kad "Needs
+// attention" di Overview boleh mendarat terus ke konteks yang betul.
+//
+// Ciri tindakan pukal kekal: kotak semak pada baris belum sah emel
+// memanggil /api/admin/users/verify (kerja sebenar di pelayan dengan
+// service_role; klien tidak pernah menandakan emel sendiri).
+// Semua tindakan satu-pengguna berpindah ke halaman butiran.
+
+import { Suspense, useEffect, useMemo, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import AdminShell from "@/components/admin/AdminShell";
+import { Card, Pill, Tabs, EmptyState, relTime, initials } from "@/components/admin/ui";
+import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { supabase } from "@/lib/supabaseClient";
+import {
+  adminListProfiles,
+  adminListUsersMeta,
+  type Profile,
+  type UserMeta,
+} from "@/lib/data";
+import {
+  TAB_PENGGUNA,
+  tapisPengguna,
+  kiraTab,
+  emelBelumSah,
+  pelanProfil,
+  LABEL_PELAN,
+  LABEL_PELAN_PENDEK,
+  type TabPengguna,
+  type StatusPengguna,
+} from "@/lib/adminUsers";
+
+const SEBARIS = 25;
 
 function fmt(d: string | null | undefined) {
   if (!d) return "Never";
-  try { return new Date(d).toLocaleString(); } catch { return String(d); }
+  try {
+    return new Date(d).toLocaleString();
+  } catch {
+    return String(d);
+  }
 }
 
-/** Pelan tersimpan profil; apa-apa nilai lain dianggap free untuk paparan. */
-function pelanProfil(u: Profile): PelanAdmin {
-  const p: string | undefined = u.plan;
-  return PELAN_ADMIN.includes(p as PelanAdmin) ? (p as PelanAdmin) : 'free';
+/** Label pil peranan; superadmin dipapar "Owner". */
+function labelPeranan(role: string) {
+  if (role === "superadmin") return "Owner";
+  if (role === "admin") return "Admin";
+  if (role === "educator") return "Educator";
+  return "Participant";
 }
 
-export default function Page() {
-  const [users, setUsers] = useState<Profile[]>([]);
+function SenaraiPengguna({
+  users,
+  meta,
+  onReload,
+}: {
+  users: Profile[];
+  meta: Record<string, UserMeta>;
+  onReload: () => void;
+}) {
+  const router = useRouter();
+  const sp = useSearchParams();
   const confirm = useConfirm();
-  const [meta, setMeta] = useState<Record<string, UserMeta>>({});
-  const [q, setQ] = useState("");
-  const [roleFilter, setRoleFilter] = useState<'all'|'participant'|'educator'|'admin'>("all");
-  const [expanded, setExpanded] = useState<string | null>(null);
-  const [classCache, setClassCache] = useState<Record<string, any>>({});
-  const [limitDraft, setLimitDraft] = useState<Record<string, { owned: string; coed: string }>>({});
+
+  const tabAwal = (TAB_PENGGUNA.find((t) => t.key === sp.get("tab"))?.key ?? "all") as TabPengguna;
+  const statusAwal = (["verified", "unverified", "expiring"].includes(sp.get("status") || "")
+    ? sp.get("status")
+    : "all") as StatusPengguna;
+
+  const [tab, setTab] = useState<TabPengguna>(tabAwal);
+  const [status, setStatus] = useState<StatusPengguna>(statusAwal);
+  const [q, setQ] = useState(sp.get("q") || "");
+  const [muka, setMuka] = useState(1);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [alsoApprove, setAlsoApprove] = useState(false);
   const [verifying, setVerifying] = useState(false);
-  const reload = async () => {
-    setUsers(await adminListProfiles());
-    setMeta(await adminListUsersMeta());
-  };
-  useEffect(() => { reload(); }, []);
-  const filtered = users.filter(u => (roleFilter === "all" || u.role === roleFilter)).filter(u => !q || (u.display_name || "").toLowerCase().includes(q.toLowerCase()) || u.role.includes(q.toLowerCase()) || (meta[u.id]?.email || "").toLowerCase().includes(q.toLowerCase()));
-  const unverified = filtered.filter(u => { const m = meta[u.id]; return m && m.email && !m.email_confirmed_at; });
-  const toggleSelected = (id: string) => setSelected(prev => { const n = new Set(prev); if (n.has(id)) n.delete(id); else n.add(id); return n; });
+  const [mesej, setMesej] = useState<{ baik: boolean; teks: string } | null>(null);
 
-  const setRole = async (u: Profile, role: 'participant'|'educator'|'admin'|'superadmin') => {
-    await adminUpdateProfile(u.id, { role }); await logAudit('role_change', 'profile', u.id, { from: u.role, to: role }); reload();
+  const ditapis = useMemo(
+    () => tapisPengguna(users, meta, { tab, q, status }),
+    [users, meta, tab, q, status],
+  );
+  const kiraan = useMemo(
+    () => kiraTab(users, meta, { q, status }),
+    [users, meta, q, status],
+  );
+  const belumSahDalam = useMemo(
+    () => ditapis.filter((u) => emelBelumSah(u.id, meta)).map((u) => u.id),
+    [ditapis, meta],
+  );
+
+  const jumlah = ditapis.length;
+  const mula = jumlah === 0 ? 0 : (muka - 1) * SEBARIS + 1;
+  const akhir = Math.min(muka * SEBARIS, jumlah);
+  const barisMuka = ditapis.slice((muka - 1) * SEBARIS, muka * SEBARIS);
+
+  const tukarTab = (k: string) => {
+    setTab(k as TabPengguna);
+    setMuka(1);
   };
-  const toggleExpand = async (u: Profile) => {
-    if (expanded === u.id) { setExpanded(null); return; }
-    setExpanded(u.id);
-    if (!classCache[u.id]) {
-      try {
-        if (u.role === 'participant') {
-          const joined = await adminListParticipantClasses(u.id);
-          setClassCache(c => ({ ...c, [u.id]: { joined } }));
-        } else {
-          const { owned, coEducator } = await adminListEducatorClasses(u.id);
-          setClassCache(c => ({ ...c, [u.id]: { owned, coEducator } }));
-        }
-      } catch (e: any) { alert('Failed to load classes: ' + (e?.message || e)); }
-    }
+
+  const tukarStatus = (s: string) => {
+    setStatus(s as StatusPengguna);
+    setMuka(1);
   };
+
+  const toggleSelected = (id: string) => {
+    setSelected((prev) => {
+      const n = new Set(prev);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
+  };
+
   /**
-   * Tukar pelan pengguna (V2-008). Semua empat pelan boleh dipilih.
-   * Menurunkan pelan unlimited sentiasa minta pengesahan dahulu: satu klik
-   * tersilap pada pemilih ini boleh memotong semua had akaun tersebut.
-   */
-  const setPlan = async (u: Profile, plan: PelanAdmin) => {
-    const semasa = pelanProfil(u);
-    if (plan === semasa) return;
-    if (semasa === 'unlimited') {
-      const ok = await confirm({
-        title: `Downgrade "${u.display_name || u.id.slice(0, 8)}" from Unlimited to ${LABEL_PELAN[plan]}? All limits will be re-applied immediately.`,
-        tone: 'danger',
-      });
-      if (!ok) { reload(); return; }
-    }
-    try {
-      const { error } = await supabase.rpc('qm_set_plan', { p_user: u.id, p_plan: plan });
-      if (error) throw error;
-      await logAudit('set_plan', 'profile', u.id, { from: semasa, to: plan });
-      reload();
-    } catch (e: any) { alert(mesejHad(e, 'Failed to change plan.')); }
-  };
-  const saveLimits = async (u: Profile) => {
-    const d = limitDraft[u.id] || { owned: String(u.max_classes_owned ?? ''), coed: String(u.max_classes_as_coeducator ?? '') };
-    const parse = (v: string) => v.trim() === '' ? null : Math.max(0, parseInt(v, 10) || 0);
-    try {
-      await adminSetClassLimits(u.id, parse(d.owned), parse(d.coed));
-      await logAudit('set_class_limits', 'profile', u.id, { owned: parse(d.owned), coed: parse(d.coed) });
-      reload();
-      alert('Class limits updated.');
-    } catch (e: any) { alert('Failed to save limits: ' + (e?.message || e)); }
-  };
-  const toggleSuspend = async (u: Profile) => {
-    await adminUpdateProfile(u.id, { suspended: !u.suspended });
-    await logAudit(u.suspended ? 'unsuspend' : 'suspend', 'profile', u.id); reload();
-  };
-  const toggleApprove = async (u: Profile) => {
-    await adminUpdateProfile(u.id, { approved: !u.approved });
-    await logAudit(u.approved ? 'unapprove' : 'approve', 'profile', u.id); reload();
-  };
-  const toggleCapability = async (u: Profile, key: 'can_upload_files' | 'can_upload_videos') => {
-    const next = !((u as any)[key]);
-    await adminUpdateProfile(u.id, { [key]: next } as any);
-    await logAudit(next ? 'enable_capability' : 'disable_capability', 'profile', u.id, { capability: key });
-    reload();
-  };
-  const removeUser = async (u: Profile) => {
-    if (!(await confirm({ title: `Permanently delete user "${u.display_name || u.id.slice(0,8)}"? This cannot be undone.`, tone: 'danger' }))) return;
-    try {
-      await adminDeleteUser(u.id);
-      await logAudit('delete_user', 'profile', u.id);
-      reload();
-    } catch (e: any) {
-      alert('Delete failed: ' + (e?.message || e));
-    }
-  };
-  const resendVerification = async (u: Profile) => {
-    const email = meta[u.id]?.email;
-    if (!email) { alert('No email on file for this user.'); return; }
-    try {
-      const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: `${window.location.origin}/auth/callback` } });
-      if (error) throw error;
-      alert('Verification email resent to ' + email);
-    } catch (e: any) {
-      alert('Resend failed: ' + (e?.message || e));
-    }
-  };
-  /**
-   * Menandakan emel sah tanpa pengguna mengklik pautan.
-   *
-   * Kerja sebenar berlaku di /api/admin/users/verify dengan service_role.
-   * Klien sengaja tidak boleh melakukannya sendiri: memintas pengesahan emel
-   * ialah keupayaan admin, bukan keupayaan pelayar.
+   * Sahkan emel secara pukal melalui /api/admin/users/verify. Route itu
+   * menulis rekod auditnya sendiri; klien hanya menyampaikan senarai.
    */
   const verifyEmails = async (ids: string[]) => {
     if (ids.length === 0) return;
-    const siapa = ids.length > 1 ? `${ids.length} pengguna` : 'pengguna ini';
-    if (!(await confirm({ title: `Tandakan emel ${siapa} sebagai sah${alsoApprove ? ', dan luluskan sekali' : ''}?` }))) return;
+    const siapa = ids.length > 1 ? `${ids.length} users` : "this user";
+    if (
+      !(await confirm({
+        title: `Mark ${siapa} as email verified${alsoApprove ? " and approve them" : ""}?`,
+        tone: "default",
+      }))
+    )
+      return;
     setVerifying(true);
+    setMesej(null);
     try {
       const { data: { session } } = await supabase.auth.getSession();
-      const res = await fetch('/api/admin/users/verify', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session?.access_token ?? ''}` },
+      const res = await fetch("/api/admin/users/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${session?.access_token ?? ""}` },
         body: JSON.stringify({ userIds: ids, alsoApprove }),
       });
-      const out = await res.json().catch(() => ({} as any));
-      if (!res.ok) throw new Error(out?.error || `HTTP ${res.status}`);
-      const gagal = (out.results || []).filter((r: any) => !r.ok);
-      alert(
-        `Disahkan ${out.ok}/${out.total}.` +
-        (gagal.length ? '\nGagal:\n' + gagal.map((f: any) => `${String(f.id).slice(0, 8)}: ${f.error}`).join('\n') : '')
-      );
+      const out = (await res.json().catch(() => ({}))) as {
+        ok?: number;
+        total?: number;
+        error?: string;
+        results?: { id: string; ok: boolean; error?: string }[];
+      };
+      if (!res.ok) throw new Error(out.error || `HTTP ${res.status}`);
+      const gagal = (out.results || []).filter((r) => !r.ok);
+      setMesej({
+        baik: true,
+        teks:
+          `Verified ${out.ok ?? 0}/${out.total ?? ids.length}.` +
+          (gagal.length ? ` Failed: ${gagal.map((f) => f.error || f.id.slice(0, 8)).join("; ")}` : ""),
+      });
       setSelected(new Set());
-      reload();
-    } catch (e: any) {
-      alert('Verify failed: ' + (e?.message || e));
+      onReload();
+    } catch (e: unknown) {
+      setMesej({ baik: false, teks: e instanceof Error ? e.message : String(e) });
     } finally {
       setVerifying(false);
     }
   };
+
+  return (
+    <div>
+      <p className="text-ink-muted text-sm mb-6">Find anyone on Kuizen and manage their account.</p>
+
+      <Tabs items={TAB_PENGGUNA.map((t) => ({ ...t, count: kiraan[t.key] }))} value={tab} onChange={tukarTab} />
+
+      <div className="flex flex-wrap items-center gap-2 py-4">
+        <div className="relative flex-1 min-w-[200px]">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
+          <input
+            className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-hairline text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
+            placeholder="Search name, username or email"
+            value={q}
+            onChange={(e) => {
+              setQ(e.target.value);
+              setMuka(1);
+            }}
+          />
+        </div>
+        <select
+          value={status}
+          onChange={(e) => tukarStatus(e.target.value)}
+          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
+          aria-label="Filter by status"
+        >
+          <option value="all">All statuses</option>
+          <option value="verified">Verified</option>
+          <option value="unverified">Unverified</option>
+          <option value="expiring">Plan expiring (14 days)</option>
+        </select>
+      </div>
+
+      {/* Bar tindakan pukal: hanya timbul bila ada emel belum sah dalam paparan */}
+      {belumSahDalam.length > 0 && (
+        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
+          <span className="font-medium text-amber-900">{belumSahDalam.length} unverified</span>
+          <button
+            type="button"
+            onClick={() => setSelected(new Set(belumSahDalam))}
+            className="px-2 py-1 rounded-lg bg-white border border-amber-200 text-xs text-amber-900 hover:bg-amber-100"
+          >
+            Select all
+          </button>
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              className="px-2 py-1 rounded-lg bg-white border border-amber-200 text-xs text-amber-900 hover:bg-amber-100"
+            >
+              Clear
+            </button>
+          )}
+          <label className="flex items-center gap-1.5 text-xs text-amber-900 cursor-pointer">
+            <input type="checkbox" checked={alsoApprove} onChange={(e) => setAlsoApprove(e.target.checked)} />
+            Also approve
+          </label>
+          <button
+            type="button"
+            disabled={selected.size === 0 || verifying}
+            onClick={() => verifyEmails(Array.from(selected))}
+            className="ml-auto px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-40"
+          >
+            {verifying ? "Verifying..." : `Verify selected (${selected.size})`}
+          </button>
+        </div>
+      )}
+
+      {mesej && (
+        <div
+          className={`mb-4 text-sm rounded-lg px-3 py-2 inline-block ${
+            mesej.baik ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
+          }`}
+        >
+          {mesej.teks}
+        </div>
+      )}
+
+      <Card className="overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
+                <th className="w-10 px-4 py-3"></th>
+                <th className="px-4 py-3 font-medium">User</th>
+                <th className="px-4 py-3 font-medium">Role</th>
+                <th className="px-4 py-3 font-medium">Email</th>
+                <th className="px-4 py-3 font-medium">Account</th>
+                <th className="px-4 py-3 font-medium">Plan</th>
+                <th className="px-4 py-3 font-medium">Last active</th>
+              </tr>
+            </thead>
+            <tbody>
+              {barisMuka.map((u) => {
+                const m = meta[u.id];
+                const belum = emelBelumSah(u.id, meta);
+                const adaPelan = u.role === "educator" || u.role === "admin" || u.role === "superadmin";
+                return (
+                  <tr
+                    key={u.id}
+                    onClick={() => router.push(`/admin/users/${u.id}`)}
+                    className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9] cursor-pointer transition"
+                  >
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                      {belum && (
+                        <input
+                          type="checkbox"
+                          aria-label={`Select ${u.display_name || "user"}`}
+                          checked={selected.has(u.id)}
+                          onChange={() => toggleSelected(u.id)}
+                        />
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="w-9 h-9 rounded-full bg-[#EAE6FC] text-brand-purple text-[12px] font-semibold flex items-center justify-center shrink-0">
+                          {initials(u.display_name)}
+                        </span>
+                        <span className="min-w-0">
+                          <span className="block font-medium text-ink truncate">{u.display_name || "Unnamed user"}</span>
+                          <span className="block text-xs text-ink-faint truncate">{m?.email || "No email"}</span>
+                        </span>
+                      </div>
+                    </td>
+                    <td className="px-4 py-3">
+                      <Pill tone="violet">{labelPeranan(u.role)}</Pill>
+                    </td>
+                    <td className="px-4 py-3">
+                      {!m?.email ? (
+                        <Pill>No email</Pill>
+                      ) : m.email_confirmed_at ? (
+                        <Pill tone="green">Verified</Pill>
+                      ) : (
+                        <Pill tone="yellow">Unverified</Pill>
+                      )}
+                    </td>
+                    <td className="px-4 py-3">
+                      {u.suspended ? (
+                        <Pill tone="red">Suspended</Pill>
+                      ) : !u.approved ? (
+                        <Pill tone="yellow">Pending</Pill>
+                      ) : (
+                        <Pill tone="green">Active</Pill>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-ink-muted">
+                      {adaPelan ? LABEL_PELAN_PENDEK[pelanProfil(u)] : "-"}
+                    </td>
+                    <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{relTime(m?.last_sign_in_at)}</td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+        {jumlah === 0 && <EmptyState title="No users match." body="Try a different search or filter." />}
+
+        <div className="flex items-center justify-between px-4 py-3 border-t border-hairline">
+          <span className="text-xs text-ink-faint">
+            Showing {mula}-{akhir} of {jumlah}
+          </span>
+          <div className="flex items-center gap-1">
+            <button
+              type="button"
+              disabled={muka <= 1}
+              onClick={() => setMuka((v) => Math.max(1, v - 1))}
+              className="p-2 rounded-xl border border-hairline text-ink-muted hover:text-ink disabled:opacity-40"
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="w-4 h-4" />
+            </button>
+            <button
+              type="button"
+              disabled={muka * SEBARIS >= jumlah}
+              onClick={() => setMuka((v) => v + 1)}
+              className="p-2 rounded-xl border border-hairline text-ink-muted hover:text-ink disabled:opacity-40"
+              aria-label="Next page"
+            >
+              <ChevronRight className="w-4 h-4" />
+            </button>
+          </div>
+        </div>
+      </Card>
+
+      <p className="text-xs text-ink-faint mt-3">Account changes are recorded in Audit.</p>
+    </div>
+  );
+}
+
+export default function Page() {
+  const [users, setUsers] = useState<Profile[]>([]);
+  const [meta, setMeta] = useState<Record<string, UserMeta>>({});
+  const [muat, setMuat] = useState(true);
+
+  const reload = async () => {
+    try {
+      const [p, m] = await Promise.all([adminListProfiles(), adminListUsersMeta()]);
+      setUsers(p);
+      setMeta(m);
+    } catch {
+      // RLS menolak pembacaan bukan admin; halaman kekal kosong.
+    } finally {
+      setMuat(false);
+    }
+  };
+
+  useEffect(() => {
+    reload();
+  }, []);
+
+  /**
+   * Eksport CSV: fungsi lama dikekalkan, ditambah lajur Plan dan Last
+   * active. BOM UTF-8 supaya Excel di Windows membaca aksara beraksen.
+   */
   const exportCsv = () => {
-    const esc = (v:any) => { const str = v==null?"":String(v); return /[",\n]/.test(str) ? '"'+str.replace(/"/g,'""')+'"' : str; };
-    const headers = ["Name","Username","Email","Role","Email verified","Suspended","Approved","Registered"];
-    const rows = users.map(u => { const m = meta[u.id]; return [
-      u.display_name || "", (u as any).username || "", m?.email || "", u.role,
-      m?.email_confirmed_at ? "Yes" : "No", u.suspended ? "Yes" : "No", u.approved ? "Yes" : "No",
-      fmt(m?.created_at || u.created_at)
-    ].map(esc).join(","); });
+    const esc = (v: unknown) => {
+      const str = v == null ? "" : String(v);
+      return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
+    };
+    const headers = ["Name", "Username", "Email", "Role", "Email verified", "Suspended", "Approved", "Registered", "Plan", "Last active"];
+    const rows = users.map((u) => {
+      const m = meta[u.id];
+      return [
+        u.display_name || "",
+        u.username || "",
+        m?.email || "",
+        u.role,
+        m?.email_confirmed_at ? "Yes" : "No",
+        u.suspended ? "Yes" : "No",
+        u.approved ? "Yes" : "No",
+        fmt(m?.created_at || u.created_at),
+        LABEL_PELAN[pelanProfil(u)],
+        fmt(m?.last_sign_in_at),
+      ]
+        .map(esc)
+        .join(",");
+    });
     const csv = [headers.join(","), ...rows].join("\n");
-    const blob = new Blob(["\uFEFF"+csv], { type: "text/csv;charset=utf-8;" });
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
-    a.href = url; a.download = `kuizen-users-${new Date().toISOString().slice(0,10)}.csv`;
-    document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+    a.href = url;
+    a.download = `kuizen-users-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
-  const pendingEducators = users.filter(u => u.role === 'educator' && !u.approved && !u.suspended);
+
   return (
-    <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">Users</h2>
-      {pendingEducators.length > 0 && (
-        <div className="card mb-3 border-2 border-yellow-300 bg-yellow-50">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xs font-bold uppercase text-yellow-800">Pending Educator Approvals</span>
-            <span className="text-xs px-2 py-0.5 rounded-full bg-yellow-200 text-yellow-900 font-bold">{pendingEducators.length}</span>
-          </div>
-          <div className="space-y-2">
-            {pendingEducators.map(u => { const m = meta[u.id]; return (
-              <div key={u.id} className="bg-white rounded-lg p-3 border border-yellow-200">
-                <div className="flex justify-between items-start gap-2">
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-sm truncate">{u.display_name || u.id.slice(0,8)}</div>
-                    {m?.email && <div className="text-xs text-gray-600 truncate">{m.email}</div>}
-                    <div className="text-[11px] text-gray-500 mt-1">Registered: {fmt(m?.created_at || u.created_at)}</div>
-                  </div>
-                  <div className="flex gap-1 flex-shrink-0">
-                    <button onClick={()=>toggleApprove(u)} className="text-xs px-3 py-1.5 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700">Approve</button>
-                    <button onClick={()=>removeUser(u)} className="text-xs px-3 py-1.5 rounded-lg bg-red-100 text-red-700 font-semibold hover:bg-red-200">Reject</button>
-                  </div>
-                </div>
-              </div>
-            ); })}
-          </div>
-        </div>
+    <AdminShell
+      title="Users"
+      actions={
+        <button
+          type="button"
+          onClick={exportCsv}
+          className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
+        >
+          <Download className="w-4 h-4 text-ink-faint" /> Export CSV
+        </button>
+      }
+    >
+      {muat ? (
+        <div className="text-sm text-ink-faint py-8">Loading...</div>
+      ) : (
+        <Suspense fallback={<div className="text-sm text-ink-faint py-8">Loading...</div>}>
+          <SenaraiPengguna users={users} meta={meta} onReload={reload} />
+        </Suspense>
       )}
-      <div className="flex items-center gap-2 mb-3"><div className="relative flex-1">
-        <Search className="absolute left-3 top-3 w-4 h-4 text-gray-400"/>
-        <input className="input pl-9" placeholder="Search users…" value={q} onChange={e=>setQ(e.target.value)}/></div>
-        <select value={roleFilter} onChange={e=>setRoleFilter(e.target.value as any)} className="text-sm border rounded px-2 py-2">
-          <option value="all">All roles</option>
-          <option value="participant">Participant</option>
-          <option value="educator">Educator</option>
-          <option value="admin">Admin</option>
-        </select><div>
-      </div><button onClick={exportCsv} className="text-xs px-3 py-2 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-700 whitespace-nowrap">Export CSV</button></div>
-      {unverified.length > 0 && (
-        <div className="mb-3 flex items-center gap-2 flex-wrap text-xs bg-amber-50 border border-amber-200 rounded-xl px-3 py-2">
-          <span className="font-semibold text-amber-900">{unverified.length} belum sahkan emel</span>
-          <button onClick={()=>setSelected(new Set(unverified.map(x=>x.id)))} className="px-2 py-1 rounded bg-white border">Pilih semua</button>
-          {selected.size > 0 && <button onClick={()=>setSelected(new Set())} className="px-2 py-1 rounded bg-white border">Kosongkan</button>}
-          <label className="flex items-center gap-1 cursor-pointer">
-            <input type="checkbox" checked={alsoApprove} onChange={e=>setAlsoApprove(e.target.checked)} />
-            Juga luluskan
-          </label>
-          <button disabled={selected.size === 0 || verifying} onClick={()=>verifyEmails(Array.from(selected))} className="px-3 py-1.5 rounded-lg bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-40">
-            {verifying ? 'Sedang sahkan...' : `Sahkan yang dipilih (${selected.size})`}
-          </button>
-        </div>
-      )}
-      <div className="space-y-2">{filtered.map(u => {
-        const m = meta[u.id];
-        return (
-        <div key={u.id} className="card">
-          <div className="flex justify-between items-center">
-            <div>
-              <div className="font-semibold">{u.display_name || u.id.slice(0,8)}</div>
-              <div className="text-xs text-gray-500">{u.role}{u.suspended?' · suspended':''}{!u.approved?' · pending approval':''}</div>
-              {m?.email && <div className="text-xs text-gray-500 flex items-center gap-1 flex-wrap">{m.email}{m.email_confirmed_at ? <span className="px-1.5 py-0.5 rounded-full bg-green-100 text-green-700 text-[10px] font-semibold">✓ Verified</span> : <span className="px-1.5 py-0.5 rounded-full bg-red-100 text-red-700 text-[10px] font-semibold">Unverified</span>}</div>}
-            </div>
-            <select value={u.role} onChange={e=>setRole(u, e.target.value as any)} className="text-xs border rounded px-2 py-1">
-              <option value="participant">participant</option>
-              <option value="educator">educator</option>
-              <option value="admin">admin</option>
-            </select>
-          </div>
-          <div className="text-xs text-gray-600 mt-2 grid grid-cols-2 gap-x-2">
-            <div><span className="text-gray-400">Registered:</span> {fmt(m?.created_at || u.created_at)}</div>
-            <div><span className="text-gray-400">Last login:</span> {fmt(m?.last_sign_in_at)}</div>
-          </div>
-          <div className="flex gap-2 mt-2 flex-wrap">
-            <button onClick={()=>toggleSuspend(u)} className="text-xs px-2 py-1 rounded bg-gray-100">{u.suspended ? 'Unsuspend' : 'Suspend'}</button>
-            {!u.approved && <button onClick={()=>toggleApprove(u)} className="text-xs px-2 py-1 rounded bg-green-100 text-green-700">Approve</button>}
-            <button onClick={()=>removeUser(u)} className="text-xs px-2 py-1 rounded bg-red-100 text-red-700">Remove</button>
-            {m && !m.email_confirmed_at && m.email && <button onClick={()=>resendVerification(u)} className="text-xs px-2 py-1 rounded bg-gray-100">Resend verification</button>}
-            {m && !m.email_confirmed_at && m.email && <button onClick={()=>verifyEmails([u.id])} disabled={verifying} className="text-xs px-2 py-1 rounded bg-green-600 text-white font-semibold hover:bg-green-700 disabled:opacity-40">Sahkan emel</button>}
-            {m && !m.email_confirmed_at && m.email && <label className="text-xs px-2 py-1 rounded bg-gray-100 flex items-center gap-1 cursor-pointer"><input type="checkbox" checked={selected.has(u.id)} onChange={()=>toggleSelected(u.id)} />Pilih</label>}
-          </div>
-          {(u.role === 'educator' || u.role === 'admin' || u.role === 'superadmin') && (
-            <div className="mt-2 flex items-center gap-2 flex-wrap text-xs">
-              <span className="text-gray-500">Plan</span>
-              <select className="border rounded px-2 py-1"
-                value={pelanProfil(u)}
-                onChange={e=>setPlan(u, e.target.value as PelanAdmin)}>
-                {PELAN_ADMIN.map(p => (
-                  <option key={p} value={p}>{LABEL_PELAN[p]}</option>
-                ))}
-              </select>
-              {u.plan_expires_at && (
-                <span className="text-gray-400">Expires: {fmt(u.plan_expires_at)}</span>
-              )}
-              <span className="text-gray-400">Switching the plan also resets the limits below.</span>
-            </div>
-          )}
-          {(u.role === 'educator' || u.role === 'admin') && (
-            <div className="mt-2 flex items-end gap-2 flex-wrap text-xs">
-              <label className="flex flex-col">Max classes (own)
-                <input type="number" min={0} className="border rounded px-2 py-1 w-24"
-                  value={(limitDraft[u.id]?.owned) ?? String(u.max_classes_owned ?? '')}
-                  onChange={e=>setLimitDraft(d=>({ ...d, [u.id]: { owned: e.target.value, coed: d[u.id]?.coed ?? String(u.max_classes_as_coeducator ?? '') } }))}/>
-              </label>
-              <label className="flex flex-col">Max as co-educator
-                <input type="number" min={0} className="border rounded px-2 py-1 w-24"
-                  value={(limitDraft[u.id]?.coed) ?? String(u.max_classes_as_coeducator ?? '')}
-                  onChange={e=>setLimitDraft(d=>({ ...d, [u.id]: { coed: e.target.value, owned: d[u.id]?.owned ?? String(u.max_classes_owned ?? '') } }))}/>
-              </label>
-              <button onClick={()=>saveLimits(u)} className="px-2 py-1 rounded bg-blue-100 text-blue-700">Save limits</button>
-            </div>
-          )}
-          {(u.role === 'educator' || u.role === 'admin' || u.role === 'superadmin') && (
-            <div className="mt-2 flex items-center gap-4 flex-wrap text-xs bg-violet-50 border border-violet-200 rounded-xl px-3 py-2">
-              <span className="font-semibold text-violet-800">Upload permissions</span>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" className="accent-violet-600 w-4 h-4"
-                  checked={!!(u as any).can_upload_files}
-                  onChange={()=>toggleCapability(u, 'can_upload_files')} />
-                Files (FileLu)
-              </label>
-              <label className="flex items-center gap-1.5 cursor-pointer">
-                <input type="checkbox" className="accent-violet-600 w-4 h-4"
-                  checked={!!(u as any).can_upload_videos}
-                  onChange={()=>toggleCapability(u, 'can_upload_videos')} />
-                Videos (Bunny Stream)
-              </label>
-              {(u.role === 'admin' || u.role === 'superadmin') && <span className="text-violet-500">Admins always allowed</span>}
-            </div>
-          )}
-          <button onClick={()=>toggleExpand(u)} className="text-xs px-2 py-1 rounded bg-gray-100 mt-2">
-            {expanded === u.id ? 'Hide classes' : (u.role === 'participant' ? 'View joined classes' : 'View classes')}
-          </button>
-          {expanded === u.id && (
-            <div className="mt-2 text-xs border-t pt-2">
-              {!classCache[u.id] ? <div className="text-gray-500">Loading…</div> : (
-                u.role === 'participant' ? (
-                  (classCache[u.id].joined || []).length === 0
-                    ? <div className="text-gray-500">No joined classes.</div>
-                    : <div><div className="font-semibold mb-1">Joined classes ({classCache[u.id].joined.length})</div>
-                        {classCache[u.id].joined.map((c:any)=>(
-                          <div key={c.id} className="flex items-center gap-2 py-0.5">
-                            <span className="inline-block w-2 h-2 rounded-full" style={{background:c.color||'#6366f1'}}/>
-                            <span>{c.name}</span>
-                            <span className="text-gray-400">· joined {fmt(c.joined_at)}{c.ended_at ? ' · ended' : ''}{c.is_archived ? ' · archived' : ''}</span>
-                          </div>
-                        ))}
-                      </div>
-                ) : (
-                  <div className="space-y-2">
-                    <div><div className="font-semibold mb-1">Created (owner) ({(classCache[u.id].owned||[]).length})</div>
-                      {(classCache[u.id].owned||[]).length === 0 ? <div className="text-gray-500">None.</div> :
-                        classCache[u.id].owned.map((c:any)=>(
-                          <div key={c.id} className="flex items-center gap-2 py-0.5">
-                            <span className="inline-block w-2 h-2 rounded-full" style={{background:c.color||'#6366f1'}}/>
-                            <span>{c.name}</span>
-                            <span className="text-gray-400">· {fmt(c.created_at)}{c.ended_at ? ' · ended' : ''}{c.is_archived ? ' · archived' : ''}</span>
-                          </div>
-                        ))}
-                    </div>
-                    <div><div className="font-semibold mb-1">Co-educator ({(classCache[u.id].coEducator||[]).length})</div>
-                      {(classCache[u.id].coEducator||[]).length === 0 ? <div className="text-gray-500">None.</div> :
-                        classCache[u.id].coEducator.map((c:any)=>(
-                          <div key={c.id} className="flex items-center gap-2 py-0.5">
-                            <span className="inline-block w-2 h-2 rounded-full" style={{background:c.color||'#6366f1'}}/>
-                            <span>{c.name}</span>
-                            <span className="text-gray-400">· {c.member_role || 'co-educator'}</span>
-                          </div>
-                        ))}
-                    </div>
-                  </div>
-                )
-              )}
-            </div>
-          )}
-        </div>
-      );})}</div>
-    </Shell>
+    </AdminShell>
   );
 }

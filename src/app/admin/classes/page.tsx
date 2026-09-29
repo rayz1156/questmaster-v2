@@ -1,6 +1,5 @@
 "use client";
-import Shell from "@/components/Shell";
-import { adminTabs } from "@/lib/adminTabs";
+import AdminShell from "@/components/admin/AdminShell";
 import { useEffect, useState } from "react";
 import { adminListAllClasses, adminUpdateClass, adminDeleteClass, logAudit } from "@/lib/data";
 import { Search, Pencil, Trash2, X, Save } from "lucide-react";
@@ -16,8 +15,7 @@ export default function Page() {
   async function save() { if (!edit) return; await adminUpdateClass(edit.id, { name: edit.name, code: edit.code }); await logAudit('class_edit','class',edit.id,{}); setEdit(null); reload(); }
   async function remove(c: any) { if (!(await confirm({ title: `Delete class "${c.name}"?`, tone: 'danger' }))) return; await adminDeleteClass(c.id); await logAudit('class_delete','class',c.id,{ name: c.name }); reload(); }
   return (
-    <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">Classes</h2>
+    <AdminShell title="Classes">
       <div className="relative mb-3"><Search className="absolute left-3 top-3 w-4 h-4 text-gray-400"/><input className="input pl-9" placeholder="Search classes..." value={q} onChange={e=>setQ(e.target.value)}/></div>
       <div className="space-y-2">{filtered.map(c => (
         <div key={c.id} className="card">
@@ -33,6 +31,6 @@ export default function Page() {
           <label className="text-xs text-gray-500">Code</label><input className="input mb-3" value={edit.code||''} onChange={e=>setEdit({...edit,code:e.target.value})}/>
           <button onClick={save} className="w-full py-2 rounded-xl bg-black text-white flex items-center justify-center gap-1"><Save className="w-4 h-4"/>Save</button>
         </div></div>}
-    </Shell>
+    </AdminShell>
   );
 }

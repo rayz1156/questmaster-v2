@@ -1,6 +1,5 @@
 "use client";
-import Shell from "@/components/Shell";
-import { adminTabs } from "@/lib/adminTabs";
+import AdminShell from "@/components/admin/AdminShell";
 import { useEffect, useState } from "react";
 import { adminListAllSubmissions, reviewSubmission, logAudit, type Submission } from "@/lib/data";
 export default function Page() {
@@ -13,8 +12,7 @@ export default function Page() {
     reload();
   };
   return (
-    <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">Moderation</h2>
+    <AdminShell title="Moderation">
       <p className="text-xs text-gray-500 mb-3">Override educator decisions on any submission.</p>
       <div className="space-y-2">{subs.map(s => (
         <div key={s.id} className="card">
@@ -28,6 +26,6 @@ export default function Page() {
             <button onClick={()=>act(s,'rejected')} className="flex-1 text-xs py-1 rounded bg-red-600 text-white">Reject</button>
           </div>
         </div>))}</div>
-    </Shell>
+    </AdminShell>
   );
 }

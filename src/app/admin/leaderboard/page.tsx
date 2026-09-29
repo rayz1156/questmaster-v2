@@ -1,6 +1,5 @@
 "use client";
-import Shell from "@/components/Shell";
-import { adminTabs } from "@/lib/adminTabs";
+import AdminShell from "@/components/admin/AdminShell";
 import { useEffect, useState } from "react";
 import { adminListAllClasses, listClassTeamScores, listClassIndividualScores, listTeamMembers, type ClassTeamScore, type ClassIndividualScore } from "@/lib/data";
 import { ChevronDown, ChevronRight, UserIcon } from "lucide-react";
@@ -56,8 +55,7 @@ export default function Page() {
   };
 
   return (
-    <Shell tabs={adminTabs}>
-      <h2 className="font-bold text-lg mb-3">Leaderboard</h2>
+    <AdminShell title="Leaderboard">
       {classes.length > 1 && (
         <select className="input mb-3" value={activeClassId} onChange={e => setActiveClassId(e.target.value)}>
           {classes.map((c: any) => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -137,6 +135,6 @@ export default function Page() {
           })}
         </div>
       )}
-    </Shell>
+    </AdminShell>
   );
 }
