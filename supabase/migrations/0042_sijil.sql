@@ -362,6 +362,7 @@ declare
   v_new_id    uuid;
   v_ok        boolean;
   v_criteria  jsonb;
+  r           record;
 begin
   select t.class_id, t.title, t.criteria
     into v_class_id, v_title, v_criteria

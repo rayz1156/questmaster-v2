@@ -112,7 +112,8 @@ BEGIN
     VALUES (c1, p1), (c1, p2), (c1, p3), (c2, p1);
 
   -- Hunt dengan satu penghantaran approved oleh p1 sahaja.
-  INSERT INTO public.qm_hunts (id, owner_id, title) VALUES (h1, u_ed, 'Hunt Sijil');
+  INSERT INTO public.qm_hunts (id, owner_id, title, class_id)
+    VALUES (h1, u_ed, 'Hunt Sijil', c1);
   INSERT INTO public.qm_challenges (id, hunt_id, title, points) VALUES (ch1, h1, 'Soalan ujian', 10);
   INSERT INTO public.qm_submissions (challenge_id, user_id, answer, status)
     VALUES (ch1, p1, 'jawapan', 'approved');
@@ -151,12 +152,12 @@ $seed$;
 -- ---------------------------------------------------------------------
 DO $chk$
 DECLARE
-  v_id uuid;
+  v_ids uuid[];
   v_n  int;
 BEGIN
   -- Keluarkan sijil untuk p1 dan p3 (templat semua, nama disahkan sahaja).
   PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000000a1');
-  SELECT issued_ids INTO v_id FROM public.qm_issue_certificates(
+  SELECT issued_ids INTO v_ids FROM public.qm_issue_certificates(
             '33333333-0000-0000-0000-000000000005', NULL);
 
   PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000000b2');
@@ -203,12 +204,12 @@ $chk$;
 -- 3. Educator kelas lain tidak boleh mengeluarkan
 -- ---------------------------------------------------------------------
 DO $chk$
-DECLARE
-  v_id uuid;
 BEGIN
   PERFORM pg_temp.qm_test_as('11111111-0000-0000-0000-0000000000a2');
+  -- PERFORM, bukan SELECT INTO: fungsi memulangkan dua lajur dan kita hanya
+  -- mahu menyemak bahawa ia melempar ralat kebenaran.
   BEGIN
-    SELECT * INTO v_id FROM public.qm_issue_certificates('33333333-0000-0000-0000-000000000001', NULL);
+    PERFORM public.qm_issue_certificates('33333333-0000-0000-0000-000000000001', NULL);
     PERFORM pg_temp.qm_verdict('c', false, 'pendidik kelas lain berjaya mengeluarkan sijil');
   EXCEPTION WHEN OTHERS THEN
     PERFORM pg_temp.qm_verdict('c', SQLSTATE <> '00000' AND SQLERRM LIKE '%educator%',
@@ -342,6 +343,7 @@ $chk$;
 -- ---------------------------------------------------------------------
 DO $chk$
 DECLARE
+  i int;
   v_kod text;
   v_baik boolean := true;
   v_satu text;
