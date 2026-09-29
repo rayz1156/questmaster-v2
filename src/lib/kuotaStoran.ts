@@ -24,6 +24,16 @@ function statusKod(kod: string): number {
   return 403;
 }
 
+/** Tukar ralat RPC kepada RalatKuota dengan kod QM_* yang boleh dibaca. */
+function ralatDaripadaRpc(error: { message?: string } | null): RalatKuota {
+  const teks: string = error?.message || String(error);
+  const m = /QM_[A-Z_]+/.exec(teks);
+  const kod = m ? m[0] : 'QM_UNKNOWN';
+  // Buang awalan kod supaya klien memaparkan mesej yang boleh dibaca.
+  const mesej = teks.replace(/^.*?QM_[A-Z_]+:\s*/, '').trim() || teks;
+  return { status: statusKod(kod), body: { error: mesej, code: kod } };
+}
+
 /**
  * Panggil qm_reserve_upload. Gagal memulangkan RalatKuota yang boleh
  * dibalas terus oleh laluan; kejayaan memulangkan null.
@@ -40,19 +50,15 @@ export async function reserveMuatNaik(
     p_mime: mime,
   });
   if (!error) return null;
-  const teks: string = error.message || String(error);
-  const m = /QM_[A-Z_]+/.exec(teks);
-  const kod = m ? m[0] : 'QM_UNKNOWN';
-  // Buang awalan kod supaya klien memaparkan mesej yang boleh dibaca.
-  const mesej = teks.replace(/^.*?QM_[A-Z_]+:\s*/, '').trim() || teks;
-  return { status: statusKod(kod), body: { error: mesej, code: kod } };
+  return ralatDaripadaRpc(error);
 }
 
 /**
- * Panggil qm_record_upload. Kegagalan dicatat dalam log pelayan tetapi
- * TIDAK menggagalkan permintaan: fail sudah berada di storan, jadi
- * membalas 413 selepas bait sampai hanya mengelirukan pengguna. Merekod
- * gagal ialah ketidakselakuan yang perlu dibaiki, bukan ralat pengguna.
+ * Panggil qm_record_upload. Kejayaan memulangkan null; kegagalan
+ * memulangkan RalatKuota. Pemanggil WAJIB memadam fail yang sudah sampai
+ * ke storan (fileluDelete) dan membalas ralat ini kepada klien: rekod yang
+ * gagal bermakna fail itu tidak dikira dalam kuota, jadi ia tidak boleh
+ * dibiarkan berada di storan secara senyap (kzsec 2/3).
  */
 export async function rekodMuatNaik(
   supa: SupabaseClient,
@@ -61,7 +67,7 @@ export async function rekodMuatNaik(
   bytes: number,
   mime: string,
   source: string,
-): Promise<void> {
+): Promise<RalatKuota | null> {
   const { error } = await supa.rpc('qm_record_upload', {
     p_class: pClass,
     p_file_code: fileCode,
@@ -69,9 +75,10 @@ export async function rekodMuatNaik(
     p_mime: mime,
     p_source: source,
   });
-  if (error) {
-    console.error(
-      `[kuota-storan] qm_record_upload gagal source=${source} code=${fileCode}: ${error.message}`,
-    );
-  }
+  if (!error) return null;
+  const ralat = ralatDaripadaRpc(error);
+  console.error(
+    `[kuota-storan] qm_record_upload gagal source=${source} code=${fileCode}: ${error.message}`,
+  );
+  return ralat;
 }

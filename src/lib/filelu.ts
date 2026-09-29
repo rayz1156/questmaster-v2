@@ -16,7 +16,7 @@
 
 const API_KEY = process.env.FILELU_API_KEY || '';
 const BASE = 'https://filelu.com';
-import { s5PutObject } from '@/lib/s5';
+import { s5DeleteObject, s5PutObject } from '@/lib/s5';
 
 function requireKey() {
   if (!API_KEY) throw new Error('FILELU_API_KEY is not configured');
@@ -146,4 +146,33 @@ export async function fileluDirectLink(fileCode: string): Promise<FileluDirectLi
 /** Permanent share/landing page URL for the given code. */
 export function fileluShareUrl(fileCode: string): string {
   return `${BASE}/${fileCode}`;
+}
+
+/**
+ * Padam fail daripada storan selepas muat naik (V2-002b-baiki, kzsec 2/3).
+ * Kod awalan `s5__` padam terus di S5 menggunakan kunci yang dinyahkod;
+ * kod FileLu langsung melalui API file/remove, corak permintaan yang sama
+ * dengan only_me di atas. Pulangkan true hanya jika padam disahkan.
+ */
+export async function fileluDelete(fileCode: string): Promise<boolean> {
+  if (fileCode.startsWith('s5__')) {
+    try {
+      const key = Buffer.from(fileCode.slice(4), 'base64').toString('utf8');
+      await s5DeleteObject(key);
+      return true;
+    } catch (e) {
+      console.error('[fileluDelete] S5 delete gagal:', (e as Error)?.message || e);
+      return false;
+    }
+  }
+  try {
+    const key = requireKey();
+    const u = `${BASE}/api/file/remove?file_code=${encodeURIComponent(fileCode)}&remove=1&key=${encodeURIComponent(key)}`;
+    const res = await fetch(u, { cache: 'no-store' });
+    if (!res.ok) return false;
+    const j: { status?: number } | null = await res.json().catch(() => null);
+    return !!j && j.status === 200;
+  } catch {
+    return false;
+  }
 }

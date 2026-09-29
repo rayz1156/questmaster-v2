@@ -1,24 +1,25 @@
 import { supabase } from '@/lib/supabase';
 
-export type Pelan = 'free' | 'pro' | 'institution';
+export type Pelan = 'free' | 'pro' | 'institution' | 'unlimited';
 
 /**
  * Had pelan: SATU sumber untuk UI dan landing page. Angka di sini MESTI
  * selari dengan qm_plan_limits dalam supabase/migrations/0040_pelan_v2.sql
- * (baris 87 hingga 89). Null bermakna tanpa had praktikal. Jangan guna
- * nilai ini sebagai sekatan: kuatkuasa sebenar berada di pangkalan data.
+ * (baris 87 hingga 89). Null bermakna tanpa had (pelan unlimited atau
+ * had pro/institution yang memang null). Jangan guna nilai ini sebagai
+ * sekatan: kuatkuasa sebenar berada di pangkalan data.
  *
  * file_mb / storage_mb dalam MB.
  */
 export const HAD_PELAN: Record<Pelan, {
-  kelas: number;
-  kelasKoPendidik: number;
+  kelas: number | null;
+  kelasKoPendidik: number | null;
   ahliSeKelas: number | null;
-  pemainSesi: number;
+  pemainSesi: number | null;
   aktiviti: number | null;
   papan: number | null;
-  fileMb: number;
-  storageMb: number;
+  fileMb: number | null;
+  storageMb: number | null;
   penilaianRakan: boolean;
 }> = {
   free: {
@@ -54,9 +55,23 @@ export const HAD_PELAN: Record<Pelan, {
     storageMb: 10240,
     penilaianRakan: true,
   },
+  // Pelan dalaman, tidak dijual (V2-002b-baiki): semua had null dan boleh
+  // muat naik video. HARGA_PELAN tidak memasukkannya.
+  unlimited: {
+    kelas: null,
+    kelasKoPendidik: null,
+    ahliSeKelas: null,
+    pemainSesi: null,
+    aktiviti: null,
+    papan: null,
+    fileMb: null,
+    storageMb: null,
+    penilaianRakan: true,
+  },
 };
 
-/** Harga pelan, mata wang MYR. Sumber tunggal untuk UI dan landing page. */
+/** Harga pelan, mata wang MYR. Sumber tunggal untuk UI dan landing page.
+ *  Pelan unlimited TIDAK dijual: pelan dalaman, jadi tiada harga. */
 export const HARGA_PELAN = {
   pro: { bulanan: 29, tahunanSebulan: 19, tahunan: 228 },
   institution: { tahunan: 1500, kerusi: 10 },
@@ -145,7 +160,12 @@ export async function pelanSaya(): Promise<RingkasanPelan | null> {
   if (error || !data) return null;
 
   const j = data as JsonPelan;
-  const plan = (j.plan === 'pro' || j.plan === 'institution') ? j.plan : 'free';
+  // 'unlimited' ialah pelan keempat yang sah (V2-002b-baiki); apa-apa nilai
+  // lain yang tidak dikenali jatuh ke free seperti sebelum ini.
+  const plan: Pelan =
+    j.plan === 'pro' || j.plan === 'institution' || j.plan === 'unlimited'
+      ? j.plan
+      : 'free';
   const had = j.limits || {};
   return {
     pelan: plan,

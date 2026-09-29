@@ -10,10 +10,13 @@
 --   a  fail 11MB ditolak pada free
 --   b  fail 11MB diterima pada pro
 --   c  fail 21MB ditolak pada pro
---   d  video/mp4 ditolak semua pelan
+--   d1 video/mp4 ditolak pada free; d2 pada pro
+--   d3 video/mp4 500MB DITERIMA pada unlimited (V2-002b-baiki)
+--   d4 video/mp4 500MB ditolak pada pro (video yang sama seperti d3)
 --   e  jumlah melebihi 100MB ditolak pada free
 --   f  peserta yang bukan ahli kelas ditolak
 --   g  fail penghantaran peserta dikira dalam kuota pemilik kelas
+--      (pemilik kelas BERBEZA daripada e supaya tiada pertindihan kuota)
 --   h  authenticated tidak boleh INSERT terus ke qm_file_usage
 --   i  pengguna A tidak nampak rekod B
 
@@ -76,8 +79,12 @@ DECLARE
   u_pro  uuid := '11111111-1111-1111-1111-111111111201';
   u_asal uuid := '11111111-1111-1111-1111-111111111301';
   u_ahli uuid := '11111111-1111-1111-1111-111111111401';
+  u_own  uuid := '11111111-1111-1111-1111-111111111501';
+  u_ahli2 uuid := '11111111-1111-1111-1111-111111111601';
+  u_unl  uuid := '11111111-1111-1111-1111-111111111701';
   c_f    uuid := '22222222-2222-2222-2222-222222222101';
   c_p    uuid := '22222222-2222-2222-2222-222222222201';
+  c_g    uuid := '22222222-2222-2222-2222-222222222301';
 BEGIN
   PERFORM set_config('session_replication_role', 'replica', true);
 
@@ -85,14 +92,22 @@ BEGIN
     (u_free, 'educator', 'free'),
     (u_pro,  'educator', 'pro'),
     (u_asal, 'educator', 'pro'),
-    (u_ahli, 'participant', 'free');
+    (u_ahli, 'participant', 'free'),
+    (u_own,  'educator', 'pro'),
+    (u_ahli2, 'participant', 'free'),
+    (u_unl,  'educator', 'unlimited');
 
   INSERT INTO public.qm_classes (id, owner_id, name) VALUES
     (c_f, u_free, 'Kelas Free'),
-    (c_p, u_pro,  'Kelas Pro');
+    (c_p, u_pro,  'Kelas Pro'),
+    -- Kelas terpisah untuk senario g supaya rekod penghantaran peserta
+    -- tidak bertindih dengan kuota u_free yang dipenuhi dalam senario e.
+    (c_g, u_own,  'Kelas Hantaran');
 
-  -- Ahli kelas c_f: u_ahli (untuk semakan g, dia dibenarkan memuat naik).
+  -- Ahli kelas c_f: u_ahli (untuk semakan kebenaran ahli, tanpa rekod kuota).
   INSERT INTO public.qm_class_members (class_id, user_id) VALUES (c_f, u_ahli);
+  -- Ahli kelas c_g: u_ahli2 (senario g; pemilik kelas ialah u_own).
+  INSERT INTO public.qm_class_members (class_id, user_id) VALUES (c_g, u_ahli2);
 
   PERFORM set_config('session_replication_role', 'origin', true);
 END;
@@ -218,6 +233,51 @@ END;
 $chk$;
 
 -- ---------------------------------------------------------------------
+-- d3. video/mp4 500MB DITERIMA pada unlimited (V2-002b-baiki): pelan
+--     dengan kunci video = true lulus tanpa had saiz fail atau storan.
+--     Muat naik profil (p_class NULL), jadi pemilik kuota ialah pemanggil.
+-- ---------------------------------------------------------------------
+DO $chk$
+DECLARE
+  u_unl uuid := '11111111-1111-1111-1111-111111111701';
+BEGIN
+  PERFORM pg_temp.qm_test_as(u_unl);
+  BEGIN
+    PERFORM public.qm_reserve_upload(NULL, 500 * 1024 * 1024, 'video/mp4');
+    PERFORM pg_temp.qm_verdict('d3', true, 'unlimited diterima untuk video/mp4 500MB (kunci video = true)');
+  EXCEPTION
+    WHEN OTHERS THEN
+      PERFORM pg_temp.qm_verdict('d3', false, 'unlimited ditolak secara salah: ' || sqlerrm);
+  END;
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+-- ---------------------------------------------------------------------
+-- d4. Video yang sama (500MB, video/mp4) ditolak pada pro: pelan pro
+--     mempunyai kunci video = false, jadi QM_VIDEO_BLOCKED diutamakan.
+-- ---------------------------------------------------------------------
+DO $chk$
+DECLARE
+  u_pro uuid := '11111111-1111-1111-1111-111111111201';
+BEGIN
+  PERFORM pg_temp.qm_test_as(u_pro);
+  BEGIN
+    PERFORM public.qm_reserve_upload(NULL, 500 * 1024 * 1024, 'video/mp4');
+    PERFORM pg_temp.qm_verdict('d4', false, 'video 500MB pro TIDAK ditolak');
+  EXCEPTION
+    WHEN OTHERS THEN
+      IF sqlerrm LIKE 'QM_VIDEO_BLOCKED:%' THEN
+        PERFORM pg_temp.qm_verdict('d4', true, 'video/mp4 500MB ditolak pada pro (QM_VIDEO_BLOCKED)');
+      ELSE
+        PERFORM pg_temp.qm_verdict('d4', false, 'ralat lain: ' || sqlerrm);
+      END IF;
+  END;
+  PERFORM pg_temp.qm_test_reset();
+END;
+$chk$;
+
+-- ---------------------------------------------------------------------
 -- e. Jumlah melebihi 100MB ditolak pada free (storage_mb 100).
 --    Setiap fail 10MB (tepat pada had fail free, tidak melepasinya).
 --    Sepuluh rekod = 100MB; kesebelas melepasi jumlah dan ditolak.
@@ -282,22 +342,23 @@ $chk$;
 
 -- ---------------------------------------------------------------------
 -- g. Fail penghantaran peserta dikira dalam kuota PEMILIK KELAS:
---    u_ahli (free) memuat naik ke kelas milik u_free. Selepas itu
---    qm_storage_used(u_free) meningkat, bukan qm_storage_used(u_ahli).
+--    u_ahli2 (free) memuat naik ke kelas c_g milik u_own (pro). Pemilik
+--    kelas BERBEZA daripada senario e supaya tiada pertindihan kuota.
+--    Selepas itu qm_storage_used(u_own) meningkat, bukan u_ahli2.
 -- ---------------------------------------------------------------------
 DO $chk$
 DECLARE
-  u_free uuid := '11111111-1111-1111-1111-111111111101';
-  u_ahli uuid := '11111111-1111-1111-1111-111111111401';
-  c_f    uuid := '22222222-2222-2222-2222-222222222101';
+  u_own   uuid := '11111111-1111-1111-1111-111111111501';
+  u_ahli2 uuid := '11111111-1111-1111-1111-111111111601';
+  c_g     uuid := '22222222-2222-2222-2222-222222222301';
   v_before bigint;
   v_after  bigint;
   v_row  record;
 BEGIN
-  v_before := public.qm_storage_used(u_free);
-  PERFORM pg_temp.qm_test_as(u_ahli);
+  v_before := public.qm_storage_used(u_own);
+  PERFORM pg_temp.qm_test_as(u_ahli2);
   BEGIN
-    PERFORM public.qm_record_upload(c_f, 's5__hantaransesi', 5 * 1024 * 1024, 'image/png', 'submission_board');
+    PERFORM public.qm_record_upload(c_g, 's5__hantaransesi', 5 * 1024 * 1024, 'image/png', 'submission_board');
     PERFORM pg_temp.qm_verdict('g1', true, 'ahli kelas dibenarkan memuat naik ke kelas');
   EXCEPTION
     WHEN OTHERS THEN
@@ -307,8 +368,8 @@ BEGIN
 
   SELECT owner_id, bytes INTO v_row FROM public.qm_file_usage
    WHERE file_code = 's5__hantaransesi';
-  v_after := public.qm_storage_used(u_free);
-  IF v_row.owner_id = u_free AND v_after = v_before + 5 * 1024 * 1024 THEN
+  v_after := public.qm_storage_used(u_own);
+  IF v_row.owner_id = u_own AND v_after = v_before + 5 * 1024 * 1024 THEN
     PERFORM pg_temp.qm_verdict('g2', true, 'fail penghantaran dikira dalam kuota pemilik kelas');
   ELSE
     PERFORM pg_temp.qm_verdict('g2', false,

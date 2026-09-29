@@ -91,7 +91,18 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     return NextResponse.json(kuota.body, { status: kuota.status });
   }
 
-  await rekodMuatNaik(owner.supa, params.classId, fileCode, size, mime, 'learning_board');
+  const rekod = await rekodMuatNaik(owner.supa, params.classId, fileCode, size, mime, 'learning_board_presigned');
+  if (rekod) {
+    // Rekod gagal selepas objek disahkan wujud (kzsec 2/3): padam objek
+    // supaya tiada fail yatim di luar kuota, kemudian balas ralat. Jangan
+    // gagal senyap.
+    try {
+      await s5DeleteObject(t.object_key);
+    } catch (e: unknown) {
+      console.error(`[upload-finalize] gagal padam objek selepas rekod gagal: ${e instanceof Error ? e.message : e}`);
+    }
+    return NextResponse.json(rekod.body, { status: rekod.status });
+  }
 
   console.log(
     `[upload-finalize] user=${owner.user!.id} class=${params.classId} key=${t.object_key} bytes=${size}`

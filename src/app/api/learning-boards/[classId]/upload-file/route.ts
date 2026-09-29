@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { assertCapability } from '@/lib/capabilities';
-import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
+import { fileluUpload, fileluShareUrl, fileluDelete } from '@/lib/filelu';
 import { fetchRemoteToDisk, checkRateLimit, readTmp, UploadGuardError } from '@/lib/upload-guard';
 import { s5ObjectKey, s5PutStream, s5FileCode } from '@/lib/s5';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
@@ -48,9 +48,11 @@ const ALLOWED_MIME_PREFIXES = [
   'text/',
   'image/',
   'audio/',
+  'video/',
 ];
-// Video disekat pada tahap pelan v2 (tiket V2-002b). Penolakan dilakukan
-// oleh qm_reserve_upload di pangkalan data; senarai ini hanya penapis pertama.
+// Video TIDAK disekat secara keras di sini (V2-002b-baiki): ia diteruskan ke
+// qm_reserve_upload supaya pelan unlimited (kunci video = true) boleh memuat
+// naik video, manakala pelan lain ditolak oleh fungsi pangkalan data.
 
 function extOf(name: string): string {
   const i = name.lastIndexOf('.');
@@ -123,7 +125,16 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       await s5PutStream(key, readTmp(remote.tmpPath), remote.bytes, remote.mimeType);
       const fileCode = s5FileCode(key);
 
-      await rekodMuatNaik(owner.supa, params.classId, fileCode, remote.bytes, remote.mimeType, 'learning_board');
+      // Rekod ialah penentu akhir kuota. Jika gagal (contoh kuota penuh
+      // semasa fail ditransit), cuba padam fail daripada storan supaya
+      // tidak ada fail yatim yang tidak dikira (kzsec 2/3).
+      const rekod = await rekodMuatNaik(
+        owner.supa, params.classId, fileCode, remote.bytes, remote.mimeType, 'learning_board_url');
+      if (rekod) {
+        const padam = await fileluDelete(fileCode);
+        console.error(`[upload-file/source_url] rekod gagal, padam=${padam} code=${fileCode}`);
+        return NextResponse.json(rekod.body, { status: rekod.status });
+      }
 
       console.log(
         `[upload-file/source_url] user=${owner.user!.id} class=${params.classId} ` +
@@ -183,7 +194,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
 
-  await rekodMuatNaik(owner.supa, params.classId, uploaded.fileCode, uploaded.sizeBytes, mime, 'learning_board');
+  const rekod = await rekodMuatNaik(owner.supa, params.classId, uploaded.fileCode, uploaded.sizeBytes, mime, 'learning_board');
+  if (rekod) {
+    // Cubaan padam terbaik: jika qm_record_upload menolak, fail tidak
+    // boleh kekal di storan tanpa rekod kuota (kzsec 2/3).
+    const padam = await fileluDelete(uploaded.fileCode);
+    console.error(`[upload-file] rekod gagal, padam=${padam} code=${uploaded.fileCode}`);
+    return NextResponse.json(rekod.body, { status: rekod.status });
+  }
 
   // Stable URL that streams the file through our server (sets correct content-type so <img>/<video> can render).
   const fileluFileUrl = `/api/learning-boards/${params.classId}/file-redirect/${uploaded.fileCode}`;

@@ -116,13 +116,10 @@ BEGIN
       USING ERRCODE = 'P0001';
   END IF;
 
-  -- Video disekat untuk semua pelan (v2). Semakan mime di pelayan kerana
-  -- klien boleh diubah suai.
-  IF COALESCE(p_mime, '') LIKE 'video/%' THEN
-    RAISE EXCEPTION 'QM_VIDEO_BLOCKED: Video files are not supported. Paste a YouTube or Google Drive link instead.'
-      USING ERRCODE = 'P0001';
-  END IF;
-
+  -- Video ditentukan oleh pelan berkesan pemilik kuota, bukan sekatan
+  -- keras (V2-002b-baiki, temuan 2): pelan dengan kunci video = true
+  -- dibenarkan (unlimited), yang lain ditolak. Semakan dibuat selepas
+  -- pelan diketahui, jadi blok MIME awal digugurkan.
   -- Tentukan pemilik kuota dan sahkan pemanggil berhak.
   IF p_class IS NOT NULL THEN
     SELECT c.owner_id INTO v_owner FROM public.qm_classes c WHERE c.id = p_class;
@@ -148,19 +145,32 @@ BEGIN
     v_owner := v_caller;
   END IF;
 
-  -- Had daripada SATU sumber: pelan berkesan pemilik kuota.
+  -- Had daripada SATU sumber: pelan berkesan pemilik kuota. NULL bermakna
+  -- tanpa had (pelan unlimited), jadi setiap semakan mesti melangkau jika
+  -- hadnya NULL.
   v_plan := public.qm_effective_plan(v_owner);
   v_file_mb  := (public.qm_plan_limits(v_plan) ->> 'file_mb')::bigint;
   v_store_mb := (public.qm_plan_limits(v_plan) ->> 'storage_mb')::bigint;
 
-  IF p_bytes > v_file_mb * 1024 * 1024 THEN
+  IF COALESCE(p_mime, '') LIKE 'video/%'
+     AND COALESCE((public.qm_plan_limits(v_plan) ->> 'video')::boolean, false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'QM_VIDEO_BLOCKED: Video files are not supported. Paste a YouTube or Google Drive link instead.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_file_mb IS NOT NULL AND p_bytes > v_file_mb * 1024 * 1024 THEN
     RAISE EXCEPTION 'QM_LIMIT_FILE_SIZE: File exceeds the % MB per-file limit of your plan.',
       v_file_mb
       USING ERRCODE = 'P0001';
   END IF;
 
+  -- Kunci advisori per transaksi atas pemilik kuota (kzsec 1, TOCTOU): dua
+  -- muat naik selari untuk pemilik yang sama tidak boleh kedua-duanya
+  -- melepasi semakan jumlah sebelum salah satu rekod disisipkan.
+  PERFORM pg_advisory_xact_lock(hashtext('qm_storage:' || v_owner::text));
+
   v_used := public.qm_storage_used(v_owner);
-  IF v_used + p_bytes > v_store_mb * 1024 * 1024 THEN
+  IF v_store_mb IS NOT NULL AND v_used + p_bytes > v_store_mb * 1024 * 1024 THEN
     RAISE EXCEPTION 'QM_LIMIT_STORAGE: Storage quota is full (% MB used of % MB). Delete old files or upgrade.',
       v_used / (1024 * 1024), v_store_mb
       USING ERRCODE = 'P0001';
@@ -214,8 +224,13 @@ BEGIN
     RAISE EXCEPTION 'QM_LIMIT_FILE_SIZE: Saiz fail mesti lebih daripada sifar.'
       USING ERRCODE = 'P0001';
   END IF;
-  IF COALESCE(p_mime, '') LIKE 'video/%' THEN
-    RAISE EXCEPTION 'QM_VIDEO_BLOCKED: Video files are not supported. Paste a YouTube or Google Drive link instead.'
+
+  -- p_source disahkan terhadap senarai tetap (kzsec 6): sumber bebas
+  -- memudahkan rekod palsu diselit tanpa dapat dikesan.
+  IF p_source IS NULL OR p_source NOT IN (
+       'learning_board', 'learning_board_url', 'learning_board_presigned',
+       'submission_board', 'intro_board', 'profile_intro') THEN
+    RAISE EXCEPTION 'QM_BAD_SOURCE: Sumber muat naik tidak sah.'
       USING ERRCODE = 'P0001';
   END IF;
 
@@ -245,18 +260,32 @@ BEGIN
     v_owner := v_caller;
   END IF;
 
+  -- Had daripada SATU sumber (ulang semula di sini: fungsi ini penentu
+  -- akhir, jangan percaya reserve klien). NULL bermakna tanpa had.
   v_plan := public.qm_effective_plan(v_owner);
   v_file_mb  := (public.qm_plan_limits(v_plan) ->> 'file_mb')::bigint;
   v_store_mb := (public.qm_plan_limits(v_plan) ->> 'storage_mb')::bigint;
 
-  IF p_bytes > v_file_mb * 1024 * 1024 THEN
+  IF COALESCE(p_mime, '') LIKE 'video/%'
+     AND COALESCE((public.qm_plan_limits(v_plan) ->> 'video')::boolean, false) IS NOT TRUE THEN
+    RAISE EXCEPTION 'QM_VIDEO_BLOCKED: Video files are not supported. Paste a YouTube or Google Drive link instead.'
+      USING ERRCODE = 'P0001';
+  END IF;
+
+  IF v_file_mb IS NOT NULL AND p_bytes > v_file_mb * 1024 * 1024 THEN
     RAISE EXCEPTION 'QM_LIMIT_FILE_SIZE: File exceeds the % MB per-file limit of your plan.',
       v_file_mb
       USING ERRCODE = 'P0001';
   END IF;
 
+  -- Kunci advisori per transaksi atas pemilik kuota (kzsec 1, TOCTOU).
+  -- qm_record_upload ialah penentu akhir: semakan jumlah diulang DI SINI
+  -- dengan kunci dipegang, supaya laluan antara reserve dan record tidak
+  -- boleh digunakan untuk melepasi kuota.
+  PERFORM pg_advisory_xact_lock(hashtext('qm_storage:' || v_owner::text));
+
   v_used := public.qm_storage_used(v_owner);
-  IF v_used + p_bytes > v_store_mb * 1024 * 1024 THEN
+  IF v_store_mb IS NOT NULL AND v_used + p_bytes > v_store_mb * 1024 * 1024 THEN
     RAISE EXCEPTION 'QM_LIMIT_STORAGE: Storage quota is full (% MB used of % MB). Delete old files or upgrade.',
       v_used / (1024 * 1024), v_store_mb
       USING ERRCODE = 'P0001';
@@ -266,7 +295,7 @@ BEGIN
     (file_code, bytes, mime, class_id, owner_id, uploaded_by, source)
   VALUES
     (p_file_code, p_bytes, p_mime, p_class, v_owner, v_caller,
-     COALESCE(nullif(btrim(COALESCE(p_source, '')), ''), 'unknown'))
+     btrim(p_source))
   RETURNING public.qm_file_usage.id INTO v_id;
 
   RETURN v_id;

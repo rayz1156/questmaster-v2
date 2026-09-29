@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { assertCapability } from '@/lib/capabilities';
-import { fileluUpload, fileluShareUrl } from '@/lib/filelu';
+import { fileluUpload, fileluShareUrl, fileluDelete } from '@/lib/filelu';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const dynamic = 'force-dynamic';
@@ -9,9 +9,13 @@ export const runtime = 'nodejs';
 
 // Had tetap 150MB digugurkan (tiket V2-002b): had sebenar kini datang
 // daripada pelan berkesan pemilik kelas melalui qm_reserve_upload.
+// Video DITERUSKAN ke qm_reserve_upload (V2-002b-baiki): pelan dengan
+// kunci video = true dibenarkan, yang lain ditolak oleh fungsi pangkalan
+// data, bukan oleh senarai ini.
 const ALLOWED_MIME_PREFIXES = [
   'image/',
   'audio/',
+  'video/',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats',
@@ -56,7 +60,14 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
 
-  await rekodMuatNaik(auth.supa, params.classId, uploaded.fileCode, uploaded.sizeBytes, mime, 'submission_board');
+  const rekod = await rekodMuatNaik(auth.supa, params.classId, uploaded.fileCode, uploaded.sizeBytes, mime, 'submission_board');
+  if (rekod) {
+    // Rekod gagal: padam fail daripada storan supaya tiada fail yatim
+    // yang tidak dikira dalam kuota (kzsec 2/3).
+    const padam = await fileluDelete(uploaded.fileCode);
+    console.error(`[submission-upload-file] rekod gagal, padam=${padam} code=${uploaded.fileCode}`);
+    return NextResponse.json(rekod.body, { status: rekod.status });
+  }
 
   const fileluFileUrl = `/api/submission-boards/${params.huntId}/${params.classId}/file-redirect/${uploaded.fileCode}`;
   return NextResponse.json({

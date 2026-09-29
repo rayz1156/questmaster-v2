@@ -176,7 +176,7 @@ export default function EduClasses() {
       {pelan && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
           <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${pelan.pelan === "free" ? "bg-[#F3F2F7] text-ink-muted border border-hairline" : "bg-violet-50 text-brand-purple border border-violet-200"}`}>
-            {pelan.pelan === "pro" ? "Pro plan" : pelan.pelan === "institution" ? "Institution plan" : "Free plan"}
+            {pelan.pelan === "pro" ? "Pro plan" : pelan.pelan === "institution" ? "Institution plan" : pelan.pelan === "unlimited" ? "Unlimited plan" : "Free plan"}
           </span>
           <span className="text-ink-muted">
             {tanpaHad(pelan.hadKelas)
@@ -297,8 +297,12 @@ export default function EduClasses() {
 function KadStoran({ pelan }: { pelan: RingkasanPelan }) {
   const had = HAD_PELAN[pelan.pelan];
   const usedMb = (pelan.storageDigunakanBytes ?? 0) / (1024 * 1024);
-  const pct = Math.min(100, had.storageMb > 0 ? (usedMb / had.storageMb) * 100 : 0);
-  const hampirPenuh = pct >= 80;
+  // Pelan unlimited (storageMb null): tiada kuota, tiada bar amaran.
+  const tanpaHadStoran = had.storageMb === null;
+  const pct = tanpaHadStoran
+    ? 0
+    : Math.min(100, had.storageMb! > 0 ? (usedMb / had.storageMb!) * 100 : 0);
+  const hampirPenuh = !tanpaHadStoran && pct >= 80;
   const fmt = (n: number) => (n >= 100 ? Math.round(n).toString() : n.toFixed(1).replace(/\.0$/, ""));
 
   return (
@@ -307,15 +311,19 @@ function KadStoran({ pelan }: { pelan: RingkasanPelan }) {
         <HardDrive className="w-4 h-4 text-brand-purple" />
         <div className="font-semibold text-ink text-sm">Storage</div>
         <span className="ml-auto text-xs text-ink-muted">
-          {fmt(usedMb)} MB of {had.storageMb} MB used
+          {had.storageMb === null
+            ? `${fmt(usedMb)} MB used (unlimited)`
+            : `${fmt(usedMb)} MB of ${had.storageMb} MB used`}
         </span>
       </div>
-      <div className="w-full h-2 rounded-full bg-white border border-violet-100 overflow-hidden">
-        <div
-          className={`h-full rounded-full transition-all ${hampirPenuh ? "bg-amber-500" : "bg-gradient-to-r from-violet-600 to-indigo-600"}`}
-          style={{ width: `${pct}%` }}
-        />
-      </div>
+      {had.storageMb !== null && (
+        <div className="w-full h-2 rounded-full bg-white border border-violet-100 overflow-hidden">
+          <div
+            className={`h-full rounded-full transition-all ${hampirPenuh ? "bg-amber-500" : "bg-gradient-to-r from-violet-600 to-indigo-600"}`}
+            style={{ width: `${pct}%` }}
+          />
+        </div>
+      )}
       {hampirPenuh && (
         <div className="text-xs text-amber-600 mt-2">
           You have used {Math.round(pct)}% of your storage. Delete old files or upgrade.

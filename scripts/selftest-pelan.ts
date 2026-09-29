@@ -27,20 +27,23 @@ function check(name: string, cond: boolean, extra?: unknown) {
  *
  * Nilai yang disalin daripada migrasi 0040_pelan_v2.sql:
  *   pro:         classes 30, live_players 300, activities null, boards null,
- *                file_mb 20, storage_mb 1024, peer_review true
+ *                file_mb 20, storage_mb 1024, peer_review true, video false
  *   institution: classes 30, live_players 300, activities null, boards null,
- *                file_mb 20, storage_mb 10240, peer_review true
+ *                file_mb 20, storage_mb 10240, peer_review true, video false
  *   free (lalai):classes 3, members_per_class 150, live_players 60,
  *                activities 30, boards 5, file_mb 10, storage_mb 100,
- *                peer_review false
+ *                peer_review false, video false
+ *   unlimited:   semua had null, peer_review true, video true
+ *                (V2-002b-baiki, 0040 baris 102)
  */
-const SQL: Record<Pelan, { classes: number; membersPerClass: number | null; livePlayers: number; activities: number | null; boards: number | null; fileMb: number; storageMb: number; peerReview: boolean }> = {
+const SQL: Record<Pelan, { classes: number | null; membersPerClass: number | null; livePlayers: number | null; activities: number | null; boards: number | null; fileMb: number | null; storageMb: number | null; peerReview: boolean }> = {
   pro:         { classes: 30, membersPerClass: null, livePlayers: 300, activities: null, boards: null, fileMb: 20, storageMb: 1024,  peerReview: true },
   institution: { classes: 30, membersPerClass: null, livePlayers: 300, activities: null, boards: null, fileMb: 20, storageMb: 10240, peerReview: true },
   free:        { classes: 3,  membersPerClass: 150,  livePlayers: 60,  activities: 30,   boards: 5,   fileMb: 10, storageMb: 100,   peerReview: false },
+  unlimited:   { classes: null, membersPerClass: null, livePlayers: null, activities: null, boards: null, fileMb: null, storageMb: null, peerReview: true },
 };
 
-for (const p of ['free', 'pro', 'institution'] as Pelan[]) {
+for (const p of ['free', 'pro', 'institution', 'unlimited'] as Pelan[]) {
   const h = HAD_PELAN[p];
   const s = SQL[p];
   check(`${p}: kelas`, h.kelas === s.classes, [h.kelas, s.classes]);
@@ -54,6 +57,19 @@ for (const p of ['free', 'pro', 'institution'] as Pelan[]) {
 
 check('free: peserta setiap kelas 150', HAD_PELAN.free.ahliSeKelas === 150, HAD_PELAN.free.ahliSeKelas);
 check('pro: peserta setiap kelas tanpa had', HAD_PELAN.pro.ahliSeKelas === null, HAD_PELAN.pro.ahliSeKelas);
+
+/* ===== Bahagian 1b: pelan unlimited (V2-002b-baiki) ===== */
+check('unlimited: semua had null',
+  HAD_PELAN.unlimited.kelas === null && HAD_PELAN.unlimited.ahliSeKelas === null &&
+  HAD_PELAN.unlimited.pemainSesi === null && HAD_PELAN.unlimited.aktiviti === null &&
+  HAD_PELAN.unlimited.papan === null && HAD_PELAN.unlimited.fileMb === null &&
+  HAD_PELAN.unlimited.storageMb === null,
+  HAD_PELAN.unlimited);
+check('unlimited: penilaian rakan benar', HAD_PELAN.unlimited.penilaianRakan === true);
+
+/* ===== Bahagian 1c: HARGA_PELAN TIDAK memasukkan unlimited ===== */
+// Pelan unlimited ialah pelan dalaman, tidak dijual (V2-002b-baiki).
+check('HARGA_PELAN tiada unlimited', !('unlimited' in HARGA_PELAN), Object.keys(HARGA_PELAN));
 
 /* ===== Bahagian 2: HARGA_PELAN (tiket baris 29) ===== */
 check('harga pro bulanan 29', HARGA_PELAN.pro.bulanan === 29, HARGA_PELAN.pro);

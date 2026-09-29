@@ -103,12 +103,24 @@ export async function requireClassMember(req: NextRequest | Request | null, clas
     .eq('class_id', classId)
     .eq('user_id', auth.user!.id)
     .maybeSingle();
+  // Ko-educator yang sudah menerima jemputan juga diterima (kzsec 5):
+  // qm_class_members ialah jadual PESERTA sahaja; pendidik ada dalam
+  // qm_class_educators dan jemputan yang belum diterima tidak memberi hak.
   if (!member) {
-    return {
-      ...auth,
-      klass: null,
-      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as NextResponse,
-    };
+    const { data: edu } = await auth.supa
+      .from('qm_class_educators')
+      .select('educator_id')
+      .eq('class_id', classId)
+      .eq('educator_id', auth.user!.id)
+      .not('accepted_at', 'is', null)
+      .maybeSingle();
+    if (!edu) {
+      return {
+        ...auth,
+        klass: null,
+        response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as NextResponse,
+      };
+    }
   }
   return { ...auth, klass };
 }

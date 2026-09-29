@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fileluUpload } from '@/lib/filelu';
+import { fileluUpload, fileluDelete } from '@/lib/filelu';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
@@ -26,7 +26,13 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   if (klass.owner_id !== auth.user!.id) {
     const { data: member } = await admin
       .from('qm_class_members').select('user_id').eq('class_id', board.class_id).eq('user_id', auth.user!.id).maybeSingle();
-    if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    // Ko-educator yang sudah menerima jemputan juga diterima (kzsec 5):
+    // dia bukan qm_class_members tetapi berhak memuat naik.
+    const { data: edu } = await admin
+      .from('qm_class_educators').select('educator_id')
+      .eq('class_id', board.class_id).eq('educator_id', auth.user!.id)
+      .not('accepted_at', 'is', null).maybeSingle();
+    if (!member && !edu) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 
   const form = await req.formData().catch(() => null);
@@ -34,15 +40,18 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   const file = form.get('file');
   if (!(file instanceof File)) return NextResponse.json({ error: 'file field missing' }, { status: 400 });
   if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: `File too large. Max ${Math.round(MAX_BYTES/1024/1024)} MB` }, { status: 413 });
   const mime = file.type || 'application/octet-stream';
   if (!mime.startsWith('image/')) return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
 
-  // Kuota disemak SEBELUM bait dihantar (tiket V2-002b). Pemilik kuota
-  // ialah pemilik kelas papan ini; 15MB MAX_BYTES dikekalkan sebagai injap
-  // operasi di hadapan had pelan.
+  // Kuota disemak SEBELUM bait dihantar dan SEBELUM injap 15MB (tiket
+  // V2-002b-baiki, kzsec 4): had pelan (file_mb) dikuatkuasakan lebih
+  // dahulu supaya mesej ralat pelan yang tepat sampai kepada pengguna.
+  // Pemilik kuota ialah pemilik kelas papan ini; 15MB dikekalkan sebagai
+  // injap operasi di hadapan had pelan.
   const kuota = await reserveMuatNaik(auth.supa, board.class_id, file.size, mime);
   if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
+
+  if (file.size > MAX_BYTES) return NextResponse.json({ error: `File too large. Max ${Math.round(MAX_BYTES/1024/1024)} MB` }, { status: 413 });
 
   const buf = Buffer.from(await file.arrayBuffer());
   let uploaded;
@@ -52,7 +61,14 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
     return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
   }
 
-  await rekodMuatNaik(auth.supa, board.class_id, uploaded.fileCode, uploaded.sizeBytes ?? file.size, mime, 'intro_board');
+  const rekod = await rekodMuatNaik(auth.supa, board.class_id, uploaded.fileCode, uploaded.sizeBytes ?? file.size, mime, 'intro_board');
+  if (rekod) {
+    // Rekod gagal selepas muat naik (kzsec 2/3): cuba padam fail daripada
+    // storan supaya tiada fail yatim di luar kuota, kemudian balas ralat.
+    const padam = await fileluDelete(uploaded.fileCode);
+    console.error(`[intro-upload-image] rekod gagal, padam=${padam} code=${uploaded.fileCode}`);
+    return NextResponse.json(rekod.body, { status: rekod.status });
+  }
 
   const url = `/api/intro-boards/${params.boardId}/image/${uploaded.fileCode}`;
   return NextResponse.json({ url, path: uploaded.fileCode, fileCode: uploaded.fileCode });
