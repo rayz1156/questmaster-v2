@@ -2,6 +2,9 @@ import { supabase } from '@/lib/supabase';
 
 export type Pelan = 'free' | 'pro' | 'institution' | 'unlimited';
 
+/** Pelan yang dipaparkan di landing page (unlimited ialah pelan dalaman). */
+export type PelanAwam = Exclude<Pelan, 'unlimited'>;
+
 /**
  * Had pelan: SATU sumber untuk UI dan landing page. Angka di sini MESTI
  * selari dengan qm_plan_limits dalam supabase/migrations/0040_pelan_v2.sql
@@ -73,6 +76,7 @@ export const HAD_PELAN: Record<Pelan, {
 /** Harga pelan, mata wang MYR. Sumber tunggal untuk UI dan landing page.
  *  Pelan unlimited TIDAK dijual: pelan dalaman, jadi tiada harga. */
 export const HARGA_PELAN = {
+  free: { tahunan: 0 },
   pro: { bulanan: 29, tahunanSebulan: 19, tahunan: 228 },
   institution: { tahunan: 1500, kerusi: 10 },
 } as const;

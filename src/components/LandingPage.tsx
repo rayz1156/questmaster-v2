@@ -3,7 +3,9 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import LandingSessionCheck from "@/components/LandingSessionCheck";
 import HeroVideo from "@/components/HeroVideo";
+import BahagianHarga from "@/components/landing/BahagianHarga";
 import { TEKS_LANDING, TAPAK, LALUAN, type Bahasa } from "@/lib/landing-copy";
+import { HARGA_PELAN } from "@/lib/pelan";
 
 /**
  * Halaman utama awam, dikongsi oleh "/" (BM) dan "/en" (Inggeris).
@@ -20,16 +22,16 @@ import { TEKS_LANDING, TAPAK, LALUAN, type Bahasa } from "@/lib/landing-copy";
 const DISPLAY = { fontFamily: "var(--font-display), Georgia, serif" } as const;
 
 const IKON = [
-  <>
+  <g key="main">
     <circle cx="12" cy="12" r="9" />
     <path d="M10 8.5l5.5 3.5L10 15.5V8.5Z" fill="currentColor" stroke="none" />
-  </>,
-  <>
+  </g>,
+  <g key="doc">
     <path d="M6 3h8l4 4v14H6V3Z" />
     <path d="M14 3v4h4" />
     <path d="M9 12h6M9 16h6" />
-  </>,
-  <path d="M5 19V11M12 19V5M19 19v-6" />,
+  </g>,
+  <path key="chart" d="M5 19V11M12 19V5M19 19v-6" />,
 ];
 
 function urlPenuh(bahasa: Bahasa) {
@@ -92,6 +94,65 @@ function jsonLd(bahasa: Bahasa) {
         publisher: { "@id": `${TAPAK}/#organization` },
       },
       {
+        "@type": "Product",
+        "@id": `${TAPAK}/#product`,
+        name: "Kuizen",
+        description: t.orgDescription,
+        url: `${TAPAK}/#harga`,
+        brand: { "@id": `${TAPAK}/#organization` },
+        offers: [
+          {
+            "@type": "Offer",
+            name: t.harga.pelanNama.free,
+            price: "0",
+            priceCurrency: "MYR",
+            url: `${TAPAK}/#harga`,
+          },
+          {
+            "@type": "Offer",
+            name: t.harga.pelanNama.pro,
+            price: String(HARGA_PELAN.pro.tahunan),
+            priceCurrency: "MYR",
+            url: `${TAPAK}/#harga`,
+            priceSpecification: {
+              "@type": "UnitPriceSpecification",
+              price: String(HARGA_PELAN.pro.tahunan),
+              priceCurrency: "MYR",
+              billingDuration: "P1Y",
+              billingIncrement: 1,
+            },
+          },
+          {
+            "@type": "Offer",
+            name: t.harga.pelanNama.pro,
+            price: String(HARGA_PELAN.pro.bulanan),
+            priceCurrency: "MYR",
+            url: `${TAPAK}/#harga`,
+            priceSpecification: {
+              "@type": "UnitPriceSpecification",
+              price: String(HARGA_PELAN.pro.bulanan),
+              priceCurrency: "MYR",
+              billingDuration: "P1M",
+              billingIncrement: 1,
+            },
+          },
+          {
+            "@type": "Offer",
+            name: t.harga.pelanNama.institution,
+            price: String(HARGA_PELAN.institution.tahunan),
+            priceCurrency: "MYR",
+            url: `${TAPAK}/#harga`,
+            priceSpecification: {
+              "@type": "UnitPriceSpecification",
+              price: String(HARGA_PELAN.institution.tahunan),
+              priceCurrency: "MYR",
+              billingDuration: "P1Y",
+              billingIncrement: 1,
+            },
+          },
+        ],
+      },
+      {
         "@type": "FAQPage",
         "@id": `${url}#faq`,
         inLanguage: t.inLanguage,
@@ -134,6 +195,8 @@ function PilihBahasa({ bahasa, label }: { bahasa: Bahasa; label: string }) {
 export default function LandingPage({ bahasa }: { bahasa: Bahasa }) {
   const t = TEKS_LANDING[bahasa];
   const ciriId = bahasa === "ms" ? "ciri" : "features";
+  // Pautan Harga: halaman BM ke tempatan, halaman EN ke /en#harga (tiket V2-006).
+  const hargaHref = bahasa === "ms" ? "#harga" : "/en#harga";
 
   return (
     <div className="min-h-screen flex flex-col bg-white" lang={t.htmlLang}>
@@ -148,6 +211,7 @@ export default function LandingPage({ bahasa }: { bahasa: Bahasa }) {
           <Logo size={28} />
           <nav className="hidden sm:flex items-center gap-7 text-sm text-ink-muted">
             <Link href={`#${ciriId}`} className="hover:text-ink">{t.nav.ciri}</Link>
+            <Link href={hargaHref} className="hover:text-ink">{t.nav.harga}</Link>
             <Link href="/blog" className="hover:text-ink">{t.nav.blog}</Link>
             <Link href="/help" className="hover:text-ink">{t.nav.bantuan}</Link>
           </nav>
@@ -218,6 +282,8 @@ export default function LandingPage({ bahasa }: { bahasa: Bahasa }) {
           </div>
         </section>
 
+        <BahagianHarga bahasa={bahasa} />
+
         <section className="px-6 sm:px-8 pt-14 pb-16 border-t border-hairline">
           <div className="mx-auto w-full max-w-[760px]">
             <h2
@@ -273,6 +339,7 @@ export default function LandingPage({ bahasa }: { bahasa: Bahasa }) {
             <p className="mt-1.5 text-[13px] text-ink-faint">{t.kaki.slogan}</p>
           </div>
           <nav className="flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-muted">
+            <Link href={hargaHref} className="hover:text-ink">{t.kaki.harga}</Link>
             <Link href="/privacy" className="hover:text-ink">{t.kaki.privasi}</Link>
             <Link href="/terms" className="hover:text-ink">{t.kaki.terma}</Link>
             <Link href="/blog" className="hover:text-ink">{t.kaki.blog}</Link>
