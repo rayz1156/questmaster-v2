@@ -53,7 +53,6 @@ export async function GET(req: NextRequest) {
   // requireUser hanya memulangkan user null bersama response ralat di atas.
   const user = auth.user!;
 
-  const profil = await profilPemanggil(auth.supa, user.id);
   // qm_email_integrations tiada polisi authenticated; hanya service role
   // boleh membacanya, dan hanya selepas pemanggil disahkan di atas.
   const svc = getServiceSupabase();
