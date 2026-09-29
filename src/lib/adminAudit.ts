@@ -99,3 +99,172 @@ export function alasanAudit(meta: unknown): string | null {
     return null;
   }
 }
+
+/* =========================================================
+ * Penapis log audit (V2-011c)
+ * ========================================================= */
+
+/** Baris qm_audit_log sebagaimana dipulangkan adminListAuditLogPaged. */
+export interface BarisAudit {
+  id: number;
+  actor_id: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  meta: unknown;
+  created_at: string;
+}
+
+/** Tempoh penapis Period pada halaman Audit. */
+export type PeriodAudit = '24h' | '7d' | '30d' | 'all';
+
+/** Jam tempoh setiap pilihan Period, 'all' bermakna tanpa had. */
+export const JAM_PERIOD: Record<PeriodAudit, number | null> = {
+  '24h': 24,
+  '7d': 7 * 24,
+  '30d': 30 * 24,
+  all: null,
+};
+
+/**
+ * Tarikh mula (ISO) untuk penapis Period; null bermakna semua masa.
+ * Masa rujukan boleh disuntik untuk ujian.
+ */
+export function mulaPeriod(period: PeriodAudit, nowMs?: number): string | null {
+  const jam = JAM_PERIOD[period];
+  if (jam === null) return null;
+  const kini = typeof nowMs === 'number' ? nowMs : Date.now();
+  return new Date(kini - jam * 3_600_000).toISOString();
+}
+
+/**
+ * Padanan satu baris terhadap tempoh Period. Baris rosak tarikh tidak
+ * dipapar bila tempoh aktif (paling selamat: jangan tunjuk entri lama
+ * yang tidak boleh dibanding).
+ */
+export function padanPeriod(r: BarisAudit, period: PeriodAudit, nowMs?: number): boolean {
+  const mula = mulaPeriod(period, nowMs);
+  if (mula === null) return true;
+  const t = new Date(r.created_at).getTime();
+  if (Number.isNaN(t)) return false;
+  return t >= new Date(mula).getTime();
+}
+
+/** Ringkasan alasan untuk lajur Reason: satu baris, dipotong. */
+export function ringkasAlasan(meta: unknown, max = 80): string {
+  const alasan = alasanAudit(meta);
+  if (!alasan) return '-';
+  if (alasan.length <= max) return alasan;
+  const ruang = alasan.lastIndexOf(' ', max);
+  return (ruang > max * 0.5 ? alasan.slice(0, ruang) : alasan.slice(0, max)) + '...';
+}
+
+/**
+ * Peta nama sasaran audit yang dibina halaman daripada profil, kelas,
+ * aktiviti, challenge dan pasukan. Semua medan pilihan supaya halaman
+ * boleh menghantar peta separa apabila satu sumber gagal dimuat.
+ */
+export interface PetaSasaranAudit {
+  profil?: Record<string, string | null>;
+  kelas?: Record<string, string | null>;
+  hunt?: Record<string, string | null>;
+  /** challenge_id -> tajuk; digunakan juga untuk pautan butiran aktiviti. */
+  challenge?: Record<string, string | null>;
+  /** challenge_id -> hunt_id untuk membina pautan. */
+  challengeHunt?: Record<string, string>;
+  team?: Record<string, string | null>;
+}
+
+export interface SasaranAudit {
+  /** Nama sasaran jika dapat dipetakan, jika tidak null. */
+  nama: string | null;
+  /** Jenis sasaran untuk paparan: "User", "Class", "Activity", dsb. */
+  jenis: string;
+  /** Id dipendekkan kepada 8 aksara untuk fon mono kecil. */
+  idPendek: string;
+  /** Pautan butiran jika jenis sasaran ada halaman butiran admin. */
+  href: string | null;
+}
+
+/** Label jenis sasaran daripada target_type log. */
+export function jenisSasaran(targetType: string | null | undefined): string {
+  const t = String(targetType || '').toLowerCase();
+  if (t === 'profile' || t === 'user') return 'User';
+  if (t === 'class') return 'Class';
+  if (t === 'hunt' || t === 'activity') return 'Activity';
+  if (t === 'challenge') return 'Challenge';
+  if (t === 'team') return 'Team';
+  if (t === 'submission') return 'Submission';
+  return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Target';
+}
+
+/**
+ * Paparan sasaran satu baris audit: nama dipetakan daripada peta jika
+ * boleh; jika tidak, jenis sasaran dengan id 8 aksara. Pautan dibina
+ * hanya untuk sasaran yang ada halaman butiran admin. UUID penuh tidak
+ * pernah dipaparkan sebagai nama.
+ */
+export function sasaranAudit(r: BarisAudit, peta: PetaSasaranAudit): SasaranAudit {
+  const id = r.target_id || '';
+  const jenis = jenisSasaran(r.target_type);
+  const idPendek = id ? id.slice(0, 8) : '';
+  const t = String(r.target_type || '').toLowerCase();
+  let nama: string | null = null;
+  let href: string | null = null;
+  if (t === 'profile' || t === 'user') {
+    nama = (peta.profil?.[id] || '').trim() || null;
+    href = id ? `/admin/users/${id}` : null;
+  } else if (t === 'class') {
+    nama = (peta.kelas?.[id] || '').trim() || null;
+    href = id ? `/admin/classes/${id}` : null;
+  } else if (t === 'hunt' || t === 'activity') {
+    nama = (peta.hunt?.[id] || '').trim() || null;
+    href = id ? `/admin/hunts/${id}` : null;
+  } else if (t === 'challenge') {
+    nama = (peta.challenge?.[id] || '').trim() || null;
+    const huntId = peta.challengeHunt?.[id];
+    href = huntId ? `/admin/hunts/${huntId}` : null;
+  } else if (t === 'team') {
+    nama = (peta.team?.[id] || '').trim() || null;
+  }
+  return { nama, jenis, idPendek, href };
+}
+
+/**
+ * Carian sasaran di klien terhadap senarai yang sudah dimuat: id penuh,
+ * id pendek, nama sasaran, nama pelaku atau nama kelas/pengguna dalam
+ * teks paparan. Tidak peka huruf besar.
+ */
+export function padanCarianSasaran(
+  r: BarisAudit,
+  q: string,
+  peta: PetaSasaranAudit,
+  namaPelaku: Record<string, string | null>,
+): boolean {
+  const jarum = q.trim().toLowerCase();
+  if (!jarum) return true;
+  if (r.target_id && r.target_id.toLowerCase().includes(jarum)) return true;
+  if (r.target_id && r.target_id.slice(0, 8).toLowerCase().includes(jarum)) return true;
+  const sasaran = sasaranAudit(r, peta);
+  if (sasaran.nama && sasaran.nama.toLowerCase().includes(jarum)) return true;
+  if (jenisSasaran(r.target_type).toLowerCase().includes(jarum)) return true;
+  const pelaku = r.actor_id ? (namaPelaku[r.actor_id] || '').trim() : '';
+  if (pelaku && pelaku.toLowerCase().includes(jarum)) return true;
+  return false;
+}
+
+/**
+ * Susunan tindakan untuk pilihan Action: hanya tindakan yang betul-betul
+ * wujud dalam baris yang dimuat, menaik mengikut abjad.
+ */
+export function senaraiTindakan(rows: BarisAudit[]): string[] {
+  return Array.from(new Set(rows.map((r) => r.action).filter(Boolean))).sort();
+}
+
+/**
+ * Id pelaku yang wujud dalam baris, menaik mengikut abjad; halaman peta
+ * nama pelaku daripada adminListProfiles untuk pilihan Actor.
+ */
+export function senaraiPelaku(rows: BarisAudit[]): string[] {
+  return Array.from(new Set(rows.map((r) => r.actor_id).filter((x): x is string => !!x))).sort();
+}

@@ -890,3 +890,95 @@ export async function adminListParticipantClasses(userId: string): Promise<any[]
     .map((r: any) => r.qm_classes ? { ...r.qm_classes, joined_at: r.joined_at } : null)
     .filter(Boolean);
 }
+
+// === ADMIN V2-011c: ahli kelas dan ahli pasukan ===
+
+/** Ahli kelas dengan nama dan emel (pentadbir mendapat emel daripada qm_user_directory). */
+export interface AhliKelasAdmin {
+  user_id: string;
+  joined_at: string | null;
+  nama: string | null;
+  emel: string | null;
+}
+
+/**
+ * Senarai ahli satu kelas untuk tab Members butiran kelas admin.
+ * Nama dan emel datang daripada RPC qm_user_directory; kegagalan RPC
+ * direkodkan sebagai amaran dan baris kekal dengan nama null supaya
+ * halaman boleh papar "Unnamed user" tanpa gagal keseluruhan.
+ */
+export async function adminListClassMembers(classId: string): Promise<AhliKelasAdmin[]> {
+  const { data: rows, error } = await supabase
+    .from('qm_class_members')
+    .select('user_id, joined_at')
+    .eq('class_id', classId)
+    .order('joined_at', { ascending: true });
+  if (error) throw error;
+  const list = (rows || []) as { user_id: string; joined_at: string }[];
+  if (list.length === 0) return [];
+  const { data: profs, error: e2 } = await supabase.rpc('qm_user_directory', {
+    p_ids: list.map((r) => r.user_id),
+  });
+  if (e2) console.warn('qm_user_directory failed', e2);
+  const byId = new Map<string, any>(
+    (((profs as any[]) || []) as any[]).map((p: any) => [p.user_id, p]),
+  );
+  return list.map((r) => ({
+    user_id: r.user_id,
+    joined_at: r.joined_at,
+    nama: byId.get(r.user_id)?.display_name ?? null,
+    emel: byId.get(r.user_id)?.email ?? null,
+  }));
+}
+
+/** Ahli satu pasukan termasuk peranan leader/member (ketua jika ada). */
+export interface AhliPasukanAdmin {
+  user_id: string;
+  role: string;
+  nama: string | null;
+  emel: string | null;
+}
+
+/** Senarai ahli satu pasukan untuk panel kanan tab Teams butiran kelas. */
+export async function adminListTeamMembers(teamId: string): Promise<AhliPasukanAdmin[]> {
+  const { data: rows, error } = await supabase
+    .from('qm_team_members')
+    .select('user_id, role')
+    .eq('team_id', teamId);
+  if (error) throw error;
+  const list = (rows || []) as { user_id: string; role: string }[];
+  if (list.length === 0) return [];
+  const { data: profs, error: e2 } = await supabase.rpc('qm_user_directory', {
+    p_ids: list.map((r) => r.user_id),
+  });
+  if (e2) console.warn('qm_user_directory failed', e2);
+  const byId = new Map<string, any>(
+    (((profs as any[]) || []) as any[]).map((p: any) => [p.user_id, p]),
+  );
+  return list.map((r) => ({
+    user_id: r.user_id,
+    role: r.role || 'member',
+    nama: byId.get(r.user_id)?.display_name ?? null,
+    emel: byId.get(r.user_id)?.email ?? null,
+  }));
+}
+
+/**
+ * Ahli banyak pasukan sekaligus untuk kiraan pada senarai kiri tab Teams.
+ * Kunci ialah id pasukan yang tiada ahli tidak muncul dalam peta.
+ */
+export async function adminListMembersOfTeams(
+  teamIds: string[],
+): Promise<Record<string, { user_id: string; role: string }[]>> {
+  const out: Record<string, { user_id: string; role: string }[]> = {};
+  if (teamIds.length === 0) return out;
+  const { data, error } = await supabase
+    .from('qm_team_members')
+    .select('team_id, user_id, role')
+    .in('team_id', teamIds);
+  if (error) throw error;
+  for (const r of (data || []) as { team_id: string; user_id: string; role: string }[]) {
+    (out[r.team_id] = out[r.team_id] || []).push({ user_id: r.user_id, role: r.role || 'member' });
+  }
+  return out;
+}
