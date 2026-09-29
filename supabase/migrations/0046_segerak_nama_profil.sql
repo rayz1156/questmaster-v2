@@ -27,6 +27,9 @@
 -- 1. Jadual sandaran. RLS aktif tanpa polisi: RLS menafikan semua akses
 --    baris kepada pengguna biasa walaupun ada GRANT, dan REVOKE di bawah
 --    menjadikannya jelas. Hanya supabase_admin/service_role boleh baca.
+--    Pengekalan (kzsec S1, PDPA): jadual ini hanya untuk pemulihan dan
+--    WAJIB digugurkan selepas 30 hari (selepas 29 Okt 2026) jika tiada
+--    aduan: drop table public.qm_profiles_nama_sandaran_0046;
 -- ---------------------------------------------------------------------
 create table if not exists public.qm_profiles_nama_sandaran_0046 (
   id uuid primary key,
@@ -82,7 +85,9 @@ begin
   -- atau NULL bermakna pengguna mahu kosongkan kad Intro sahaja; nama
   -- akaun tidak dikosongkan.
   if new.intro_display_name is distinct from old.intro_display_name
-     and nullif(btrim(new.intro_display_name), '') is not null then
+     and nullif(btrim(new.intro_display_name), '') is not null
+     -- kzsec S2: jangan tulis ganti penanda akaun padam sendiri.
+     and coalesce(old.display_name, '') not like '[Deleted]%' then
     new.display_name := left(btrim(new.intro_display_name), 80);
   end if;
   return new;
