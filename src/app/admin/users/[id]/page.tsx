@@ -399,8 +399,8 @@ export default function Page({ params }: { params: { id: string } }) {
     });
     if (!ok) return;
     try {
+      // Audit delete_user ditulis oleh qm_admin_delete_user di pelayan (0048).
       await adminDeleteUser(id);
-      await logAudit("delete_user", "profile", id);
       router.push("/admin/users");
     } catch (e) {
       setMesej({ baik: false, teks: mesejHad(e, "Delete failed.") });

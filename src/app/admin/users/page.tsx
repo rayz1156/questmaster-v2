@@ -15,10 +15,12 @@ import { Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
 import { Card, Pill, Tabs, EmptyState, relTime, initials } from "@/components/admin/ui";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { petikCsv, lindungFormula } from "@/lib/csvPeserta";
 import { supabase } from "@/lib/supabaseClient";
 import {
   adminListProfiles,
   adminListUsersMeta,
+  logAudit,
   type Profile,
   type UserMeta,
 } from "@/lib/data";
@@ -352,6 +354,7 @@ function SenaraiPengguna({
 }
 
 export default function Page() {
+  const confirm = useConfirm();
   const [users, setUsers] = useState<Profile[]>([]);
   const [meta, setMeta] = useState<Record<string, UserMeta>>({});
   const [muat, setMuat] = useState(true);
@@ -376,11 +379,15 @@ export default function Page() {
    * Eksport CSV: fungsi lama dikekalkan, ditambah lajur Plan dan Last
    * active. BOM UTF-8 supaya Excel di Windows membaca aksara beraksen.
    */
-  const exportCsv = () => {
-    const esc = (v: unknown) => {
-      const str = v == null ? "" : String(v);
-      return /[",\n]/.test(str) ? '"' + str.replace(/"/g, '""') + '"' : str;
-    };
+  const exportCsv = async () => {
+    // Fail ini mengandungi emel semua pengguna (temuan kzsec V2-011b):
+    // minta pengesahan dan rekod dalam Audit sebelum memuat turun.
+    const ok = await confirm({
+      title: `Export ${users.length} users with their email addresses? This is recorded in Audit.`,
+    });
+    if (!ok) return;
+    await logAudit("users_export", "profile", undefined, { count: users.length });
+    const esc = (v: unknown) => petikCsv(lindungFormula(v == null ? "" : String(v)));
     const headers = ["Name", "Username", "Email", "Role", "Email verified", "Suspended", "Approved", "Registered", "Plan", "Last active"];
     const rows = users.map((u) => {
       const m = meta[u.id];
