@@ -18,6 +18,7 @@ import EducatorsCard from "@/components/EducatorsCard";
 import EmailExportButton from "@/components/EmailExportButton";
 import { EDU_TABS } from "@/lib/eduTabs";
 import { listClassMembers, listTeamsByClass, listClassTeamScores } from "@/lib/data";
+import { namaAhli } from "@/lib/namaAhli";
 import { supabase } from "@/lib/supabase";
 
 type Sub = "students" | "teams" | "educators";
@@ -158,8 +159,9 @@ export default function ClassPeoplePage() {
       }
     };
 
-  const name = (m: Record<string, unknown>) =>
-    String(m.display_name || m.full_name || m.email || m.user_id || "Student");
+  // Tiket V2-007: nama daripada m.qm_profiles (display_name, kemudian emel
+  // sebelum @, kemudian "Student"). UUID tidak boleh dipaparkan sebagai nama.
+  const name = (m: Record<string, unknown>) => namaAhli(m);
 
   const shownMembers = useMemo(() => {
     const needle = q.trim().toLowerCase();
