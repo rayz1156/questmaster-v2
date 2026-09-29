@@ -348,6 +348,9 @@ $fn$;
 REVOKE ALL ON FUNCTION public.qm_my_plan_usage() FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.qm_my_plan_usage() TO authenticated;
 
-GRANT EXECUTE ON FUNCTION public.qm_storage_used(uuid) TO authenticated, service_role;
+-- kzsec S1: hanya dipanggil oleh fungsi SECURITY DEFINER, jadi pengguna
+-- tidak perlu (dan tidak boleh) meninjau penggunaan storan orang lain.
+REVOKE ALL ON FUNCTION public.qm_storage_used(uuid) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.qm_storage_used(uuid) TO service_role;
 
 NOTIFY pgrst, 'reload schema';
