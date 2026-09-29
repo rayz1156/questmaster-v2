@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getServiceSupabase } from "@/lib/supabase-route";
 import { encrypt } from "@/lib/mcp/crypto";
 import { PROVIDERS } from "@/lib/email-providers";
+import { pelanBerbayar } from "@/lib/pelan";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -21,9 +22,28 @@ async function profilPemanggil(
   return (data as ProfilPemanggil) ?? null;
 }
 
-/** Pro = pelan pro, ATAU admin/superadmin (dibenarkan walau pelan bukan pro). */
-function bolehPro(p: ProfilPemanggil): boolean {
-  return p?.plan === "pro" || p?.role === "admin" || p?.role === "superadmin";
+/**
+ * Pelan berkesan pemanggil melalui RPC qm_effective_plan (0040):
+ * admin => pro, tamat tempoh => free, selain itu pelan tersimpan.
+ * Gagal RPC memulangkan null; pemanggil mesti menganggapnya tidak berbayar.
+ */
+async function pelanBerkesan(
+  supa: NonNullable<Awaited<ReturnType<typeof requireUser>>["supa"]>,
+): Promise<string | null> {
+  const { data, error } = await supa.rpc("qm_effective_plan");
+  if (error || typeof data !== "string") return null;
+  return data;
+}
+
+/** Benar jika pelan berkesan berbayar ATAU pemanggil admin/superadmin. */
+async function bolehBerbayar(
+  supa: NonNullable<Awaited<ReturnType<typeof requireUser>>["supa"]>,
+): Promise<boolean> {
+  const profil = await profilPemanggil(supa, (await supa.auth.getUser()).data.user?.id ?? "");
+  const pentadbir = profil?.role === "admin" || profil?.role === "superadmin";
+  if (pentadbir) return true;
+  const berkesan = await pelanBerkesan(supa);
+  return pelanBerbayar(berkesan);
 }
 
 /** GET: status integrasi pemanggil. Tidak pernah memulangkan kunci mahupun secret_enc. */
@@ -43,8 +63,13 @@ export async function GET(req: NextRequest) {
     .eq("owner_id", user.id)
     .maybeSingle();
 
+  // Pelan berkesan sebenar (V2-008): admin => 'pro' oleh qm_effective_plan,
+  // tamat tempoh => 'free', selain itu plan tersimpan (pro/institution/unlimited).
+  // Pelan unlimited dipaparkan sebagai 'pro' di UI kerana PelanAwam tidak
+  // memasukkannya; kebenaran sebenar sentiasa disemak oleh pelayan.
+  const berkesan = await pelanBerkesan(auth.supa);
   return NextResponse.json({
-    plan: bolehPro(profil) ? "pro" : "free",
+    plan: berkesan === "unlimited" || berkesan === "institution" ? "pro" : berkesan ?? "free",
     connected: !!row,
     provider: row?.provider ?? null,
     hint: row?.secret_hint ?? null,
@@ -71,8 +96,7 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: "Invalid API key" }, { status: 400 });
   }
 
-  const profil = await profilPemanggil(auth.supa, user.id);
-  if (!bolehPro(profil)) {
+  if (!(await bolehBerbayar(auth.supa))) {
     // UI menunjuk kod QM_PRO_ONLY untuk keadaan terkunci.
     return NextResponse.json(
       {

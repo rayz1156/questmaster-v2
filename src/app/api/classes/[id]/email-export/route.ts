@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { requireUser, getServiceSupabase } from "@/lib/supabase-route";
 import { decrypt } from "@/lib/mcp/crypto";
 import { PROVIDERS, classTags, splitName, EmailProviderContact } from "@/lib/email-providers";
+import { pelanBerbayar } from "@/lib/pelan";
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -77,14 +78,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  // --- Semakan pelan Pro ---
+  // --- Semakan pelan berbayar (V2-008) ---
+  // Pentadbir sentiasa dibenarkan. Pengguna lain melalui pelan berkesan
+  // qm_effective_plan (0040): admin => pro, tamat tempoh => free, selain itu
+  // plan tersimpan. Benar untuk pro, institution dan unlimited.
   const { data: profil } = (await auth.supa
     .from("qm_profiles")
-    .select("plan, role")
+    .select("role")
     .eq("id", user.id)
-    .maybeSingle()) as { data: { plan?: string; role?: string } | null };
-  const pro =
-    profil?.plan === "pro" || profil?.role === "admin" || profil?.role === "superadmin";
+    .maybeSingle()) as { data: { role?: string } | null };
+  const pentadbir = profil?.role === "admin" || profil?.role === "superadmin";
+  let berkesan: string | null = null;
+  if (!pentadbir) {
+    const { data: rpcPlan, error: rpcErr } = await auth.supa.rpc("qm_effective_plan");
+    berkesan = !rpcErr && typeof rpcPlan === "string" ? rpcPlan : null;
+  }
+  const pro = pentadbir || pelanBerbayar(berkesan);
   if (!pro) {
     return NextResponse.json(
       {
