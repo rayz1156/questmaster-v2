@@ -10,7 +10,6 @@ const tabung = new Map<string, number[]>();
 
 /** Pulangkan true jika panggilan dibenarkan (belum melebihi had). */
 export function dalamHad(kunci: string): boolean {
-  const kini = Date.now();
   const senarai = (tabung.get(kunci) ?? []).filter((t) => t > Date.now() - TETINGKAP_MS);
   if (senarai.length >= KADAR_MAKS) {
     tabung.set(kunci, senarai);

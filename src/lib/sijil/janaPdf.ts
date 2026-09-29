@@ -145,7 +145,7 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
   tengah(urlSah, fonTajuk, 10, 70);
 
   // Pengeluar, kiri bawah
-  page.drawText(pengeluar, { x: 56, y: 60, size: 11, font: fonTajuk });
+  page.drawText(pengeluar, { x: 56, y: 60, size: 11, font: fonBadan });
 
   // Kod QR yang menunjuk ke URL pengesahan
   const qrPng = await QRCode.toBuffer(urlSah, { width: 220, margin: 1 });
