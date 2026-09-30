@@ -12,8 +12,8 @@ import { supabase } from "@/lib/supabaseClient";
 import { listMyEducatorClasses } from "@/lib/data";
 import type { EducatorClassRow } from "@/lib/types";
 import {
-  GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, BookOpen,
-  Activity, TrendingUp, AlertTriangle, Eye, LogIn, Target, CheckCircle2, HelpCircle,
+  Users, BarChart3, BookOpen,
+  Activity, TrendingUp, AlertTriangle, Eye, LogIn, Target, CheckCircle2,
   Download,
 } from "lucide-react";
 

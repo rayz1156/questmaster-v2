@@ -11,7 +11,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { ChevronDown, ChevronUp, Download, Search, Upload, Users, X } from "lucide-react";
+import { ChevronDown, ChevronUp, Download, Search, Upload, Users } from "lucide-react";
 import Shell from "@/components/Shell";
 import ClassShell from "@/components/ClassShell";
 import EducatorsCard from "@/components/EducatorsCard";
