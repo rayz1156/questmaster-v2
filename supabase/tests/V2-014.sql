@@ -798,7 +798,7 @@ begin
   end if;
 
   -- Soalan kedua: salah paling kerap ialah A (Lima) dua kali; kunci betul
-  -- tidak bocor, hanya label Beta.
+  -- tidak bocor, hanya label Enam (pilihan B).
   select to_jsonb(e) into v_q
     from jsonb_array_elements(v_res -> 'hard_questions') e
    where e ->> 'question_id' = '00000000-0000-0000-0000-0000000000d3';
@@ -808,11 +808,11 @@ begin
   if (v_q -> 'top_wrong_choice' ->> 'key') = 'A'
      and (v_q -> 'top_wrong_choice' ->> 'label') = 'Lima'
      and (v_q -> 'top_wrong_choice' ->> 'count')::int = 2
-     and v_q ->> 'correct_label' = 'Beta'
+     and v_q ->> 'correct_label' = 'Enam'
      and v_q ->> 'correct_key' is null
      and (v_q ->> 'answered')::int = 3
      and (v_q ->> 'avg_ms')::numeric = 4333.3 then
-    raise notice 'LULUS 10c: top_wrong_choice A (Lima) dua kali, correct_label Beta, tiada correct_key';
+    raise notice 'LULUS 10c: top_wrong_choice A (Lima) dua kali, correct_label Enam, tiada correct_key';
   else
     raise exception 'GAGAL 10c: soalan kedua = %', v_q;
   end if;
