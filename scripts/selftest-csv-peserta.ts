@@ -1,5 +1,6 @@
 /**
- * Ujian sendiri untuk binaan CSV peserta (tiket V2-010).
+ * Ujian sendiri untuk binaan CSV peserta (tiket V2-010, lajur markah
+ * ditambah dalam V2-013).
  *
  * Jalankan:  npx tsx scripts/selftest-csv-peserta.ts
  *
@@ -64,15 +65,17 @@ check('tarikh: tidak sah kosong', tarikhKl('bukan tarikh') === '');
 
 const kosong = binaCsvPeserta([]);
 check('kosong: BOM di awal', kosong.charCodeAt(0) === 0xfeff);
-check('kosong: hanya baris tajuk', kosong === '\uFEFFName,Email,Status,Joined\r\n', JSON.stringify(kosong));
+check('kosong: hanya baris tajuk sembilan lajur',
+  kosong === '\uFEFFName,Email,Status,Joined,Activities,Live Quiz,Adjustments,Total,Rank\r\n',
+  JSON.stringify(kosong));
 
 const campur = binaCsvPeserta([
-  { nama: '陈伟明', emel: 'weiming@example.com', status: 'Active', joinedAt: '2026-08-01T02:00:00Z' },
+  { nama: '陈伟明', emel: 'weiming@example.com', status: 'Active', joinedAt: '2026-08-01T02:00:00Z', aktiviti: 0, kuizLangsung: 0, pelarasan: 0, jumlah: 0, kedudukan: 5 },
   { nama: 'Zarul', emel: null, status: 'Active', joinedAt: '2026-09-29T20:30:00Z' },
   { nama: null, emel: 'baru@example.com', status: 'Invited', joinedAt: null },
-  { nama: '=HYPERLINK("http://x","klik")', emel: 'nakal@example.com', status: 'Active', joinedAt: '2026-07-05T00:00:00Z' },
-  { nama: 'Nur Aisyah binti Ahmad', emel: 'aisyah@example.com', status: 'Active', joinedAt: '2026-06-15T00:00:00Z' },
-  { nama: 'Tamilselvi', emel: 'tamilselvi@example.com', status: 'Active', joinedAt: '2026-06-16T00:00:00Z' },
+  { nama: '=HYPERLINK("http://x","klik")', emel: 'nakal@example.com', status: 'Active', joinedAt: '2026-07-05T00:00:00Z', aktiviti: 1234567, kuizLangsung: 0, pelarasan: -50, jumlah: 1234517, kedudukan: 1 },
+  { nama: 'Nur Aisyah binti Ahmad', emel: 'aisyah@example.com', status: 'Active', joinedAt: '2026-06-15T00:00:00Z', aktiviti: 1000, kuizLangsung: 2500, pelarasan: 0, jumlah: 3500, kedudukan: 2 },
+  { nama: 'Tamilselvi', emel: 'tamilselvi@example.com', status: 'Active', joinedAt: '2026-06-16T00:00:00Z', aktiviti: 1000, kuizLangsung: 2500, pelarasan: 0, jumlah: 3500, kedudukan: 2 },
 ]);
 
 check('campur: BOM di awal', campur.charCodeAt(0) === 0xfeff);
@@ -99,10 +102,38 @@ check('campur: emel null jadi medan kosong', barisCsv[4].startsWith('Zarul,,Acti
 
 // Joined: tarikh sahaja, zon Asia/Kuala_Lumpur (UTC 20:30 sudah 30 Sep).
 check('campur: joined ikut tarikh KL',
-  barisCsv[4].endsWith('2026-09-30'),
+  barisCsv[4].startsWith('Zarul,,Active,2026-09-30,'),
   barisCsv[4]);
 
-check('campur: Invited joined kosong', barisCsv[6].endsWith(',Invited,'), barisCsv[6]);
+// Baris Invited: joined dan kelima-lima lajur markah kosong sepenuhnya.
+check('campur: Invited joined dan lajur markah kosong',
+  barisCsv[6] === ',baru@example.com,Invited,,,,,,',
+  barisCsv[6]);
+
+// Baris Active tanpa medan markah: semua lajur markah jadi 0.
+check('campur: Active tanpa markah jadi 0',
+  barisCsv[4] === 'Zarul,,Active,2026-09-30,0,0,0,0,0',
+  barisCsv[4]);
+
+// Nombor besar tanpa pemisah ribuan supaya Excel membaca sebagai nombor.
+check('campur: nombor besar tanpa pemisah ribuan',
+  barisCsv[1].includes(',1234567,') && !barisCsv[1].includes('1,234,567'),
+  barisCsv[1]);
+
+// Pelarasan negatif dibenarkan dan kekal bertanda tolak.
+check('campur: pelarasan negatif bertanda',
+  barisCsv[1].includes(',-50,'),
+  barisCsv[1]);
+
+// Seri berkongsi kedudukan yang sama (Nur dan Tamilselvi kedua-duanya 2).
+check('campur: seri berkongsi kedudukan',
+  barisCsv[2].endsWith(',1000,2500,0,3500,2') && barisCsv[3].endsWith(',1000,2500,0,3500,2'),
+  [barisCsv[2], barisCsv[3]]);
+
+// Peserta tanpa markah papar 0 pada semua pecahan.
+check('campur: peserta tanpa markah sifar',
+  barisCsv[5] === '陈伟明,weiming@example.com,Active,2026-08-01,0,0,0,0,5',
+  barisCsv[5]);
 
 check('campur: nama Unicode Cina kekal', campur.includes('陈伟明'));
 

@@ -3,6 +3,7 @@ import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { binaCsvPeserta, slugFail, type BarisPeserta } from '@/lib/csvPeserta';
+import { kiraKedudukan } from '@/lib/markahPeserta';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,43 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     return NextResponse.json({ error: membersErr.message }, { status: 500 });
   }
 
+  // V2-013: markah terkumpul daripada view qm_class_individual_scores,
+  // dibaca dengan klien Bearer PEMANGGAL (bukan service role) supaya
+  // penapis kebenaran migrasi 0050 terpakai: bukan pemilik, educator
+  // diterima atau admin akan mendapat sifar baris dan CSV tanpa markah,
+  // bukan markah semua kelas. Susunan baris dikekalkan oleh binaCsvPeserta.
+  const { data: markah, error: markahErr } = await supa
+    .from('qm_class_individual_scores')
+    .select('user_id, task_score, live_score, adjustment_score, total_score')
+    .eq('class_id', params.id);
+  if (markahErr) {
+    return NextResponse.json({ error: markahErr.message }, { status: 500 });
+  }
+  const senaraiMarkah = (markah || []) as {
+    user_id: string;
+    task_score: number | null;
+    live_score: number | null;
+    adjustment_score: number | null;
+    total_score: number | null;
+  }[];
+  const kedudukan = kiraKedudukan(senaraiMarkah.map((b) => Number(b.total_score) || 0));
+  const petaMarkah = new Map<string, {
+    task: number;
+    live: number;
+    adj: number;
+    jumlah: number;
+    kedudukan: number;
+  }>();
+  senaraiMarkah.forEach((b, i) => {
+    petaMarkah.set(b.user_id, {
+      task: Number(b.task_score) || 0,
+      live: Number(b.live_score) || 0,
+      adj: Number(b.adjustment_score) || 0,
+      jumlah: Number(b.total_score) || 0,
+      kedudukan: kedudukan[i] || 0,
+    });
+  });
+
   // Nama dan emel melalui RPC direktori, dengan identiti pemanggil.
   const ids = (members || []).map((m: { user_id: string }) => m.user_id);
   const dirMap = new Map<string, { nama: string | null; emel: string | null }>();
@@ -72,11 +110,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const baris: BarisPeserta[] = (members || []).map((m: { user_id: string; joined_at: string | null }) => {
     const dir = dirMap.get(m.user_id);
+    const mk = petaMarkah.get(m.user_id);
     return {
       nama: dir?.nama ?? null,
       emel: dir?.emel ?? null,
       status: 'Active' as const,
       joinedAt: m.joined_at,
+      aktiviti: mk?.task ?? 0,
+      kuizLangsung: mk?.live ?? 0,
+      pelarasan: mk?.adj ?? 0,
+      jumlah: mk?.jumlah ?? 0,
+      kedudukan: mk?.kedudukan ?? 0,
     };
   });
 
