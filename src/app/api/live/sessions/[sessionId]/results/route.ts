@@ -27,7 +27,6 @@ export const fetchCache = 'force-no-store';
  */
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-const TIADA_UUID = '00000000-0000-0000-0000-000000000000';
 const HAD_PROMPT = 200;
 
 interface BarisSesi {

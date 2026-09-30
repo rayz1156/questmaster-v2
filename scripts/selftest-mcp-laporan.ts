@@ -120,7 +120,7 @@ let lastAuth = "";
 
 function stubFetch(payload: unknown, status = 200, headers: Record<string, string> = {}) {
   networkTouched = false;
-  globalThis.fetch = (async (input: any, init?: any) => {
+  globalThis.fetch = (async (input: unknown, init?: { headers?: Record<string, string> }) => {
     networkTouched = true;
     lastUrl = String(input);
     lastAuth = init?.headers?.Authorization ?? "";
@@ -135,7 +135,7 @@ function stubFetch(payload: unknown, status = 200, headers: Record<string, strin
 
 function stubFetchText(teks: string, namaFail: string) {
   networkTouched = false;
-  globalThis.fetch = (async (input: any, init?: any) => {
+  globalThis.fetch = (async (input: unknown, init?: { headers?: Record<string, string> }) => {
     networkTouched = true;
     lastUrl = String(input);
     lastAuth = init?.headers?.Authorization ?? "";
@@ -246,10 +246,10 @@ async function ujianPemetaan() {
   // 2h. get_class_insights: laluan insights dipanggil sebelum tapisan.
   const insightsContoh = binaInsightsContoh(2);
   stubFetch({ data: insightsContoh });
-  const insights = (await insightsKelasAlat(TOKEN, {
+  await insightsKelasAlat(TOKEN, {
     class_id: UUID_KELAS,
     sections: ["pulse", "attention"],
-  })) as Record<string, unknown>;
+  });
   check("get_class_insights: laluan insights dipetakan",
     lastUrl.endsWith(`/api/classes/${UUID_KELAS}/insights`), lastUrl);
 
