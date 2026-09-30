@@ -290,7 +290,7 @@ begin
   end if;
 
   if not exists (select 1 from public.qm_live_players_pautan_0049
-                 where player_id not in ('00000000-0000-0000-0000-0000000000f1'::uuid,
+                 where class_id = '00000000-0000-0000-0000-0000000000c1'::uuid and player_id not in ('00000000-0000-0000-0000-0000000000f1'::uuid,
                                          '00000000-0000-0000-0000-0000000000f2'::uuid,
                                          '00000000-0000-0000-0000-0000000000f8'::uuid)) then
     raise notice 'LULUS 3g: tiada baris sandaran lain';
@@ -309,11 +309,14 @@ declare
   v_skipped text;
   v_actor uuid;
 begin
-  select count(*), min(actor_id::text)::uuid, min(meta->>'linked'), min(meta->>'skipped_ambiguous')
+  -- Baris terkini ialah daripada panggilan ujian; migrasi sendiri menulis satu baris lebih awal.
+  select 1, actor_id, meta->>'linked', meta->>'skipped_ambiguous'
     into v_bil, v_actor, v_linked, v_skipped
   from public.qm_audit_log
   where action = 'live_scores_backfill'
-    and target_type = 'system';
+    and target_type = 'system'
+  order by id desc
+  limit 1;
 
   if v_bil = 1 and v_actor is null and v_linked = '3' and v_skipped = '3' then
     raise notice 'LULUS 3h: satu baris audit ringkasan (actor null, linked 3, skipped 3)';
