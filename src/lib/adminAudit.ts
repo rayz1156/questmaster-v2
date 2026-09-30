@@ -40,6 +40,11 @@ const LABELS: Record<string, AuditLabel> = {
   hunt_status: { label: 'Changed activity status', tone: 'neutral' },
   class_archive: { label: 'Archived class', tone: 'neutral' },
   class_unarchive: { label: 'Restored class', tone: 'good' },
+  // V2-016a: galeri templat sijil Kuizen oleh admin (laluan
+  // /api/admin/certificate-gallery, audit ditulis pelayan).
+  certificate_gallery_create: { label: 'Created gallery template', tone: 'good' },
+  certificate_gallery_update: { label: 'Updated gallery template', tone: 'neutral' },
+  certificate_gallery_delete: { label: 'Deleted gallery template', tone: 'danger' },
 };
 
 export function labelTindakan(action: string): AuditLabel {
@@ -200,6 +205,8 @@ export function jenisSasaran(targetType: string | null | undefined): string {
   if (t === 'challenge') return 'Challenge';
   if (t === 'team') return 'Team';
   if (t === 'submission') return 'Submission';
+  // V2-016a: item galeri templat sijil (qm_certificate_library).
+  if (t === 'certificate_library') return 'Gallery template';
   return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Target';
 }
 

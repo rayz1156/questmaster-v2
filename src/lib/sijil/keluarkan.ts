@@ -21,6 +21,8 @@ export type TemplatSijil = {
   background_path: string | null;
   logo_path: string | null;
   layout: Record<string, unknown> | null;
+  /** Item pustaka asal (V2-016a); null untuk templat luar pustaka. */
+  library_id?: string | null;
 };
 
 /** Satu sijil yang berjaya dikeluarkan dan (mungkin) dimuat naik PDFnya. */
@@ -40,7 +42,7 @@ export async function bacaTemplatKelas(
 ): Promise<TemplatSijil | null> {
   const { data: template } = await supa
     .from('qm_certificate_templates')
-    .select('id, class_id, title, background_path, logo_path, layout')
+    .select('id, class_id, title, background_path, logo_path, layout, library_id')
     .eq('id', templateId)
     .eq('class_id', classId)
     .maybeSingle();

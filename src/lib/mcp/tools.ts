@@ -41,6 +41,10 @@ import {
   finalizeCertificateAsset,
   previewCertificate,
   listCertificateTemplates,
+  listCertificateLibrary,
+  useCertificateTemplate,
+  copyCertificateTemplate,
+  saveCertificateToLibrary,
 } from "./certificate-tools";
 
 /** Had limit khusus list_live_quizzes: lalai 50, maksimum 200 (tiket KZ-004). */
@@ -2154,6 +2158,109 @@ export const TOOLS: ToolDef[] = [
         method: "POST",
         body: { reason },
       });
+    },
+  },
+
+  {
+    name: "list_certificate_library",
+    title: "Senarai pustaka templat sijil",
+    description:
+      "Senaraikan pustaka templat sijil pemanggil: galeri Kuizen yang diterbitkan " +
+      "(gallery) dan templat peribadi (mine, Templat saya). Setiap item membawa " +
+      "preview_url latar bertandatangan 10 minit dan locked (item galeri bukan " +
+      "free_tier berkunci untuk pelan percuma).",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {},
+    },
+    handler: async (_args, s) => {
+      return listCertificateLibrary(s.accessToken);
+    },
+  },
+
+  {
+    name: "use_certificate_template",
+    title: "Guna templat pustaka dalam kelas",
+    description:
+      "Cipta templat sijil kelas daripada item pustaka (galeri atau Templat saya): " +
+      "latar dan logo dirujuk tanpa salinan fail. Kriteria lalai all_members; " +
+      "criteria.type lain seperti create_certificate_template. Item galeri bukan " +
+      "free_tier memerlukan pelan kelas berbayar (402). Hanya pendidik kelas.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        library_id: { type: "string", description: "UUID item pustaka" },
+        class_id: { type: "string", description: "UUID kelas sasaran" },
+        title: { type: "string", description: "Tajuk templat, lalai tajuk item (pilihan)" },
+        criteria: {
+          type: "object",
+          description: "Kriteria kelayakan; lalai all_members",
+          properties: {
+            type: { type: "string", enum: ["all_members", "hunt_completed", "min_score", "live_attended"] },
+            hunt_id: { type: "string" },
+            quiz_id: { type: "string" },
+            min_score: { type: "number" },
+          },
+        },
+      },
+      required: ["library_id", "class_id"],
+    },
+    handler: async (args, s) => {
+      return useCertificateTemplate(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "copy_certificate_template",
+    title: "Salin templat sijil ke kelas lain",
+    description:
+      "Salin templat sijil satu kelas ke kelas lain yang pemanggil juga pendidiknya. " +
+      "Tajuk, layout, latar/logo (rujukan laluan sama, tiada salinan fail) dan " +
+      "library_id disalin; kriteria ditetapkan semula kepada all_members kerana " +
+      "aktiviti kelas asal tidak wujud dalam kelas sasaran. Pencetus pelan terpakai " +
+      "pada kelas sasaran: background_removed: true bermakna latar dibuang kerana " +
+      "pelan pemilik kelas sasaran percuma.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas asal" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        target_class_id: { type: "string", description: "UUID kelas sasaran (berbeza)" },
+      },
+      required: ["class_id", "template_id", "target_class_id"],
+    },
+    handler: async (args, s) => {
+      return copyCertificateTemplate(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "save_certificate_to_library",
+    title: "Simpan templat ke Templat saya",
+    description:
+      "Simpan templat sijil kelas ke pustaka peribadi (Templat saya): objek latar " +
+      "dan logo disalin ke ruang nama peribadi dan boleh diguna untuk semua kelas " +
+      "yang pemanggil urus. Pelan pemanggil mesti Pro/Institusi/Unlimited (402) " +
+      "dan had 50 item dikuatkuasakan (409). Hanya pendidik kelas asal.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas asal" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        title: { type: "string", description: "Tajuk item, lalai tajuk templat (pilihan)" },
+      },
+      required: ["class_id", "template_id"],
+    },
+    handler: async (args, s) => {
+      return saveCertificateToLibrary(s.accessToken, args);
     },
   },
 

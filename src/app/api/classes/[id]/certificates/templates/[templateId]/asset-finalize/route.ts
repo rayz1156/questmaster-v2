@@ -22,6 +22,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
+import { muat16Bait, tandatanganImej } from '@/lib/sijil/aset';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,32 +35,6 @@ const LAJUR: Record<'background' | 'logo', 'background_path' | 'logo_path'> = {
   background: 'background_path',
   logo: 'logo_path',
 };
-
-/**
- * Muat turun 16 bait pertama objek storage dengan header Range melalui
- * kunci service role. Versi storage-js yang dipasang tidak menyokong
- * pilihan range pada download(), jadi fetch mentah digunakan; jika pelayan
- * abaikan Range, badan penuh diterima dan hanya 16 bait pertama dibaca.
- */
-async function muat16Bait(path: string): Promise<Uint8Array | null> {
-  const base = (process.env.NEXT_PUBLIC_SUPABASE_URL ?? '').replace(/\/$/, '');
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY ?? '';
-  if (!base || !key) return null;
-  const selamat = path.split('/').map(encodeURIComponent).join('/');
-  const res = await fetch(`${base}/storage/v1/object/certificate-assets/${selamat}`, {
-    headers: { apikey: key, Authorization: `Bearer ${key}`, Range: 'bytes=0-15' },
-    cache: 'no-store',
-  });
-  if (!res.ok) return null;
-  return new Uint8Array(await res.arrayBuffer());
-}
-
-/** Tandatangan PNG (89 50 4E 47) atau JPEG (FF D8 FF) pada bait pertama. */
-function tandatanganImej(b: Uint8Array): boolean {
-  if (b.length >= 4 && b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47) return true;
-  if (b.length >= 3 && b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff) return true;
-  return false;
-}
 
 export async function POST(
   req: NextRequest,
@@ -170,10 +145,15 @@ export async function POST(
     );
   }
 
-  // Padam objek lama jika berbeza daripada yang baharu.
+  // Padam objek lama hanya jika TIADA baris lain (templat kelas atau item
+  // pustaka) yang masih merujuk laluannya (V2-016a: fail kini boleh
+  // dikongsi antara templat, memadam buta merosakkan templat lain).
   if (lama && lama !== path) {
     const svc = getServiceSupabase();
-    await svc.storage.from('certificate-assets').remove([lama]).catch(() => undefined);
+    const { data: dipakai } = await svc.rpc('qm_certificate_asset_in_use', { p_path: lama });
+    if (dipakai !== true) {
+      await svc.storage.from('certificate-assets').remove([lama]).catch(() => undefined);
+    }
   }
 
   return NextResponse.json({ template: updated });

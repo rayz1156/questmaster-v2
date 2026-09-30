@@ -176,6 +176,127 @@ export async function previewCertificate(
   return { url: res.url, expires_in: res.expires_in };
 }
 
+/** Item pustaka templat seperti dipulangkan route /api/certificate-library. */
+export interface CertLibraryItem {
+  id: string;
+  scope: "gallery" | "personal";
+  owner_id: string | null;
+  title: string;
+  kind: string | null;
+  text_tone: string;
+  background_path: string | null;
+  logo_path: string | null;
+  layout: Record<string, unknown> | null;
+  free_tier: boolean;
+  published: boolean;
+  sort_order: number;
+  preview_url: string | null;
+  locked: boolean;
+}
+
+/**
+ * Senaraikan pustaka templat sijil pemanggil (V2-016a): galeri Kuizen yang
+ * diterbitkan dan "Templat saya". Item galeri yang bukan free_tier
+ * berkunci untuk pelan percuma (locked).
+ */
+export async function listCertificateLibrary(
+  accessToken: string
+): Promise<{ gallery: CertLibraryItem[]; mine: CertLibraryItem[] }> {
+  return callApi<{ gallery: CertLibraryItem[]; mine: CertLibraryItem[] }>(
+    accessToken,
+    "/api/certificate-library"
+  );
+}
+
+/**
+ * Guna item pustaka dalam satu kelas (V2-016a): cipta templat kelas baharu
+ * yang merujuk latar/logo item; kriteria lalai all_members. Route yang
+ * menyemak pendidik kelas, keterlihatan item dan pelan.
+ */
+export async function useCertificateTemplate(
+  accessToken: string,
+  args: {
+    library_id?: string;
+    class_id?: string;
+    title?: string;
+    criteria?: unknown;
+  }
+): Promise<Record<string, unknown>> {
+  if (!args.library_id) throw new Error("library_id diperlukan");
+  if (!args.class_id) throw new Error("class_id diperlukan");
+  const res = await callApi<{ template?: Record<string, unknown> }>(
+    accessToken,
+    `/api/classes/${args.class_id}/certificates/templates/from-library`,
+    {
+      method: "POST",
+      body: {
+        library_id: args.library_id,
+        ...(typeof args.title === "string" && args.title.trim()
+          ? { title: args.title.trim().slice(0, 120) }
+          : {}),
+        ...(args.criteria !== undefined && args.criteria !== null ? { criteria: args.criteria } : {}),
+      },
+    }
+  );
+  return (res.template ?? res) as Record<string, unknown>;
+}
+
+/**
+ * Salin templat sijil satu kelas ke kelas lain yang pemanggil juga
+ * pendidiknya (V2-016a). Kriteria ditetapkan semula kepada all_members.
+ * background_removed: true bermakna latar dibuang pencetus pelan pada
+ * kelas sasaran.
+ */
+export async function copyCertificateTemplate(
+  accessToken: string,
+  args: {
+    class_id?: string;
+    template_id?: string;
+    target_class_id?: string;
+  }
+): Promise<Record<string, unknown>> {
+  if (!args.class_id) throw new Error("class_id diperlukan");
+  if (!args.template_id) throw new Error("template_id diperlukan");
+  if (!args.target_class_id) throw new Error("target_class_id diperlukan");
+  return callApi<Record<string, unknown>>(
+    accessToken,
+    `/api/classes/${args.class_id}/certificates/templates/${args.template_id}/copy`,
+    { method: "POST", body: { target_class_id: args.target_class_id } }
+  );
+}
+
+/**
+ * Simpan templat sijil kelas ke "Templat saya" (V2-016a): objek latar/logo
+ * disalin ke ruang nama peribadi. Pelan pemanggil mesti berbayar (402)
+ * dan had 50 item dikuatkuasakan pangkalan data (409 LIBRARY_LIMIT).
+ */
+export async function saveCertificateToLibrary(
+  accessToken: string,
+  args: {
+    class_id?: string;
+    template_id?: string;
+    title?: string;
+  }
+): Promise<Record<string, unknown>> {
+  if (!args.class_id) throw new Error("class_id diperlukan");
+  if (!args.template_id) throw new Error("template_id diperlukan");
+  const res = await callApi<{ item?: Record<string, unknown> }>(
+    accessToken,
+    "/api/certificate-library",
+    {
+      method: "POST",
+      body: {
+        from_template_id: args.template_id,
+        class_id: args.class_id,
+        ...(typeof args.title === "string" && args.title.trim()
+          ? { title: args.title.trim().slice(0, 120) }
+          : {}),
+      },
+    }
+  );
+  return (res.item ?? res) as Record<string, unknown>;
+}
+
 /** Satu baris senarai templat sijil untuk alat list_certificate_templates. */
 export interface CertTemplateRingkas {
   id: string;

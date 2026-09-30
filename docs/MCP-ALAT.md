@@ -136,6 +136,10 @@ platform, jadi tiada alatnya.
 | finalize_certificate_asset | STAFF, tulis | Sahkan muat naik aset: tandatangan bait disemak, templat dikemas kini, objek lama dipadam. |
 | preview_certificate | STAFF, tulis | PDF contoh dengan nama contoh; pulangkan URL bertandatangan sah 10 minit. Tidak mencipta sijil sah. |
 | list_certificate_templates | STAFF, baca | Senarai templat kelas: id, tajuk, kriteria, layout, ada latar/logo, dikemas kini. |
+| list_certificate_library | STAFF, baca | Pustaka templat sijil pemanggil: galeri Kuizen diterbitkan (gallery) dan Templat saya (mine), dengan preview_url latar 10 minit dan locked (galeri bukan free_tier berkunci untuk pelan percuma). |
+| use_certificate_template | STAFF, tulis | Cipta templat kelas daripada item pustaka: library_id, class_id, title pilihan, criteria pilihan (lalai all_members). Latar/logo dirujuk tanpa salinan fail. Galeri bukan free_tier memerlukan pelan kelas berbayar (402). |
+| copy_certificate_template | STAFF, tulis | Salin templat sijil ke kelas lain yang pemanggil juga pendidiknya: class_id, template_id, target_class_id. Kriteria ditetapkan semula all_members; background_removed: true bermakna latar dibuang pencetus pelan kelas sasaran. |
+| save_certificate_to_library | STAFF, tulis | Simpan templat kelas ke Templat saya: class_id, template_id, title pilihan. Objek latar/logo disalin ke ruang nama peribadi; pelan pemanggil berbayar (402), had 50 item (409). |
 | issue_certificates | STAFF, tulis | Tanpa confirm: pratonton kelayakan (nama, layak, sebab, sudah dikeluarkan). Dengan confirm: true: keluarkan sijil sebenar kepada participant_ids yang diberi, atau semua yang layak jika tiada senarai. Fungsi pelayan yang sama dengan laluan API. |
 | list_certificates | STAFF, baca | Senarai sijil kelas: kod, nama, program, tarikh, status, sebab pembatalan dan emailed_at. |
 | revoke_certificate | STAFF, tulis | Batalkan sijil dengan sebab (wajib). Halaman awam /sijil/<kod> menunjukkan Dibatalkan. |
