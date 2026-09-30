@@ -16,7 +16,7 @@
 --      menukar class_id (temuan kzsec V2-012 P4). CREATE OR REPLACE tidak
 --      menyentuh geran, pemilikan atau tingkah laku akses sedia ada.
 --
--- Ahli kelas sengaja dibenarkan kerak kedudukan peserta
+-- Ahli kelas sengaja dibenarkan kerana kedudukan peserta
 -- (src/app/participant/leaderboard) membaca view ini dengan sesi sendiri.
 --
 -- Idempoten: CREATE OR REPLACE dan REVOKE/GRANT boleh diulang.
