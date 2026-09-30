@@ -30,17 +30,28 @@ function check(name: string, cond: boolean, extra?: unknown) {
 const TOKEN = "token-palsu";
 const realFetch = globalThis.fetch;
 
-type Panggilan = { url: string; method: string; auth: string; body: any };
+type Panggilan = {
+  url: string;
+  method: string;
+  auth: string;
+  body: Record<string, unknown> | null;
+};
+
+/** Baca medan mode daripada badan JSON yang tidak ditaip. */
+const modBadan = (v: unknown): string | undefined => (v as { mode?: string } | null)?.mode;
 
 /** Gantung fetch global; rekod setiap panggilan dan balas payload tetap. */
 function stubFetch(payload: unknown, status = 200) {
   const panggilan: Panggilan[] = [];
-  globalThis.fetch = (async (input: any, init?: any) => {
+  globalThis.fetch = (async (input: RequestInfo | URL, init?: RequestInit) => {
     panggilan.push({
       url: String(input),
       method: init?.method ?? "GET",
-      auth: init?.headers?.Authorization ?? "",
-      body: init?.body ? JSON.parse(init.body) : null,
+      auth: (init?.headers as Record<string, string> | undefined)?.Authorization ?? "",
+      body:
+        typeof init?.body === "string"
+          ? (JSON.parse(init.body) as Record<string, unknown>)
+          : null,
     });
     return new Response(JSON.stringify(payload), {
       status,
@@ -60,14 +71,14 @@ async function run() {
     layout: { mode: "full_background" },
   });
   check("cipta: templat dipulangkan",
-    (r1 as any).id === "t-1" && (r1 as any).title === "Sijil Robotik", r1);
+    r1.id === "t-1" && r1.title === "Sijil Robotik", r1);
   check("cipta: URL route templates betul",
     c[0].url.endsWith("/api/classes/k-1/certificates/templates")
       && c[0].method === "POST"
       && c[0].auth === `Bearer ${TOKEN}`,
     c[0]);
   check("cipta: layout dihantar",
-    c[0].body.layout?.mode === "full_background" && c[0].body.title === "Sijil Robotik", c[0]);
+    modBadan(c[0].body?.layout) === "full_background" && c[0].body?.title === "Sijil Robotik", c[0]);
 
   /* 2. Cipta templat: input jahat ditolak sebelum rangkaian. */
   let ditolak = false;
@@ -85,10 +96,10 @@ async function run() {
   });
   check("kemas kini: PATCH route templates dengan clear_background",
     c[0].method === "PATCH"
-      && c[0].body.template_id === "t-1"
-      && c[0].body.clear_background === true
-      && c[0].body.layout.mode === "standard"
-      && c[0].body.title === undefined,
+      && c[0].body?.template_id === "t-1"
+      && c[0].body?.clear_background === true
+      && modBadan(c[0].body?.layout) === "standard"
+      && c[0].body?.title === undefined,
     c[0]);
 
   /* 4. Kemas kini: tiada medan ditolak sebelum rangkaian. */
@@ -109,9 +120,9 @@ async function run() {
   const r5 = await createCertificateAssetTicket(TOKEN, "k-1", "t-1", "background", "image/png", 2621440);
   check("tiket: badan kind/mimeType/size betul",
     c[0].url.endsWith("/api/classes/k-1/certificates/templates/t-1/asset-ticket")
-      && c[0].body.kind === "background"
-      && c[0].body.mimeType === "image/png"
-      && c[0].body.size === 2621440,
+      && c[0].body?.kind === "background"
+      && c[0].body?.mimeType === "image/png"
+      && c[0].body?.size === 2621440,
     c[0]);
   check("tiket: arahan curl sedia guna mengandungi upload_url",
     r5.curl === 'curl -X PUT --upload-file <file> -H "Content-Type: image/png" "https://s.example/storage/v1/object/upload/sign/x?token=abc"',
@@ -124,11 +135,11 @@ async function run() {
   const r6 = await finalizeCertificateAsset(TOKEN, "k-1", "t-1", "background", "k-1/t-1/background-0011.png");
   check("finalize: badan kind/path betul",
     c[0].url.endsWith("/api/classes/k-1/certificates/templates/t-1/asset-finalize")
-      && c[0].body.kind === "background"
-      && c[0].body.path === "k-1/t-1/background-0011.png",
+      && c[0].body?.kind === "background"
+      && c[0].body?.path === "k-1/t-1/background-0011.png",
     c[0]);
   check("finalize: templat terkini dipulangkan",
-    (r6 as any).background_path === "k-1/t-1/background-0011.png", r6);
+    r6.background_path === "k-1/t-1/background-0011.png", r6);
 
   /* 7. Pratonton: format=url dan nama pilihan. */
   c = stubFetch({ url: "https://s.example/sample.pdf?token=z", expires_in: 600 });
@@ -138,14 +149,14 @@ async function run() {
       && c[0].method === "POST",
     c[0]);
   check("pratonton: nama contoh dihantar",
-    c[0].body.name === "Aisyah Binti Rahman", c[0]);
+    c[0].body?.name === "Aisyah Binti Rahman", c[0]);
   check("pratonton: hasil { url, expires_in }",
     r7.url === "https://s.example/sample.pdf?token=z" && r7.expires_in === 600, r7);
 
   /* 8. Pratonton tanpa nama: badan kosong. */
   c = stubFetch({ url: "https://s.example/sample.pdf", expires_in: 600 });
   await previewCertificate(TOKEN, "k-1", "t-1");
-  check("pratonton: tanpa nama badan tidak membawa name", c[0].body.name === undefined, c[0]);
+  check("pratonton: tanpa nama badan tidak membawa name", c[0].body?.name === undefined, c[0]);
 
   /* 9. Senarai: boolean ada latar/logo dan dikemas kini. */
   c = stubFetch({
