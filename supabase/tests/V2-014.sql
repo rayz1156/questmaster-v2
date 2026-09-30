@@ -151,8 +151,8 @@ insert into public.qm_live_questions (id, quiz_id, order_idx, prompt, options, c
    '[{"key":"A","text":"Lima"},{"key":"B","text":"Enam"},{"key":"C","text":"Tujuh"}]'::jsonb, 'B', 1000, 20);
 
 insert into public.qm_live_sessions (id, quiz_id, host_id, code, status, created_at, ended_at) values
-  ('00000000-0000-0000-0000-0000000000d0', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'AAA111', 'ended', now() - interval '3 days', now() - interval '3 days'),
-  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'BBB222', 'ended', now() - interval '1 day', now() - interval '1 day');
+  ('00000000-0000-0000-0000-0000000000d0', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'TKAA23', 'ended', now() - interval '3 days', now() - interval '3 days'),
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'TKBB34', 'ended', now() - interval '1 day', now() - interval '1 day');
 
 -- Pemain: b4 main kedua-dua sesi (1500, 800), b9 sesi pertama sahaja (500).
 insert into public.qm_live_players (id, session_id, nickname, user_id, player_token, score, joined_at) values
