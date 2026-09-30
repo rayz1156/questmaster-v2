@@ -402,11 +402,13 @@ begin
   end if;
 
   -- Siti aktif 2 hari, Abu 3 hari (hanya melalui jawapan Live Quiz),
-  -- Ali hari ini. Bakar, Chik, Daud hanya sertai 10 hari lepas.
-  if (v_res -> 'inactivity' ->> 'active_30d')::int = 3 then
-    raise notice 'LULUS 4c: active_30d = 3 (termasuk ahli aktif melalui Live Quiz sahaja)';
+  -- Ali hari ini. ba ada submission ditolak 10 hari lepas (aktiviti nyata,
+  -- jadi dikira dalam 30 hari). bb dan bc hanya sertai 10 hari lepas; sertai
+  -- BUKAN aktiviti (pembetulan CTO: jangkaan asal 3 terlepas submission ba).
+  if (v_res -> 'inactivity' ->> 'active_30d')::int = 4 then
+    raise notice 'LULUS 4c: active_30d = 4 (termasuk ahli aktif melalui Live Quiz sahaja, sertai tidak dikira)';
   else
-    raise exception 'GAGAL 4c: active_30d = % (jangka 3)', v_res -> 'inactivity' ->> 'active_30d';
+    raise exception 'GAGAL 4c: active_30d = % (jangka 4)', v_res -> 'inactivity' ->> 'active_30d';
   end if;
 
   if (v_res -> 'inactivity' ->> 'active_7d')::int = 3
