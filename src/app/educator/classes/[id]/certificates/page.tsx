@@ -27,12 +27,15 @@ import { authHeader } from "@/lib/peer-client";
 import { pelanSaya } from "@/lib/pelan";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { tickLayak } from "@/lib/sijil/ui";
+import { normaliseSusunAtur } from "@/lib/sijil/susunAtur";
+import LayoutEditor from "./layout-editor";
 
 type Templat = {
   id: string;
   title: string;
   background_path: string | null;
   logo_path: string | null;
+  layout: Record<string, unknown> | null;
   criteria: { type: string; hunt_id?: string; quiz_id?: string; min_score?: number };
 };
 
@@ -59,7 +62,8 @@ type Sijil = {
 
 type Pilihan = { id: string; title: string };
 
-const MAX_ASET = 2 * 1024 * 1024;
+// PNG A4 landskap 300 dpi (kira-kira 2.5 MB, kadang lebih) diterima.
+const MAX_ASET = 8 * 1024 * 1024;
 
 export default function CertificatesPage() {
   const params = useParams<{ id: string }>();
@@ -94,7 +98,7 @@ export default function CertificatesPage() {
     const [{ data: t }, { data: c }, { data: h }, { data: q }] = await Promise.all([
       supabase
         .from("qm_certificate_templates")
-        .select("id, title, background_path, logo_path, criteria")
+        .select("id, title, background_path, logo_path, layout, criteria")
         .eq("class_id", classId)
         .order("created_at", { ascending: true }),
       supabase
@@ -190,7 +194,7 @@ export default function CertificatesPage() {
       return;
     }
     if (fail.size > MAX_ASET) {
-      setMsg("Image must be 2 MB or smaller.");
+      setMsg("Image must be 8 MB or smaller.");
       return;
     }
     const laluan = `${classId}/${crypto.randomUUID()}-${fail.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
@@ -215,6 +219,27 @@ export default function CertificatesPage() {
     } else {
       setMsg(null);
     }
+    await muatSemula();
+  };
+
+  /**
+   * Suis "latar ialah reka bentuk penuh": tetapkan mode layout templat
+   * (V2-015) sambil mengekalkan kedudukan nama, QR dan kod yang sudah
+   * disimpan. Route PATCH yang menormalkan layout.
+   */
+  const togolMod = async (t: Templat, penuh: boolean) => {
+    const susun = { ...normaliseSusunAtur(t.layout), mode: penuh ? ("full_background" as const) : ("standard" as const) };
+    const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json", ...(await authHeader()) },
+      body: JSON.stringify({ template_id: t.id, layout: susun }),
+    });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMsg(j.error ?? "Could not save the mode.");
+      return;
+    }
+    setMsg(null);
     await muatSemula();
   };
 
@@ -295,6 +320,9 @@ export default function CertificatesPage() {
 
   const [revokeSijil, setRevokeSijil] = useState<Sijil | null>(null);
   const [sebabBatalkan, setSebabBatalkan] = useState("");
+
+  // Editor susun atur (V2-015): templat yang sedang dibuka.
+  const [editor, setEditor] = useState<Templat | null>(null);
 
   const batalkan = async (s: Sijil) => {
     const ok = await confirm({
@@ -460,6 +488,24 @@ export default function CertificatesPage() {
                     />
                     Logo {pro ? "" : "(Pro)"}
                   </label>
+                  {t.background_path && (
+                    <label
+                      className="flex items-center gap-2 text-sm"
+                      title="When on, the background is a complete design: only the name, QR and code are printed over it"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={(t.layout?.mode as string) === "full_background"}
+                        onChange={(e) => togolMod(t, e.target.checked)}
+                      />
+                      Complete design
+                    </label>
+                  )}
+                  {t.background_path && (
+                    <button className="btn-quiet" onClick={() => setEditor(t)}>
+                      Edit layout
+                    </button>
+                  )}
                   <button
                     className="btn-quiet"
                     onClick={() => {
@@ -479,6 +525,27 @@ export default function CertificatesPage() {
             ))}
           </div>
         )}
+
+        {editor && (() => {
+          // Templat segar daripada senarai supaya mode terkini digunakan
+          // walaupun suis di baris templat diketik semasa editor terbuka.
+          const t = templat.find((x) => x.id === editor.id) ?? editor;
+          return (
+            <LayoutEditor
+              classId={classId}
+              templateId={t.id}
+              mode={
+                (t.layout?.mode as string) === "full_background"
+                  ? "full_background"
+                  : "standard"
+              }
+              layout={t.layout}
+              backgroundPath={t.background_path ?? ""}
+              onClose={() => setEditor(null)}
+              onSaved={muatSemula}
+            />
+          );
+        })()}
 
         {/* Pengeluaran */}
         <div className="rounded-xl border border-hairline bg-white p-4 mb-8">
