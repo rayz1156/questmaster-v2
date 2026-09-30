@@ -62,7 +62,7 @@ peribadi (tanpa class_id) atau dikongsi dengan kelas.
 | list_live_quizzes | Senarai kuiz yang boleh dihoskan pengguna, dengan bilangan soalan. Argumen limit dihormati (lalai 50, maksimum 200). |
 | get_live_quiz | Satu kuiz dengan semua soalan, pilihan dan kunci jawapan. |
 | get_live_session | Keadaan penuh sesi dari sudut hos: status, kod, pautan sertai, pautan QR, pemain, soalan semasa, taburan jawapan. |
-| get_live_leaderboard | Kedudukan dan markah sesi (semasa atau selesai), 20 teratas. |
+| get_live_leaderboard | Kedudukan dan markah sesi (semasa atau selesai), 20 teratas. Untuk senarai penuh semua pemain, guna get_live_session_results. |
 
 ### Tulis
 
@@ -89,6 +89,25 @@ Aliran biasa satu sesi dari Claude:
 Had pelan dikuatkuasakan oleh pangkalan data: had kuiz milikan (pencetus pada
 `qm_live_quizzes`) dan had pemain sesi (`max_live_players`, dipetik pada masa
 sesi dicipta). Ralat daripada had itu dihantar balik seperti sedia ada.
+
+## Laporan dan markah
+
+Semua alat laporan adalah baca sahaja dan untuk educator dan admin (STAFF).
+Setiap alat memanggil route API aplikasi sebagai pengguna, jadi semakan
+pemilik kelas, pendidik yang sudah menerima jemputan dan admin aktif
+dijalankan oleh route. Tiada emel pelajar dalam hasil. Hasil besar dipangkas
+dengan `truncated: true`.
+
+| Alat | Peranan | Kegunaan |
+|---|---|---|
+| list_live_sessions | STAFF | Senarai sesi Live Quiz lepas dan semasa bagi kuiz yang pengguna urus, terbaru dahulu. Penapis class_id, quiz_id, status; limit lalai 20, maksimum 100. Cara menemui session_id sesi lepas. |
+| get_live_session_results | STAFF | Keputusan penuh satu sesi: SEMUA pemain dengan kedudukan seri, pecahan setiap soalan (correct_label, pilihan salah paling kerap) dan ringkasan. Sesi belum tamat dibenarkan; periksa status. |
+| get_class_scores | STAFF | Markah terkumpul kelas: pelajar (rank, task, live, adjustment, total, live_sessions) dan pasukan. sort total/task/live/name; limit lalai 200, maksimum 500. |
+| get_student_scores | STAFF | Markah terperinci seorang peserta: jumlah, kedudukan, aktiviti, sesi Live Quiz dan pelarasan (laluan V2-013). |
+| get_hunt_results | STAFF | Keputusan satu aktiviti: hantaran setiap cabaran mengikut status dan markah setiap ahli kelas (tiada hantaran = 0). |
+| get_class_insights | STAFF | Insights kelas (V2-014): sections subset daripada pulse, attention, distribution, hard_questions, hard_challenges, progress (maks 50 pelajar), teams; kosong bermakna semua. |
+| export_class_insights_csv | STAFF | Eksport Insights sebagai teks CSV (sections wajib: students, attention, questions, challenges, teams, trend, all). Pulangkan filename dan csv, had 200 KB. |
+| get_class_engagement | STAFF | Ringkasan penglibatan satu kelas (class_id pilihan). |
 
 ## Penilaian rakan (peer review)
 

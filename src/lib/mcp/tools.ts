@@ -24,6 +24,16 @@ import {
   liveSessionLinks,
 } from "./live-quiz-tools";
 import { updateChallenge, deleteChallenge } from "./challenge-tools";
+import {
+  senaraiSesiLangsung,
+  keputusanSesiLangsung,
+  markahKelas,
+  markahPelajar,
+  keputusanHunt,
+  insightsKelasAlat,
+  eksportInsightsCsv,
+  engagementKelas,
+} from "./report-tools";
 import { importTeamsCsv, setTeamLeader, groupTeamsWithMembers } from "./team-tools";
 import {
   listPeerRounds,
@@ -1495,7 +1505,8 @@ export const TOOLS: ToolDef[] = [
     title: "Papan pendahulu langsung",
     description:
       "Kedudukan dan markah pemain bagi satu sesi Live Quiz (semasa atau sudah tamat). " +
-      "Dua puluh teratas, ikut markah kemudian masa.",
+      "Dua puluh teratas, ikut markah kemudian masa. Untuk senarai penuh semua pemain " +
+      "serta pecahan soalan, guna get_live_session_results.",
     roles: STAFF,
     write: false,
     inputSchema: {
@@ -1694,6 +1705,226 @@ export const TOOLS: ToolDef[] = [
       if (!args.session_id) throw new Error("session_id diperlukan");
       return controlLiveSession(s.accessToken, args.session_id, args);
     },
+  },
+
+  /* ============================================================
+   * Laporan dan markah (V2-017)
+   * Semua alat baca sahaja. Setiap satu memanggil route API aplikasi
+   * sebagai pengguna, jadi semakan pemilik kelas, pendidik diterima
+   * dan admin aktif dijalankan oleh route, bukan disalin ke sini.
+   * Tiada emel pelajar dalam mana-mana hasil.
+   * ============================================================ */
+
+  {
+    name: "list_live_sessions",
+    title: "Senarai sesi Live Quiz",
+    description:
+      "Senaraikan sesi Live Quiz lepas dan semasa bagi kuiz yang anda urus, terbaru dahulu. " +
+      "Guna ini untuk menemui session_id sesi lepas sebelum memanggil get_live_session_results. " +
+      "Setiap baris membawa status, bilangan pemain, purata markah dan tiga teratas. " +
+      "Penapis: class_id, quiz_id, status (lobby, asking, revealed, ended). " +
+      "limit lalai 20, maksimum 100; truncated: true bila senarai dipotong.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas; hadkan kepada kuiz kelas ini" },
+        quiz_id: { type: "string", description: "UUID kuiz; hadkan kepada kuiz ini" },
+        status: {
+          type: "string",
+          enum: ["lobby", "asking", "revealed", "ended"],
+          description: "Tapis ikut status sesi",
+        },
+        limit: { type: "number", description: "Lalai 20, maksimum 100" },
+      },
+    },
+    handler: async (args, s) => senaraiSesiLangsung(s.accessToken, args ?? {}),
+  },
+
+  {
+    name: "get_live_session_results",
+    title: "Keputusan penuh sesi Live Quiz",
+    description:
+      "Keputusan penuh SATU sesi Live Quiz: SEMUA pemain dengan kedudukan (seri berkongsi), " +
+      "markah, bilangan betul, ketepatan dan purata masa; pecahan setiap soalan termasuk " +
+      "pilihan salah paling kerap; dan ringkasan sesi. Sesi yang belum tamat dibenarkan; " +
+      "periksa medan status. Dapatkan session_id daripada list_live_sessions.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: { session_id: { type: "string", description: "UUID sesi" } },
+      required: ["session_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.session_id) throw new Error("session_id diperlukan");
+      return keputusanSesiLangsung(s.accessToken, args.session_id);
+    },
+  },
+
+  {
+    name: "get_class_scores",
+    title: "Markah terkumpul kelas",
+    description:
+      "Markah terkumpul seluruh kelas: pelajar (kedudukan ikut jumlah, markah aktiviti, " +
+      "Live Quiz, pelarasan dan bilangan sesi) serta pasukan. Guna ini untuk papan markah " +
+      "kelas; untuk satu peserta guna get_student_scores. sort: total, task, live atau name " +
+      "(lalai total). limit lalai 200, maksimum 500; truncated: true bila dipotong.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        sort: {
+          type: "string",
+          enum: ["total", "task", "live", "name"],
+          description: "Susunan pelajar, lalai total",
+        },
+        limit: { type: "number", description: "Lalai 200, maksimum 500" },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      return markahKelas(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "get_student_scores",
+    title: "Markah seorang peserta",
+    description:
+      "Markah terperinci SATU peserta kelas: jumlah dan pecahannya, kedudukan kelas, " +
+      "aktiviti (mata diluluskan), sesi Live Quiz yang dimainkan dan pelarasan manual. " +
+      "Guna selepas get_class_scores untuk mengorek seorang pelajar.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        user_id: { type: "string", description: "UUID peserta" },
+      },
+      required: ["class_id", "user_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id || !args.user_id) throw new Error("class_id dan user_id diperlukan");
+      return markahPelajar(s.accessToken, args.class_id, args.user_id);
+    },
+  },
+
+  {
+    name: "get_hunt_results",
+    title: "Keputusan aktiviti (hunt)",
+    description:
+      "Keputusan satu aktiviti (hunt) kelas: bilangan hantaran setiap cabaran mengikut " +
+      "status (disahkan, tertunda, ditolak) dan markah setiap ahli kelas termasuk yang " +
+      "belum menghantar (sifar). Guna ini untuk melihat siapa belum menyiapkan aktiviti.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        hunt_id: { type: "string", description: "UUID hunt; mesti milik kelas ini" },
+      },
+      required: ["class_id", "hunt_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id || !args.hunt_id) throw new Error("class_id dan hunt_id diperlukan");
+      return keputusanHunt(s.accessToken, args.class_id, args.hunt_id);
+    },
+  },
+
+  {
+    name: "get_class_insights",
+    title: "Insights kelas",
+    description:
+      "Insights markah kelas (V2-014): pulse, bendera perhatian pelajar (attention), " +
+      "agihan markah (distribution), soalan dan cabaran susar (hard_questions, " +
+      "hard_challenges), trend markah Live Quiz (progress, maksimum 50 pelajar) dan " +
+      "pasukan (teams). sections ialah subset bahagian yang dikehendaki; kosong bermakna " +
+      "semua. Hasil dipangkas dengan truncated: true bila melebihi had.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        sections: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: [
+              "pulse",
+              "attention",
+              "distribution",
+              "hard_questions",
+              "hard_challenges",
+              "progress",
+              "teams",
+            ],
+          },
+          description: "Subset bahagian; kosong bermakna semua",
+        },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      return insightsKelasAlat(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "export_class_insights_csv",
+    title: "Eksport CSV Insights",
+    description:
+      "Eksport Insights kelas sebagai teks CSV melalui laluan eksport aplikasi. sections " +
+      "wajib: satu atau lebih daripada students, attention, questions, challenges, teams, " +
+      "trend, atau all. Pulangkan filename dan csv; CSV dipangkas pada had 200 KB dengan " +
+      "truncated: true. Rekod audit eksport kekal ditulis oleh laluan.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        sections: {
+          type: "array",
+          items: {
+            type: "string",
+            enum: ["students", "attention", "questions", "challenges", "teams", "trend", "all"],
+          },
+          description: "Bahagian yang dieksport, wajib tidak kosong",
+        },
+      },
+      required: ["class_id", "sections"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      return eksportInsightsCsv(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "get_class_engagement",
+    title: "Ringkasan penglibatan",
+    description:
+      "Ringkasan penglibatan: satu kelas bila class_id diberi, atau semua kelas anda bila " +
+      "ditinggalkan kosong. Statistik aktiviti, Live Quiz dan penglibatan ahli. Guna untuk " +
+      "trend penyertaan keseluruhan, bukan markah individu.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas pilihan" },
+      },
+    },
+    handler: async (args, s) => engagementKelas(s.accessToken, args?.class_id),
   },
 
   /* ============================================================

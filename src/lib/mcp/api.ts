@@ -67,6 +67,29 @@ export async function callApi<T = any>(
 }
 
 /**
+ * Panggilan GET yang balasannya ialah teks dan bukan JSON, contohnya eksport
+ * CSV Insights. Pulangkan teks mentah serta nama fail daripada header
+ * content-disposition bila ada.
+ */
+export async function callApiText(
+  accessToken: string,
+  path: string
+): Promise<{ filename: string | null; text: string }> {
+  const res = await fetch(`${BASE}${path}`, {
+    method: "GET",
+    headers: { Authorization: `Bearer ${accessToken}` },
+    cache: "no-store",
+  });
+  if (!res.ok) {
+    const err = await readError(res);
+    throw new ApiError(res.status, err.text, err.payload);
+  }
+  const disposition = res.headers.get("content-disposition");
+  const padanan = /filename="?([^";]+)"?/i.exec(disposition ?? "");
+  return { filename: padanan ? padanan[1] : null, text: await res.text() };
+}
+
+/**
  * Muat naik fail ke route upload-file, yang mengharapkan FormData dengan
  * medan bernama `file`. Kami membina Blob daripada base64 supaya klien MCP
  * boleh menghantar bait melalui JSON-RPC.
