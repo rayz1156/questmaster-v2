@@ -5,9 +5,9 @@
 // buang dengan pengesahan menaip nama. Tab: Overview, Members,
 // Activities, Teams dan Ranking.
 //
-// Ranking individu dikira oleh kiraRankingIndividu (tulen) daripada
-// submission diluluskan; skor pasukan datang terus daripada enjin
-// pemarkahan langsung qm_teams.score.
+// Ranking individu datang daripada view qm_class_individual_scores
+// (V2-012, migrasi 0049): Activities + Live Quiz + Adjustments; skor
+// pasukan datang terus daripada enjin pemarkahan langsung qm_teams.score.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -34,6 +34,7 @@ import {
   adminDeleteClass,
   adminUpdateTeam,
   adminDeleteTeam,
+  listClassIndividualScores,
   logAudit,
   type Profile,
   type Hunt,
@@ -42,8 +43,8 @@ import {
   type Team,
   type AhliKelasAdmin,
   type AhliPasukanAdmin,
+  type ClassIndividualScore,
 } from "@/lib/data";
-import { kiraRankingIndividu } from "@/lib/adminRanking";
 import { labelStatusKelas, statusKelas, type KelasAdmin } from "@/lib/adminClasses";
 import { petikCsv, lindungFormula, tarikhKl, slugFail } from "@/lib/csvPeserta";
 
@@ -84,10 +85,13 @@ export default function Page({ params }: { params: { id: string } }) {
   const [butiranAhli, setButiranAhli] = useState<Record<string, AhliPasukanAdmin[]>>({});
   const [editPasukan, setEditPasukan] = useState<{ id: string; nama: string; lama: string } | null>(null);
   const [modRanking, setModRanking] = useState<"teams" | "individuals">("teams");
+  // V2-012: ranking individu daripada view qm_class_individual_scores
+  // (migrasi 0049) supaya markah Live Quiz dikumpul bersama markah aktiviti.
+  const [markahIndividu, setMarkahIndividu] = useState<ClassIndividualScore[]>([]);
 
   const reload = async () => {
     try {
-      const [semuaKelas, profs, semuaHunt, semuaCh, semuaSub, semuaTeam, ahliKelas] = await Promise.all([
+      const [semuaKelas, profs, semuaHunt, semuaCh, semuaSub, semuaTeam, ahliKelas, markah] = await Promise.all([
         adminListAllClasses(),
         adminListProfiles(),
         adminListAllHunts(),
@@ -95,6 +99,7 @@ export default function Page({ params }: { params: { id: string } }) {
         adminListAllSubmissions(),
         adminListAllTeams(),
         adminListClassMembers(id).catch(() => [] as AhliKelasAdmin[]),
+        listClassIndividualScores(id).catch(() => [] as ClassIndividualScore[]),
       ]);
       const k = (semuaKelas || []).find((r) => r.id === id) || null;
       setKelas(k as KelasAdmin | null);
@@ -105,6 +110,7 @@ export default function Page({ params }: { params: { id: string } }) {
       const teamKelas = semuaTeam.filter((t) => t.class_id === id);
       setTeams(teamKelas);
       setAhli(ahliKelas);
+      setMarkahIndividu(markah);
       // Kiraan ahli setiap pasukan untuk senarai kiri tab Teams.
       if (teamKelas.length > 0) {
         adminListMembersOfTeams(teamKelas.map((t) => t.id))
@@ -160,10 +166,16 @@ export default function Page({ params }: { params: { id: string } }) {
     return peta;
   }, [profiles, ahli]);
 
-  const rankingIndividu = useMemo(
-    () => kiraRankingIndividu(subsKelas, challengesKelas, namaById),
-    [subsKelas, challengesKelas, namaById],
-  );
+  // Bilangan jawapan diluluskan setiap pelajar; kekal dikira di sini kerana
+  // view qm_class_individual_scores tidak membawanya (V2-012: skor individu
+  // kini datang daripada view, sila lihat markahIndividu).
+  const diluluskanByUser = useMemo(() => {
+    const peta: Record<string, number> = {};
+    for (const s of subsKelas) {
+      if (s.status === "approved") peta[s.user_id] = (peta[s.user_id] || 0) + 1;
+    }
+    return peta;
+  }, [subsKelas]);
   const teamsSusun = useMemo(
     () => [...teams].sort((a, b) => (Number(b.score) || 0) - (Number(a.score) || 0)),
     [teams],
@@ -261,9 +273,21 @@ export default function Page({ params }: { params: { id: string } }) {
         [String(i + 1), petikCsv(lindungFormula(t.name)), String(Number(t.score) || 0)].join(","),
       );
     } else {
-      tajuk = "Rank,Name,Score,Approved answers";
-      baris = rankingIndividu.map((r, i) =>
-        [String(i + 1), petikCsv(lindungFormula(r.nama)), String(r.skor), String(r.diluluskan)].join(","),
+      // V2-012: lajur tambahan supaya eksport sepadan dengan paparan individu
+      // (Activities, Live Quiz, Adjustments, Live sessions), manakala kiraan
+      // jawapan diluluskan dikekalkan untuk kesinambungan dengan eksport lama.
+      tajuk = "Rank,Name,Score,Approved answers,Activities,Live Quiz,Adjustments,Live sessions";
+      baris = markahIndividu.map((r, i) =>
+        [
+          String(i + 1),
+          petikCsv(lindungFormula(r.display_name || namaById[r.user_id] || "Unnamed user")),
+          String(Number(r.total_score) || 0),
+          String(diluluskanByUser[r.user_id] ?? 0),
+          String(r.task_score ?? 0),
+          String(r.live_score ?? 0),
+          String(r.adjustment_score ?? 0),
+          String(r.live_sessions ?? 0),
+        ].join(","),
       );
     }
     muatTurunCsv([tajuk, ...baris].join("\r\n"), `kuizen-ranking-${modRanking}-${slugFail(kelas?.name || "class")}.csv`);
@@ -760,10 +784,10 @@ export default function Page({ params }: { params: { id: string } }) {
                   </div>
                 ))
               )
-            ) : rankingIndividu.length === 0 ? (
+            ) : markahIndividu.length === 0 ? (
               <EmptyState title="No students ranked yet." />
             ) : (
-              rankingIndividu.map((r, i) => (
+              markahIndividu.map((r, i) => (
                 <div
                   key={r.user_id}
                   className="flex items-center gap-3 px-4 py-3 border-t border-hairline first:border-t-0"
@@ -776,17 +800,21 @@ export default function Page({ params }: { params: { id: string } }) {
                       href={`/admin/users/${r.user_id}`}
                       className="text-sm font-medium text-ink hover:text-brand-purple truncate"
                     >
-                      {r.nama}
+                      {r.display_name || namaById[r.user_id] || "Unnamed user"}
                     </Link>
-                    <span className="block text-xs text-ink-faint">{r.diluluskan} approved answers</span>
+                    {/* V2-012: pecahan markah individu daripada view
+                        qm_class_individual_scores (migrasi 0049). */}
+                    <span className="block text-xs text-ink-faint truncate">
+                      Activities {r.task_score ?? 0} · Live Quiz {r.live_score ?? 0} · Adjustments {r.adjustment_score ?? 0}
+                    </span>
                   </span>
-                  <span className="text-sm font-semibold text-brand-purple shrink-0">{r.skor}</span>
+                  <span className="text-sm font-semibold text-brand-purple shrink-0">{Number(r.total_score) || 0}</span>
                 </div>
               ))
             )}
           </Card>
           <p className="text-xs text-ink-faint mt-3">
-            Team scores come from the live scoring engine. Individual totals are computed from approved answers.
+            Team scores come from the live scoring engine. Individual totals combine activities, live quizzes and adjustments.
           </p>
         </div>
       )}

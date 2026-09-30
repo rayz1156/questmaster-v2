@@ -417,7 +417,20 @@ export async function listClassTeamScores(classId: string): Promise<ClassTeamSco
 
 // Individual (per-student) scores within a class. Backed by the qm_class_individual_scores
 // view (migration 0027): each student's own approved-submission points + individual adjustments.
-export type ClassIndividualScore = { class_id: string; user_id: string; display_name: string | null; total_score: number };
+// V2-012 (migration 0049): jumlah kini task + Live Quiz + adjustment, dan
+// komponen didedahkan sebagai lajur berasingan. live_sessions mengira sesi
+// kuiz langsung berbeza yang menyumbang markah. Lajur baharu pilihan supaya
+// jenis kekal sah walaupun PostgREST belum muat semula skema.
+export type ClassIndividualScore = {
+  class_id: string;
+  user_id: string;
+  display_name: string | null;
+  total_score: number;
+  task_score?: number;
+  live_score?: number;
+  adjustment_score?: number;
+  live_sessions?: number;
+};
 
 export async function listClassIndividualScores(classId: string): Promise<ClassIndividualScore[]> {
   const { data, error } = await supabase.from('qm_class_individual_scores').select('*').eq('class_id', classId).order('total_score', { ascending: false });

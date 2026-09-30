@@ -141,7 +141,9 @@ function QuizList() {
     return arr;
   }, [quizzes, tapisKelas, q]);
 
-  const labelKelas = (x: LiveQuizRow) => (x.class?.name ? x.class.name : "Personal");
+  // V2-012: kuiz tanpa kelas terbuka kepada tetamu; label "No class" jelas
+  // berbanding "Personal" yang membayangkan kuiz itu milik peribadi sahaja.
+  const labelKelas = (x: LiveQuizRow) => (x.class?.name ? x.class.name : "No class");
 
   const CreateForm = () => (
     <div className="surface p-5 mb-6">
@@ -154,10 +156,18 @@ function QuizList() {
         <>
           <label className="block text-sm font-medium text-ink mb-1.5">Class <span className="text-ink-faint font-normal">(optional)</span></label>
           <select value={newClassId} onChange={(e) => setNewClassId(e.target.value)} className="input max-w-sm mb-4">
-            <option value="">Personal quiz, no class</option>
+            <option value="">No class (anyone can join as a guest)</option>
             {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
           </select>
         </>
+      )}
+      {/* V2-012: kuiz kelas menutup sesi kepada tetamu; nyatakan kesannya
+          kepada pendidik sebelum mereka mencipta kuiz. Berlaku sama ada
+          kuiz dicipta dalam Library (kelas dipilih) atau di dalam kelas. */}
+      {(tapisKelas || newClassId) && (
+        <p className="text-xs text-ink-faint mb-4 max-w-sm">
+          Players must sign in. Scores add to the class ranking.
+        </p>
       )}
       <div className="flex items-center justify-end gap-2">
         <button type="button" onClick={() => setShowNew(false)} className="btn-secondary">Cancel</button>

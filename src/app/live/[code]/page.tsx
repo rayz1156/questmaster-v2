@@ -56,6 +56,15 @@ export default function SkrinMainLangsung() {
   // null = belum semak; "" = semak selesai, tiada nama berdaftar; rentetan
   // tak kosong = nama berdaftar untuk dipapar pada skrin masuk.
   const [namaBerdaftar, setNamaBerdaftar] = useState<string | null>(null);
+  // Tiket V2-012: kuiz kelas menutup sesi kepada tetamu. whoami kini
+  // memulangkan classQuiz dan member, dan halaman menawarkan kad "Sign in"
+  // atau "Enter class code". Aliran yang sama dengan keputusanMasuk dalam
+  // src/lib/live-quiz.ts, tetapi fungsi itu tidak diimport di sini kerana
+  // modul berkenaan membawa next/server ke dalam bundle klien.
+  const [kuizKelas, setKuizKelas] = useState<boolean | null>(null);
+  const [adaSesi, setAdaSesi] = useState(false);
+  const [ahli, setAhli] = useState(false);
+  const [kodRalatMasuk, setKodRalatMasuk] = useState<string | null>(null);
 
   const [keadaan, setKeadaan] = useState<Keadaan | null>(null);
   const [papan, setPapan] = useState<BarisPapan[] | null>(null);
@@ -119,8 +128,10 @@ export default function SkrinMainLangsung() {
     if (identiti) muatSoalan();
   }, [identiti, muatSoalan]);
 
-  // Tiket V2-007: semak nama berdaftar sekali sahaja semasa tiada identiti.
-  // Jika sesi Supabase wujud, GET whoami dengan Bearer; jika ada nama,
+  // Tiket V2-007 + V2-012: semak whoami sekali sahaja semasa tiada identiti.
+  // Kini dipanggil WALAUPUN tiada sesi (tanpa Bearer) supaya classQuiz
+  // diketahui lebih awal dan kad "Sign in" boleh dipapar sebelum log masuk.
+  // Jika sesi Supabase wujud, Bearer dihantar dan nama berdaftar dipulangkan;
   // skrin masuk memaparkan "Joining as <nama>" dengan medan nama dikunci.
   useEffect(() => {
     if (identiti || namaBerdaftar !== null) return;
@@ -128,13 +139,16 @@ export default function SkrinMainLangsung() {
     const semak = async () => {
       try {
         const ses = await supabase.auth.getSession();
-        if (!ses.data.session) { if (hidup) setNamaBerdaftar(""); return; }
-        const r = await fetch(`/api/live/play/${kod}/whoami`, {
-          headers: { Authorization: `Bearer ${ses.data.session.access_token}` },
-        });
+        const headers: Record<string, string> = ses.data.session
+          ? { Authorization: `Bearer ${ses.data.session.access_token}` }
+          : {};
+        const r = await fetch(`/api/live/play/${kod}/whoami`, { headers });
         const j = await r.json();
         const nama = typeof j?.registeredName === "string" && j.registeredName ? j.registeredName : "";
         if (hidup) {
+          setAdaSesi(!!ses.data.session);
+          setKuizKelas(j?.classQuiz === true);
+          setAhli(j?.member === true);
           setNamaBerdaftar(nama);
           if (nama) setNama(nama);
         }
@@ -235,7 +249,17 @@ export default function SkrinMainLangsung() {
         body: JSON.stringify({ nickname: bersih }),
       });
       const j = await r.json();
-      if (!r.ok) { setErr(j.error || "Could not join the session."); return; }
+      if (!r.ok) {
+        // V2-012: kuiz kelas menolak tetamu dan bukan ahli. Papar kad yang
+        // sama dengan skrin masuk supaya pengguna tahu langkah seterusnya,
+        // bukan baris ralat merah sahaja.
+        if (j?.code === "LOGIN_REQUIRED" || j?.code === "NOT_CLASS_MEMBER") {
+          setKodRalatMasuk(j.code);
+          return;
+        }
+        setErr(j.error || "Could not join the session.");
+        return;
+      }
       // Nama sebenar pemain datang daripada pelayan (boleh berbeza, cth
       // akhiran "<nama> 2" bila nama berdaftar sudah diambil).
       const namaSebenar = typeof j.nickname === "string" && j.nickname ? j.nickname : bersih;
@@ -289,32 +313,70 @@ export default function SkrinMainLangsung() {
 
   if (!identiti) {
     const berdaftar = !!namaBerdaftar;
+    // Aliran masuk (V2-012), cermin keputusanMasuk dalam src/lib/live-quiz.ts.
+    // Kuiz kelas: tetamu diminta log masuk; pengguna log masuk tetapi bukan
+    // ahli diminta menyertai kelas dahulu. kodRalatMasuk merangkumi jawapan
+    // 401/403 daripada POST join supaya kad yang sama dipapar selepas cubaan.
+    const perluLogMasuk =
+      kodRalatMasuk === "LOGIN_REQUIRED" || (kuizKelas === true && !adaSesi);
+    const bukanAhli =
+      kodRalatMasuk === "NOT_CLASS_MEMBER" || (kuizKelas === true && adaSesi && !ahli);
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="card w-full max-w-sm">
           <h1 className="text-xl font-bold text-center mb-1">Join Session {kod}</h1>
-          {berdaftar ? (
-            <p className="text-sm text-gray-500 text-center mb-4">
-              Joining as <span className="font-semibold text-gray-800">{namaBerdaftar}</span>
-            </p>
+          {perluLogMasuk ? (
+            <>
+              <p className="text-sm text-gray-500 text-center mb-4">
+                This quiz is part of a class. Sign in to play and your score will
+                count towards the class ranking.
+              </p>
+              <Link
+                href={`/login?next=/live/${kod}`}
+                className="btn-primary w-full py-2 block text-center"
+              >
+                Sign in
+              </Link>
+            </>
+          ) : bukanAhli ? (
+            <>
+              <p className="text-sm text-gray-500 text-center mb-4">
+                Join the class first to play this quiz. Ask your educator for the
+                class code.
+              </p>
+              <Link
+                href="/participant/join"
+                className="btn-primary w-full py-2 block text-center"
+              >
+                Enter class code
+              </Link>
+            </>
           ) : (
-            <p className="text-sm text-gray-500 text-center mb-4">Choose your player name.</p>
+            <>
+              {berdaftar ? (
+                <p className="text-sm text-gray-500 text-center mb-4">
+                  Joining as <span className="font-semibold text-gray-800">{namaBerdaftar}</span>
+                </p>
+              ) : (
+                <p className="text-sm text-gray-500 text-center mb-4">Choose your player name.</p>
+              )}
+              <form onSubmit={onSertai}>
+                <input
+                  className="input w-full mb-3"
+                  placeholder="Player name"
+                  maxLength={24}
+                  value={nama}
+                  disabled={berdaftar}
+                  onChange={(e) => setNama(e.target.value)}
+                  autoFocus
+                />
+                {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
+                <button type="submit" disabled={busy} className="btn-primary w-full py-2">
+                  {busy ? "Joining…" : "Join"}
+                </button>
+              </form>
+            </>
           )}
-          <form onSubmit={onSertai}>
-            <input
-              className="input w-full mb-3"
-              placeholder="Player name"
-              maxLength={24}
-              value={nama}
-              disabled={berdaftar}
-              onChange={(e) => setNama(e.target.value)}
-              autoFocus
-            />
-            {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
-            <button type="submit" disabled={busy} className="btn-primary w-full py-2">
-              {busy ? "Joining…" : "Join"}
-            </button>
-          </form>
           <div className="text-center mt-3">
             <Link href="/live" className="text-xs text-gray-500 hover:text-gray-800">← Back</Link>
           </div>

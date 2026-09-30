@@ -211,9 +211,18 @@ function LeaderboardInner() {
             return (
               <div key={s.user_id} className={`relative flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tileBg}`}>
                 <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medalBg}`}>{i + 1}</div>
-                <div className="flex-1 min-w-0 flex items-center gap-2">
-                  <UserIcon className="w-4 h-4 text-ink-faint shrink-0"/>
-                  <div className="text-[15px] font-medium text-ink truncate">{s.display_name || 'Student'}</div>
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2">
+                    <UserIcon className="w-4 h-4 text-ink-faint shrink-0"/>
+                    <div className="text-[15px] font-medium text-ink truncate">{s.display_name || 'Student'}</div>
+                  </div>
+                  {/* V2-012: pecahan markah individu daripada view
+                      qm_class_individual_scores (migrasi 0049). Total kekal
+                      dipapar di kanan; baris ini menunjukkan dari mana ia
+                      datang: Activities, Live Quiz, Adjustments. */}
+                  <div className="text-xs text-ink-faint mt-0.5 truncate">
+                    Activities {s.task_score ?? 0} · Live Quiz {s.live_score ?? 0} · Adjustments {s.adjustment_score ?? 0}
+                  </div>
                 </div>
                 <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${ptsBg}`}>
                   <div className="text-center">
