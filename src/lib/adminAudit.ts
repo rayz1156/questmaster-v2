@@ -35,6 +35,8 @@ const LABELS: Record<string, AuditLabel> = {
   password_reset_sent: { label: 'Sent password reset', tone: 'neutral' },
   users_export: { label: 'Exported users', tone: 'warn' },
   members_export: { label: 'Exported class members', tone: 'warn' },
+  // V2-014a: eksport CSV Insights oleh laluan (pemilik, educator, admin).
+  insights_export: { label: 'Exported class insights', tone: 'warn' },
   hunt_status: { label: 'Changed activity status', tone: 'neutral' },
   class_archive: { label: 'Archived class', tone: 'neutral' },
   class_unarchive: { label: 'Restored class', tone: 'good' },
