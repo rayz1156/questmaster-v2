@@ -579,12 +579,19 @@ BEGIN
     JOIN sesi_kelas sk ON sk.sesi = lp.session_id
     WHERE lp.user_id IS NOT NULL
   ),
+  -- quiz_title dan session_ended_at ialah medan tambahan untuk tajuk lajur
+  -- eksport CSV trend; empat medan wajib (session_id, played_at, score, pct)
+  -- kekal pada kedudukan pertama.
   trend AS (
     SELECT pe.uid AS uid, pe.sesi AS sesi, pe.main_pada AS played_at,
            pe.score AS score,
            CASE WHEN mk.jumlah IS NULL OR mk.jumlah = 0 THEN NULL
-                ELSE ROUND(100.0 * pe.score / mk.jumlah, 1) END AS pct
+                ELSE ROUND(100.0 * pe.score / mk.jumlah, 1) END AS pct,
+           lq3.title AS quiz_title,
+           ls3.ended_at AS session_ended_at
     FROM pemain pe
+    JOIN public.qm_live_sessions ls3 ON ls3.id = pe.sesi
+    JOIN public.qm_live_quizzes lq3 ON lq3.id = pe.kuiz
     LEFT JOIN mata_kuiz mk ON mk.kuiz = pe.kuiz
     WHERE pe.status_sesi = 'ended'
   ),
@@ -595,7 +602,9 @@ BEGIN
                'session_id', t3.sesi,
                'played_at', t3.played_at,
                'score', t3.score,
-               'pct', t3.pct
+               'pct', t3.pct,
+               'quiz_title', t3.quiz_title,
+               'session_ended_at', t3.session_ended_at
              ) ORDER BY t3.played_at, t3.sesi
            ), '[]'::jsonb) AS data
     FROM trend t3
