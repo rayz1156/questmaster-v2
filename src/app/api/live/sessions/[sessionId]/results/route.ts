@@ -139,7 +139,7 @@ export async function GET(
     .select('id, nickname, user_id, score, total_ms, best_streak')
     .eq('session_id', params.sessionId);
   if (errPemain) {
-    console.error('live results players failed', errPemain);
+    console.error('live results players failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
   const pemain = (pemainData || []) as BarisPemain[];
@@ -149,7 +149,7 @@ export async function GET(
     .select('player_id, question_id, choice_key, is_correct, ms_taken')
     .eq('session_id', params.sessionId);
   if (errJawapan) {
-    console.error('live results answers failed', errJawapan);
+    console.error('live results answers failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
   const jawapan = (jawapanData || []) as BarisJawapan[];
@@ -214,7 +214,7 @@ export async function GET(
     .eq('quiz_id', sesi.quiz_id)
     .order('order_idx');
   if (errSoalan) {
-    console.error('live results questions failed', errSoalan);
+    console.error('live results questions failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
   const soalan = (soalanData || []) as BarisSoalan[];

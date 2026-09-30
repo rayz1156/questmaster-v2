@@ -101,7 +101,7 @@ export async function GET(
     .eq('hunt_id', params.huntId)
     .order('order_idx');
   if (errCabaran) {
-    console.error('hunt results challenges failed', errCabaran);
+    console.error('hunt results challenges failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
   const cabaran = (cabaranData || []) as BarisCabaran[];
@@ -113,7 +113,7 @@ export async function GET(
     .select('challenge_id, user_id, status, created_at')
     .in('challenge_id', idsCabaran.length > 0 ? idsCabaran : [TIADA_UUID]);
   if (errHantaran) {
-    console.error('hunt results submissions failed', errHantaran);
+    console.error('hunt results submissions failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
   const hantaran = (hantaranData || []) as BarisHantaran[];
@@ -141,7 +141,7 @@ export async function GET(
     .select('user_id')
     .eq('class_id', params.id);
   if (errAhli) {
-    console.error('hunt results members failed', errAhli);
+    console.error('hunt results members failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
   const idsAhli = (ahliData || []).map((a: { user_id: string }) => String(a.user_id));
@@ -151,7 +151,7 @@ export async function GET(
     .select('id, display_name')
     .in('id', idsAhli.length > 0 ? idsAhli : [TIADA_UUID]);
   if (errProfil) {
-    console.error('hunt results profiles failed', errProfil);
+    console.error('hunt results profiles failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
   const petaNama = new Map<string, string>();

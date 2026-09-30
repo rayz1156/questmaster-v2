@@ -113,7 +113,7 @@ export async function GET(
     )
     .eq('class_id', params.id);
   if (errView) {
-    console.error('class scores view failed', errView);
+    console.error('class scores view failed');
     return NextResponse.json({ error: 'Failed to load scores.' }, { status: 500 });
   }
   const semuaPelajar = (barisView || []) as BarisView[];
@@ -156,7 +156,7 @@ export async function GET(
     .select('team_id, team_name, base_score, task_score, adjustment_score, total_score')
     .eq('class_id', params.id);
   if (errPasukan) {
-    console.error('class scores teams failed', errPasukan);
+    console.error('class scores teams failed');
     return NextResponse.json({ error: 'Failed to load scores.' }, { status: 500 });
   }
   const pasukan = ((barisPasukan || []) as BarisPasukan[]).slice().sort(
@@ -180,7 +180,7 @@ export async function GET(
       .select('team_id, user_id')
       .in('team_id', idsPasukan.length > 0 ? idsPasukan : [TIADA_UUID]);
     if (errAhli) {
-      console.error('class scores team members failed', errAhli);
+      console.error('class scores team members failed');
       return NextResponse.json({ error: 'Failed to load scores.' }, { status: 500 });
     }
     const kiraan = new Map<string, number>();

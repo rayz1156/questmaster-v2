@@ -17,6 +17,13 @@ export async function semakPendidikKelas(
   classId: string,
   userId: string,
 ): Promise<boolean> {
+  // kzsec V2-017 S1 (CTO): pengguna digantung ditolak dahulu, termasuk educator kelas.
+  const { data: prof } = await supa
+    .from('qm_profiles')
+    .select('role, suspended')
+    .eq('id', userId)
+    .maybeSingle();
+  if (!prof || prof.suspended) return false;
   const { data: edu } = await supa
     .from('qm_class_educators')
     .select('educator_id')
@@ -25,12 +32,7 @@ export async function semakPendidikKelas(
     .not('accepted_at', 'is', null)
     .maybeSingle();
   if (edu) return true;
-  const { data: prof } = await supa
-    .from('qm_profiles')
-    .select('role, suspended')
-    .eq('id', userId)
-    .maybeSingle();
-  return !!prof && !prof.suspended && ['admin', 'superadmin'].includes(prof.role);
+  return ['admin', 'superadmin'].includes(prof.role);
 }
 
 /** Balas ralat pangkalan data sebagai mesej boleh baca dengan status betul. */

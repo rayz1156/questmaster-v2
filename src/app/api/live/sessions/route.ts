@@ -144,7 +144,7 @@ export async function GET(req: NextRequest) {
       .select('id')
       .eq('class_id', classId);
     if (errKuizKelas) {
-      console.error('live sessions quiz list failed', errKuizKelas);
+      console.error('live sessions quiz list failed');
       return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
     }
     idKuizTapis = (kuizKelas || []).map((k: { id: string }) => String(k.id));
@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
       .select('id')
       .eq('owner_id', callerId);
     if (errKuizSendiri) {
-      console.error('live sessions own quiz list failed', errKuizSendiri);
+      console.error('live sessions own quiz list failed');
       return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
     }
     const senaraiId = new Set<string>((kuizSendiri || []).map((k: { id: string }) => String(k.id)));
@@ -179,7 +179,7 @@ export async function GET(req: NextRequest) {
         .select('id')
         .in('class_id', Array.from(idsKelas));
       if (errKelas) {
-        console.error('live sessions class quiz list failed', errKelas);
+        console.error('live sessions class quiz list failed');
         return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
       }
       for (const k of kuizKelas || []) senaraiId.add(String(k.id));
@@ -201,7 +201,7 @@ export async function GET(req: NextRequest) {
   if (status) pertanyaan = pertanyaan.eq('status', status);
   const { data: sesiData, error: errSesi } = await pertanyaan;
   if (errSesi) {
-    console.error('live sessions list failed', errSesi);
+    console.error('live sessions list failed');
     return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
   }
   const semuaSesi = (sesiData || []) as BarisSesi[];
@@ -216,7 +216,7 @@ export async function GET(req: NextRequest) {
     .select('id, title, class_id')
     .in('id', idsKuiz.length > 0 ? idsKuiz : [TIADA_UUID]);
   if (errKuizBaris) {
-    console.error('live sessions quiz read failed', errKuizBaris);
+    console.error('live sessions quiz read failed');
     return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
   }
   const petaKuiz = new Map<string, { title: string | null; class_id: string | null }>();
@@ -248,7 +248,7 @@ export async function GET(req: NextRequest) {
     .select('id, session_id, nickname, user_id, score, total_ms')
     .in('session_id', idsSesi.length > 0 ? idsSesi : [TIADA_UUID]);
   if (errPemain) {
-    console.error('live sessions players read failed', errPemain);
+    console.error('live sessions players read failed');
     return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
   }
   const pemain = (pemainData || []) as BarisPemain[];
@@ -258,7 +258,7 @@ export async function GET(req: NextRequest) {
     .select('session_id, player_id')
     .in('session_id', idsSesi.length > 0 ? idsSesi : [TIADA_UUID]);
   if (errJawapan) {
-    console.error('live sessions answers read failed', errJawapan);
+    console.error('live sessions answers read failed');
     return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
   }
   const jawapan = (jawapanData || []) as BarisJawapanRingkas[];
