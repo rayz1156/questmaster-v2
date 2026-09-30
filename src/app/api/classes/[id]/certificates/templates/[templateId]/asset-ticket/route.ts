@@ -15,6 +15,7 @@
  * dengan pencetus qm_certificate_template_plan_guard 0042).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { pelanSijilBerbayar } from '@/lib/sijil/pelanSijil';
 import { randomBytes } from 'node:crypto';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
@@ -91,7 +92,7 @@ export async function POST(
     const { data: rpcPlan, error: rpcErr } = await auth.supa.rpc('qm_effective_plan', { p_user: ownerId });
     if (!rpcErr && typeof rpcPlan === 'string') pelan = rpcPlan;
   }
-  if (pelan !== 'pro' && pelan !== 'institution') {
+  if (!pelanSijilBerbayar(pelan)) {
     return NextResponse.json(
       { error: 'Certificate backgrounds and logos are available on Pro and Institution plans.' },
       { status: 402 },

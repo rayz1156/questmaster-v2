@@ -16,6 +16,7 @@
  * kebenaran disahkan (corak laluan preview).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { pelanSijilBerbayar, pelanPemilikKelas } from '@/lib/sijil/pelanSijil';
 import { randomBytes } from 'node:crypto';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
@@ -104,7 +105,8 @@ export async function POST(
     urlSah: `https://kuizen.fun/sijil/${KOD_CONTOH}`,
     latar: latarBait,
     logo: logoBait,
-    tera: true,
+    // Tera "Dijana dengan Kuizen" hanya untuk pelan percuma (pelan pemilik kelas).
+    tera: !pelanSijilBerbayar(await pelanPemilikKelas(auth.supa, classId)),
     layout,
   });
 

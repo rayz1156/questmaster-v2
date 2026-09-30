@@ -9,6 +9,7 @@
  * service role HANYA selepas kebenaran pendidik disahkan.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { pelanSijilBerbayar, pelanPemilikKelas } from '@/lib/sijil/pelanSijil';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
@@ -84,7 +85,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     urlSah: 'https://kuizen.fun/sijil/PREVIEW',
     latar: latarBait,
     logo: logoBait,
-    tera: true,
+    // Tera "Dijana dengan Kuizen" hanya untuk pelan percuma (pelan pemilik kelas).
+    tera: !pelanSijilBerbayar(await pelanPemilikKelas(auth.supa, classId)),
     layout,
   });
 

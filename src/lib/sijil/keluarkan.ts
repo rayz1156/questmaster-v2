@@ -10,6 +10,7 @@
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { janaPdfSijil, formatTarikhBm } from '@/lib/sijil/janaPdf';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
+import { pelanSijilBerbayar, pelanPemilikKelas } from '@/lib/sijil/pelanSijil';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /** Templat yang diperlukan untuk jana PDF (lajur yang sama dibaca oleh laluan). */
@@ -108,6 +109,8 @@ export async function keluarkanSijil(
   // Normalkan layout (V2-015) sebelum PDF dijana: kunci asing dibuang dan
   // semua nombor diapit, untuk templat lama dan baharu sama.
   const layout = normaliseSusunAtur(template.layout);
+  // Tera "Dijana dengan Kuizen" hanya untuk pelan percuma pemilik kelas (CTO V2-015).
+  const tera = !pelanSijilBerbayar(await pelanPemilikKelas(svc, template.class_id));
 
   const hasil: HasilSijil[] = [];
   for (const s of baris ?? []) {
@@ -121,7 +124,7 @@ export async function keluarkanSijil(
       urlSah: `https://kuizen.fun/sijil/${s.code}`,
       latar: latarBait,
       logo: logoBait,
-      tera: true,
+      tera,
       layout,
     });
     const { error: upErr } = await svc.storage
