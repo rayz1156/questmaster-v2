@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Trophy, Users, Timer, Check, X } from "lucide-react";
+import { Trophy, Users, Timer, Check, X, Flame } from "lucide-react";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
 import { supabase } from "@/lib/supabase";
 
@@ -69,6 +69,20 @@ export default function SkrinMainLangsung() {
   const [keadaan, setKeadaan] = useState<Keadaan | null>(null);
   const [papan, setPapan] = useState<BarisPapan[] | null>(null);
   const [berbaki, setBerbaki] = useState<number | null>(null);
+
+  // Lencana rentak (streak): rentak terakhir disimpan dalam ref supaya pil
+  // semasa "asking" dan pengesanan kehilangan rentak boleh membacanya tanpa
+  // mencetus render. Kehilangan rentak (jawapan salah selepas tiga betul
+  // berturut-turut atau lebih) perlu render, jadi ia dalam state.
+  const streakRef = useRef(0);
+  const [streakHilang, setStreakHilang] = useState(false);
+
+  useEffect(() => {
+    const r = keadaan?.reveal;
+    if (!r) return;
+    setStreakHilang(!r.isCorrect && streakRef.current >= 3);
+    streakRef.current = r.streak ?? 0;
+  }, [keadaan]);
 
   // Cache soalan klien (Bahagian 2.4): dimuat turun sekali, disimpan dalam
   // localStorage di bawah kuizen-live-q-<kod>. Tinjauan state hanya
@@ -446,7 +460,12 @@ export default function SkrinMainLangsung() {
         )}
 
         {k.status === "asking" && soalanSemasa && (
-          <div className="card">
+          <div className="card relative">
+            {streakRef.current >= 2 && (
+              <div className="absolute -top-2.5 right-4 z-10 inline-flex items-center gap-1 rounded-full bg-orange-500 px-2 py-0.5 text-xs font-semibold text-white shadow-sm">
+                <Flame className="w-3.5 h-3.5" /> {streakRef.current}
+              </div>
+            )}
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
               <span>Question {k.questionIndex + 1} / {k.totalQuestions}</span>
               <span className="flex items-center gap-1 font-semibold text-gray-700">
@@ -483,6 +502,23 @@ export default function SkrinMainLangsung() {
         {k.status === "revealed" && soalanSemasa && (
           <div className="card">
             <div className="text-xs text-gray-500 mb-2">Question {k.questionIndex + 1} / {k.totalQuestions}</div>
+            {/* Lencana rentak gaya Kahoot: betul berturut-turut dua kali atau
+                lebih papar pil besar; salah selepas rentak panjang papar pil
+                "Streak lost". Animasi pop hanya bila gerakan dibenarkan. */}
+            {k.reveal?.isCorrect && (k.reveal.streak ?? 0) >= 2 && (
+              <div className="flex justify-center mb-2">
+                <div className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-4 py-1.5 font-semibold text-white motion-safe:animate-pop">
+                  <Flame className="w-4 h-4" /> Answer streak {k.reveal.streak}
+                </div>
+              </div>
+            )}
+            {!k.reveal?.isCorrect && k.reveal?.myChoice && streakHilang && (
+              <div className="flex justify-center mb-2">
+                <div className="inline-flex items-center rounded-full bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-600">
+                  Streak lost
+                </div>
+              </div>
+            )}
             <div className={`text-center mb-3 ${k.reveal?.isCorrect ? "text-green-600" : "text-red-600"}`}>
               {k.reveal?.myChoice ? (
                 <>

@@ -25,6 +25,12 @@ import { supabase } from "@/lib/supabase";
 
 type Sub = "students" | "teams" | "educators";
 
+// Kunci susunan jadual markah pelajar. Semua lajur markah boleh disusun
+// dengan klik kepala lajur; nama kekal lalai (A-Z).
+type KunciUrut = "nama" | "aktiviti" | "langsung" | "jumlah" | "kedudukan";
+// Baris markah per peserta, bentuk nilai dalam petaMarkah.
+type BarisMarkah = { task: number; live: number; adj: number; jumlah: number; kedudukan: number };
+
 
 /** Baris tunggu yang belum tuntut, dipaparkan dengan label pending. */
 type InviteRow = { id: string; team_id: string; email: string; nama: string | null; role: string };
@@ -67,10 +73,10 @@ export default function ClassPeoplePage() {
   const [scores, setScores] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
     // V2-013: markah individu daripada view qm_class_individual_scores dan
-    // laci butiran markah peserta. Susunan jadual: nama (lalai A-Z) atau
-    // jumlah markah, boleh ditukar arah dengan klik kepala lajur.
+    // laci butiran markah peserta. Susunan jadual: semua lajur markah boleh
+    // disusun dengan klik kepala lajur; nama kekal lalai (A-Z).
     const [markahInd, setMarkahInd] = useState<ClassIndividualScore[]>([]);
-    const [urut, setUrut] = useState<{ kunci: "nama" | "jumlah"; arah: 1 | -1 }>({ kunci: "nama", arah: 1 });
+    const [urut, setUrut] = useState<{ kunci: KunciUrut; arah: 1 | -1 }>({ kunci: "nama", arah: 1 });
     const [laciUser, setLaciUser] = useState<{ id: string; nama: string } | null>(null);
     const [loading, setLoading] = useState(true);
     const [err, setErr] = useState<string | null>(null);
@@ -239,7 +245,8 @@ export default function ClassPeoplePage() {
   }, [markahInd]);
 
   // Baris ahli bergabung dengan markah, ditapis ikut carian dan disusun
-  // ikut kunci kepala lajur (nama lalai A-Z, atau jumlah markah).
+  // ikut kunci kepala lajur. Name kekal lalai (A-Z); lajur markah klik
+  // pertama papar markah tertinggi dahulu, dan seri dipecahkan ikut nama A-Z.
   const barisAhli = useMemo(() => {
     const needle = q.trim().toLowerCase();
     const asas = needle
@@ -249,19 +256,51 @@ export default function ClassPeoplePage() {
       const mk = petaMarkah.get(String(m.user_id || ""));
       return { m, mk };
     });
+    // Nilai lajur aktif untuk satu baris. Kedudukan 0 bermakna tiada markah,
+    // jadi ia sentiasa diletakkan di bawah semasa disusun ikut Rank.
+    const nilai = (mk: BarisMarkah | undefined): number => {
+      if (!mk) return 0;
+      if (urut.kunci === "aktiviti") return mk.task;
+      if (urut.kunci === "langsung") return mk.live;
+      if (urut.kunci === "jumlah") return mk.jumlah;
+      return mk.kedudukan ? mk.kedudukan : Number.MAX_SAFE_INTEGER;
+    };
     baris.sort((a, b) => {
-      if (urut.kunci === "jumlah") {
-        const ja = a.mk?.jumlah ?? 0;
-        const jb = b.mk?.jumlah ?? 0;
-        if (ja !== jb) return urut.arah === 1 ? ja - jb : jb - ja;
-      }
       const ka = name(a.m).toLowerCase();
       const kb = name(b.m).toLowerCase();
-      const banding = ka < kb ? -1 : ka > kb ? 1 : 0;
-      return urut.kunci === "nama" ? banding * urut.arah : banding;
+      const bandingNama = ka < kb ? -1 : ka > kb ? 1 : 0;
+      if (urut.kunci === "nama") return bandingNama * urut.arah;
+      const va = nilai(a.mk);
+      const vb = nilai(b.mk);
+      if (va !== vb) return (va - vb) * urut.arah;
+      return bandingNama; // seri markah: nama A-Z sentiasa
     });
     return baris;
   }, [members, q, urut, petaMarkah]);
+
+  // Klik kepala lajur: klik pertama guna arah lalai lajur itu (markah
+  // tertinggi dahulu, kecuali Name dan Rank yang mula dari atas senarai),
+  // klik seterusnya terbalik.
+  const klikUrut = (kunci: KunciUrut, arahPertama: 1 | -1) =>
+    setUrut((u) =>
+      u.kunci === kunci
+        ? { kunci, arah: u.arah === 1 ? -1 : 1 }
+        : { kunci, arah: arahPertama },
+    );
+
+  // aria-sort untuk kepala lajur aktif sahaja.
+  const arahSort = (kunci: KunciUrut) =>
+    urut.kunci === kunci ? (urut.arah === 1 ? "ascending" : "descending") : undefined;
+
+  // Ikon arah susunan pada kepala lajur aktif.
+  const IkonUrut = ({ kunci }: { kunci: KunciUrut }) =>
+    urut.kunci === kunci ? (
+      urut.arah === 1 ? (
+        <ChevronUp className="w-3.5 h-3.5" />
+      ) : (
+        <ChevronDown className="w-3.5 h-3.5" />
+      )
+    ) : null;
 
   const shownTeams = useMemo(() => {
     const needle = q.trim().toLowerCase();
@@ -336,45 +375,85 @@ export default function ClassPeoplePage() {
               </p>
             </div>
           ) : (
-            <div className="surface">
-              <div className="grid grid-cols-[1fr,96px,84px] sm:grid-cols-[1fr,120px,96px,88px,88px,88px,52px] gap-3 sm:gap-4 px-5 py-3 bg-[#FAFAFB] items-center">
-                {/* Kepala boleh diklik untuk menyusun: Name (A-Z lalai) dan Total. */}
-                <button
-                  type="button"
-                  onClick={() =>
-                    setUrut((u) =>
-                      u.kunci === "nama"
-                        ? { kunci: "nama", arah: u.arah === 1 ? -1 : 1 }
-                        : { kunci: "nama", arah: 1 },
-                    )
-                  }
-                  className="t-head inline-flex items-center gap-1 hover:text-ink"
+            <>
+              {/* Susunan pantas untuk skrin kecil: sesetengah lajur markah
+                  tersembunyi di telefon, jadi satu-satunya cara menyusun ialah
+                  select ini. Tidak kelihatan pada sm ke atas. */}
+              <div className="sm:hidden mb-3">
+                <label htmlFor="urut-mudah-alihs" className="sr-only">Sort by</label>
+                <select
+                  id="urut-mudah-alihs"
+                  className="input text-sm"
+                  value={urut.kunci === "kedudukan" ? "nama" : urut.kunci}
+                  onChange={(e) => {
+                    const kunci = e.target.value as KunciUrut;
+                    klikUrut(kunci, kunci === "nama" ? 1 : -1);
+                  }}
                 >
-                  Name
-                  {urut.kunci === "nama" &&
-                    (urut.arah === 1 ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
-                </button>
-                <div className="t-head hidden sm:block">Status</div>
-                <div className="t-head">Joined</div>
-                <div className="t-head hidden sm:block text-right">Activities</div>
-                <div className="t-head hidden sm:block text-right">Live Quiz</div>
-                <button
-                  type="button"
-                  onClick={() =>
-                    setUrut((u) =>
-                      u.kunci === "jumlah"
-                        ? { kunci: "jumlah", arah: u.arah === 1 ? -1 : 1 }
-                        : { kunci: "jumlah", arah: -1 },
-                    )
-                  }
-                  className="t-head inline-flex items-center gap-1 justify-end hover:text-ink"
-                >
-                  Total
-                  {urut.kunci === "jumlah" &&
-                    (urut.arah === 1 ? <ChevronUp className="w-3.5 h-3.5" /> : <ChevronDown className="w-3.5 h-3.5" />)}
-                </button>
-                <div className="t-head hidden sm:block text-right">Rank</div>
+                  <option value="nama">Name</option>
+                  <option value="jumlah">Total</option>
+                  <option value="aktiviti">Activities</option>
+                  <option value="langsung">Live Quiz</option>
+                </select>
               </div>
+              <div className="surface" role="table" aria-label="Student scores">
+                <div className="grid grid-cols-[1fr,96px,84px] sm:grid-cols-[1fr,120px,96px,88px,88px,88px,52px] gap-3 sm:gap-4 px-5 py-3 bg-[#FAFAFB] items-center" role="row">
+                  {/* Kepala boleh diklik untuk menyusun: Name (A-Z lalai),
+                      Activities, Live Quiz, Total dan Rank. Klik pertama lajur
+                      markah papar markah tertinggi dahulu. */}
+                  <button
+                    type="button"
+                    onClick={() => klikUrut("nama", 1)}
+                    role="columnheader"
+                    aria-sort={arahSort("nama")}
+                    className="t-head inline-flex items-center gap-1 hover:text-ink"
+                  >
+                    Name
+                    <IkonUrut kunci="nama" />
+                  </button>
+                  <div className="t-head hidden sm:block" role="columnheader">Status</div>
+                  <div className="t-head" role="columnheader">Joined</div>
+                  <button
+                    type="button"
+                    onClick={() => klikUrut("aktiviti", -1)}
+                    role="columnheader"
+                    aria-sort={arahSort("aktiviti")}
+                    className="t-head hidden sm:inline-flex items-center gap-1 justify-end hover:text-ink"
+                  >
+                    Activities
+                    <IkonUrut kunci="aktiviti" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => klikUrut("langsung", -1)}
+                    role="columnheader"
+                    aria-sort={arahSort("langsung")}
+                    className="t-head hidden sm:inline-flex items-center gap-1 justify-end hover:text-ink"
+                  >
+                    Live Quiz
+                    <IkonUrut kunci="langsung" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => klikUrut("jumlah", -1)}
+                    role="columnheader"
+                    aria-sort={arahSort("jumlah")}
+                    className="t-head inline-flex items-center gap-1 justify-end hover:text-ink"
+                  >
+                    Total
+                    <IkonUrut kunci="jumlah" />
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => klikUrut("kedudukan", 1)}
+                    role="columnheader"
+                    aria-sort={arahSort("kedudukan")}
+                    className="t-head hidden sm:inline-flex items-center gap-1 justify-end hover:text-ink"
+                  >
+                    Rank
+                    <IkonUrut kunci="kedudukan" />
+                  </button>
+                </div>
               {barisAhli.map(({ m, mk }, i) => {
                 const jumlah = mk?.jumlah ?? 0;
                 const uid = String(m.user_id || "");
@@ -383,9 +462,10 @@ export default function ClassPeoplePage() {
                 return (
                   <div
                     key={uid || i}
+                    role="row"
                     className="t-row grid grid-cols-[1fr,96px,84px] sm:grid-cols-[1fr,120px,96px,88px,88px,88px,52px] gap-3 sm:gap-4 px-5 py-3.5 items-center"
                   >
-                    <div className="min-w-0">
+                    <div className="min-w-0" role="cell">
                       <button
                         type="button"
                         onClick={() => setLaciUser({ id: uid, nama: name(m) })}
@@ -400,33 +480,34 @@ export default function ClassPeoplePage() {
                         </span>
                       </button>
                     </div>
-                    <div className="hidden sm:flex items-center gap-2 text-sm text-ink-muted">
+                    <div className="hidden sm:flex items-center gap-2 text-sm text-ink-muted" role="cell">
                       <span className="w-1.5 h-1.5 rounded-full bg-[#4BA972]" /> Active
                     </div>
-                    <div className="text-sm text-ink-muted">
+                    <div className="text-sm text-ink-muted" role="cell">
                       {m.joined_at
                         ? new Date(String(m.joined_at)).toLocaleDateString(undefined, { day: "numeric", month: "short" })
                         : ","}
                     </div>
-                    <div className={`hidden sm:block text-right text-sm tabular-nums ${mk && mk.task > 0 ? "text-ink" : pudar}`}>
+                    <div className={`hidden sm:block text-right text-sm tabular-nums ${mk && mk.task > 0 ? "text-ink" : pudar}`} role="cell">
                       {formatMata(mk?.task ?? 0)}
                     </div>
-                    <div className={`hidden sm:block text-right text-sm tabular-nums ${mk && mk.live > 0 ? "text-ink" : pudar}`}>
+                    <div className={`hidden sm:block text-right text-sm tabular-nums ${mk && mk.live > 0 ? "text-ink" : pudar}`} role="cell">
                       {formatMata(mk?.live ?? 0)}
                     </div>
-                    <div className={`text-right text-[15px] font-medium tabular-nums ${jumlah > 0 ? "text-ink" : pudar}`}>
+                    <div className={`text-right text-[15px] font-medium tabular-nums ${jumlah > 0 ? "text-ink" : pudar}`} role="cell">
                       {formatMata(jumlah)}
                     </div>
-                    <div className="hidden sm:block text-right text-sm tabular-nums text-ink-faint">
+                    <div className="hidden sm:block text-right text-sm tabular-nums text-ink-faint" role="cell">
                       {mk?.kedudukan ?? ""}
                     </div>
                   </div>
                 );
               })}
-              <div className="px-5 py-3 border-t border-hairline text-xs text-ink-faint">
+              <div className="px-5 py-3 border-t border-hairline text-xs text-ink-faint" role="presentation">
                 {barisAhli.length} of {members.length}
               </div>
             </div>
+            </>
           )
         )}
 
