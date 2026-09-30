@@ -128,6 +128,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const templateId = typeof body.template_id === 'string' ? body.template_id : '';
   if (!templateId) return NextResponse.json({ error: 'template_id is required.' }, { status: 400 });
+  // kzsec V2-015 S2: tolak ID yang bukan UUID sebelum sebarang pertanyaan.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(templateId)) {
+    return NextResponse.json({ error: 'Invalid template_id.' }, { status: 400 });
+  }
 
   const kemas: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.title === 'string' && body.title.trim()) kemas.title = body.title.trim();
