@@ -121,7 +121,7 @@ BEGIN
   LOOP
     -- Calon ahli kelas: nama sama tepat, tidak peka huruf besar dan ruang
     -- tepi (btrim pada kedua-dua pihak).
-    SELECT COUNT(DISTINCT cm.user_id), MIN(cm.user_id)
+    SELECT COUNT(DISTINCT cm.user_id), MIN(cm.user_id::text)::uuid
       INTO v_bil_calon, v_pengguna
       FROM public.qm_class_members cm
       JOIN public.qm_profiles pr ON pr.id = cm.user_id

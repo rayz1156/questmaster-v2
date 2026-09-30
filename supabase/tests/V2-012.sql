@@ -309,7 +309,7 @@ declare
   v_skipped text;
   v_actor uuid;
 begin
-  select count(*), min(actor_id), min(meta->>'linked'), min(meta->>'skipped_ambiguous')
+  select count(*), min(actor_id::text)::uuid, min(meta->>'linked'), min(meta->>'skipped_ambiguous')
     into v_bil, v_actor, v_linked, v_skipped
   from public.qm_audit_log
   where action = 'live_scores_backfill'
