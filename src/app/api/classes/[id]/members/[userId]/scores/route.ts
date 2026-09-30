@@ -37,6 +37,11 @@ export async function GET(
   req: NextRequest,
   { params }: { params: { id: string; userId: string } },
 ) {
+  // Tolak parameter bukan UUID awal (kzsec V2-013 R4).
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+  if (!UUID.test(String(params.id)) || !UUID.test(String(params.userId))) {
+    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+  }
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
   const { supa, user } = auth;
@@ -97,7 +102,9 @@ export async function GET(
   // Baris view kelas: jumlah, pecahan, dan kedudukan. Kedudukan dikira di
   // sini (seri berkongsi kedudukan yang sama) supaya halaman dan CSV tidak
   // menyalin formula.
-  const { data: barisView, error: viewErr } = await svc
+  // Klien pemanggil, bukan service role (kzsec V2-013 P1): penapis view 0050
+  // guna auth.uid() pemanggil, jadi hanya kelas yang dia berhak lihat terbuka.
+  const { data: barisView, error: viewErr } = await supa
     .from('qm_class_individual_scores')
     .select(
       'user_id, task_score, live_score, adjustment_score, total_score, live_sessions',
