@@ -13,6 +13,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { janaPdfSijil } from '@/lib/sijil/janaPdf';
+import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -72,7 +73,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Gagal muat turun aset tidak menghalang pratonton: PDF dijana tanpa aset.
   }
 
-  const layout = (template.layout ?? {}) as Record<string, string>;
+  // Normalkan layout (V2-015) sebelum PDF dijana.
+  const layout = normaliseSusunAtur(template.layout);
   const bait = await janaPdfSijil({
     nama: 'Sample Participant',
     program: kelas?.name ?? 'Sample Program',

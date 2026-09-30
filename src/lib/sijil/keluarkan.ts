@@ -9,6 +9,7 @@
  */
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { janaPdfSijil, formatTarikhBm } from '@/lib/sijil/janaPdf';
+import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import type { SupabaseClient } from '@supabase/supabase-js';
 
 /** Templat yang diperlukan untuk jana PDF (lajur yang sama dibaca oleh laluan). */
@@ -104,7 +105,9 @@ export async function keluarkanSijil(
     logoBait = undefined;
   }
 
-  const layout = (template.layout ?? {}) as Record<string, string>;
+  // Normalkan layout (V2-015) sebelum PDF dijana: kunci asing dibuang dan
+  // semua nombor diapit, untuk templat lama dan baharu sama.
+  const layout = normaliseSusunAtur(template.layout);
 
   const hasil: HasilSijil[] = [];
   for (const s of baris ?? []) {

@@ -7,12 +7,15 @@
  */
 import { PDFDocument, StandardFonts, rgb, type PDFFont } from 'pdf-lib';
 import QRCode from 'qrcode';
+import {
+  normaliseSusunAtur,
+  WARNA_LALAI,
+  type SusunAturSijil,
+} from '@/lib/sijil/susunAtur';
 
-/** Layout templat (jsonb): kunci pilihan yang dihormati. */
-export type SusunAturSijil = {
-  titleBm?: string;
-  titleEn?: string;
-};
+/** Layout templat (jsonb): jenis tinggal di susunAtur.ts, dieksport semula
+ *  di sini supaya pengimport lama (keluarkan.ts, preview) tidak berubah. */
+export type { SusunAturSijil } from '@/lib/sijil/susunAtur';
 
 export type OpsiSijil = {
   nama: string;
@@ -62,6 +65,15 @@ function jenisImej(bait: Uint8Array): 'png' | 'jpg' | null {
   return null;
 }
 
+/** Tukar #RRGGBB (sudah disahkan oleh normaliseSusunAtur) kepada rgb(). */
+function hexRgb(h: string): ReturnType<typeof rgb> {
+  return rgb(
+    parseInt(h.slice(1, 3), 16) / 255,
+    parseInt(h.slice(3, 5), 16) / 255,
+    parseInt(h.slice(5, 7), 16) / 255,
+  );
+}
+
 /**
  * Jana PDF sijil A4 landskap dan pulangkan bait dokumen.
  * Templat lalai: sempadan berganda violet/indigo, tajuk dwibahasa,
@@ -74,6 +86,10 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
     nama, program, tarikh, pengeluar, kod, urlSah,
     latar, logo, tera, layout = {},
   } = opsi;
+
+  // Normalkan layout sebelum mengguna apa-apa medan (V2-015): kunci asing
+  // dibuang, nombor diapit, warna disahkan. Mod standard tidak berubah.
+  const susun = normaliseSusunAtur(layout);
 
   const pdf = await PDFDocument.create();
   const page = pdf.addPage([A4_W, A4_H]);
@@ -95,6 +111,79 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
     } else if (j === 'jpg') {
       page.drawImage(await pdf.embedJpg(latar), { x: 0, y: 0, width: A4_W, height: A4_H });
     }
+  }
+
+  // Mod latar reka bentuk penuh (V2-015): latar sudah dilukis penuh di
+  // atas. JANGAN lukis sempadan, logo, tajuk, program, tarikh atau
+  // pengeluar; reka bentuk sijil (Canva) sudah mengandungi semuanya.
+  // Lukis nama, QR dan kod sijil sahaja pada kedudukan yang diberikan.
+  if (susun.mode === 'full_background') {
+    const nm = susun.name ?? {
+      x: 0.5, y: 0.5, maxWidth: 0.8, size: 40,
+      color: WARNA_LALAI, weight: 'bold' as const, align: 'center' as const,
+    };
+    const fonNama = nm.weight === 'regular' ? fonBadan : fonTajuk;
+    // Saiz fon dikecilkan supaya nama muat lebar maksimum; minimum 12pt
+    // (fonMuat) supaya nama sentiasa boleh dibaca.
+    const saizNama = fonMuat(nama, nm.maxWidth * A4_W, nm.size, fonNama);
+    const lebarNama = fonNama.widthOfTextAtSize(nama, saizNama);
+    const xNama = nm.align === 'left' ? nm.x * A4_W : nm.x * A4_W - lebarNama / 2;
+    // y ialah garis dasar teks diukur dari ATAS halaman; pdf-lib bermula
+    // dari bawah, jadi balikkan paksi.
+    page.drawText(nama, {
+      x: xNama,
+      y: A4_H - nm.y * A4_H,
+      size: saizNama,
+      font: fonNama,
+      color: hexRgb(nm.color),
+    });
+
+    // Kod QR; saiz ialah pecahan LEBAR halaman, y penjuru kiri atas dari
+    // atas halaman. qr: false bermakna TIADA QR dilukis.
+    const QR_LALAI = { x: 0.815, y: 0.75, size: 0.08 };
+    const qrSusun = susun.qr === false ? null : (susun.qr ?? QR_LALAI);
+    if (qrSusun) {
+      const qrLebar = qrSusun.size * A4_W;
+      const qrPng = await QRCode.toBuffer(urlSah, { width: 220, margin: 1 });
+      const qrIm = await pdf.embedPng(new Uint8Array(qrPng));
+      page.drawImage(qrIm, {
+        x: qrSusun.x * A4_W,
+        y: A4_H - qrSusun.y * A4_H - qrLebar,
+        width: qrLebar,
+        height: qrLebar,
+      });
+    }
+
+    // Kod sijil; lalai di bawah QR (garis dasar), saiz 8, tengah.
+    if (susun.code !== false) {
+      // QR rujukan untuk kedudukan lalai kod: QR sebenar jika ada, jika
+      // tidak kedudukan QR lalai (kod tetap muncul di penjuru kanan bawah).
+      const rujukQr = qrSusun ?? QR_LALAI;
+      const cd = susun.code ?? {
+        x: rujukQr.x + rujukQr.size / 2,
+        y: rujukQr.y + (rujukQr.size * A4_W) / A4_H + 0.022,
+        size: 8,
+        color: WARNA_LALAI,
+        align: 'center' as const,
+      };
+      const lebarKod = fonTajuk.widthOfTextAtSize(kod, cd.size);
+      let xKod = cd.x * A4_W;
+      if (cd.align === 'center') xKod -= lebarKod / 2;
+      if (cd.align === 'right') xKod -= lebarKod;
+      page.drawText(kod, {
+        x: xKod,
+        y: A4_H - cd.y * A4_H,
+        size: cd.size,
+        font: fonTajuk,
+        color: hexRgb(cd.color),
+      });
+    }
+
+    // Tera "Dijana dengan Kuizen" masih dihormati bila tera benar.
+    if (tera) {
+      tengah('Dijana dengan Kuizen | kuizen.fun', fonTajuk, 9, 44);
+    }
+    return pdf.save();
   }
 
   // Sempadan berganda: violet tebal luar, indigo nipis dalam
@@ -121,8 +210,8 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
   }
 
   // Tajuk dwibahasa
-  tengah(layout.titleBm ?? 'Sijil Penyertaan', fonTajuk, 26, y);
-  tengah(layout.titleEn ?? 'Certificate of Participation', fonTajuk, 13, y - 24);
+  tengah(susun.titleBm ?? 'Sijil Penyertaan', fonTajuk, 26, y);
+  tengah(susun.titleEn ?? 'Certificate of Participation', fonTajuk, 13, y - 24);
 
   // Nama besar di tengah; nama panjang dikecilkan supaya muat
   const yNama = y - 76;
