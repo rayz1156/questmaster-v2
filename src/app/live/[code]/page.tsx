@@ -77,9 +77,16 @@ export default function SkrinMainLangsung() {
   const streakRef = useRef(0);
   const [streakHilang, setStreakHilang] = useState(false);
 
+  // Proses setiap pendedahan SEKALI sahaja (ikut indeks soalan), kerana
+  // keadaan ditinjau berulang kali semasa "revealed"; tanpa ini pil
+  // "Streak lost" hilang selepas tinjauan kedua (CTO).
+  const soalanDiprosesRef = useRef<number | null>(null);
   useEffect(() => {
     const r = keadaan?.reveal;
-    if (!r) return;
+    if (!r || keadaan?.status !== "revealed") return;
+    const idx = keadaan.questionIndex;
+    if (soalanDiprosesRef.current === idx) return;
+    soalanDiprosesRef.current = idx;
     setStreakHilang(!r.isCorrect && streakRef.current >= 3);
     streakRef.current = r.streak ?? 0;
   }, [keadaan]);
