@@ -2,10 +2,18 @@
  * GET /api/live/play/[code]/whoami (tiket V2-007)
  *
  * Laluan ringan untuk skrin masuk Kuiz Langsung. Bearer pilihan:
- *   * tanpa Bearer atau token tidak sah: { registeredName: null };
+ *   * tanpa Bearer atau token tidak sah:
+ *     { registeredName: null, classQuiz, member: false };
  *   * dengan Bearer sah dan pengguna ahli (qm_class_members) atau educator
  *     (qm_class_educators dengan accepted_at, atau pemilik qm_classes) kelas
- *     milik kuiz sesi itu: { registeredName: "<nama>" }.
+ *     milik kuiz sesi itu: { registeredName: "<nama>", classQuiz: true,
+ *     member: true }.
+ *
+ * classQuiz (V2-012) dibaca untuk SEMUA pemanggil, termasuk tanpa log masuk,
+ * kerana skrin masuk perlu tahu sama ada kuiz ini berkongsi dengan kelas
+ * sebelum menawarkan kad "Sign in" / "Join the class first". member hanya
+ * benar bagi ahli, pendidik diterima atau pemilik kelas; tiada maklumat kelas
+ * lain (nama, kod) dipulangkan.
  *
  * Nama datang daripada token yang disahkan di pelayan, BUKAN daripada badan
  * permintaan. Semakan keahlian dibuat dengan service role kerana polisi
@@ -26,24 +34,15 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   // Kod format salah dibalas serta-merta (temuan R2 V2-007-sec): tiada
   // pertanyaan pangkalan data untuk dipandang daripada luarnya.
   if (!/^[A-Z0-9]{6}$/.test(code)) {
-    return NextResponse.json({ registeredName: null });
+    return NextResponse.json({ registeredName: null, classQuiz: false, member: false });
   }
-
-  const token = bearerFromReq(req);
-  if (!token) return NextResponse.json({ registeredName: null });
-
-  // Sahkan token (corak sedia ada: auth.getUser, bukan kuki).
-  const routeSupa = getRouteSupabase(req);
-  const { data: gu } = await routeSupa.auth.getUser(token);
-  const user = gu.user;
-  if (!user) return NextResponse.json({ registeredName: null });
 
   const supa = getServiceSupabase();
 
-  // Temuan R2 (V2-007-sec): SEMUA pertanyaan dijalankan dahulu, keputusan
-  // dibuat selepas itu, supaya bilangan pertanyaan (dan masa respons) SAMA
-  // untuk setiap pemanggil disahkan. Tanpa ini, bilangan pertanyaan berbeza
-  // mengikut laluan dan masa respons membocorkan status keahlian.
+  // Sesi dan kelas kuiz dibaca untuk SEMUA pemanggil (V2-012): classQuiz
+  // diperlukan oleh skrin masuk walaupun pengguna belum log masuk, dan ia
+  // hanya menyatakan sama ada kuiz berkongsi dengan sesuatu kelas, bukan
+  // maklumat pengguna. Ini satu-satunya tambahan pertanyaan tanpa token.
   const { data: session } = await supa
     .from('qm_live_sessions')
     .select('id, quiz_id')
@@ -58,7 +57,22 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .limit(1)
     .maybeSingle();
   const classId = (quiz?.class_id as string | null | undefined) || null;
+  const classQuiz = !!classId && !!session?.quiz_id;
 
+  const token = bearerFromReq(req);
+  if (!token) return NextResponse.json({ registeredName: null, classQuiz, member: false });
+
+  // Sahkan token (corak sedia ada: auth.getUser, bukan kuki).
+  const routeSupa = getRouteSupabase(req);
+  const { data: gu } = await routeSupa.auth.getUser(token);
+  const user = gu.user;
+  if (!user) return NextResponse.json({ registeredName: null, classQuiz, member: false });
+
+  // Temuan R2 (V2-007-sec): SEMUA pertanyaan pengguna dijalankan dahulu,
+  // keputusan dibuat selepas itu, supaya bilangan pertanyaan (dan masa
+  // respons) SAMA untuk setiap pemanggil disahkan. Tanpa ini, bilangan
+  // pertanyaan berbeza mengikut laluan dan masa respons membocorkan
+  // status keahlian.
   const { data: member } = await supa
     .from('qm_class_members')
     .select('user_id')
@@ -86,9 +100,14 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
   // Nama berdaftar diambil untuk SETIAP pemanggil disahkan supaya bilangan
   // pertanyaan kekal seragam; nilai itu digunakan sahaja jika berkeahlian.
-  const nama = await namaBerdaftar(supa, user.id);
+  // Email datang daripada token (auth.getUser), bukan qm_profiles, kerana
+  // qm_profiles tiada lajur email (migrasi 0009b).
+  const nama = await namaBerdaftar(supa, user.id, user.email);
 
-  const berkeahlian =
-    !!classId && !!session?.quiz_id && !!(member || educator || owner);
-  return NextResponse.json({ registeredName: berkeahlian ? nama : null });
+  const berkeahlian = !!classId && !!(member || educator || owner);
+  return NextResponse.json({
+    registeredName: berkeahlian ? nama : null,
+    classQuiz,
+    member: berkeahlian,
+  });
 }

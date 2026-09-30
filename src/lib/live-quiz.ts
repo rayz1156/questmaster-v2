@@ -225,21 +225,29 @@ export function potongNama(v: unknown): string | null {
   return bersih.slice(0, 24);
 }
 
-/** Nama berdaftar pengguna: display_name, jika tiada bahagian emel sebelum @. */
+/**
+ * Nama berdaftar pengguna: display_name, jika tiada bahagian emel sebelum @.
+ *
+ * qm_profiles TIADA lajur email (migrasi 0009b menyatakan ia dengan jelas),
+ * jadi memilih email daripada jadual itu membuatkan seluruh pertanyaan gagal
+ * pada PostgREST. Email sebaliknya dihantar oleh pemanggil daripada token
+ * (auth.getUser), yang sudah disahkan di pelayan.
+ */
 export async function namaBerdaftar(
   supa: SupaClient,
   userId: string,
+  emel: string | null | undefined = null,
 ): Promise<string | null> {
   const { data: profil } = await supa
     .from('qm_profiles')
-    .select('display_name, email')
+    .select('display_name')
     .eq('id', userId)
     .limit(1)
     .maybeSingle();
-  const emel = typeof profil?.email === 'string' ? profil.email : '';
+  const emelSahih = typeof emel === 'string' && emel.includes('@') ? emel : '';
   return (
     potongNama(profil?.display_name) ??
-    (emel.includes('@') ? potongNama(emel.split('@')[0]) : null)
+    (emelSahih ? potongNama(emelSahih.split('@')[0]) : null)
   );
 }
 
@@ -288,6 +296,39 @@ export async function ahliKelas(
     educator: (educator as { educator_id: string } | null) ?? null,
     owner: (owner as { id: string } | null) ?? null,
   };
+}
+
+/* ============================================================
+ * Keputusan masuk peserta (V2-012)
+ * ============================================================ */
+
+/** Hasil keputusanMasuk: aliran yang mesti diambil skrin masuk peserta. */
+export type KeputusanMasuk = 'tetamu' | 'ahli' | 'perlu_log_masuk' | 'bukan_ahli';
+
+export interface SyaratMasuk {
+  /** Sesi ini milik kuiz yang ada kelas (class_id tidak null). */
+  adaKelas: boolean;
+  /** Pemanggil log masuk dengan Bearer yang sah. */
+  logMasuk: boolean;
+  /** Pemanggil berkeahlian: ahli kelas, pendidik diterima atau pemilik. */
+  ahli: boolean;
+}
+
+/**
+ * Satu tempat memutuskan aliran masuk sesi, supaya laluan join
+ * (src/app/api/live/play/[code]/join) dan halaman main
+ * (src/app/live/[code]) tidak bercapah:
+ *
+ *   tetamu          kuiz tanpa kelas: kekal terbuka kepada sesiapa;
+ *   ahli            kuiz kelas dan pemanggil berkeahlian: nama berdaftar,
+ *                   user_id ditetapkan, markah masuk kedudukan kelas;
+ *   perlu_log_masuk kuiz kelas tetapi pemanggil tidak log masuk;
+ *   bukan_ahli      kuiz kelas, pemanggil log masuk tetapi bukan ahli.
+ */
+export function keputusanMasuk(syarat: SyaratMasuk): KeputusanMasuk {
+  if (!syarat.adaKelas) return 'tetamu';
+  if (!syarat.logMasuk) return 'perlu_log_masuk';
+  return syarat.ahli ? 'ahli' : 'bukan_ahli';
 }
 
 /** Muat kuiz dan sahkan pemanggil ialah hos kuiz itu (Fasa 2, class_id nullable):

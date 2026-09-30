@@ -15,10 +15,18 @@
  * ada baris dengan user_id sama dalam sesi itu, pulangkan pemain sedia ada
  * (sambung semula): player_token hanya dipulangkan kepada pemilik yang sama,
  * yang sudah disahkan melalui Bearer.
+ *
+ * Tiket V2-012: kelas kuiz dicari SEBELUM sebarang logik nama. Kuiz yang
+ * berkongsi dengan kelas kini ditutup kepada tetamu:
+ *   * tidak log masuk (atau Bearer tidak sah): 401 LOGIN_REQUIRED;
+ *   * log masuk tetapi bukan ahli kelas: 403 NOT_CLASS_MEMBER;
+ *   * ahli: aliran V2-007 penuh, markah dipautkan ke akaun (indeks unik
+ *     0049 memaksa satu baris bagi setiap pengguna dalam setiap sesi).
+ * Kuiz tanpa kelas kekal terbuka kepada tetamu sesiapa sahaja.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, getRouteSupabase, bearerFromReq } from '@/lib/supabase-route';
-import { namaBerdaftar, ahliKelas } from '@/lib/live-quiz';
+import { namaBerdaftar, ahliKelas, keputusanMasuk, potongNama } from '@/lib/live-quiz';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -95,32 +103,71 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     return NextResponse.json({ error: 'This session is already over.' }, { status: 409 });
   }
 
-  // Identiti berdaftar daripada Bearer (pilihan).
-  let daftar: { userId: string; nama: string } | null = null;
+  // Kelas kuiz sesi ini dicari SEBELUM sebarang logik nama (V2-012):
+  // keahlian kelas menentukan sama ada sesi ini terbuka kepada tetamu.
+  let classId: string | null = null;
+  if (session.quiz_id) {
+    const { data: quiz } = await supa
+      .from('qm_live_quizzes')
+      .select('class_id')
+      .eq('id', session.quiz_id)
+      .limit(1)
+      .maybeSingle();
+    classId = (quiz?.class_id as string | null | undefined) || null;
+  }
+
+  // Identiti berdaftar daripada Bearer (pilihan). Email datang bersama token
+  // daripada auth.getUser; qm_profiles tiada lajur email (migrasi 0009b),
+  // jadi jangan pilih email daripada qm_profiles.
+  let user: { id: string; email: string | null } | null = null;
   const token = bearerFromReq(req);
-  if (token && session.quiz_id) {
+  if (token) {
     const routeSupa = getRouteSupabase(req);
     const { data: gu } = await routeSupa.auth.getUser(token);
-    const user = gu.user;
-    if (user && session.quiz_id) {
-      // Kelas milik kuiz sesi itu (class_id boleh null untuk kuiz umum).
-      const { data: quiz } = await supa
-        .from('qm_live_quizzes')
-        .select('class_id')
-        .eq('id', session.quiz_id)
-        .limit(1)
-        .maybeSingle();
-      const classId = (quiz?.class_id as string | null) || null;
-      if (classId) {
-        // Temuan R1 (V2-007-sec): semakan keahlian kongsi dengan whoami
-        // (src/lib/live-quiz.ts). Pendidik diterima dan pemilik kelas turut
-        // diterima; qm_class_members ialah jadual PESERTA sahaja.
-        const k = await ahliKelas(supa, classId, user.id);
-        if (k.member || k.educator || k.owner) {
-          const nama = await namaBerdaftar(supa, user.id);
-          if (nama) daftar = { userId: user.id, nama };
-        }
-      }
+    if (gu.user) {
+      user = { id: gu.user.id, email: typeof gu.user.email === 'string' ? gu.user.email : null };
+    }
+  }
+
+  let ahli = false;
+  if (classId && user) {
+    // Temuan R1 (V2-007-sec): semakan keahlian kongsi dengan whoami
+    // (src/lib/live-quiz.ts). Pendidik diterima dan pemilik kelas turut
+    // diterima; qm_class_members ialah jadual PESERTA sahaja.
+    const k = await ahliKelas(supa, classId, user.id);
+    ahli = !!(k.member || k.educator || k.owner);
+  }
+
+  // Satu tempat keputusan aliran masuk (V2-012), dikongsi dengan halaman main
+  // melalui keputusanMasuk dalam src/lib/live-quiz.ts.
+  const keputusan = keputusanMasuk({ adaKelas: !!classId, logMasuk: !!user, ahli });
+
+  if (keputusan === 'perlu_log_masuk') {
+    return NextResponse.json(
+      { error: 'Sign in to play this class quiz.', code: 'LOGIN_REQUIRED' },
+      { status: 401 },
+    );
+  }
+  if (keputusan === 'bukan_ahli') {
+    return NextResponse.json(
+      { error: 'Join the class first to play this quiz.', code: 'NOT_CLASS_MEMBER' },
+      { status: 403 },
+    );
+  }
+
+  // Kuiz kelas dan ahli: nama berdaftar (V2-007). Jika profil belum ada nama
+  // (tiada display_name dan tiada email pada token), guna nickname daripada
+  // badan supaya pengguna tetap boleh bermain dan markah tetap dipautkan.
+  let daftar: { userId: string; nama: string } | null = null;
+  if (keputusan === 'ahli' && user) {
+    const nama = (await namaBerdaftar(supa, user.id, user.email)) || potongNama(nickname);
+    if (nama) {
+      daftar = { userId: user.id, nama };
+    } else {
+      return NextResponse.json(
+        { error: 'A player name must be 1 to 24 characters.' },
+        { status: 400 },
+      );
     }
   }
 
@@ -217,11 +264,41 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   // Kaitkan baris pemain yang BARU dicipta dengan pengguna berdaftar
   // (user_id masih null, lihat syarat .is). Service role, baris ini sahaja.
   if (daftar) {
-    await supa
+    const upd = await supa
       .from('qm_live_players')
       .update({ user_id: daftar.userId })
       .eq('id', joined[0].player_id)
       .is('user_id', null);
+
+    // Indeks unik 0049 (session_id, user_id) WHERE user_id IS NOT NULL: dua
+    // POST serentak daripada pengguna yang sama boleh kedua-duanya berjaya
+    // disisipkan (user_id masih null) dan hanya satu UPDATE berjaya. Yang
+    // kalah menerima 23505: baris pemilik sebenar telah wujud, jadi
+    // pulangkan baris itu sebagai sambung semula dan buang baris kalah
+    // supaya ia tidak memakan petak had pemain.
+    if (upd.error && /23505|duplicate key/i.test(String(upd.error.message || ''))) {
+      const { data: sedia } = await supa
+        .from('qm_live_players')
+        .select('id, player_token, nickname')
+        .eq('session_id', session.id)
+        .eq('user_id', daftar.userId)
+        .limit(1)
+        .maybeSingle();
+      if (sedia) {
+        await supa
+          .from('qm_live_players')
+          .delete()
+          .eq('id', joined[0].player_id)
+          .is('user_id', null);
+        return NextResponse.json({
+          playerId: sedia.id,
+          playerToken: sedia.player_token,
+          nickname: sedia.nickname,
+          sessionId: session.id,
+          status: session.status,
+        });
+      }
+    }
   }
 
   return NextResponse.json({

@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase, setRememberMe } from '@/lib/supabase';
+import { pautanDalamanSelamat } from '@/lib/pautan';
 import Logo from '@/components/Logo';
 import GoogleButton from '@/components/GoogleButton';
 
@@ -69,13 +70,14 @@ function LoginInner() {
     try { await supabase.auth.getUser(); } catch {}
     setBusy(false);
     const nextParam = searchParams?.get('next');
-    // Hanya laluan relatif dibenarkan: tolak // (protocol-relative) dan /\,
-    // sama seperti semakan di /auth/callback, supaya next tidak jadi redirect terbuka.
-    const isSafeNext = !!nextParam && nextParam.startsWith('/') && !nextParam.startsWith('//') && !nextParam.startsWith('/\\');
+    // Hanya laluan relatif dibenarkan (tolak // dan \ sebagai awalan skema),
+    // sama seperti semakan di /auth/callback. Pengesah dikongsi sebagai fungsi
+    // tulen dalam src/lib/pautan.ts supaya ujian sendiri memakai takrifan sama.
+    const isSafeNext = pautanDalamanSelamat(nextParam);
     const defaultDest = role === 'educator'
       ? '/educator/classes'
       : (role === 'admin' || role === 'superadmin') ? '/admin/overview' : '/participant/home';
-    window.location.href = isSafeNext ? nextParam : defaultDest;
+    window.location.href = isSafeNext && nextParam ? nextParam : defaultDest;
   }
 
   async function resendVerification() {
