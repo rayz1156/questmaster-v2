@@ -130,11 +130,22 @@ platform, jadi tiada alatnya.
 
 | Alat | Peranan | Kegunaan |
 |---|---|---|
-| create_certificate_template | STAFF, tulis | Cipta templat sijil kelas. criteria.type: all_members, hunt_completed (perlu hunt_id), min_score (min_score, pilihan hunt_id) atau live_attended (perlu quiz_id). |
+| create_certificate_template | STAFF, tulis | Cipta templat sijil kelas. criteria.type: all_members, hunt_completed (perlu hunt_id), min_score (min_score, pilihan hunt_id) atau live_attended (perlu quiz_id). layout pilihan (mod full_background): kedudukan name, qr, code sebagai pecahan halaman. |
+| update_certificate_template | STAFF, tulis | Kemas kini templat: title, criteria, layout, atau buang latar/logo (clear_background, clear_logo). |
+| create_certificate_asset_ticket | STAFF, tulis | URL PUT bertandatangan untuk muat naik latar/logo PNG/JPEG sehingga 8 MB. Fail dihantar dengan curl -X PUT --upload-file <fail> -H "Content-Type: ..." "<upload_url>"; tiada bait melalui model. |
+| finalize_certificate_asset | STAFF, tulis | Sahkan muat naik aset: tandatangan bait disemak, templat dikemas kini, objek lama dipadam. |
+| preview_certificate | STAFF, tulis | PDF contoh dengan nama contoh; pulangkan URL bertandatangan sah 10 minit. Tidak mencipta sijil sah. |
+| list_certificate_templates | STAFF, baca | Senarai templat kelas: id, tajuk, kriteria, layout, ada latar/logo, dikemas kini. |
 | issue_certificates | STAFF, tulis | Tanpa confirm: pratonton kelayakan (nama, layak, sebab, sudah dikeluarkan). Dengan confirm: true: keluarkan sijil sebenar kepada participant_ids yang diberi, atau semua yang layak jika tiada senarai. Fungsi pelayan yang sama dengan laluan API. |
 | list_certificates | STAFF, baca | Senarai sijil kelas: kod, nama, program, tarikh, status, sebab pembatalan dan emailed_at. |
 | revoke_certificate | STAFF, tulis | Batalkan sijil dengan sebab (wajib). Halaman awam /sijil/<kod> menunjukkan Dibatalkan. |
 
-Muat naik imej latar dan logo templat tiada laluannya dalam alat MCP; ia
-dibuat melalui UI pendidik (bucket certificate-assets). Emel pukal sijil
-juga hanya melalui UI pendidik.
+Aliran sijil latar reka bentuk penuh (PNG Canva yang sudah mengandungi
+tajuk dan tandatangan): cipta templat dengan layout mode full_background,
+dapatkan tiket dengan create_certificate_asset_ticket, hantar fail dengan
+curl -X PUT --upload-file ke upload_url, sahkan dengan
+finalize_certificate_asset, kemudian tetapkan kedudukan nama dengan
+update_certificate_template dan semak hasilnya dengan preview_certificate.
+Muat naik melalui UI pendidik turut disokong (bucket certificate-assets).
+Latarnya hanya untuk pelan Pro/Institusi (pencetus 0042). Emel pukal sijil
+hanya melalui UI pendidik.

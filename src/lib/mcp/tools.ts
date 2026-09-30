@@ -34,6 +34,14 @@ import {
   deletePeerRound,
 } from "./peer-tools";
 import { inviteEducator } from "./invite-tools";
+import {
+  createCertificateTemplate,
+  updateCertificateTemplate,
+  createCertificateAssetTicket,
+  finalizeCertificateAsset,
+  previewCertificate,
+  listCertificateTemplates,
+} from "./certificate-tools";
 
 /** Had limit khusus list_live_quizzes: lalai 50, maksimum 200 (tiket KZ-004). */
 const LIVE_LIST_DEFAULT_LIMIT = 50;
@@ -1843,7 +1851,12 @@ export const TOOLS: ToolDef[] = [
       "Cipta templat sijil untuk kelas. Kriteria jenis: all_members (semua ahli), " +
       "hunt_completed (siap aktiviti tertentu, perlu hunt_id), min_score (skor minimum, " +
       "pilihan hunt_id) atau live_attended (hadir kuiz langsung tertentu, perlu quiz_id). " +
-      "Hanya pendidik kelas. Latar dan logo ditetapkan melalui UI, bukan alat ini.",
+      "layout pilihan mengawal kedudukan cetakan pada mod latar reka bentuk penuh " +
+      "(full_background): name {x, y, maxWidth, size, color, weight, align} sebagai pecahan " +
+      "halaman, qr {x, y, size} atau false, code {x, y, size, color, align} atau false. " +
+      "Latar dan logo dimuat naik melalui aliran tiket: create_certificate_asset_ticket, " +
+      "curl -X PUT --upload-file ke upload_url, kemudian finalize_certificate_asset. " +
+      "Pratonton hasil akhir dengan preview_certificate. Hanya pendidik kelas.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -1862,25 +1875,196 @@ export const TOOLS: ToolDef[] = [
           },
           required: ["type"],
         },
+        layout: {
+          type: "object",
+          description:
+            "Susun atur pilihan (mod full_background): mode 'standard' atau " +
+            "'full_background', name, qr, code, titleBm, titleEn. Pecahan halaman 0 hingga 1.",
+          properties: {
+            mode: { type: "string", enum: ["standard", "full_background"] },
+            name: { type: "object" },
+            qr: { type: "object" },
+            code: { type: "object" },
+            titleBm: { type: "string" },
+            titleEn: { type: "string" },
+          },
+        },
       },
       required: ["class_id", "title", "criteria"],
     },
     handler: async (args, s) => {
-      // Klien sesi pengguna: RLS qm_certificate_templates hanya membenarkan
-      // pendidik kelas menulis.
-      const baris = unwrapOne<Record<string, unknown>>(
-        await s.db
-          .from("qm_certificate_templates")
-          .insert({
-            class_id: args.class_id,
-            title: String(args.title ?? "").trim(),
-            criteria: args.criteria,
-          })
-          .select("id, class_id, title, criteria, background_path, logo_path")
-          .maybeSingle(),
-        "Cipta templat sijil"
+      // Route yang menormalkan layout, mengesahkan kriteria dan menyemak
+      // pendidik kelas; jangan tulis terus ke jadual.
+      return createCertificateTemplate(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "update_certificate_template",
+    title: "Kemas kini templat sijil",
+    description:
+      "Kemas kini templat sijil kelas: title, criteria, layout (kedudukan nama, QR " +
+      "dan kod pada mod full_background), atau buang latar/logo dengan clear_background " +
+      "/ clear_logo. Hanya medan yang diberi dihantar. Hanya pendidik kelas.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        title: { type: "string" },
+        criteria: {
+          type: "object",
+          properties: {
+            type: { type: "string", enum: ["all_members", "hunt_completed", "min_score", "live_attended"] },
+            hunt_id: { type: "string" },
+            quiz_id: { type: "string" },
+            min_score: { type: "number" },
+          },
+        },
+        layout: {
+          type: "object",
+          description:
+            "Susun atur penuh yang baharu; sentiasa dinormalkan oleh route.",
+        },
+        clear_background: { type: "boolean", description: "Buang latar templat" },
+        clear_logo: { type: "boolean", description: "Buang logo templat" },
+      },
+      required: ["class_id", "template_id"],
+    },
+    handler: async (args, s) => {
+      return updateCertificateTemplate(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "create_certificate_asset_ticket",
+    title: "Tiket muat naik aset sijil",
+    description:
+      "Dapatkan URL PUT bertandatangan untuk memuat naik latar atau logo templat " +
+      "sijil (PNG atau JPEG sehingga 8 MB) terus ke storan. Fail pada komputer " +
+      "pengguna dihantar dengan curl -X PUT --upload-file <fail> -H \"Content-Type: ...\" " +
+      "\"<upload_url>\" sepenuhnya di luar sembang ini; TIADA bait fail melalui model. " +
+      "Selepas curl berjaya, panggil finalize_certificate_asset dengan path yang " +
+      "dipulangkan. Pelan kelas mesti Pro atau Institution. Hanya pendidik kelas.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        kind: { type: "string", enum: ["background", "logo"], description: "Jenis aset" },
+        mime_type: {
+          type: "string",
+          enum: ["image/png", "image/jpeg"],
+          description: "Jenis MIME fail",
+        },
+        size: { type: "number", description: "Saiz fail dalam bait (maksimum 8388608)" },
+      },
+      required: ["class_id", "template_id", "kind", "mime_type", "size"],
+    },
+    handler: async (args, s) => {
+      const kind = args.kind === "background" || args.kind === "logo" ? args.kind : null;
+      if (!kind) throw new Error("kind mesti background atau logo");
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      if (!args.template_id) throw new Error("template_id diperlukan");
+      const size = Math.floor(Number(args.size));
+      if (!Number.isFinite(size) || size <= 0) throw new Error("size mesti nombor positif dalam bait");
+      return createCertificateAssetTicket(
+        s.accessToken,
+        args.class_id,
+        args.template_id,
+        kind,
+        String(args.mime_type ?? ""),
+        size
       );
-      return baris;
+    },
+  },
+
+  {
+    name: "finalize_certificate_asset",
+    title: "Sahkan muat naik aset sijil",
+    description:
+      "Sahkan bahawa latar atau logo yang dimuat naik melalui tiket sudah sampai " +
+      "ke storan dan lekatkan ia pada templat. Route menyemak tandatangan bait " +
+      "PNG/JPEG, memadam objek rosak, mengemas kini templat dan memadam objek lama. " +
+      "Guna path yang dipulangkan oleh create_certificate_asset_ticket.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        kind: { type: "string", enum: ["background", "logo"], description: "Jenis aset" },
+        path: { type: "string", description: "Laluan objek daripada tiket" },
+      },
+      required: ["class_id", "template_id", "kind", "path"],
+    },
+    handler: async (args, s) => {
+      const kind = args.kind === "background" || args.kind === "logo" ? args.kind : null;
+      if (!kind) throw new Error("kind mesti background atau logo");
+      if (typeof args.path !== "string" || !args.path.trim()) throw new Error("path diperlukan");
+      return finalizeCertificateAsset(
+        s.accessToken,
+        args.class_id,
+        args.template_id,
+        kind,
+        args.path.trim()
+      );
+    },
+  },
+
+  {
+    name: "preview_certificate",
+    title: "Pratonton PDF sijil",
+    description:
+      "Jana PDF contoh untuk templat sijil dan pulangkan URL bertandatangan sah " +
+      "10 minit yang boleh dibuka dalam tab baharu. Tidak mencipta sijil sah; kod " +
+      "contoh CONTOH0000 tidak lulus pengesahan awam. sample_name pilihan untuk " +
+      "menguji nama panjang pada kedudukan latar reka bentuk penuh.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        sample_name: { type: "string", description: "Nama contoh pada PDF (pilihan)" },
+      },
+      required: ["class_id", "template_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.template_id) throw new Error("template_id diperlukan");
+      return previewCertificate(
+        s.accessToken,
+        args.class_id,
+        args.template_id,
+        typeof args.sample_name === "string" ? args.sample_name : undefined
+      );
+    },
+  },
+
+  {
+    name: "list_certificate_templates",
+    title: "Senarai templat sijil",
+    description:
+      "Senaraikan templat sijil satu kelas: id, tajuk, kriteria, layout semasa, " +
+      "ada latar/logo dan tarikh dikemas kini. Hanya pendidik kelas.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas" },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      if (!args.class_id) throw new Error("class_id diperlukan");
+      return listCertificateTemplates(s.accessToken, args.class_id);
     },
   },
 

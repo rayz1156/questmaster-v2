@@ -139,8 +139,12 @@ export async function POST(req: NextRequest) {
         "import_live_questions, update_live_question, delete_live_question), kemudian mula " +
         "sesi (start_live_session) dan mengawalnya soalan demi soalan (control_live_session, " +
         "get_live_session, get_live_leaderboard) sementara pemain menyertai melalui kod atau " +
-        "QR. Tools yang tersedia bergantung pada peranan pengguna; alat Live Quiz hanya untuk " +
-        "educator dan admin. Panggil whoami dahulu jika anda tidak pasti apa yang boleh dilakukan.",
+        "QR. Sijil reka bentuk penuh (PNG Canva sebagai latar) turut disokong: cipta templat " +
+        "dengan layout mode full_background, dapatkan tiket muat naik, hantar fail dengan " +
+        "curl -X PUT --upload-file ke upload_url, sahkan dengan finalize_certificate_asset, " +
+        "kemudian semak kedudukan nama dengan preview_certificate. Tools yang tersedia " +
+        "bergantung pada peranan pengguna; alat Live Quiz hanya untuk educator dan admin. " +
+        "Panggil whoami dahulu jika anda tidak pasti apa yang boleh dilakukan.",
     });
   }
 
