@@ -28,7 +28,15 @@ export const EDU_TABS: EduTab[] = [
   {
     href: "/educator/classes",
     label: "Classes",
-    match: ["/educator/teams", "/educator/rankings", "/educator/invites", "/educator/outcomes"],
+    // V2-016a: /educator/certificates (Templat sijil saya) turut menyalakan
+    // Classes; pautan masuknya ada pada halaman sijil setiap kelas.
+    match: [
+      "/educator/teams",
+      "/educator/rankings",
+      "/educator/invites",
+      "/educator/outcomes",
+      "/educator/certificates",
+    ],
   },
   {
     href: "/educator/library",

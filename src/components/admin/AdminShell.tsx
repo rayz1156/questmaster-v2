@@ -30,6 +30,7 @@ import {
   Search,
   LogOut,
   User as UserIcon,
+  Award,
 } from 'lucide-react';
 import { getSession, clearSession } from '@/lib/session';
 import { LogoMark } from '@/components/Logo';
@@ -52,6 +53,8 @@ const NAV = [
   { href: '/admin/moderation', label: 'Moderation', icon: ShieldCheck, lencana: 'moderasi' as const },
   { href: '/admin/audit', label: 'Audit', icon: ScrollText },
   { href: '/admin/feedback', label: 'Feedback', icon: MessageSquare, lencana: 'maklumbalas' as const },
+  // V2-016a: galeri templat sijil Kuizen untuk semua educator.
+  { href: '/admin/certificates', label: 'Certificates', icon: Award },
   { href: '/admin/settings', label: 'Settings', icon: Settings },
 ];
 

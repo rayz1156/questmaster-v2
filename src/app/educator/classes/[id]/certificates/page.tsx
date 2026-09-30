@@ -4,7 +4,10 @@
  * Sijil (pendidik): templat, pratonton PDF, pengeluaran dan emel pukal.
  *
  * Bahagian:
- *   - Senarai templat dan borang cipta/sunting (tajuk, kriteria, latar/logo).
+ *   - Senarai templat dan dialog cipta dengan tiga tab (V2-016a): galeri
+ *     Kuizen, Templat saya dan Blank (aliran lama).
+ *   - Menu templat: "Copy to another class" dan "Save to My templates"
+ *     (V2-016a; pelan Percuma disembunyi keupayaan dengan tooltip).
  *   - Pratonton PDF melalui POST /api/classes/[id]/certificates/preview.
  *   - "Issue certificates": jadual kelayakan daripada laluan issue tanpa
  *     confirm; butang pengeluaran memanggil semula dengan confirm: true.
@@ -15,19 +18,22 @@
  * certificate-assets melalui RLS (migrasi 0042), bukan melalui pelayan.
  * Tiada em dash dalam mana-mana rentetan UI.
  */
+import Link from "next/link";
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { Download, Eye, Mail, Plus, RefreshCw } from "lucide-react";
 import Shell from "@/components/Shell";
 import ClassShell, { type ClassTabKey } from "@/components/ClassShell";
 import { EDU_TABS } from "@/lib/eduTabs";
-import { getClass, type Klass } from "@/lib/data";
+import { getClass, listMyEducatorClasses, type Klass } from "@/lib/data";
+import type { EducatorClassRow } from "@/lib/types";
 import { supabase } from "@/lib/supabase";
 import { authHeader } from "@/lib/peer-client";
 import { pelanSaya } from "@/lib/pelan";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { tickLayak } from "@/lib/sijil/ui";
 import { normaliseSusunAtur } from "@/lib/sijil/susunAtur";
+import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
 import LayoutEditor from "./layout-editor";
 
 type Templat = {
@@ -82,6 +88,13 @@ export default function CertificatesPage() {
   // Borang templat: null bermakna mod cipta.
   const [sunting, setSunting] = useState<string | null>(null);
   const [borangTerbuka, setBorangTerbuka] = useState(false);
+
+  // Dialog cipta (V2-016a): tab aktif; null bermakna tertutup.
+  const [dialogTab, setDialogTab] = useState<"gallery" | "mine" | "blank" | null>(null);
+  const [pustaka, setPustaka] = useState<{ gallery: ItemPustakaApi[]; mine: ItemPustakaApi[] }>({ gallery: [], mine: [] });
+  const [kelasPemanggil, setKelasPemanggil] = useState<EducatorClassRow[]>([]);
+  const [salinBuka, setSalinBuka] = useState<string | null>(null);
+  const [pustakaBusy, setPustakaBusy] = useState(false);
   const [tajuk, setTajuk] = useState("");
   const [jenis, setJenis] = useState("all_members");
   const [huntId, setHuntId] = useState("");
@@ -120,10 +133,15 @@ export default function CertificatesPage() {
     let alive = true;
     (async () => {
       try {
-        const [k, pl] = await Promise.all([getClass(classId), pelanSaya()]);
+        const [k, pl, kls] = await Promise.all([
+          getClass(classId),
+          pelanSaya(),
+          listMyEducatorClasses().catch(() => [] as EducatorClassRow[]),
+        ]);
         if (!alive) return;
         setKlass(k as Klass);
         setPlan(pl?.pelan ?? "free");
+        setKelasPemanggil((kls as EducatorClassRow[]) ?? []);
         await muatSemula();
       } finally {
         if (alive) setLoading(false);
@@ -134,6 +152,97 @@ export default function CertificatesPage() {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [classId]);
+
+  /** Muat pustaka templat (galeri Kuizen + Templat saya) melalui API. */
+  const muatPustaka = useCallback(async () => {
+    const res = await fetch("/api/certificate-library", { headers: await authHeader() });
+    const j = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setMsg(j.error ?? "Could not load the template library.");
+      return;
+    }
+    setPustaka({ gallery: j.gallery ?? [], mine: j.mine ?? [] });
+  }, []);
+
+  /** Buka dialog cipta dan muat pustaka sekali setiap pembukaan. */
+  const bukaDialog = async (tab: "gallery" | "mine" | "blank") => {
+    setDialogTab(tab);
+    if (tab !== "blank") await muatPustaka();
+  };
+
+  /** Guna item pustaka (galeri atau Templat saya) dalam kelas ini. */
+  const gunaItemPustaka = async (item: ItemPustakaApi) => {
+    if (item.locked || pustakaBusy) return;
+    setPustakaBusy(true);
+    try {
+      const res = await fetch(`/api/classes/${classId}/certificates/templates/from-library`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ library_id: item.id }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(j.error ?? "Could not use the template.");
+        return;
+      }
+      setMsg(null);
+      setDialogTab(null);
+      await muatSemula();
+    } finally {
+      setPustakaBusy(false);
+    }
+  };
+
+  /** Simpan templat kelas ini ke Templat saya (V2-016a). */
+  const simpanKePustaka = async (t: Templat) => {
+    if (!pro || pustakaBusy) return;
+    setPustakaBusy(true);
+    try {
+      const res = await fetch("/api/certificate-library", {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ from_template_id: t.id, class_id: classId }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(j.error ?? "Could not save the template.");
+        return;
+      }
+      setMsg(`Saved "${t.title}" to My templates.`);
+    } finally {
+      setPustakaBusy(false);
+    }
+  };
+
+  /** Salin templat kelas ini ke kelas lain yang pemanggil pendidiknya. */
+  const salinKeKelasLain = async (t: Templat, targetClassId: string) => {
+    if (!targetClassId || pustakaBusy) return;
+    setPustakaBusy(true);
+    try {
+      const res = await fetch(
+        `/api/classes/${classId}/certificates/templates/${t.id}/copy`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          body: JSON.stringify({ target_class_id: targetClassId }),
+        },
+      );
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(j.error ?? "Could not copy the template.");
+        return;
+      }
+      const nama = kelasPemanggil.find((k) => k.id === targetClassId)?.name ?? "the other class";
+      setMsg(
+        j.background_removed === true
+          ? `Copied to ${nama}. The background was removed because that class is on the Free plan.`
+          : `Copied to ${nama}.`,
+      );
+      setSalinBuka(null);
+    } finally {
+      setPustakaBusy(false);
+    }
+  };
 
   const pro = plan === "pro" || plan === "institution" || plan === "unlimited";
 
@@ -382,20 +491,148 @@ export default function CertificatesPage() {
         {msg && <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm">{msg}</div>}
 
         {/* Templat */}
-        <div className="flex items-center justify-between mb-4">
+        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
           <h2 className="text-lg font-semibold">Certificate templates</h2>
-          <button
-            className="btn-primary"
-            onClick={() => {
-              setSunting(null);
-              setTajuk("");
-              setJenis("all_members");
-              setBorangTerbuka(true);
-            }}
-          >
-            <Plus className="w-4 h-4" /> New template
-          </button>
+          <div className="flex items-center gap-2">
+            <Link href="/educator/certificates" className="btn-quiet">
+              My templates
+            </Link>
+            <button
+              className="btn-primary"
+              onClick={() => {
+                setSunting(null);
+                setTajuk("");
+                setJenis("all_members");
+                bukaDialog("gallery");
+              }}
+            >
+              <Plus className="w-4 h-4" /> New certificate
+            </button>
+          </div>
         </div>
+
+        {/* Dialog cipta (V2-016a): galeri Kuizen, Templat saya, Blank. */}
+        {dialogTab !== null && (
+          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 space-y-4">
+            <div className="flex items-center gap-2 flex-wrap">
+              {(
+                [
+                  ["gallery", "Kuizen gallery"],
+                  ["mine", "My templates"],
+                  ["blank", "Blank"],
+                ] as const
+              ).map(([k, label]) => (
+                <button
+                  key={k}
+                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
+                    dialogTab === k
+                      ? "bg-violet-50 border border-violet-200 text-brand-purple"
+                      : "bg-white border-hairline text-ink-muted hover:text-ink"
+                  }`}
+                  onClick={() => {
+                    if (k === "blank") {
+                      setSunting(null);
+                      setTajuk("");
+                      setJenis("all_members");
+                      setBorangTerbuka(true);
+                      setDialogTab("blank");
+                    } else {
+                      setBorangTerbuka(false);
+                      setSunting(null);
+                      bukaDialog(k);
+                    }
+                  }}
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                className="btn-quiet ml-auto"
+                onClick={() => {
+                  setDialogTab(null);
+                  setBorangTerbuka(false);
+                  setSunting(null);
+                }}
+              >
+                Close
+              </button>
+            </div>
+
+            {dialogTab !== "blank" && (
+              <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 gap-4">
+                {(dialogTab === "gallery" ? pustaka.gallery : pustaka.mine).map((item) => (
+                  <div
+                    key={item.id}
+                    className={`rounded-xl border bg-white overflow-hidden flex flex-col ${
+                      item.locked ? "border-hairline" : "border-violet-200"
+                    }`}
+                  >
+                    <div className="relative bg-slate-100" style={{ aspectRatio: "841.89 / 595.28" }}>
+                      {item.preview_url ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={item.preview_url}
+                          alt={item.title}
+                          className="absolute inset-0 w-full h-full object-fill"
+                        />
+                      ) : (
+                        <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
+                          Text only
+                        </div>
+                      )}
+                      {item.locked && (
+                        <Link
+                          href="/#harga"
+                          title="Available on Pro"
+                          className="absolute top-2 right-2 rounded-md bg-amber-400 text-black text-[10px] font-bold px-2 py-0.5"
+                        >
+                          Pro
+                        </Link>
+                      )}
+                    </div>
+                    <div className="p-3 flex flex-col gap-2 flex-1">
+                      <div className="text-sm font-semibold truncate" title={item.title}>
+                        {item.title}
+                      </div>
+                      <div className="text-xs text-slate-500">
+                        {item.text_tone === "light" ? "Light text" : "Dark text"}
+                        {item.kind === "participation"
+                          ? " · Participation"
+                          : item.kind === "achievement"
+                            ? " · Achievement"
+                            : ""}
+                      </div>
+                      <div className="mt-auto">
+                        {item.locked ? (
+                          <Link
+                            href="/#harga"
+                            className="btn-quiet w-full text-center block"
+                            title="Available on Pro"
+                          >
+                            Pro plan required
+                          </Link>
+                        ) : (
+                          <button
+                            className="btn-primary w-full"
+                            disabled={pustakaBusy}
+                            onClick={() => gunaItemPustaka(item)}
+                          >
+                            Use in class
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {(dialogTab === "gallery" ? pustaka.gallery : pustaka.mine).length === 0 && (
+                  <div className="col-span-full rounded-xl border border-hairline p-8 text-center text-slate-500">
+                    No templates yet
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
 
         {borangTerbuka && (
           <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 space-y-3">
@@ -520,6 +757,42 @@ export default function CertificatesPage() {
                   >
                     Edit
                   </button>
+                  <button
+                    className={`btn-quiet ${pro ? "" : "opacity-50 cursor-not-allowed"}`}
+                    title={pro ? "Save this template to My templates" : "Available on Pro"}
+                    disabled={!pro || pustakaBusy}
+                    onClick={() => simpanKePustaka(t)}
+                  >
+                    Save to My templates
+                  </button>
+                  {salinBuka === t.id ? (
+                    <select
+                      className="input"
+                      value=""
+                      disabled={pustakaBusy}
+                      onChange={(e) => {
+                        if (e.target.value) salinKeKelasLain(t, e.target.value);
+                      }}
+                    >
+                      <option value="">Choose a class...</option>
+                      {kelasPemanggil
+                        .filter((k) => k.id !== classId)
+                        .map((k) => (
+                          <option key={k.id} value={k.id}>
+                            {k.name}
+                          </option>
+                        ))}
+                    </select>
+                  ) : (
+                    <button
+                      className="btn-quiet"
+                      title="Copy this template to another class you teach"
+                      disabled={kelasPemanggil.filter((k) => k.id !== classId).length === 0}
+                      onClick={() => setSalinBuka(salinBuka === t.id ? null : t.id)}
+                    >
+                      Copy to another class
+                    </button>
+                  )}
                 </div>
               </div>
             ))}

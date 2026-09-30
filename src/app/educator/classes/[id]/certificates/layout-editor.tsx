@@ -11,10 +11,14 @@
  * menormalkan layout); "Preview PDF" memanggil laluan sample dengan
  * format=url dan membuka tab baharu. Layout disimpan bersama mod semasa
  * templat (suis mod ada pada baris templat di halaman utama).
+ *
+ * V2-016a: latar dimuat melalui laluan background-url pelayan (polisi
+ * storan 0042 tidak meliputi laluan gallery/ dan library/), dan editor
+ * boleh dipakai semula oleh halaman galeri admin melalui props latarUrl,
+ * onSimpan dan onPratonton; tanpa props itu tingkah laku kelas kekal.
  */
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, Save, X } from "lucide-react";
-import { supabase } from "@/lib/supabase";
 import { authHeader } from "@/lib/peer-client";
 import { normaliseSusunAtur, type SusunAturSijil } from "@/lib/sijil/susunAtur";
 
@@ -73,6 +77,9 @@ export default function LayoutEditor({
   mode,
   layout,
   backgroundPath,
+  latarUrl,
+  onSimpan,
+  onPratonton,
   onClose,
   onSaved,
 }: {
@@ -81,6 +88,12 @@ export default function LayoutEditor({
   mode: "standard" | "full_background";
   layout: Record<string, unknown> | null;
   backgroundPath: string;
+  /** URL latar sedia ditandatangan (guna halaman admin); lalai: route kelas. */
+  latarUrl?: string | null;
+  /** Simpan melalui pemanggil luar (guna halaman admin); lalai: PATCH kelas. */
+  onSimpan?: (susun: Susun) => Promise<boolean>;
+  /** Dapatkan URL pratonton (guna halaman admin); lalai: sample route kelas. */
+  onPratonton?: () => Promise<string | null>;
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
@@ -99,24 +112,34 @@ export default function LayoutEditor({
   } | null>(null);
   const [lebar, setLebar] = useState(0);
 
-  // Pratonton latar: URL bertandatangan 10 minit melalui klien pelayar
-  // (polisi baca pendidik pada bucket certificate-assets, migrasi 0042).
+  // Pratonton latar: URL bertandatangan 10 minit daripada laluan
+  // background-url pelayan (V2-016a) supaya latar galeri dan peribadi
+  // turut berfungsi; polisi storan 0042 hanya meliputi laluan <class_id>/.
+  // latarUrl (hala admin) terus dipakai bila diberikan.
   useEffect(() => {
+    if (latarUrl !== undefined) {
+      setLatar(latarUrl);
+      if (!latarUrl) setMsg("Could not load the background image.");
+      return;
+    }
     let alive = true;
     (async () => {
-      const { data, error } = await supabase.storage
-        .from("certificate-assets")
-        .createSignedUrl(backgroundPath, 600);
+      const res = await fetch(
+        `/api/classes/${classId}/certificates/templates/${templateId}/background-url`,
+        { headers: await authHeader() },
+      );
+      const j = await res.json().catch(() => ({}));
       if (!alive) return;
-      if (error || !data?.signedUrl) {
-        setMsg("Could not load the background image.");
+      if (!res.ok || typeof j.url !== "string") {
+        setMsg(j.error ?? "Could not load the background image.");
         return;
       }
-      setLatar(data.signedUrl);
+      setLatar(j.url);
     })();
     return () => {
       alive = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [backgroundPath]);
 
   // Ukur lebar bekas supaya saiz fon dan kotak mengikut skala sebenar
@@ -174,6 +197,17 @@ export default function LayoutEditor({
   const simpan = useCallback(async () => {
     setMenyimpan(true);
     try {
+      // Hala admin (galeri): simpan melalui pemanggil luar.
+      if (onSimpan) {
+        const ok = await onSimpan({ ...susun, mode });
+        if (!ok) {
+          setMsg("Could not save the layout.");
+          return;
+        }
+        setMsg(null);
+        await onSaved();
+        return;
+      }
       const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
@@ -189,9 +223,16 @@ export default function LayoutEditor({
     } finally {
       setMenyimpan(false);
     }
-  }, [classId, templateId, susun, mode, onSaved]);
+  }, [classId, templateId, susun, mode, onSaved, onSimpan]);
 
   const pratonton = useCallback(async () => {
+    // Hala admin (galeri): URL pratonton daripada pemanggil luar.
+    if (onPratonton) {
+      const url = await onPratonton();
+      if (url) window.open(url, "_blank");
+      else setMsg("Preview failed.");
+      return;
+    }
     const res = await fetch(
       `/api/classes/${classId}/certificates/templates/${templateId}/sample?format=url`,
       {
@@ -206,7 +247,7 @@ export default function LayoutEditor({
       return;
     }
     if (typeof j.url === "string") window.open(j.url, "_blank");
-  }, [classId, templateId]);
+  }, [classId, templateId, onPratonton]);
 
   const namaKiri =
     susun.name.align === "left"
