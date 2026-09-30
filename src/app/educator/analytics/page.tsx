@@ -1,12 +1,12 @@
 "use client";
 import { useEffect, useState, useMemo } from "react";
 import ActivityStatsPanel from "@/components/analytics/ActivityStatsPanel";
-import AtRiskPanel from "@/components/analytics/AtRiskPanel";
 import GamificationPanel from "@/components/analytics/GamificationPanel";
 import MasteryPanel from "@/components/analytics/MasteryPanel";
-import TeamStatsPanel from "@/components/analytics/TeamStatsPanel";
 import Shell from "@/components/Shell";
 import Stat from "@/components/insights/Stat";
+import PanelInsights from "@/components/insights/PanelInsights";
+import DialogEksport from "@/components/insights/DialogEksport";
 import { EDU_TABS } from '@/lib/eduTabs';
 import { supabase } from "@/lib/supabaseClient";
 import { listMyEducatorClasses } from "@/lib/data";
@@ -14,6 +14,7 @@ import type { EducatorClassRow } from "@/lib/types";
 import {
   GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, BookOpen,
   Activity, TrendingUp, AlertTriangle, Eye, LogIn, Target, CheckCircle2, HelpCircle,
+  Download,
 } from "lucide-react";
 
 type Summary = {
@@ -74,6 +75,8 @@ export default function EducatorAnalyticsPage() {
   const [summary, setSummary] = useState<Summary | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Dialog eksport CSV Insights (V2-014b), hanya untuk satu kelas.
+  const [dialogEksport, setDialogEksport] = useState(false);
 
   useEffect(() => { listMyEducatorClasses().then(setClasses).catch(() => {}); }, []);
 
@@ -111,7 +114,7 @@ export default function EducatorAnalyticsPage() {
     <Shell tabs={EDU_TABS}>
       <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <div className="eyebrow mb-1">Global insights</div>
+          <div className="eyebrow mb-1">{classId === "all" ? "Global insights" : "Insights"}</div>
           <h1 className="page-title">See how learning is going.</h1>
           <p className="page-subtitle">
             Track engagement across all your classes and spot opportunities to support your learners.
@@ -126,6 +129,17 @@ export default function EducatorAnalyticsPage() {
             <option value="all">All classes</option>
             {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
           </select>
+          {/* Butang eksport hanya bila satu kelas dipilih (tiket G). */}
+          {classId !== "all" && (
+            <button
+              type="button"
+              className="btn-primary inline-flex items-center gap-2"
+              onClick={() => setDialogEksport(true)}
+            >
+              <Download className="w-4 h-4" />
+              Export
+            </button>
+          )}
           <span className="input w-auto flex items-center text-ink-muted cursor-default">Last 90 days</span>
         </div>
       </div>
@@ -135,6 +149,16 @@ export default function EducatorAnalyticsPage() {
 
       {summary && (
         <>
+          {/* Bila satu kelas dipilih: markah peribadi dan kumpulan (V2-014b). */}
+          {classId !== "all" && <PanelInsights classId={classId} />}
+
+          {/* Bila "All classes": jemputan ringkas ke arah pilih kelas. */}
+          {classId === "all" && (
+            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-5">
+              Choose a class to see scores, who needs attention and team balance.
+            </div>
+          )}
+
           {/* Tiga nombor yang benar-benar menjawab soalan "bagaimana keadaannya". */}
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
             <Stat icon={<Users className="w-5 h-5" />} label="Learners" value={learners} />
@@ -183,25 +207,30 @@ export default function EducatorAnalyticsPage() {
             </details>
           </div>
 
-          <div id="explore" className="mb-4">
-            <h2 className="section-title">Explore a class</h2>
-            <p className="text-sm text-ink-muted mt-0.5">
-              Choose a class to see activity completion, team contribution and learning outcomes.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-4">
-            <div className="lg:col-span-7 space-y-4">
-              <ActivityStatsPanel classId={classId} />
-              <TeamStatsPanel classId={classId} />
+          {/* Analitik kelas lanjutan (V2-014b): ditutup secara lalai kerana
+              bahagian markah baharu di atas sudah menjawab soalan utama;
+              panel lama kekal boleh dicapai tanpa halaman baharu. */}
+          <details className="surface p-5 mb-4">
+            <summary className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink">
+              <BarChart3 className="w-4 h-4 text-ink-faint" />
+              More class analytics
+            </summary>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
+              <div className="lg:col-span-7 space-y-4">
+                <ActivityStatsPanel classId={classId} />
+              </div>
+              <div className="lg:col-span-5 space-y-4">
+                <MasteryPanel classId={classId} />
+                <GamificationPanel classId={classId} />
+              </div>
             </div>
-            <div className="lg:col-span-5 space-y-4">
-              <MasteryPanel classId={classId} />
-              <AtRiskPanel classId={classId} />
-              <GamificationPanel classId={classId} />
-            </div>
-          </div>
+          </details>
         </>
+      )}
+
+      {/* Dialog eksport CSV (tiket G), hanya untuk satu kelas. */}
+      {dialogEksport && classId !== "all" && (
+        <DialogEksport classId={classId} tutup={() => setDialogEksport(false)} />
       )}
     </Shell>
   );
