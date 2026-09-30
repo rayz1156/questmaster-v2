@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
+import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -105,7 +106,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       criteria,
       background_path: backgroundPath,
       logo_path: logoPath,
-      layout: typeof body.layout === 'object' && body.layout !== null ? body.layout : {},
+      // Layout sentiasa dinormalkan (V2-015): kunci asing dibuang dan
+      // semua nombor diapit sebelum disimpan.
+      layout: normaliseSusunAtur(body.layout),
       created_by: userId,
     })
     .select('id, title, criteria, background_path, logo_path, layout')
@@ -130,7 +133,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   if (typeof body.title === 'string' && body.title.trim()) kemas.title = body.title.trim();
   const criteria = bacaKriteria(body);
   if (criteria) kemas.criteria = criteria;
-  if (typeof body.layout === 'object' && body.layout !== null) kemas.layout = body.layout;
+  if (typeof body.layout === 'object' && body.layout !== null) {
+    // Normalkan pada setiap tulisan layout (V2-015).
+    kemas.layout = normaliseSusunAtur(body.layout);
+  }
   // Latar/logo hanya diterima sebagai laluan dalam kelas ini; pencetus pelan
   // memaksa NULL untuk pelan free.
   if (typeof body.background_path === 'string' && body.background_path.startsWith(`${classId}/`)) {
