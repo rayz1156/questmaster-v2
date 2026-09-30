@@ -27,7 +27,7 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 /** Had muat naik aset sijil: 8 MB supaya PNG A4 300 dpi diterima. */
-export const MAX_ASET_BYTES = 8 * 1024 * 1024;
+const MAX_ASET_BYTES = 8 * 1024 * 1024;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
