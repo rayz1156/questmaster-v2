@@ -844,7 +844,7 @@ begin
      and (v_res -> 'hard_challenges' -> 0 ->> 'rejected_pct')::numeric = 50.0
      and (v_res -> 'hard_challenges' -> 0 ->> 'pending')::int = 0
      and (v_res -> 'hard_challenges' -> 1 ->> 'challenge_id') = '00000000-0000-0000-0000-0000000000cd'
-     and (v_res -> 'hard_challenges' -> 1 ->> 'rejected_pct') is null
+     and (v_res -> 'hard_challenges' -> 1 ->> 'rejected_pct')::numeric = 0.0  -- 1 dinilai (approved), 0 ditolak
      and (v_res -> 'hard_challenges' -> 1 ->> 'pending')::int = 2 then
     raise notice 'LULUS 11b: susunan rejected_pct menurun dan pending betul';
   else
