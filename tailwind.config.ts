@@ -53,6 +53,19 @@ const config: Config = {
         card: "0 1px 2px rgba(21, 22, 27, 0.04)",
         raised: "0 4px 16px rgba(21, 22, 27, 0.08)",
       },
+      keyframes: {
+        // Animasi pop ringkas untuk lencana rentak (streak) pada skrin pemain.
+        // Sentiasa dipasangkan dengan motion-safe: supaya prefers-reduced-motion
+        // dihormati.
+        pop: {
+          "0%": { transform: "scale(0.8)", opacity: "0" },
+          "60%": { transform: "scale(1.08)" },
+          "100%": { transform: "scale(1)", opacity: "1" },
+        },
+      },
+      animation: {
+        pop: "pop 0.25s ease-out",
+      },
       maxWidth: {
         shell: "1240px",
       },
