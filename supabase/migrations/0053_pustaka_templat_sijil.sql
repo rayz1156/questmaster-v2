@@ -265,6 +265,18 @@ $fn$;
 revoke all on function public.qm_certificate_asset_in_use(text) from public, anon;
 grant execute on function public.qm_certificate_asset_in_use(text) to service_role;
 
+-- kzsec V2-016a S3 (CTO): ruang nama laluan storan mesti sepadan dengan skop.
+alter table public.qm_certificate_library
+  add constraint qm_certificate_library_ruang_nama_chk check (
+    (scope = 'gallery'
+      and (background_path is null or background_path like 'gallery/%')
+      and (logo_path is null or logo_path like 'gallery/%'))
+    or
+    (scope = 'personal'
+      and (background_path is null or background_path like 'library/' || owner_id::text || '/%')
+      and (logo_path is null or logo_path like 'library/' || owner_id::text || '/%'))
+  );
+
 NOTIFY pgrst, 'reload schema';
 
 COMMIT;

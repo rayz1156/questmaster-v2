@@ -76,6 +76,7 @@ export async function GET(req: NextRequest) {
       .from('qm_certificate_library')
       .select(LAJUR_ITEM)
       .eq('scope', 'gallery')
+      .eq('published', true) // kzsec S2: jangan bergantung pada RLS sahaja
       .order('sort_order', { ascending: true })
       .order('title', { ascending: true })
       .limit(200),

@@ -127,8 +127,8 @@ export async function POST(
   // yang memakai item ini mungkin masih menyimpan laluan sama).
   if (lama && lama !== path) {
     const svc = getServiceSupabase();
-    const { data: dipakai } = await svc.rpc('qm_certificate_asset_in_use', { p_path: lama });
-    if (dipakai !== true) {
+    const { data: dipakai, error: ralatGuna } = await svc.rpc('qm_certificate_asset_in_use', { p_path: lama });
+    if (!ralatGuna && dipakai === false) { // CTO: ralat RPC = jangan padam
       await svc.storage.from('certificate-assets').remove([lama]).catch(() => undefined);
     }
   }

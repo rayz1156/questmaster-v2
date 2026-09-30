@@ -111,8 +111,8 @@ export async function DELETE(
   const svc = getServiceSupabase();
   for (const laluan of [itemPenuh.background_path, itemPenuh.logo_path]) {
     if (!laluan) continue;
-    const { data: dipakai } = await svc.rpc('qm_certificate_asset_in_use', { p_path: laluan });
-    if (dipakai !== true) {
+    const { data: dipakai, error: ralatGuna } = await svc.rpc('qm_certificate_asset_in_use', { p_path: laluan });
+    if (!ralatGuna && dipakai === false) { // CTO: ralat RPC = jangan padam
       await svc.storage.from('certificate-assets').remove([laluan]).catch(() => undefined);
     }
   }
