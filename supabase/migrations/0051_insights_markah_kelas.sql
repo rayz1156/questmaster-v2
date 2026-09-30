@@ -261,13 +261,11 @@ BEGIN
     GROUP BY lp.user_id
   ),
   last_active AS (
+    -- aktiviti_nyata: acara, submission atau jawapan sahaja (GREATEST abaikan NULL).
+    -- Sertai kelas BUKAN aktiviti; ia hanya menghalang ahli baharu dikira berisiko.
     SELECT a.uid_ahli AS uid,
-           GREATEST(
-             a.sertai,
-             COALESCE(am.maks, a.sertai),
-             COALESCE(hm.maks, a.sertai),
-             COALESCE(jm.maks, a.sertai)
-           ) AS last_seen
+           GREATEST(am.maks, hm.maks, jm.maks) AS aktiviti_nyata,
+           COALESCE(GREATEST(am.maks, hm.maks, jm.maks), a.sertai) AS last_seen
     FROM ahli a
     LEFT JOIN acara_maks am ON am.uid = a.uid_ahli
     LEFT JOIN hantar_maks hm ON hm.uid = a.uid_ahli
@@ -275,10 +273,10 @@ BEGIN
   ),
   inactivity AS (
     SELECT
-      COUNT(*) FILTER (WHERE last_seen > now() - interval '1 day')   AS active_1d,
-      COUNT(*) FILTER (WHERE last_seen > now() - interval '7 days')  AS active_7d,
-      COUNT(*) FILTER (WHERE last_seen > now() - interval '30 days') AS active_30d,
-      COUNT(*) FILTER (WHERE last_seen < now() - interval '7 days')  AS at_risk_inactive_7d
+      COUNT(*) FILTER (WHERE aktiviti_nyata > now() - interval '1 day')   AS active_1d,
+      COUNT(*) FILTER (WHERE aktiviti_nyata > now() - interval '7 days')  AS active_7d,
+      COUNT(*) FILTER (WHERE aktiviti_nyata > now() - interval '30 days') AS active_30d,
+      COUNT(*) FILTER (WHERE last_seen < now() - interval '7 days')       AS at_risk_inactive_7d
     FROM last_active
   ),
   totals AS (

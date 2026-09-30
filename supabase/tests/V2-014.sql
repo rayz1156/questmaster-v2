@@ -151,8 +151,8 @@ insert into public.qm_live_questions (id, quiz_id, order_idx, prompt, options, c
    '[{"key":"A","text":"Lima"},{"key":"B","text":"Enam"},{"key":"C","text":"Tujuh"}]'::jsonb, 'B', 1000, 20);
 
 insert into public.qm_live_sessions (id, quiz_id, host_id, code, status, created_at, ended_at) values
-  ('00000000-0000-0000-0000-0000000000d0', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'AAA111', 'ended', now() - interval '3 days', now() - interval '3 days'),
-  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'BBB222', 'ended', now() - interval '1 day', now() - interval '1 day');
+  ('00000000-0000-0000-0000-0000000000d0', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'TKAA23', 'ended', now() - interval '3 days', now() - interval '3 days'),
+  ('00000000-0000-0000-0000-0000000000d1', '00000000-0000-0000-0000-0000000000cf', '00000000-0000-0000-0000-0000000000b1', 'TKBB34', 'ended', now() - interval '1 day', now() - interval '1 day');
 
 -- Pemain: b4 main kedua-dua sesi (1500, 800), b9 sesi pertama sahaja (500).
 insert into public.qm_live_players (id, session_id, nickname, user_id, player_token, score, joined_at) values
@@ -402,11 +402,13 @@ begin
   end if;
 
   -- Siti aktif 2 hari, Abu 3 hari (hanya melalui jawapan Live Quiz),
-  -- Ali hari ini. Bakar, Chik, Daud hanya sertai 10 hari lepas.
-  if (v_res -> 'inactivity' ->> 'active_30d')::int = 3 then
-    raise notice 'LULUS 4c: active_30d = 3 (termasuk ahli aktif melalui Live Quiz sahaja)';
+  -- Ali hari ini. ba ada submission ditolak 10 hari lepas (aktiviti nyata,
+  -- jadi dikira dalam 30 hari). bb dan bc hanya sertai 10 hari lepas; sertai
+  -- BUKAN aktiviti (pembetulan CTO: jangkaan asal 3 terlepas submission ba).
+  if (v_res -> 'inactivity' ->> 'active_30d')::int = 4 then
+    raise notice 'LULUS 4c: active_30d = 4 (termasuk ahli aktif melalui Live Quiz sahaja, sertai tidak dikira)';
   else
-    raise exception 'GAGAL 4c: active_30d = % (jangka 3)', v_res -> 'inactivity' ->> 'active_30d';
+    raise exception 'GAGAL 4c: active_30d = % (jangka 4)', v_res -> 'inactivity' ->> 'active_30d';
   end if;
 
   if (v_res -> 'inactivity' ->> 'active_7d')::int = 3
@@ -796,7 +798,7 @@ begin
   end if;
 
   -- Soalan kedua: salah paling kerap ialah A (Lima) dua kali; kunci betul
-  -- tidak bocor, hanya label Beta.
+  -- tidak bocor, hanya label Enam (pilihan B).
   select to_jsonb(e) into v_q
     from jsonb_array_elements(v_res -> 'hard_questions') e
    where e ->> 'question_id' = '00000000-0000-0000-0000-0000000000d3';
@@ -806,11 +808,11 @@ begin
   if (v_q -> 'top_wrong_choice' ->> 'key') = 'A'
      and (v_q -> 'top_wrong_choice' ->> 'label') = 'Lima'
      and (v_q -> 'top_wrong_choice' ->> 'count')::int = 2
-     and v_q ->> 'correct_label' = 'Beta'
+     and v_q ->> 'correct_label' = 'Enam'
      and v_q ->> 'correct_key' is null
      and (v_q ->> 'answered')::int = 3
      and (v_q ->> 'avg_ms')::numeric = 4333.3 then
-    raise notice 'LULUS 10c: top_wrong_choice A (Lima) dua kali, correct_label Beta, tiada correct_key';
+    raise notice 'LULUS 10c: top_wrong_choice A (Lima) dua kali, correct_label Enam, tiada correct_key';
   else
     raise exception 'GAGAL 10c: soalan kedua = %', v_q;
   end if;
@@ -842,7 +844,7 @@ begin
      and (v_res -> 'hard_challenges' -> 0 ->> 'rejected_pct')::numeric = 50.0
      and (v_res -> 'hard_challenges' -> 0 ->> 'pending')::int = 0
      and (v_res -> 'hard_challenges' -> 1 ->> 'challenge_id') = '00000000-0000-0000-0000-0000000000cd'
-     and (v_res -> 'hard_challenges' -> 1 ->> 'rejected_pct') is null
+     and (v_res -> 'hard_challenges' -> 1 ->> 'rejected_pct')::numeric = 0.0  -- 1 dinilai (approved), 0 ditolak
      and (v_res -> 'hard_challenges' -> 1 ->> 'pending')::int = 2 then
     raise notice 'LULUS 11b: susunan rejected_pct menurun dan pending betul';
   else
