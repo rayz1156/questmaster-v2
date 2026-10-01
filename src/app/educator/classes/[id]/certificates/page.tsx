@@ -8,6 +8,9 @@
  *     Kuizen, Templat saya dan Blank (aliran lama).
  *   - Menu templat: "Copy to another class" dan "Save to My templates"
  *     (V2-016a; pelan Percuma disembunyi keupayaan dengan tooltip).
+ *   - Panel "Certificate details" setiap templat (V2-016b): kursus, tarikh,
+ *     tempat, penandatangan dan imej tandatangan (muat naik, pratonton,
+ *     buang); medan kosong tidak dicetak pada sijil.
  *   - Pratonton PDF melalui POST /api/classes/[id]/certificates/preview.
  *   - "Issue certificates": jadual kelayakan daripada laluan issue tanpa
  *     confirm; butang pengeluaran memanggil semula dengan confirm: true.
@@ -33,6 +36,7 @@ import { pelanSaya } from "@/lib/pelan";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { tickLayak } from "@/lib/sijil/ui";
 import { normaliseSusunAtur } from "@/lib/sijil/susunAtur";
+import { normaliseMedan, type MedanSijil } from "@/lib/sijil/medan";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
 import LayoutEditor from "./layout-editor";
 
@@ -42,6 +46,8 @@ type Templat = {
   background_path: string | null;
   logo_path: string | null;
   layout: Record<string, unknown> | null;
+  fields: Record<string, unknown> | null;
+  signature_path: string | null;
   criteria: { type: string; hunt_id?: string; quiz_id?: string; min_score?: number };
 };
 
@@ -70,6 +76,8 @@ type Pilihan = { id: string; title: string };
 
 // PNG A4 landskap 300 dpi (kira-kira 2.5 MB, kadang lebih) diterima.
 const MAX_ASET = 8 * 1024 * 1024;
+// Imej tandatangan (V2-016b): PNG lutsinar atau JPEG sehingga 1 MB.
+const MAX_SIG = 1024 * 1024;
 
 export default function CertificatesPage() {
   const params = useParams<{ id: string }>();
@@ -111,7 +119,7 @@ export default function CertificatesPage() {
     const [{ data: t }, { data: c }, { data: h }, { data: q }] = await Promise.all([
       supabase
         .from("qm_certificate_templates")
-        .select("id, title, background_path, logo_path, layout, criteria")
+        .select("id, title, background_path, logo_path, layout, fields, signature_path, criteria")
         .eq("class_id", classId)
         .order("created_at", { ascending: true }),
       supabase
@@ -433,6 +441,150 @@ export default function CertificatesPage() {
   // Editor susun atur (V2-015): templat yang sedang dibuka.
   const [editor, setEditor] = useState<Templat | null>(null);
 
+  // Panel medan isian (V2-016b): templat yang sedang dibuka dan borangnya.
+  const [medanBuka, setMedanBuka] = useState<string | null>(null);
+  const [borangMedan, setBorangMedan] = useState<MedanSijil>({});
+  const [sigUrl, setSigUrl] = useState<Record<string, string>>({});
+  const [medanBusy, setMedanBusy] = useState(false);
+
+  /** Buka panel Certificate details dan isikan borang daripada templat. */
+  const bukaMedan = async (t: Templat) => {
+    if (medanBuka === t.id) {
+      setMedanBuka(null);
+      return;
+    }
+    setBorangMedan(normaliseMedan(t.fields));
+    setMedanBuka(t.id);
+    setMsg(null);
+    // Pratonton imej tandatangan melalui URL bertandatangan pelayan.
+    if (t.signature_path) {
+      const res = await fetch(
+        `/api/classes/${classId}/certificates/templates/${t.id}/signature-url`,
+        { headers: await authHeader() },
+      );
+      const j = await res.json().catch(() => ({}));
+      if (res.ok && typeof j.url === "string") {
+        setSigUrl((p) => ({ ...p, [t.id]: j.url }));
+      } else {
+        setSigUrl((p) => ({ ...p, [t.id]: "" }));
+      }
+    } else {
+      setSigUrl((p) => ({ ...p, [t.id]: "" }));
+    }
+  };
+
+  /** Simpan medan isian templat melalui PATCH templates (semantik ganti). */
+  const simpanMedan = async (t: Templat) => {
+    if (medanBusy) return;
+    // Tarikh tamat mesti sama hari atau lebih lewat daripada tarikh mula.
+    if (
+      borangMedan.date_start && borangMedan.date_end
+      && borangMedan.date_end < borangMedan.date_start
+    ) {
+      setMsg("End date must be on or after the start date.");
+      return;
+    }
+    setMedanBusy(true);
+    try {
+      const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ template_id: t.id, fields: borangMedan }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(j.error ?? "Could not save the certificate details.");
+        return;
+      }
+      setMsg(null);
+      setMedanBuka(null);
+      await muatSemula();
+    } finally {
+      setMedanBusy(false);
+    }
+  };
+
+  /**
+   * Muat naik imej tandatangan melalui aliran tiket (V2-016b):
+   * asset-ticket kind signature, PUT terus ke storan, kemudian asset-finalize.
+   */
+  const muatNaikTandatangan = async (t: Templat, fail: File | null) => {
+    if (!fail || medanBusy) return;
+    if (fail.type !== "image/png" && fail.type !== "image/jpeg") {
+      setMsg("The signature must be a PNG or JPEG image.");
+      return;
+    }
+    if (fail.size > MAX_SIG) {
+      setMsg("The signature image must be 1 MB or smaller.");
+      return;
+    }
+    setMedanBusy(true);
+    try {
+      const tiketRes = await fetch(
+        `/api/classes/${classId}/certificates/templates/${t.id}/asset-ticket`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          body: JSON.stringify({ kind: "signature", mimeType: fail.type, size: fail.size }),
+        },
+      );
+      const tiket = await tiketRes.json().catch(() => ({}));
+      if (!tiketRes.ok || typeof tiket.upload_url !== "string") {
+        setMsg(tiket.error ?? "Could not start the signature upload.");
+        return;
+      }
+      const put = await fetch(tiket.upload_url, {
+        method: "PUT",
+        headers: { "Content-Type": fail.type },
+        body: fail,
+      });
+      if (!put.ok) {
+        setMsg("Could not upload the signature image.");
+        return;
+      }
+      const finRes = await fetch(
+        `/api/classes/${classId}/certificates/templates/${t.id}/asset-finalize`,
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          body: JSON.stringify({ kind: "signature", path: tiket.path }),
+        },
+      );
+      const fin = await finRes.json().catch(() => ({}));
+      if (!finRes.ok) {
+        setMsg(fin.error ?? "Could not attach the signature image.");
+        return;
+      }
+      setMsg(null);
+      await muatSemula();
+    } finally {
+      setMedanBusy(false);
+    }
+  };
+
+  /** Buang imej tandatangan templat (PATCH clear_signature). */
+  const buangTandatangan = async (t: Templat) => {
+    if (medanBusy) return;
+    setMedanBusy(true);
+    try {
+      const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        body: JSON.stringify({ template_id: t.id, clear_signature: true }),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(j.error ?? "Could not remove the signature image.");
+        return;
+      }
+      setMsg(null);
+      setSigUrl((p) => ({ ...p, [t.id]: "" }));
+      await muatSemula();
+    } finally {
+      setMedanBusy(false);
+    }
+  };
+
   const batalkan = async (s: Sijil) => {
     const ok = await confirm({
       title: "Revoke certificate",
@@ -694,7 +846,8 @@ export default function CertificatesPage() {
         ) : (
           <div className="space-y-3 mb-8">
             {templat.map((t) => (
-              <div key={t.id} className="rounded-xl border border-hairline bg-white p-4 flex items-start justify-between gap-4 flex-wrap">
+              <div key={t.id}>
+                <div className="rounded-xl border border-hairline bg-white p-4 flex items-start justify-between gap-4 flex-wrap">
                 <div className="min-w-0">
                   <div className="font-semibold">{t.title}</div>
                   <div className="text-sm text-slate-500">
@@ -793,7 +946,126 @@ export default function CertificatesPage() {
                       Copy to another class
                     </button>
                   )}
+                  <button className="btn-quiet" onClick={() => bukaMedan(t)}>
+                    Certificate details
+                  </button>
                 </div>
+                </div>
+
+                {/* Panel medan isian (V2-016b) */}
+                {medanBuka === t.id && (
+                  <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mt-2 space-y-3">
+                    <h4 className="font-semibold">Certificate details</h4>
+                    <p className="text-sm text-slate-500">
+                      These values are printed on every certificate of this template. Empty
+                      fields are never printed.
+                    </p>
+                    <div className="grid gap-3 md:grid-cols-2">
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Course / programme</label>
+                        <input
+                          className="input w-full"
+                          value={borangMedan.course ?? ""}
+                          maxLength={160}
+                          onChange={(e) => setBorangMedan((p) => ({ ...p, course: e.target.value }))}
+                          placeholder="Bengkel Robotik 2026"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Location</label>
+                        <input
+                          className="input w-full"
+                          value={borangMedan.location ?? ""}
+                          maxLength={120}
+                          onChange={(e) => setBorangMedan((p) => ({ ...p, location: e.target.value }))}
+                          placeholder="Dewan Kuliah FKMT, UPSI"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Start date</label>
+                        <input
+                          className="input w-full"
+                          type="date"
+                          value={borangMedan.date_start ?? ""}
+                          onChange={(e) => setBorangMedan((p) => ({ ...p, date_start: e.target.value || undefined }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">End date (optional)</label>
+                        <input
+                          className="input w-full"
+                          type="date"
+                          value={borangMedan.date_end ?? ""}
+                          onChange={(e) => setBorangMedan((p) => ({ ...p, date_end: e.target.value || undefined }))}
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Signer name</label>
+                        <input
+                          className="input w-full"
+                          value={borangMedan.signer_name ?? ""}
+                          maxLength={100}
+                          onChange={(e) => setBorangMedan((p) => ({ ...p, signer_name: e.target.value }))}
+                          placeholder="Dr Hariz"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium mb-1">Signer title</label>
+                        <input
+                          className="input w-full"
+                          value={borangMedan.signer_title ?? ""}
+                          maxLength={120}
+                          onChange={(e) => setBorangMedan((p) => ({ ...p, signer_title: e.target.value }))}
+                          placeholder="Pensyarah"
+                        />
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <label
+                        className={`btn-quiet ${pro ? "" : "opacity-50 cursor-not-allowed"}`}
+                        title={pro ? "Upload signature image (PNG or JPEG, max 1 MB)" : "Available on Pro"}
+                      >
+                        <input
+                          type="file"
+                          accept="image/png,image/jpeg"
+                          className="hidden"
+                          disabled={!pro || medanBusy}
+                          onChange={(e) => muatNaikTandatangan(t, e.target.files?.[0] ?? null)}
+                        />
+                        Upload signature {pro ? "" : "(Pro)"}
+                      </label>
+                      {sigUrl[t.id] ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img
+                          src={sigUrl[t.id]}
+                          alt="Signature"
+                          className="h-10 rounded border border-hairline bg-white px-1"
+                        />
+                      ) : (
+                        <span className="text-xs text-slate-500">
+                          {t.signature_path ? "Loading signature..." : "No signature image yet"}
+                        </span>
+                      )}
+                      {t.signature_path && (
+                        <button
+                          className="btn-quiet text-red-600"
+                          disabled={medanBusy}
+                          onClick={() => buangTandatangan(t)}
+                        >
+                          Remove signature
+                        </button>
+                      )}
+                    </div>
+                    <div className="flex gap-2">
+                      <button className="btn-primary" onClick={() => simpanMedan(t)} disabled={medanBusy}>
+                        Save
+                      </button>
+                      <button className="btn-quiet" onClick={() => setMedanBuka(null)}>
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>
@@ -814,6 +1086,7 @@ export default function CertificatesPage() {
               }
               layout={t.layout}
               backgroundPath={t.background_path ?? ""}
+              medan={t.fields}
               onClose={() => setEditor(null)}
               onSaved={muatSemula}
             />

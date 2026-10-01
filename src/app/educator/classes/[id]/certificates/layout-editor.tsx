@@ -21,6 +21,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Eye, Save, X } from "lucide-react";
 import { authHeader } from "@/lib/peer-client";
 import { normaliseSusunAtur, type SusunAturSijil } from "@/lib/sijil/susunAtur";
+import { normaliseMedan, barisButiran } from "@/lib/sijil/medan";
 
 // Nisbah halaman A4 landskap, sama dengan janaPdf.ts.
 const A4_W = 841.89;
@@ -43,18 +44,43 @@ type SusunKod = {
   color: string;
   align: "center" | "left" | "right";
 };
+type SusunSigner = {
+  x: number;
+  y: number;
+  maxWidth: number;
+  size: number;
+  color: string;
+  align: "center" | "left";
+};
+type SusunSignature = { x: number; y: number; width: number };
 
 const NAMA_LALAI: SusunNama = {
   x: 0.5, y: 0.5, maxWidth: 0.6, size: 40, color: "#001F4B", weight: "bold", align: "center",
 };
 const QR_LALAI: SusunQr = { x: 0.815, y: 0.75, size: 0.08 };
 const KOD_LALAI: SusunKod = { x: 0.855, y: 0.885, size: 8, color: "#001F4B", align: "center" };
+// Lalai medan baharu (V2-016b): kemas dan tidak bertindih dengan lalai
+// name/QR/kod.
+const KURSUS_LALAI: SusunNama = {
+  x: 0.5, y: 0.24, maxWidth: 0.6, size: 18, color: "#001F4B", weight: "bold", align: "center",
+};
+const BUTIRAN_LALAI: SusunNama = {
+  x: 0.5, y: 0.64, maxWidth: 0.8, size: 11, color: "#001F4B", weight: "regular", align: "center",
+};
+const PENA_LALAI: SusunSigner = {
+  x: 0.12, y: 0.9, maxWidth: 0.3, size: 12, color: "#001F4B", align: "left",
+};
+const SIG_LALAI: SusunSignature = { x: 0.12, y: 0.72, width: 0.12 };
 
 type Susun = {
   mode: "standard" | "full_background";
   name: SusunNama;
   qr: SusunQr | false;
   code: SusunKod | false;
+  course: SusunNama | false;
+  details: SusunNama | false;
+  signer: SusunSigner | false;
+  signature: SusunSignature | false;
 };
 
 /** Bina keadaan editor daripada layout templat, dengan lalai penuh supaya
@@ -66,10 +92,14 @@ function bacaSusun(layout: Record<string, unknown> | null | undefined): Susun {
     name: { ...NAMA_LALAI, ...(n.name ?? {}) },
     qr: n.qr === false ? false : { ...QR_LALAI, ...(n.qr ?? {}) },
     code: n.code === false ? false : { ...KOD_LALAI, ...(n.code ?? {}) },
+    course: n.course === false ? false : { ...KURSUS_LALAI, ...(n.course ?? {}) },
+    details: n.details === false ? false : { ...BUTIRAN_LALAI, ...(n.details ?? {}) },
+    signer: n.signer === false ? false : { ...PENA_LALAI, ...(n.signer ?? {}) },
+    signature: n.signature === false ? false : { ...SIG_LALAI, ...(n.signature ?? {}) },
   };
 }
 
-type SasaranSeret = "name" | "qr" | "code";
+type SasaranSeret = "name" | "qr" | "code" | "course" | "details" | "signer" | "signature";
 
 export default function LayoutEditor({
   classId,
@@ -77,6 +107,7 @@ export default function LayoutEditor({
   mode,
   layout,
   backgroundPath,
+  medan,
   latarUrl,
   onSimpan,
   onPratonton,
@@ -88,6 +119,9 @@ export default function LayoutEditor({
   mode: "standard" | "full_background";
   layout: Record<string, unknown> | null;
   backgroundPath: string;
+  /** Medan isian templat (V2-016b): teks sebenar pada penanda; nilai contoh
+   *  dipakai bila medan kosong. */
+  medan?: Record<string, unknown> | null;
   /** URL latar sedia ditandatangan (guna halaman admin); lalai: route kelas. */
   latarUrl?: string | null;
   /** Simpan melalui pemanggil luar (guna halaman admin); lalai: PATCH kelas. */
@@ -101,6 +135,8 @@ export default function LayoutEditor({
   const [latar, setLatar] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [menyimpan, setMenyimpan] = useState(false);
+  // Medan isian dinormalkan sekali untuk teks penanda (V2-016b).
+  const medanSijil = normaliseMedan(medan);
 
   const bekasRef = useRef<HTMLDivElement>(null);
   const seretRef = useRef<{
@@ -161,7 +197,11 @@ export default function LayoutEditor({
     const kotak =
       sasaran === "name" ? susun.name
         : sasaran === "qr" ? (susun.qr || QR_LALAI)
-          : (susun.code || KOD_LALAI);
+          : sasaran === "code" ? (susun.code || KOD_LALAI)
+            : sasaran === "course" ? (susun.course || KURSUS_LALAI)
+              : sasaran === "details" ? (susun.details || BUTIRAN_LALAI)
+                : sasaran === "signer" ? (susun.signer || PENA_LALAI)
+                  : (susun.signature || SIG_LALAI);
     seretRef.current = {
       sasaran,
       startX: e.clientX,
@@ -186,7 +226,19 @@ export default function LayoutEditor({
       if (s.sasaran === "qr") {
         return { ...p, qr: { ...(p.qr || QR_LALAI), x, y } };
       }
-      return { ...p, code: { ...(p.code || KOD_LALAI), x, y } };
+      if (s.sasaran === "code") {
+        return { ...p, code: { ...(p.code || KOD_LALAI), x, y } };
+      }
+      if (s.sasaran === "course") {
+        return { ...p, course: { ...(p.course || KURSUS_LALAI), x, y } };
+      }
+      if (s.sasaran === "details") {
+        return { ...p, details: { ...(p.details || BUTIRAN_LALAI), x, y } };
+      }
+      if (s.sasaran === "signer") {
+        return { ...p, signer: { ...(p.signer || PENA_LALAI), x, y } };
+      }
+      return { ...p, signature: { ...(p.signature || SIG_LALAI), x, y } };
     });
   };
 
@@ -263,9 +315,9 @@ export default function LayoutEditor({
         </button>
       </div>
       <p className="text-sm text-slate-500">
-        Drag the name, QR and code boxes onto the background. Positions are saved as page
-        fractions and used when the background is a complete design (only the name, QR and
-        code are printed).
+        Drag the name, QR, code, course, date and location, signer and signature boxes onto the
+        background. Positions are saved as page fractions. Boxes with empty fields show sample
+        values; empty fields are never printed on the certificate.
       </p>
       {msg && <div className="text-sm text-red-600">{msg}</div>}
 
@@ -357,6 +409,124 @@ export default function LayoutEditor({
               CONTOH0000
             </div>
           )}
+
+          {/* Kotak kursus (V2-016b): teks sebenar atau nilai contoh */}
+          {susun.course !== false && (
+            <div
+              role="button"
+              tabIndex={0}
+              onPointerDown={mulaSeret("course")}
+              onPointerMove={gerakSeret}
+              onPointerUp={tamatSeret}
+              onPointerCancel={tamatSeret}
+              className="absolute cursor-move border-2 border-dashed border-violet-600 bg-white/10 text-center truncate"
+              style={{
+                left: lebar
+                  ? susun.course.align === "left"
+                    ? susun.course.x * lebar
+                    : susun.course.x * lebar - (susun.course.maxWidth * lebar) / 2
+                  : "50%",
+                top: `${susun.course.y * 100}%`,
+                width: lebar ? susun.course.maxWidth * lebar : "60%",
+                fontSize: `${lebar ? (susun.course.size / A4_W) * lebar : 18}px`,
+                fontWeight: susun.course.weight === "bold" ? 700 : 400,
+                color: susun.course.color,
+                transform: "translateY(-80%)",
+                touchAction: "none",
+              }}
+              title="Course or programme printed on the certificate"
+            >
+              {medanSijil.course || "Course / programme"}
+            </div>
+          )}
+
+          {/* Kotak butiran (V2-016b): tarikh | tempat */}
+          {susun.details !== false && (
+            <div
+              role="button"
+              tabIndex={0}
+              onPointerDown={mulaSeret("details")}
+              onPointerMove={gerakSeret}
+              onPointerUp={tamatSeret}
+              onPointerCancel={tamatSeret}
+              className="absolute cursor-move border-2 border-dashed border-violet-600 bg-white/10 text-center truncate"
+              style={{
+                left: lebar
+                  ? susun.details.align === "left"
+                    ? susun.details.x * lebar
+                    : susun.details.x * lebar - (susun.details.maxWidth * lebar) / 2
+                  : "50%",
+                top: `${susun.details.y * 100}%`,
+                width: lebar ? susun.details.maxWidth * lebar : "80%",
+                fontSize: `${lebar ? (susun.details.size / A4_W) * lebar : 11}px`,
+                fontWeight: susun.details.weight === "bold" ? 700 : 400,
+                color: susun.details.color,
+                transform: "translateY(-80%)",
+                touchAction: "none",
+              }}
+              title="Date and location line"
+            >
+              {barisButiran(medanSijil) || "1 hingga 3 Oktober 2026 | Location"}
+            </div>
+          )}
+
+          {/* Kotak penandatangan (V2-016b): nama tebal, jawatan di bawah */}
+          {susun.signer !== false && (
+            <div
+              role="button"
+              tabIndex={0}
+              onPointerDown={mulaSeret("signer")}
+              onPointerMove={gerakSeret}
+              onPointerUp={tamatSeret}
+              onPointerCancel={tamatSeret}
+              className="absolute cursor-move border-2 border-dashed border-violet-600 bg-white/10"
+              style={{
+                left: lebar
+                  ? susun.signer.align === "left"
+                    ? susun.signer.x * lebar
+                    : susun.signer.x * lebar - (susun.signer.maxWidth * lebar) / 2
+                  : "12%",
+                top: `${susun.signer.y * 100}%`,
+                width: lebar ? susun.signer.maxWidth * lebar : "30%",
+                fontSize: `${lebar ? (susun.signer.size / A4_W) * lebar : 12}px`,
+                color: susun.signer.color,
+                textAlign: susun.signer.align === "left" ? "left" : "center",
+                transform: "translateY(-80%)",
+                touchAction: "none",
+              }}
+              title="Signer name and title"
+            >
+              <div className="font-bold truncate">{medanSijil.signer_name || "Signer name"}</div>
+              <div className="truncate" style={{ fontSize: "85%" }}>
+                {medanSijil.signer_title || "Signer title"}
+              </div>
+            </div>
+          )}
+
+          {/* Kotak imej tandatangan (V2-016b) */}
+          {susun.signature !== false && (
+            <div
+              role="button"
+              tabIndex={0}
+              onPointerDown={mulaSeret("signature")}
+              onPointerMove={gerakSeret}
+              onPointerUp={tamatSeret}
+              onPointerCancel={tamatSeret}
+              className="absolute cursor-move border-2 border-dashed border-violet-600 bg-white flex items-center justify-center text-[10px] text-slate-500"
+              style={{
+                left: lebar ? susun.signature.x * lebar : "12%",
+                top: `${susun.signature.y * 100}%`,
+                width: lebar ? susun.signature.width * lebar : 60,
+                height: lebar
+                  ? Math.min(susun.signature.width * lebar * 0.4, 0.12 * lebar * (A4_H / A4_W))
+                  : 24,
+                touchAction: "none",
+              }}
+              title="Signature image"
+            >
+              Signature
+            </div>
+          )}
         </div>
 
         {/* Kawalan */}
@@ -432,6 +602,38 @@ export default function LayoutEditor({
               onChange={(e) => setSusun((p) => ({ ...p, code: e.target.checked ? { ...KOD_LALAI } : false }))}
             />
             Print certificate code
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={susun.course !== false}
+              onChange={(e) => setSusun((p) => ({ ...p, course: e.target.checked ? { ...KURSUS_LALAI } : false }))}
+            />
+            Print course
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={susun.details !== false}
+              onChange={(e) => setSusun((p) => ({ ...p, details: e.target.checked ? { ...BUTIRAN_LALAI } : false }))}
+            />
+            Print date and location
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={susun.signer !== false}
+              onChange={(e) => setSusun((p) => ({ ...p, signer: e.target.checked ? { ...PENA_LALAI } : false }))}
+            />
+            Print signer
+          </label>
+          <label className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={susun.signature !== false}
+              onChange={(e) => setSusun((p) => ({ ...p, signature: e.target.checked ? { ...SIG_LALAI } : false }))}
+            />
+            Print signature image
           </label>
           <div className="flex gap-2 pt-2">
             <button className="btn-primary" onClick={simpan} disabled={menyimpan}>
