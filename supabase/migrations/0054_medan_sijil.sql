@@ -53,6 +53,27 @@ begin
       add constraint qm_cert_tpl_fields_saiz_chk
       check (octet_length(fields::text) <= 4096);
   end if;
+
+  -- Pembetulan CTO (kzsec S1): signature_path mesti dalam ruang nama
+  -- templat sendiri <class_id>/<id>/signature-<hex>.png|jpg supaya tulisan
+  -- terus melalui PostgREST tidak boleh merujuk aset kelas lain (yang
+  -- kemudian dimuat turun oleh service role ke dalam PDF).
+  if not exists (
+    select 1 from pg_constraint
+     where conrelid = 'public.qm_certificate_templates'::regclass
+       and conname = 'qm_cert_tpl_signature_ruang_nama_chk'
+  ) then
+    alter table public.qm_certificate_templates
+      add constraint qm_cert_tpl_signature_ruang_nama_chk
+      check (
+        signature_path is null
+        or (
+          signature_path ~ '^[0-9a-f-]{36}/[0-9a-f-]{36}/signature-[0-9a-f]{1,32}[.](png|jpg)$'
+          and split_part(signature_path, '/', 1) = class_id::text
+          and split_part(signature_path, '/', 2) = id::text
+        )
+      );
+  end if;
 end $$;
 
 -- ---------------------------------------------------------------------

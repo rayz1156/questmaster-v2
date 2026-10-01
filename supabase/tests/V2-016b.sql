@@ -188,4 +188,25 @@ begin
   end if;
 end $$;
 
+-- 8. Pembetulan CTO: signature_path di luar ruang nama templat ditolak.
+do $$
+begin
+  begin
+    update public.qm_certificate_templates
+       set signature_path = '00000000-0000-0000-0000-000000001bc1/00000000-0000-0000-0000-000000001bd2/signature-b.png'
+     where id = '00000000-0000-0000-0000-000000001bd3';
+    raise exception 'GAGAL 12: laluan kelas lain diterima';
+  exception when check_violation then
+    raise notice 'LULUS 12: signature_path kelas lain ditolak (%)', sqlerrm;
+  end;
+  begin
+    update public.qm_certificate_templates
+       set signature_path = '00000000-0000-0000-0000-000000001bc2/00000000-0000-0000-0000-000000001bd3/../x.png'
+     where id = '00000000-0000-0000-0000-000000001bd3';
+    raise exception 'GAGAL 13: laluan traversal diterima';
+  exception when check_violation then
+    raise notice 'LULUS 13: signature_path traversal ditolak';
+  end;
+end $$;
+
 rollback;
