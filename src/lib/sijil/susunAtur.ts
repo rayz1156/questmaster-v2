@@ -31,6 +31,27 @@ export type SusunAturKod = {
   align?: 'center' | 'left' | 'right';
 };
 
+/**
+ * Kedudukan penandatangan (V2-016b): nama tebal pada y (garis dasar),
+ * jawatan biasa satu baris di bawah pada saiz 85%. Tiada medan weight:
+ * nama sentiasa tebal. Pecahan halaman, sama bentuk nombor seperti name.
+ */
+export type SusunAturSigner = {
+  x: number;
+  y: number;
+  maxWidth: number;
+  size: number;
+  color: string;
+  align?: 'center' | 'left';
+};
+
+/**
+ * Kedudukan kotak imej tandatangan (V2-016b): x dan y ialah penjuru KIRI
+ * ATAS, width pecahan lebar halaman; tinggi ikut nisbah imej, dihadkan
+ * 0.12 tinggi halaman semasa dilukis.
+ */
+export type SusunAturSignature = { x: number; y: number; width: number };
+
 /** Layout templat (jsonb `qm_certificate_templates.layout`). */
 export type SusunAturSijil = {
   titleBm?: string;
@@ -39,6 +60,14 @@ export type SusunAturSijil = {
   name?: SusunAturNama;
   qr?: SusunAturQr | false;
   code?: SusunAturKod | false;
+  /** Kursus (baris teks, bentuk sama seperti name) (V2-016b). */
+  course?: SusunAturNama | false;
+  /** Baris butiran: tarikh | tempat (bentuk sama seperti name) (V2-016b). */
+  details?: SusunAturNama | false;
+  /** Blok penandatangan: nama tebal + jawatan di bawah (V2-016b). */
+  signer?: SusunAturSigner | false;
+  /** Kotak imej tandatangan (V2-016b). */
+  signature?: SusunAturSignature | false;
 };
 
 /** Warna lalai semua teks sijil, selaras dengan contoh reka bentuk Boss. */
@@ -56,6 +85,9 @@ export const QR_SAIZ_MIN = 0.04;
 export const QR_SAIZ_MAKS = 0.2;
 export const KOD_SAIZ_MIN = 6;
 export const KOD_SAIZ_MAKS = 24;
+/** Julat lebar kotak tandatangan, pecahan lebar halaman (V2-016b). */
+export const SIG_SAIZ_MIN = 0.02;
+export const SIG_SAIZ_MAKS = 0.5;
 
 /** Apit nombor bernilai terhingga ke dalam julat [min, maks]. */
 function apit(v: unknown, min: number, max: number): number | null {
@@ -73,6 +105,30 @@ function warna(v: unknown): string {
 function tajuk(v: unknown): string {
   const s = typeof v === 'string' ? v.trim() : '';
   return s.slice(0, PANJANG_TAJUK_MAKS);
+}
+
+/**
+ * Normalkan objek kedudukan bentuk name {x, y, maxWidth, size, color,
+ * weight?, align?}; null jika medan nombor wajib tiada atau tidak sah.
+ * Berkongsi oleh name, course dan details (V2-016b).
+ */
+function namaSah(v: unknown): SusunAturNama | null {
+  if (typeof v !== 'object' || v === null || Array.isArray(v)) return null;
+  const nm = v as Record<string, unknown>;
+  const x = apit(nm.x, 0, 1);
+  const y = apit(nm.y, 0, 1);
+  const maxWidth = apit(nm.maxWidth, 0, 1);
+  const size = apit(nm.size, NAMA_SAIZ_MIN, NAMA_SAIZ_MAKS);
+  if (x === null || y === null || maxWidth === null || size === null) return null;
+  return {
+    x,
+    y,
+    maxWidth,
+    size,
+    color: warna(nm.color),
+    ...(nm.weight === 'bold' || nm.weight === 'regular' ? { weight: nm.weight } : {}),
+    align: nm.align === 'left' ? 'left' : 'center',
+  };
 }
 
 /**
@@ -95,24 +151,8 @@ export function normaliseSusunAtur(input: unknown): SusunAturSijil {
 
   if (s.mode === 'standard' || s.mode === 'full_background') out.mode = s.mode;
 
-  if (typeof s.name === 'object' && s.name !== null && !Array.isArray(s.name)) {
-    const nm = s.name as Record<string, unknown>;
-    const x = apit(nm.x, 0, 1);
-    const y = apit(nm.y, 0, 1);
-    const maxWidth = apit(nm.maxWidth, 0, 1);
-    const size = apit(nm.size, NAMA_SAIZ_MIN, NAMA_SAIZ_MAKS);
-    if (x !== null && y !== null && maxWidth !== null && size !== null) {
-      out.name = {
-        x,
-        y,
-        maxWidth,
-        size,
-        color: warna(nm.color),
-        ...(nm.weight === 'bold' || nm.weight === 'regular' ? { weight: nm.weight } : {}),
-        align: nm.align === 'left' ? 'left' : 'center',
-      };
-    }
-  }
+  const nama = namaSah(s.name);
+  if (nama) out.name = nama;
 
   if (s.qr === false) {
     out.qr = false;
@@ -141,6 +181,54 @@ export function normaliseSusunAtur(input: unknown): SusunAturSijil {
         color: warna(k.color),
         align: k.align === 'left' ? 'left' : k.align === 'right' ? 'right' : 'center',
       };
+    }
+  }
+
+  // Medan baharu V2-016b: course dan details berkongsi bentuk name;
+  // signer tanpa weight; signature hanya x, y dan width.
+  if (s.course === false) {
+    out.course = false;
+  } else {
+    const kursus = namaSah(s.course);
+    if (kursus) out.course = kursus;
+  }
+
+  if (s.details === false) {
+    out.details = false;
+  } else {
+    const butiran = namaSah(s.details);
+    if (butiran) out.details = butiran;
+  }
+
+  if (s.signer === false) {
+    out.signer = false;
+  } else if (typeof s.signer === 'object' && s.signer !== null && !Array.isArray(s.signer)) {
+    const sg = s.signer as Record<string, unknown>;
+    const x = apit(sg.x, 0, 1);
+    const y = apit(sg.y, 0, 1);
+    const maxWidth = apit(sg.maxWidth, 0, 1);
+    const size = apit(sg.size, NAMA_SAIZ_MIN, NAMA_SAIZ_MAKS);
+    if (x !== null && y !== null && maxWidth !== null && size !== null) {
+      out.signer = {
+        x,
+        y,
+        maxWidth,
+        size,
+        color: warna(sg.color),
+        align: sg.align === 'left' ? 'left' : 'center',
+      };
+    }
+  }
+
+  if (s.signature === false) {
+    out.signature = false;
+  } else if (typeof s.signature === 'object' && s.signature !== null && !Array.isArray(s.signature)) {
+    const si = s.signature as Record<string, unknown>;
+    const x = apit(si.x, 0, 1);
+    const y = apit(si.y, 0, 1);
+    const width = apit(si.width, SIG_SAIZ_MIN, SIG_SAIZ_MAKS);
+    if (x !== null && y !== null && width !== null) {
+      out.signature = { x, y, width };
     }
   }
 

@@ -150,15 +150,16 @@ platform, jadi tiada alatnya.
 | Alat | Peranan | Kegunaan |
 |---|---|---|
 | create_certificate_template | STAFF, tulis | Cipta templat sijil kelas. criteria.type: all_members, hunt_completed (perlu hunt_id), min_score (min_score, pilihan hunt_id) atau live_attended (perlu quiz_id). layout pilihan (mod full_background): kedudukan name, qr, code sebagai pecahan halaman. |
-| update_certificate_template | STAFF, tulis | Kemas kini templat: title, criteria, layout, atau buang latar/logo (clear_background, clear_logo). |
-| create_certificate_asset_ticket | STAFF, tulis | URL PUT bertandatangan untuk muat naik latar/logo PNG/JPEG sehingga 8 MB. Fail dihantar dengan curl -X PUT --upload-file <fail> -H "Content-Type: ..." "<upload_url>"; tiada bait melalui model. |
-| finalize_certificate_asset | STAFF, tulis | Sahkan muat naik aset: tandatangan bait disemak, templat dikemas kini, objek lama dipadam. |
+| update_certificate_template | STAFF, tulis | Kemas kini templat: title, criteria, layout, fields (medan isian: course, date_start, date_end, location, signer_name, signer_title; mengantikan objek lama), atau buang latar/logo/tandatangan (clear_background, clear_logo, clear_signature). |
+| create_certificate_asset_ticket | STAFF, tulis | URL PUT bertandatangan untuk muat naik latar/logo PNG/JPEG sehingga 8 MB atau tandatangan sehingga 1 MB. Fail dihantar dengan curl -X PUT --upload-file <fail> -H "Content-Type: ..." "<upload_url>"; tiada bait melalui model. |
+| finalize_certificate_asset | STAFF, tulis | Sahkan muat naik aset (latar, logo, tandatangan): tandatangan bait disemak, templat dikemas kini, objek lama dipadam. |
 | preview_certificate | STAFF, tulis | PDF contoh dengan nama contoh; pulangkan URL bertandatangan sah 10 minit. Tidak mencipta sijil sah. |
-| list_certificate_templates | STAFF, baca | Senarai templat kelas: id, tajuk, kriteria, layout, ada latar/logo, dikemas kini. |
+| list_certificate_templates | STAFF, baca | Senarai templat kelas: id, tajuk, kriteria, layout, medan isian (fields), ada latar/logo/tandatangan, dikemas kini. |
 | list_certificate_library | STAFF, baca | Pustaka templat sijil pemanggil: galeri Kuizen diterbitkan (gallery) dan Templat saya (mine), dengan preview_url latar 10 minit dan locked (galeri bukan free_tier berkunci untuk pelan percuma). |
 | use_certificate_template | STAFF, tulis | Cipta templat kelas daripada item pustaka: library_id, class_id, title pilihan, criteria pilihan (lalai all_members). Latar/logo dirujuk tanpa salinan fail. Galeri bukan free_tier memerlukan pelan kelas berbayar (402). |
 | copy_certificate_template | STAFF, tulis | Salin templat sijil ke kelas lain yang pemanggil juga pendidiknya: class_id, template_id, target_class_id. Kriteria ditetapkan semula all_members; background_removed: true bermakna latar dibuang pencetus pelan kelas sasaran. |
 | save_certificate_to_library | STAFF, tulis | Simpan templat kelas ke Templat saya: class_id, template_id, title pilihan. Objek latar/logo disalin ke ruang nama peribadi; pelan pemanggil berbayar (402), had 50 item (409). |
+| update_certificate_library_item | STAFF, tulis | Kemas kini item Templat saya: library_id, title pilihan, layout pilihan (termasuk kedudukan course, details, signer, signature; dinormalkan oleh route). Sekurang-kurangnya satu medan diperlukan. |
 | issue_certificates | STAFF, tulis | Tanpa confirm: pratonton kelayakan (nama, layak, sebab, sudah dikeluarkan). Dengan confirm: true: keluarkan sijil sebenar kepada participant_ids yang diberi, atau semua yang layak jika tiada senarai. Fungsi pelayan yang sama dengan laluan API. |
 | list_certificates | STAFF, baca | Senarai sijil kelas: kod, nama, program, tarikh, status, sebab pembatalan dan emailed_at. |
 | revoke_certificate | STAFF, tulis | Batalkan sijil dengan sebab (wajib). Halaman awam /sijil/<kod> menunjukkan Dibatalkan. |

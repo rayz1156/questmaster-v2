@@ -14,6 +14,7 @@ import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
+import { normaliseMedan } from '@/lib/sijil/medan';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -53,11 +54,17 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
 
   const { data, error } = await auth.supa
     .from('qm_certificate_templates')
-    .select('id, title, background_path, logo_path, layout, criteria, created_at, updated_at')
+    .select('id, title, background_path, logo_path, layout, fields, signature_path, criteria, created_at, updated_at')
     .eq('class_id', classId)
     .order('created_at', { ascending: true });
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ templates: data ?? [] });
+  // V2-016b: pulangkan medan isian dan boolean ada tandatangan; laluan
+  // objek tandatangan tidak didedahkan (UI guna laluan signature-url).
+  const senarai = (data ?? []).map((t: Record<string, unknown>) => {
+    const { signature_path, ...lain } = t;
+    return { ...lain, has_signature: !!signature_path };
+  });
+  return NextResponse.json({ templates: senarai });
 }
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
@@ -111,7 +118,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       layout: normaliseSusunAtur(body.layout),
       created_by: userId,
     })
-    .select('id, title, criteria, background_path, logo_path, layout')
+    .select('id, title, criteria, background_path, logo_path, layout, fields')
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
   return NextResponse.json({ template: data }, { status: 201 });
@@ -141,6 +148,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     // Normalkan pada setiap tulisan layout (V2-015).
     kemas.layout = normaliseSusunAtur(body.layout);
   }
+  // Medan isian (V2-016b): objek fields mengantikan keseluruhan nilai
+  // lama (semantik ganti, bukan gabungan). Dibenarkan semua pelan.
+  if (typeof body.fields === 'object' && body.fields !== null && !Array.isArray(body.fields)) {
+    kemas.fields = normaliseMedan(body.fields);
+  }
+  if (body.clear_signature === true) kemas.signature_path = null;
   // Latar/logo hanya diterima sebagai laluan dalam kelas ini; pencetus pelan
   // memaksa NULL untuk pelan free.
   if (typeof body.background_path === 'string' && body.background_path.startsWith(`${classId}/`)) {
@@ -157,8 +170,10 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .update(kemas)
     .eq('id', templateId)
     .eq('class_id', classId)
-    .select('id, title, criteria, background_path, logo_path, layout')
+    .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
     .single();
   if (error) return NextResponse.json({ error: error.message }, { status: 400 });
-  return NextResponse.json({ template: data });
+  // has_signature supaya klien tahu imej ada tanpa laluan objek.
+  const { signature_path, ...templatKini } = data ?? {};
+  return NextResponse.json({ template: { ...templatKini, has_signature: !!signature_path } });
 }

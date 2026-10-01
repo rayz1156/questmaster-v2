@@ -223,7 +223,199 @@ async function main() {
     'tanpa name: nama dilukis di tengah dan QR lalai muncul');
 
   // ------------------------------------------------------------------
-  // 30: contoh PDF untuk semakan mata CTO
+  // 30-35: normaliseSusunAtur medan baharu (V2-016b)
+  // ------------------------------------------------------------------
+  const m1 = normaliseSusunAtur({
+    mode: 'full_background',
+    course: { x: 0.5, y: 0.2, maxWidth: 0.6, size: 40, color: 'red', weight: 'italic', align: 'right' },
+    details: { x: 0.5, y: 0.3, maxWidth: 0.8, size: 300, color: '#001F4B' },
+    signer: { x: 0.1, y: 0.9, maxWidth: 0.3, size: 20, color: '#001F4B', align: 'right' },
+    signature: { x: 0.1, y: 0.8, width: 5 },
+  });
+  // Selepas normalisasi dengan objek penuh, semua kekunci mestilah objek.
+  const kursus = m1.course as Exclude<typeof m1.course, false | undefined>;
+  const butiran = m1.details as Exclude<typeof m1.details, false | undefined>;
+  const pena = m1.signer as Exclude<typeof m1.signer, false | undefined>;
+  const sig = m1.signature as Exclude<typeof m1.signature, false | undefined>;
+  semak('30-course-bentuk-name',
+    kursus.x === 0.5 && kursus.size === 40 && kursus.color === WARNA_LALAI
+      && kursus.align === 'center' && kursus.weight === undefined,
+    'course berkongsi bentuk name: warna lalai, align lalai, weight tidak sah dibuang');
+  semak('31-details-size', butiran.size === 96, `details.size diapit ke 96 (${butiran.size})`);
+  semak('32-signer-tanpa-weight',
+    pena.align === 'center' && pena.size === 20 && !('weight' in pena),
+    'signer: align lalai center dan tiada medan weight');
+  semak('33-signature-apit', sig.width === 0.5 && sig.x === 0.1,
+    `signature.width diapit ke 0.5 (${sig.width})`);
+  const m2 = normaliseSusunAtur({ course: false, details: false, signer: false, signature: false });
+  semak('34-false-dikekal',
+    m2.course === false && m2.details === false && m2.signer === false && m2.signature === false,
+    'course/details/signer/signature false dikekalkan (jangan cetak)');
+  const m3 = normaliseSusunAtur({
+    course: { x: 0.5, y: 0.2, maxWidth: 0.6 },
+    signature: { x: 0.1, y: 0.8 },
+  });
+  semak('35-tak-lengkap', m3.course === undefined && m3.signature === undefined,
+    'course tanpa size dan signature tanpa width dibuang sepenuhnya');
+  semak('36-idempoten-baru', sama(normaliseSusunAtur(m1), m1),
+    'normalkan semula layout medan baharu = sama hasil');
+
+  // ------------------------------------------------------------------
+  // 37-44: medan isian pada janaPdf (V2-016b)
+  // ------------------------------------------------------------------
+  const MEDAN = {
+    course: 'Bengkel Robotik UPSI 2026',
+    date_start: '2026-10-01',
+    date_end: '2026-10-03',
+    location: 'Dewan Kuliah FKMT, UPSI',
+    signer_name: 'Dr Hariz',
+    signer_title: 'Pensyarah Kanan',
+  };
+  const SUSUN_MEDAN = {
+    mode: 'full_background',
+    qr: false,
+    code: false,
+    name: { x: 0.5, y: 0.35, maxWidth: 0.7, size: 40, color: '#001F4B' },
+    course: { x: 0.5, y: 0.25, maxWidth: 0.7, size: 18, color: '#001F4B' },
+    details: { x: 0.5, y: 0.65, maxWidth: 0.8, size: 11, color: '#001F4B' },
+    signer: { x: 0.12, y: 0.9, maxWidth: 0.3, size: 12, color: '#001F4B', align: 'left' },
+    signature: { x: 0.12, y: 0.72, width: 0.1 },
+  };
+  const fbMedan = await janaPdfSijil({
+    nama: 'Aisyah Binti Rahman',
+    program: 'Program Sains',
+    tarikh: '30 September 2026',
+    pengeluar: 'Dr Hariz',
+    kod: 'CONTOH0000',
+    urlSah: 'https://kuizen.fun/sijil/CONTOH0000',
+    latar: new Uint8Array(PNG_1PX),
+    tera: false,
+    layout: SUSUN_MEDAN as unknown as SusunAturSijil,
+    medan: MEDAN,
+    tandatangan: new Uint8Array(PNG_1PX),
+  });
+  const teksFbMedan = bacaanPenuh(fbMedan);
+  semak('37-kursus-ada', teksFbMedan.includes(hexTeks('Bengkel Robotik UPSI 2026')),
+    'kursus dicetak pada kedudukan course');
+  semak('38-butiran-ada',
+    teksFbMedan.includes(hexTeks('1 hingga 3 Oktober 2026 | Dewan Kuliah FKMT, UPSI')),
+    'baris butiran tarikh | tempat dicetak');
+  semak('39-penandatangan-ada',
+    teksFbMedan.includes(hexTeks('Dr Hariz')) && teksFbMedan.includes(hexTeks('Pensyarah Kanan')),
+    'nama tebal dan jawatan dicetak pada blok signer');
+
+  const fbMedanTanpaImej = await janaPdfSijil({
+    nama: 'Aisyah Binti Rahman',
+    program: 'Program Sains',
+    tarikh: '30 September 2026',
+    pengeluar: 'Dr Hariz',
+    kod: 'CONTOH0000',
+    urlSah: 'https://kuizen.fun/sijil/CONTOH0000',
+    latar: new Uint8Array(PNG_1PX),
+    tera: false,
+    layout: SUSUN_MEDAN as unknown as SusunAturSijil,
+    medan: MEDAN,
+  });
+  semak('40-imej-tandatangan',
+    kiraImej(teksFbMedan) - kiraImej(bacaanPenuh(fbMedanTanpaImej)) >= 1,
+    'imej tandatangan dilukis (PNG 1px beralpha: imej + SMask = dua objek tambahan)');
+
+  const fbMedanKosong = await janaPdfSijil({
+    nama: 'Aisyah Binti Rahman',
+    program: 'Program Sains',
+    tarikh: '30 September 2026',
+    pengeluar: 'Dr Hariz',
+    kod: 'CONTOH0000',
+    urlSah: 'https://kuizen.fun/sijil/CONTOH0000',
+    latar: new Uint8Array(PNG_1PX),
+    tera: false,
+    layout: SUSUN_MEDAN as unknown as SusunAturSijil,
+    medan: {},
+  });
+  const teksKosong = bacaanPenuh(fbMedanKosong);
+  semak('41-medan-kosong-senyap',
+    !teksKosong.includes(hexTeks('Bengkel')) && !teksKosong.includes(hexTeks('Dr Hariz'))
+      && !teksKosong.includes(hexTeks('|')),
+    'medan kosong: tiada label, tiada ruang aneh, tiada apa-apa dicetak');
+
+  let ralatAksara: unknown = null;
+  let teksAksara = '';
+  try {
+    const fbAksara = await janaPdfSijil({
+      nama: 'Nama',
+      program: 'Program',
+      tarikh: '30 September 2026',
+      pengeluar: 'Dr Hariz',
+      kod: 'CONTOH0000',
+      urlSah: 'https://kuizen.fun/sijil/CONTOH0000',
+      latar: new Uint8Array(PNG_1PX),
+      tera: false,
+      layout: SUSUN_MEDAN as unknown as SusunAturSijil,
+      medan: { course: 'Bengkel \u4e2d\u6587 \u0627\u0644\u0639\u0631\u0628\u064a\u0629', signer_name: '\u4e2d\u6587' },
+    });
+    teksAksara = bacaanPenuh(fbAksara);
+  } catch (e) {
+    ralatAksara = e;
+  }
+  semak('42-aksara-luar-winansi',
+    ralatAksara === null && teksAksara.includes(hexTeks('?')),
+    'aksara CJK/Arab diganti dengan ? dan janaPdf tidak lontar ralat');
+
+  // Mod standard dengan medan (V2-016b): kursus, butiran dan penandatangan
+  // dicetak; tanpa medan output kekal SAMA.
+  const stdMedan = await janaPdfSijil({
+    nama: 'Aisyah Binti Rahman', program: 'Kelas Sains', tarikh: '30 September 2026',
+    pengeluar: 'Dr Hariz', kod: 'AB3CD4EF5G', urlSah: 'https://kuizen.fun/sijil/AB3CD4EF5G',
+    latar: new Uint8Array(PNG_1PX), tera: true, layout: {},
+    medan: MEDAN, tandatangan: new Uint8Array(PNG_1PX),
+  });
+  const teksStdMedan = bacaanPenuh(stdMedan);
+  semak('43-standard-medan',
+    teksStdMedan.includes(hexTeks('Bengkel Robotik UPSI 2026'))
+      && teksStdMedan.includes(hexTeks('1 hingga 3 Oktober 2026 | Dewan Kuliah FKMT, UPSI'))
+      && teksStdMedan.includes(hexTeks('Dr Hariz'))
+      && teksStdMedan.includes(hexTeks('Pensyarah Kanan')),
+    'mod standard: kursus, butiran, nama dan jawatan penandatangan dicetak');
+
+  const stdKosong = await janaPdfSijil({
+    nama: 'Aisyah Binti Rahman', program: 'Kelas Sains', tarikh: '30 September 2026',
+    pengeluar: 'Dr Hariz', kod: 'AB3CD4EF5G', urlSah: 'https://kuizen.fun/sijil/AB3CD4EF5G',
+    latar: new Uint8Array(PNG_1PX), tera: true, layout: {}, medan: {},
+  });
+  const teksStdKosong = bacaanPenuh(stdKosong);
+  semak('44-standard-tanpa-medan',
+    teksStdKosong.includes(hexTeks('Sijil Penyertaan'))
+      && teksStdKosong.includes(hexTeks('Aisyah Binti Rahman'))
+      && teksStdKosong.includes(hexTeks('Kelas Sains'))
+      && teksStdKosong.includes(hexTeks('Certificate code: AB3CD4EF5G'))
+      && !teksStdKosong.includes(hexTeks('Bengkel'))
+      && !teksStdKosong.includes(hexTeks('Dewan Kuliah'))
+      && !teksStdKosong.includes(hexTeks('Pensyarah Kanan')),
+    'mod standard tanpa nilai medan: tiada kursus/butiran/penandatangan dicetak');
+
+  // Teks terlalu panjang untuk maxWidth: saiz turun hingga minimum 8
+  // kemudian dipangkas dengan elipsis.
+  const fbPotong = await janaPdfSijil({
+    nama: 'Nama',
+    program: 'Program',
+    tarikh: '30 September 2026',
+    pengeluar: 'Dr Hariz',
+    kod: 'CONTOH0000',
+    urlSah: 'https://kuizen.fun/sijil/CONTOH0000',
+    latar: new Uint8Array(PNG_1PX),
+    tera: false,
+    layout: {
+      mode: 'full_background', qr: false, code: false,
+      course: { x: 0.5, y: 0.25, maxWidth: 0.1, size: 96, color: '#001F4B' },
+    } as unknown as SusunAturSijil,
+    medan: { course: 'KURSUS PANJANG SANGAT SEKALI LAGI DAN LAGI TANPA HENTI' },
+  });
+  semak('45-pangkas-elipsis',
+    bacaanPenuh(fbPotong).includes(hexTeks('...')),
+    'teks tidak muat: kecilkan ke minimum 8, kemudian pangkas dengan elipsis');
+
+  // ------------------------------------------------------------------
+  // 46: contoh PDF untuk semakan mata CTO
   // ------------------------------------------------------------------
   const baitContoh = await janaPdfSijil({
     nama: 'Aisyah Binti Rahman',

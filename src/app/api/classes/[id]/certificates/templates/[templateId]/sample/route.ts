@@ -93,6 +93,16 @@ export async function POST(
   } catch {
     // Gagal muat turun aset tidak menghalang contoh: PDF dijana tanpa aset.
   }
+  // Imej tandatangan (V2-016b): dimuat turun hanya jika templat memanggilnya.
+  let tandatanganBait: Uint8Array | undefined;
+  try {
+    if (template.signature_path) {
+      const { data: d } = await svc.storage.from('certificate-assets').download(template.signature_path);
+      if (d) tandatanganBait = new Uint8Array(await d.arrayBuffer());
+    }
+  } catch {
+    // Gagal muat turun tidak menghalang contoh: PDF dijana tanpa imej.
+  }
 
   // Normalkan layout (V2-015) sebelum PDF dijana.
   const layout = normaliseSusunAtur(template.layout);
@@ -108,6 +118,9 @@ export async function POST(
     // Tera "Dijana dengan Kuizen" hanya untuk pelan percuma (pelan pemilik kelas).
     tera: !pelanSijilBerbayar(await pelanPemilikKelas(auth.supa, classId)),
     layout,
+    // Medan isian dan imej tandatangan templat (V2-016b).
+    medan: template.fields,
+    tandatangan: tandatanganBait,
   });
 
   // format=url: simpan dalam bucket certificates (pdf sahaja mengikut

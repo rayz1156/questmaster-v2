@@ -1,18 +1,22 @@
 /**
  * POST /api/classes/[id]/certificates/templates/[templateId]/asset-ticket
  *
- * Tiket muat naik latar/logo sijil (V2-015) untuk bucket `certificate-assets`.
- * Body: { kind: 'background' | 'logo', mimeType, size }. Pelayan MENJANA
- * laluan objek (klien tidak pernah menawarkan laluan), mengeluarkan URL
- * PUT bertandatangan melalui klien service role HANYA selepas semua
- * semakan kebenaran dan pelan, dan memulangkannya bersama token.
+ * Tiket muat naik latar/logo/tandatangan sijil (V2-015, V2-016b) untuk
+ * bucket `certificate-assets`. Body: { kind: 'background' | 'logo' |
+ * 'signature', mimeType, size }. Pelayan MENJANA laluan objek (klien
+ * tidak pernah menawarkan laluan), mengeluarkan URL PUT bertandatangan
+ * melalui klien service role HANYA selepas semua semakan kebenaran dan
+ * pelan, dan memulangkannya bersama token.
+ *
+ * Tandatangan (V2-016b): PNG/JPEG lutsinar maksimum 1 MB, laluan
+ * <classId>/<templateId>/signature-<rawak>.png|jpg.
  *
  * Pemanggil (pelayar, curl, alat MCP) kemudian memuat naik fail TERUS ke
  * storan dengan PUT; tiada bait melalui pelayan aplikasi atau model.
  *
  * Kebenaran: pendidik kelas (semakPendidikKelas), templat milik kelas,
  * pelan berkesan PEMILIK kelas pro/institution (402 selain itu; sama
- * dengan pencetus qm_certificate_template_plan_guard 0042).
+ * dengan pencetus qm_certificate_template_plan_guard 0054).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { pelanSijilBerbayar } from '@/lib/sijil/pelanSijil';
@@ -28,6 +32,8 @@ export const fetchCache = 'force-no-store';
 
 /** Had muat naik aset sijil: 8 MB supaya PNG A4 300 dpi diterima. */
 const MAX_ASET_BYTES = 8 * 1024 * 1024;
+/** Had muat naik imej tandatangan (V2-016b): 1 MB. */
+const MAX_SIG_BYTES = 1024 * 1024;
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -94,18 +100,21 @@ export async function POST(
   }
   if (!pelanSijilBerbayar(pelan)) {
     return NextResponse.json(
-      { error: 'Certificate backgrounds and logos are available on Pro and Institution plans.' },
+      { error: 'Certificate backgrounds, logos and signatures are available on Pro, Institution and Unlimited plans.' },
       { status: 402 },
     );
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const kind = body.kind === 'background' || body.kind === 'logo' ? body.kind : null;
+  const kind =
+    body.kind === 'background' || body.kind === 'logo' || body.kind === 'signature'
+      ? body.kind
+      : null;
   const mimeType = typeof body.mimeType === 'string' ? body.mimeType : '';
   const size = typeof body.size === 'number' && Number.isFinite(body.size) ? Math.floor(body.size) : 0;
 
   if (!kind) {
-    return NextResponse.json({ error: 'kind must be background or logo.' }, { status: 400 });
+    return NextResponse.json({ error: 'kind must be background, logo or signature.' }, { status: 400 });
   }
   if (mimeType !== 'image/png' && mimeType !== 'image/jpeg') {
     return NextResponse.json(
@@ -116,9 +125,10 @@ export async function POST(
   if (size <= 0) {
     return NextResponse.json({ error: 'size is required.' }, { status: 400 });
   }
-  if (size > MAX_ASET_BYTES) {
+  const hadBytes = kind === 'signature' ? MAX_SIG_BYTES : MAX_ASET_BYTES;
+  if (size > hadBytes) {
     return NextResponse.json(
-      { error: 'Image must be 8 MB or smaller.' },
+      { error: `Image must be ${hadBytes / (1024 * 1024)} MB or smaller.` },
       { status: 400 },
     );
   }

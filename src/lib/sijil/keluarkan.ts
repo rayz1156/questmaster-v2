@@ -21,6 +21,10 @@ export type TemplatSijil = {
   background_path: string | null;
   logo_path: string | null;
   layout: Record<string, unknown> | null;
+  /** Medan isian sijil (V2-016b). */
+  fields: Record<string, unknown> | null;
+  /** Laluan imej tandatangan (V2-016b). */
+  signature_path: string | null;
   /** Item pustaka asal (V2-016a); null untuk templat luar pustaka. */
   library_id?: string | null;
 };
@@ -42,7 +46,7 @@ export async function bacaTemplatKelas(
 ): Promise<TemplatSijil | null> {
   const { data: template } = await supa
     .from('qm_certificate_templates')
-    .select('id, class_id, title, background_path, logo_path, layout, library_id')
+    .select('id, class_id, title, background_path, logo_path, layout, fields, signature_path, library_id')
     .eq('id', templateId)
     .eq('class_id', classId)
     .maybeSingle();
@@ -107,6 +111,16 @@ export async function keluarkanSijil(
   } catch {
     logoBait = undefined;
   }
+  // Imej tandatangan (V2-016b): dimuat turun hanya jika templat memanggilnya.
+  let tandatanganBait: Uint8Array | undefined;
+  try {
+    if (template.signature_path) {
+      const { data: d } = await svc.storage.from('certificate-assets').download(template.signature_path);
+      if (d) tandatanganBait = new Uint8Array(await d.arrayBuffer());
+    }
+  } catch {
+    tandatanganBait = undefined;
+  }
 
   // Normalkan layout (V2-015) sebelum PDF dijana: kunci asing dibuang dan
   // semua nombor diapit, untuk templat lama dan baharu sama.
@@ -128,6 +142,9 @@ export async function keluarkanSijil(
       logo: logoBait,
       tera,
       layout,
+      // Medan isian dan imej tandatangan (V2-016b).
+      medan: template.fields,
+      tandatangan: tandatanganBait,
     });
     const { error: upErr } = await svc.storage
       .from('certificates')

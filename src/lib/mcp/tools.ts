@@ -55,6 +55,7 @@ import {
   useCertificateTemplate,
   copyCertificateTemplate,
   saveCertificateToLibrary,
+  updateCertificateLibraryItem,
 } from "./certificate-tools";
 
 /** Had limit khusus list_live_quizzes: lalai 50, maksimum 200 (tiket KZ-004). */
@@ -2088,7 +2089,9 @@ export const TOOLS: ToolDef[] = [
       "pilihan hunt_id) atau live_attended (hadir kuiz langsung tertentu, perlu quiz_id). " +
       "layout pilihan mengawal kedudukan cetakan pada mod latar reka bentuk penuh " +
       "(full_background): name {x, y, maxWidth, size, color, weight, align} sebagai pecahan " +
-      "halaman, qr {x, y, size} atau false, code {x, y, size, color, align} atau false. " +
+      "halaman, qr {x, y, size} atau false, code {x, y, size, color, align} atau false, " +
+      "course, details dan signer {x, y, maxWidth, size, color, align} atau false, " +
+      "signature {x, y, width} atau false (V2-016b). " +
       "Latar dan logo dimuat naik melalui aliran tiket: create_certificate_asset_ticket, " +
       "curl -X PUT --upload-file ke upload_url, kemudian finalize_certificate_asset. " +
       "Pratonton hasil akhir dengan preview_certificate. Hanya pendidik kelas.",
@@ -2122,6 +2125,10 @@ export const TOOLS: ToolDef[] = [
             code: { type: "object" },
             titleBm: { type: "string" },
             titleEn: { type: "string" },
+            course: { type: "object", description: "Kedudukan kursus {x, y, maxWidth, size, color, weight, align} atau false" },
+            details: { type: "object", description: "Kedudukan baris tarikh | tempat, bentuk sama course, atau false" },
+            signer: { type: "object", description: "Kedudukan nama penandatangan {x, y, maxWidth, size, color, align} atau false" },
+            signature: { type: "object", description: "Kotak imej tandatangan {x, y, width} atau false" },
           },
         },
       },
@@ -2139,8 +2146,11 @@ export const TOOLS: ToolDef[] = [
     title: "Kemas kini templat sijil",
     description:
       "Kemas kini templat sijil kelas: title, criteria, layout (kedudukan nama, QR " +
-      "dan kod pada mod full_background), atau buang latar/logo dengan clear_background " +
-      "/ clear_logo. Hanya medan yang diberi dihantar. Hanya pendidik kelas.",
+      "dan kod pada mod full_background), fields (medan isian V2-016b: course, " +
+      "date_start, date_end, location, signer_name, signer_title; objek mengantikan " +
+      "keseluruhan nilai lama), atau buang latar/logo/tandatangan dengan " +
+      "clear_background / clear_logo / clear_signature. Hanya medan yang diberi " +
+      "dihantar. Hanya pendidik kelas.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -2163,8 +2173,24 @@ export const TOOLS: ToolDef[] = [
           description:
             "Susun atur penuh yang baharu; sentiasa dinormalkan oleh route.",
         },
+        fields: {
+          type: "object",
+          description:
+            "Medan isian sijil (V2-016b): course (1-160), date_start (YYYY-MM-DD), " +
+            "date_end (pilihan, >= date_start), location (1-120), signer_name (1-100), " +
+            "signer_title (1-120). Medan kosong tidak dicetak. Mengantikan keseluruhan objek lama.",
+          properties: {
+            course: { type: "string" },
+            date_start: { type: "string" },
+            date_end: { type: "string" },
+            location: { type: "string" },
+            signer_name: { type: "string" },
+            signer_title: { type: "string" },
+          },
+        },
         clear_background: { type: "boolean", description: "Buang latar templat" },
         clear_logo: { type: "boolean", description: "Buang logo templat" },
+        clear_signature: { type: "boolean", description: "Buang imej tandatangan templat" },
       },
       required: ["class_id", "template_id"],
     },
@@ -2177,12 +2203,13 @@ export const TOOLS: ToolDef[] = [
     name: "create_certificate_asset_ticket",
     title: "Tiket muat naik aset sijil",
     description:
-      "Dapatkan URL PUT bertandatangan untuk memuat naik latar atau logo templat " +
-      "sijil (PNG atau JPEG sehingga 8 MB) terus ke storan. Fail pada komputer " +
+      "Dapatkan URL PUT bertandatangan untuk memuat naik latar, logo atau imej " +
+      "tandatangan templat sijil (PNG atau JPEG; latar/logo sehingga 8 MB, " +
+      "tandatangan sehingga 1 MB) terus ke storan. Fail pada komputer " +
       "pengguna dihantar dengan curl -X PUT --upload-file <fail> -H \"Content-Type: ...\" " +
       "\"<upload_url>\" sepenuhnya di luar sembang ini; TIADA bait fail melalui model. " +
       "Selepas curl berjaya, panggil finalize_certificate_asset dengan path yang " +
-      "dipulangkan. Pelan kelas mesti Pro atau Institution. Hanya pendidik kelas.",
+      "dipulangkan. Pelan kelas mesti berbayar. Hanya pendidik kelas.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -2190,19 +2217,22 @@ export const TOOLS: ToolDef[] = [
       properties: {
         class_id: { type: "string", description: "UUID kelas" },
         template_id: { type: "string", description: "UUID templat sijil" },
-        kind: { type: "string", enum: ["background", "logo"], description: "Jenis aset" },
+        kind: { type: "string", enum: ["background", "logo", "signature"], description: "Jenis aset" },
         mime_type: {
           type: "string",
           enum: ["image/png", "image/jpeg"],
           description: "Jenis MIME fail",
         },
-        size: { type: "number", description: "Saiz fail dalam bait (maksimum 8388608)" },
+        size: { type: "number", description: "Saiz fail dalam bait (latar/logo maksimum 8388608, tandatangan 1048576)" },
       },
       required: ["class_id", "template_id", "kind", "mime_type", "size"],
     },
     handler: async (args, s) => {
-      const kind = args.kind === "background" || args.kind === "logo" ? args.kind : null;
-      if (!kind) throw new Error("kind mesti background atau logo");
+      const kind =
+        args.kind === "background" || args.kind === "logo" || args.kind === "signature"
+          ? args.kind
+          : null;
+      if (!kind) throw new Error("kind mesti background, logo atau signature");
       if (!args.class_id) throw new Error("class_id diperlukan");
       if (!args.template_id) throw new Error("template_id diperlukan");
       const size = Math.floor(Number(args.size));
@@ -2222,10 +2252,10 @@ export const TOOLS: ToolDef[] = [
     name: "finalize_certificate_asset",
     title: "Sahkan muat naik aset sijil",
     description:
-      "Sahkan bahawa latar atau logo yang dimuat naik melalui tiket sudah sampai " +
-      "ke storan dan lekatkan ia pada templat. Route menyemak tandatangan bait " +
-      "PNG/JPEG, memadam objek rosak, mengemas kini templat dan memadam objek lama. " +
-      "Guna path yang dipulangkan oleh create_certificate_asset_ticket.",
+      "Sahkan bahawa latar, logo atau tandatangan yang dimuat naik melalui tiket " +
+      "sudah sampai ke storan dan lekatkan ia pada templat. Route menyemak " +
+      "tandatangan bait PNG/JPEG, memadam objek rosak, mengemas kini templat dan " +
+      "memadam objek lama. Guna path yang dipulangkan oleh create_certificate_asset_ticket.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -2233,14 +2263,17 @@ export const TOOLS: ToolDef[] = [
       properties: {
         class_id: { type: "string", description: "UUID kelas" },
         template_id: { type: "string", description: "UUID templat sijil" },
-        kind: { type: "string", enum: ["background", "logo"], description: "Jenis aset" },
+        kind: { type: "string", enum: ["background", "logo", "signature"], description: "Jenis aset" },
         path: { type: "string", description: "Laluan objek daripada tiket" },
       },
       required: ["class_id", "template_id", "kind", "path"],
     },
     handler: async (args, s) => {
-      const kind = args.kind === "background" || args.kind === "logo" ? args.kind : null;
-      if (!kind) throw new Error("kind mesti background atau logo");
+      const kind =
+        args.kind === "background" || args.kind === "logo" || args.kind === "signature"
+          ? args.kind
+          : null;
+      if (!kind) throw new Error("kind mesti background, logo atau signature");
       if (typeof args.path !== "string" || !args.path.trim()) throw new Error("path diperlukan");
       return finalizeCertificateAsset(
         s.accessToken,
@@ -2287,7 +2320,8 @@ export const TOOLS: ToolDef[] = [
     title: "Senarai templat sijil",
     description:
       "Senaraikan templat sijil satu kelas: id, tajuk, kriteria, layout semasa, " +
-      "ada latar/logo dan tarikh dikemas kini. Hanya pendidik kelas.",
+      "medan isian (fields), ada latar/logo/tandatangan dan tarikh dikemas kini. " +
+      "Hanya pendidik kelas.",
     roles: STAFF,
     write: false,
     inputSchema: {
@@ -2492,6 +2526,35 @@ export const TOOLS: ToolDef[] = [
     },
     handler: async (args, s) => {
       return saveCertificateToLibrary(s.accessToken, args);
+    },
+  },
+
+  {
+    name: "update_certificate_library_item",
+    title: "Kemas kini item Templat saya",
+    description:
+      "Kemas kini item pustaka peribadi (Templat saya): tajuk dan/atau layout " +
+      "kedudukan cetakan (name, qr, code, course, details, signer, signature; " +
+      "sentiasa dinormalkan oleh route). Hanya medan yang diberi dihantar; " +
+      "sekurang-kurangnya satu diperlukan. Hanya pemilik item.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        library_id: { type: "string", description: "UUID item pustaka peribadi" },
+        title: { type: "string", description: "Tajuk baharu, 1 hingga 120 aksara (pilihan)" },
+        layout: {
+          type: "object",
+          description:
+            "Susun atur penuh yang baharu, termasuk kedudukan medan baharu " +
+            "(course, details, signer, signature); dinormalkan oleh route.",
+        },
+      },
+      required: ["library_id"],
+    },
+    handler: async (args, s) => {
+      return updateCertificateLibraryItem(s.accessToken, args);
     },
   },
 

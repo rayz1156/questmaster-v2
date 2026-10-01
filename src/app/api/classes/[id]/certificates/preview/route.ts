@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Templat mesti milik kelas ini (klien Bearer, RLS pendidik).
   const { data: template } = await auth.supa
     .from('qm_certificate_templates')
-    .select('id, class_id, title, background_path, logo_path, layout')
+    .select('id, class_id, title, background_path, logo_path, layout, fields, signature_path')
     .eq('id', templateId)
     .eq('class_id', classId)
     .maybeSingle();
@@ -73,6 +73,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   } catch {
     // Gagal muat turun aset tidak menghalang pratonton: PDF dijana tanpa aset.
   }
+  // Imej tandatangan (V2-016b): dimuat turun hanya jika templat memanggilnya.
+  let tandatanganBait: Uint8Array | undefined;
+  try {
+    if (template.signature_path) {
+      const { data: d } = await svc.storage.from('certificate-assets').download(template.signature_path);
+      if (d) tandatanganBait = new Uint8Array(await d.arrayBuffer());
+    }
+  } catch {
+    // Gagal muat turun tidak menghalang pratonton: PDF dijana tanpa imej.
+  }
 
   // Normalkan layout (V2-015) sebelum PDF dijana.
   const layout = normaliseSusunAtur(template.layout);
@@ -88,6 +98,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Tera "Dijana dengan Kuizen" hanya untuk pelan percuma (pelan pemilik kelas).
     tera: !pelanSijilBerbayar(await pelanPemilikKelas(auth.supa, classId)),
     layout,
+    // Medan isian dan imej tandatangan templat (V2-016b).
+    medan: template.fields,
+    tandatangan: tandatanganBait,
   });
 
   return new NextResponse(bait as unknown as BodyInit, {

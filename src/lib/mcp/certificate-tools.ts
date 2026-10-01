@@ -9,7 +9,7 @@
 import { callApi } from "./api";
 
 /** Aset sijil yang disokong oleh tiket muat naik. */
-export type CertAssetKind = "background" | "logo";
+export type CertAssetKind = "background" | "logo" | "signature";
 
 /** Templat sijil seperti dipulangkan route templates. */
 export interface CertTemplate {
@@ -19,6 +19,9 @@ export interface CertTemplate {
   background_path?: string | null;
   logo_path?: string | null;
   layout?: Record<string, unknown> | null;
+  /** Medan isian sijil (V2-016b). */
+  fields?: Record<string, unknown> | null;
+  signature_path?: string | null;
 }
 
 /**
@@ -57,7 +60,8 @@ export async function createCertificateTemplate(
 
 /**
  * Kemas kini templat sijil melalui route PATCH templates: tajuk, kriteria,
- * layout, atau buang latar/logo (clear_background / clear_logo).
+ * layout, medan isian (fields, V2-016b), atau buang latar/logo/tandatangan
+ * (clear_background / clear_logo / clear_signature).
  * Hanya medan yang diberi dihantar.
  */
 export async function updateCertificateTemplate(
@@ -68,8 +72,10 @@ export async function updateCertificateTemplate(
     title?: string;
     criteria?: unknown;
     layout?: unknown;
+    fields?: unknown;
     clear_background?: boolean;
     clear_logo?: boolean;
+    clear_signature?: boolean;
   }
 ): Promise<Record<string, unknown>> {
   if (!args.class_id) throw new Error("class_id diperlukan");
@@ -79,8 +85,12 @@ export async function updateCertificateTemplate(
   if (typeof args.title === "string" && args.title.trim()) body.title = args.title.trim();
   if (args.criteria !== undefined) body.criteria = args.criteria;
   if (args.layout !== undefined) body.layout = args.layout;
+  // fields (V2-016b): objek mengantikan keseluruhan nilai lama; route
+  // yang menormalkannya dengan normaliseMedan.
+  if (args.fields !== undefined && args.fields !== null) body.fields = args.fields;
   if (args.clear_background === true) body.clear_background = true;
   if (args.clear_logo === true) body.clear_logo = true;
+  if (args.clear_signature === true) body.clear_signature = true;
   if (Object.keys(body).length === 1) throw new Error("Tiada medan untuk dikemas kini");
 
   const res = await callApi<{ template?: Record<string, unknown> }>(
@@ -103,10 +113,10 @@ export type CertAssetTicket = {
 };
 
 /**
- * Dapatkan tiket muat naik latar/logo sijil (route asset-ticket).
+ * Dapatkan tiket muat naik latar/logo/tandatangan sijil (route asset-ticket).
  * Fail pada komputer pengguna dihantar TERUS ke storan dengan curl;
- * tiada bait melalui model. Mime mesti image/png atau image/jpeg dan
- * saiz maksimum 8 MB.
+ * tiada bait melalui model. Mime mesti image/png atau image/jpeg; saiz
+ * maksimum 8 MB untuk latar/logo dan 1 MB untuk tandatangan (V2-016b).
  */
 export async function createCertificateAssetTicket(
   accessToken: string,
@@ -303,14 +313,17 @@ export interface CertTemplateRingkas {
   title: string;
   criteria: Record<string, unknown> | null;
   layout: Record<string, unknown> | null;
+  fields: Record<string, unknown> | null;
   has_background: boolean;
   has_logo: boolean;
+  has_signature: boolean;
   updated_at: string | null;
 }
 
 /**
  * Senaraikan templat sijil kelas melalui route GET templates; laluan
- * objek diterjemah kepada boolean ada/tiada latar dan logo.
+ * objek diterjemah kepada boolean ada/tiada latar, logo dan tandatangan,
+ * dan medan isian (fields) dibawa bersama (V2-016b).
  */
 export async function listCertificateTemplates(
   accessToken: string,
@@ -325,9 +338,39 @@ export async function listCertificateTemplates(
     title: t.title,
     criteria: (t.criteria ?? null) as Record<string, unknown> | null,
     layout: (t.layout ?? null) as Record<string, unknown> | null,
+    fields: (t.fields ?? null) as Record<string, unknown> | null,
     has_background: !!t.background_path,
     has_logo: !!t.logo_path,
+    has_signature:
+      !!t.signature_path
+      || (t as { has_signature?: boolean }).has_signature === true,
     updated_at: (t as { updated_at?: string | null }).updated_at ?? null,
   }));
   return { templates: senarai };
+}
+
+/**
+ * Kemas kini item "Templat saya" (V2-016b) melalui route PATCH
+ * /api/certificate-library/[libraryId]: tajuk dan/atau layout kedudukan
+ * (dinormalkan oleh route). Hanya medan yang diberi dihantar.
+ */
+export async function updateCertificateLibraryItem(
+  accessToken: string,
+  args: {
+    library_id?: string;
+    title?: string;
+    layout?: unknown;
+  }
+): Promise<Record<string, unknown>> {
+  if (!args.library_id) throw new Error("library_id diperlukan");
+  const body: Record<string, unknown> = {};
+  if (typeof args.title === "string" && args.title.trim()) body.title = args.title.trim();
+  if (args.layout !== undefined && args.layout !== null) body.layout = args.layout;
+  if (Object.keys(body).length === 0) throw new Error("title atau layout diperlukan");
+  const res = await callApi<{ item?: Record<string, unknown> }>(
+    accessToken,
+    `/api/certificate-library/${args.library_id}`,
+    { method: "PATCH", body }
+  );
+  return (res.item ?? res) as Record<string, unknown>;
 }

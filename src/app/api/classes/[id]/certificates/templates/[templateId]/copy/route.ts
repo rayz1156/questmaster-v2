@@ -78,10 +78,15 @@ export async function POST(
       background_path: template.background_path,
       logo_path: template.logo_path,
       layout: normaliseSusunAtur(template.layout),
+      // Medan isian dan imej tandatangan turut disalin (V2-016b): rujukan
+      // laluan sama, tiada salinan fail; pencetus pelan kelas sasaran
+      // memaksa signature_path NULL jika pemiliknya Percuma.
+      fields: template.fields ?? {},
+      signature_path: template.signature_path,
       library_id: template.library_id ?? null,
       created_by: userId,
     })
-    .select('id, class_id, title, criteria, background_path, logo_path, layout, library_id')
+    .select('id, class_id, title, criteria, background_path, logo_path, layout, fields, library_id')
     .single();
   if (insErr || !salinan) {
     return NextResponse.json(

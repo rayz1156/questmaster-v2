@@ -1,20 +1,22 @@
 /**
  * POST /api/classes/[id]/certificates/templates/[templateId]/asset-finalize
  *
- * Sahkan muat naik latar/logo sijil (V2-015) selepas klien melakukan PUT ke
- * URL bertandatangan. Body: { kind: 'background' | 'logo', path }.
+ * Sahkan muat naik latar/logo/tandatangan sijil (V2-015, V2-016b) selepas
+ * klien melakukan PUT ke URL bertandatangan. Body:
+ * { kind: 'background' | 'logo' | 'signature', path }.
  *
  * 1. Laluan mesti berprefiks `${classId}/${templateId}/${kind}-` (laluan
  *    sentiasa dijana asset-ticket; klien hanya memulangkannya).
  * 2. Muat turun 16 bait pertama objek dan sahkan tandatangan PNG/JPEG
  *    sebenar (jenis MIME yang diisytiharkan pada tiket tidak dipercayai).
  *    Objek yang bukan imej dipadam dan dibalas 400.
- * 3. Kemas kini background_path/logo_path templat melalui klien pendidik
- *    (RLS); pencetus pelan 0042 kekal berkuat kuasa di pangkalan data.
+ * 3. Kemas kini background_path/logo_path/signature_path templat melalui
+ *    klien pendidik (RLS); pencetus pelan kekal berkuat kuasa di pangkalan
+ *    data.
  * 4. Objek lama templat dipadam daripada bucket jika laluan berbeza.
  *
  * Kebenaran: pendidik kelas, templat milik kelas, pelan pemilik kelas
- * pro/institution (402 selain itu, selari asset-ticket).
+ * berbayar (402 selain itu, selari asset-ticket).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { pelanSijilBerbayar } from '@/lib/sijil/pelanSijil';
@@ -31,9 +33,10 @@ export const fetchCache = 'force-no-store';
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Medan templat yang dikemas kini mengikut kind. */
-const LAJUR: Record<'background' | 'logo', 'background_path' | 'logo_path'> = {
+const LAJUR: Record<'background' | 'logo' | 'signature', 'background_path' | 'logo_path' | 'signature_path'> = {
   background: 'background_path',
   logo: 'logo_path',
+  signature: 'signature_path',
 };
 
 export async function POST(
@@ -79,17 +82,20 @@ export async function POST(
   }
   if (!pelanSijilBerbayar(pelan)) {
     return NextResponse.json(
-      { error: 'Certificate backgrounds and logos are available on Pro and Institution plans.' },
+      { error: 'Certificate backgrounds, logos and signatures are available on Pro, Institution and Unlimited plans.' },
       { status: 402 },
     );
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const kind = body.kind === 'background' || body.kind === 'logo' ? body.kind : null;
+  const kind =
+    body.kind === 'background' || body.kind === 'logo' || body.kind === 'signature'
+      ? body.kind
+      : null;
   const path = typeof body.path === 'string' ? body.path : '';
 
   if (!kind) {
-    return NextResponse.json({ error: 'kind must be background or logo.' }, { status: 400 });
+    return NextResponse.json({ error: 'kind must be background, logo or signature.' }, { status: 400 });
   }
 
   // Laluan mesti berprefiks kelas+templat+kind dan bebas path traversal.
@@ -127,16 +133,19 @@ export async function POST(
 
   const lajur = LAJUR[kind];
   // Objek lama templat untuk kolum ini, dipadam kemudian jika berbeza.
-  const lama = kind === 'background' ? template.background_path : template.logo_path;
+  const lama =
+    kind === 'background' ? template.background_path
+      : kind === 'logo' ? template.logo_path
+        : template.signature_path;
 
   // Tulis melalui klien pendidik: RLS mengecil kepada templat kelas ini
-  // dan pencetus pelan 0042 kekal berkuat kuasa.
+  // dan pencetus pelan kekal berkuat kuasa.
   const { data: updated, error: updErr } = await auth.supa
     .from('qm_certificate_templates')
     .update({ [lajur]: path, updated_at: new Date().toISOString() })
     .eq('id', params.templateId)
     .eq('class_id', classId)
-    .select('id, title, criteria, background_path, logo_path, layout')
+    .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
     .single();
   if (updErr || !updated) {
     return NextResponse.json(

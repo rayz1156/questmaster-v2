@@ -101,10 +101,13 @@ export async function POST(
       background_path: itemPenuh.background_path,
       logo_path: itemPenuh.logo_path,
       layout: normaliseSusunAtur(itemPenuh.layout),
+      // Medan isian bermula kosong (V2-016b): nilai diisi setiap templat
+      // kelas oleh pendidik, bukan diwarisi daripada item pustaka.
+      fields: {},
       library_id: itemPenuh.id,
       created_by: userId,
     })
-    .select('id, title, criteria, background_path, logo_path, layout, library_id')
+    .select('id, title, criteria, background_path, logo_path, layout, fields, library_id')
     .single();
   if (insErr || !template) {
     return NextResponse.json(

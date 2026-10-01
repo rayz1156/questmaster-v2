@@ -2,7 +2,9 @@
  * PATCH/DELETE /api/certificate-library/[libraryId]
  *
  * Urus "Templat saya" (V2-016a), milik pemanggil sahaja:
- *   PATCH: tukar tajuk (1 hingga 120 aksara).
+ *   PATCH: tukar tajuk (1 hingga 120 aksara) dan/atau layout kedudukan
+ *          (V2-016b, termasuk course/details/signer/signature; sentiasa
+ *          dinormalkan oleh normaliseSusunAtur).
  *   DELETE: padam item; objek storan dipadam HANYA jika tiada baris lain
  *          (templat kelas atau item pustaka) yang masih merujuk laluannya
  *          (qm_certificate_asset_in_use, selepas baris item dipadam).
@@ -13,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
+import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import type { ItemPustaka } from '@/lib/sijil/pustaka';
 
 export const runtime = 'nodejs';
@@ -43,15 +46,28 @@ export async function PATCH(
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
-  const title = typeof body.title === 'string' ? body.title.trim().slice(0, 120) : '';
-  if (!title) {
-    return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
+  const kemas: Record<string, unknown> = { updated_at: new Date().toISOString() };
+  // Tajuk pilihan (V2-016b): wajib sah jika diberi; layout juga diterima
+  // bersendirian. Sekurang-kurangnya satu medan mesti ada.
+  if (typeof body.title === 'string') {
+    const title = body.title.trim().slice(0, 120);
+    if (!title) {
+      return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
+    }
+    kemas.title = title;
+  }
+  if (typeof body.layout === 'object' && body.layout !== null && !Array.isArray(body.layout)) {
+    // Normalkan pada setiap tulisan layout (V2-016b).
+    kemas.layout = normaliseSusunAtur(body.layout);
+  }
+  if (Object.keys(kemas).length === 1) {
+    return NextResponse.json({ error: 'Title or layout is required.' }, { status: 400 });
   }
 
   // RLS mengecilkan kepada item personal milik sendiri sahaja.
   const { data, error } = await auth.supa
     .from('qm_certificate_library')
-    .update({ title, updated_at: new Date().toISOString() })
+    .update(kemas)
     .eq('id', params.libraryId)
     .eq('scope', 'personal')
     .eq('owner_id', userId)
