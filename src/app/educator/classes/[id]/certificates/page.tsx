@@ -22,7 +22,7 @@
  * Tiada em dash dalam mana-mana rentetan UI.
  */
 import Link from "next/link";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import { Download, Eye, Mail, Plus, RefreshCw } from "lucide-react";
 import Shell from "@/components/Shell";
@@ -73,6 +73,73 @@ type Sijil = {
 };
 
 type Pilihan = { id: string; title: string };
+
+/** Gambar kecil latar sebuah templat: muat URL bertandatangan sekali bagi
+ *  setiap templat dan papar nisbah A4 landskap. Klik membuka editor.
+ *  Templat tanpa background_path tidak memaparkan apa-apa. */
+function LakaranLatar({
+  classId,
+  t,
+  onBuka,
+}: {
+  classId: string;
+  t: Templat;
+  onBuka: (t: Templat) => void;
+}) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [gagal, setGagal] = useState(false);
+
+  useEffect(() => {
+    if (!t.background_path) return;
+    let alive = true;
+    setUrl(null);
+    setGagal(false);
+    (async () => {
+      const res = await fetch(
+        `/api/classes/${classId}/certificates/templates/${t.id}/background-url`,
+        { headers: await authHeader() },
+      );
+      const j = await res.json().catch(() => ({}));
+      if (!alive) return;
+      if (res.ok && typeof j.url === "string") {
+        setUrl(j.url);
+      } else {
+        setGagal(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, [classId, t.id, t.background_path]);
+
+  if (!t.background_path) return null;
+  return (
+    <button
+      type="button"
+      className="shrink-0 block w-[120px]"
+      title="Edit layout"
+      onClick={() => onBuka(t)}
+    >
+      {url ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={url}
+          alt={`Background of ${t.title}`}
+          className="block w-[120px] rounded-lg border border-hairline"
+          style={{ aspectRatio: "841.89 / 595.28" }}
+          draggable={false}
+        />
+      ) : (
+        <div
+          className="flex w-[120px] items-center justify-center rounded-lg border border-hairline bg-slate-100 text-[10px] text-slate-500"
+          style={{ aspectRatio: "841.89 / 595.28" }}
+        >
+          {gagal ? "No preview" : "Loading..."}
+        </div>
+      )}
+    </button>
+  );
+}
 
 // PNG A4 landskap 300 dpi (kira-kira 2.5 MB, kadang lebih) diterima.
 const MAX_ASET = 8 * 1024 * 1024;
@@ -130,11 +197,15 @@ export default function CertificatesPage() {
       supabase.from("qm_hunts").select("id, title").eq("class_id", classId).order("title"),
       supabase.from("qm_live_quizzes").select("id, title").eq("class_id", classId).order("title"),
     ]);
-    setTemplat((t as Templat[]) ?? []);
+    const senarai = (t as Templat[]) ?? [];
+    setTemplat(senarai);
     setSijil((c as Sijil[]) ?? []);
     setHunts((h as Pilihan[]) ?? []);
     setKuiz((q as Pilihan[]) ?? []);
-    if (!pilihTemplat && (t as Templat[] | null)?.length) setPilihTemplat(t![0].id);
+    if (!pilihTemplat && senarai.length) setPilihTemplat(senarai[0].id);
+    // Dipulangkan supaya pemanggil boleh mencari templat baharu yang
+    // dimuat semula (layout dan background_path terkini).
+    return senarai;
   }, [classId, pilihTemplat]);
 
   useEffect(() => {
@@ -195,7 +266,17 @@ export default function CertificatesPage() {
       }
       setMsg(null);
       setDialogTab(null);
-      await muatSemula();
+      // Muat semula senarai dahulu, kemudian buka editor templat baharu
+      // supaya layout dan background_path terkini digunakan.
+      const senarai = await muatSemula();
+      const idBaharu = typeof (j as { template?: { id?: unknown } }).template?.id === "string"
+        ? ((j as { template: { id: string } }).template.id)
+        : "";
+      const baharu = idBaharu ? senarai.find((x) => x.id === idBaharu) ?? null : null;
+      if (baharu) {
+        setPilihTemplat(baharu.id);
+        if (baharu.background_path) setEditor(baharu);
+      }
     } finally {
       setPustakaBusy(false);
     }
@@ -440,6 +521,15 @@ export default function CertificatesPage() {
 
   // Editor susun atur (V2-015): templat yang sedang dibuka.
   const [editor, setEditor] = useState<Templat | null>(null);
+  // Rujukan bekas editor untuk tatal automatik bila editor dibuka.
+  const editorRef = useRef<HTMLDivElement>(null);
+
+  // Tatal ke editor setiap kali ia dibuka atau bertukar templat.
+  useEffect(() => {
+    if (editor) {
+      editorRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    }
+  }, [editor]);
 
   // Panel medan isian (V2-016b): templat yang sedang dibuka dan borangnya.
   const [medanBuka, setMedanBuka] = useState<string | null>(null);
@@ -848,6 +938,7 @@ export default function CertificatesPage() {
             {templat.map((t) => (
               <div key={t.id}>
                 <div className="rounded-xl border border-hairline bg-white p-4 flex items-start justify-between gap-4 flex-wrap">
+                <LakaranLatar classId={classId} t={t} onBuka={setEditor} />
                 <div className="min-w-0">
                   <div className="font-semibold">{t.title}</div>
                   <div className="text-sm text-slate-500">
@@ -1076,20 +1167,28 @@ export default function CertificatesPage() {
           // walaupun suis di baris templat diketik semasa editor terbuka.
           const t = templat.find((x) => x.id === editor.id) ?? editor;
           return (
-            <LayoutEditor
-              classId={classId}
-              templateId={t.id}
-              mode={
-                (t.layout?.mode as string) === "full_background"
-                  ? "full_background"
-                  : "standard"
-              }
-              layout={t.layout}
-              backgroundPath={t.background_path ?? ""}
-              medan={t.fields}
-              onClose={() => setEditor(null)}
-              onSaved={muatSemula}
-            />
+            <div ref={editorRef}>
+              <LayoutEditor
+                // key: mulakan semula keadaan dalaman (susun, latar)
+                // bila templat bertukar.
+                key={t.id}
+                classId={classId}
+                templateId={t.id}
+                title={t.title}
+                mode={
+                  (t.layout?.mode as string) === "full_background"
+                    ? "full_background"
+                    : "standard"
+                }
+                layout={t.layout}
+                backgroundPath={t.background_path ?? ""}
+                medan={t.fields}
+                onClose={() => setEditor(null)}
+                onSaved={async () => {
+                  await muatSemula();
+                }}
+              />
+            </div>
           );
         })()}
 

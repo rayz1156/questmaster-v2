@@ -108,6 +108,7 @@ export default function LayoutEditor({
   layout,
   backgroundPath,
   medan,
+  title,
   latarUrl,
   onSimpan,
   onPratonton,
@@ -122,6 +123,9 @@ export default function LayoutEditor({
   /** Medan isian templat (V2-016b): teks sebenar pada penanda; nilai contoh
    *  dipakai bila medan kosong. */
   medan?: Record<string, unknown> | null;
+  /** Nama templat dipaparkan pada tajuk editor (pilihan; halaman admin
+   *  tidak menghantarnya). */
+  title?: string;
   /** URL latar sedia ditandatangan (guna halaman admin); lalai: route kelas. */
   latarUrl?: string | null;
   /** Simpan melalui pemanggil luar (guna halaman admin); lalai: PATCH kelas. */
@@ -309,7 +313,7 @@ export default function LayoutEditor({
   return (
     <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3 className="font-semibold">Layout editor</h3>
+        <h3 className="font-semibold">{title ? `Edit layout: ${title}` : "Layout editor"}</h3>
         <button className="btn-quiet" onClick={onClose}>
           <X className="w-4 h-4" /> Close
         </button>
