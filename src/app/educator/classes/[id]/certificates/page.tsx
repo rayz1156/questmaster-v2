@@ -70,6 +70,9 @@ type Sijil = {
   revoked_at: string | null;
   revoked_reason: string | null;
   template_id: string;
+  // KZ-007: untuk lajur Email dan kotak semak pilihan emel.
+  emailed_at: string | null;
+  pdf_path: string | null;
 };
 
 type Pilihan = { id: string; title: string };
@@ -191,7 +194,7 @@ export default function CertificatesPage() {
         .order("created_at", { ascending: true }),
       supabase
         .from("qm_certificates")
-        .select("id, code, name_snapshot, program_snapshot, issued_at, revoked_at, revoked_reason, template_id")
+        .select("id, code, name_snapshot, program_snapshot, issued_at, revoked_at, revoked_reason, template_id, emailed_at, pdf_path")
         .eq("class_id", classId)
         .order("issued_at", { ascending: false }),
       supabase.from("qm_hunts").select("id, title").eq("class_id", classId).order("title"),
@@ -495,10 +498,30 @@ export default function CertificatesPage() {
       setMsg(j.error ?? "Could not issue certificates.");
       return;
     }
-    setMsg(null);
+    // KZ-007: sentiasa papar mesej selepas issue supaya pendidik tahu
+    // apa yang berlaku (dulu setMsg(null) memadam mesej dan issue 0
+    // kelihatan seperti tiada apa-apa berlaku).
+    const bilangan = typeof (j as { issued?: unknown }).issued === "number"
+      ? (j as { issued: number }).issued
+      : 0;
+    setMsg(
+      bilangan === 0
+        ? "No new certificates were issued. Everyone selected already has a certificate or has no name."
+        : `Issued ${bilangan} certificate${bilangan === 1 ? "" : "s"}.`,
+    );
     await bacaKelayakan();
     await muatSemula();
   };
+
+  // KZ-007: pilihan kotak semak sijil untuk emel terpilih.
+  const [pilihEmel, setPilihEmel] = useState<Record<string, boolean>>({});
+  const [emelBusy, setEmelBusy] = useState(false);
+
+  // Sijil boleh diemel: tidak dibatalkan dan PDF sudah ada.
+  const sijilBolehEmel = (s: Sijil) => !s.revoked_at && !!s.pdf_path;
+  const terpilihEmel = sijil.filter((s) => sijilBolehEmel(s) && pilihEmel[s.id]);
+  const bilanganPilihEmel = terpilihEmel.length;
+  const semuaPilihEmel = sijil.some(sijilBolehEmel) && bilanganPilihEmel === sijil.filter(sijilBolehEmel).length;
 
   const emelPukal = async () => {
     const ok = await confirm({
@@ -507,13 +530,47 @@ export default function CertificatesPage() {
       confirmLabel: "Send",
     });
     if (!ok) return;
-    const res = await api(`/api/classes/${classId}/certificates/email`, {});
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setMsg(j.error ?? "Could not send certificate emails.");
-      return;
+    await hantarEmel(null, false);
+  };
+
+  /** KZ-007: emel sijil terpilih (resend supaya yang sudah diemel boleh dihantar semula). */
+  const emelTerpilih = async () => {
+    if (bilanganPilihEmel === 0) return;
+    await hantarEmel(terpilihEmel.map((s) => s.id), true);
+  };
+
+  /** KZ-007: emel satu sijil daripada baris jadual (Send atau Resend). */
+  const emelSatu = async (s: Sijil) => {
+    await hantarEmel([s.id], true);
+  };
+
+  /** Hantar permintaan emel dan papar mesej hasil; kosongkan pilihan dan muat semula. */
+  const hantarEmel = async (ids: string[] | null, resend: boolean) => {
+    if (emelBusy) return;
+    setEmelBusy(true);
+    try {
+      const res = await fetch(`/api/classes/${classId}/certificates/email`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", ...(await authHeader()) },
+        // Tanpa ids: tiada badan bererti semua yang belum diemel ({} juga sah).
+        body: JSON.stringify(ids && ids.length > 0 ? { certificate_ids: ids, resend } : {}),
+      });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setMsg(j.error ?? "Could not send certificate emails.");
+        return;
+      }
+      const gagal = (j.failed ?? []) as { error?: string }[];
+      const ralatPertama = gagal[0]?.error;
+      setMsg(
+        `Emails sent: ${j.sent ?? 0}. Failed: ${gagal.length}.` +
+          (ralatPertama ? ` ${ralatPertama}` : ""),
+      );
+      setPilihEmel({});
+      await muatSemula();
+    } finally {
+      setEmelBusy(false);
     }
-    setMsg(`Emails sent: ${j.sent ?? 0}.`);
   };
 
   const [revokeSijil, setRevokeSijil] = useState<Sijil | null>(null);
@@ -1214,9 +1271,17 @@ export default function CertificatesPage() {
               className="btn-primary"
               onClick={pro ? emelPukal : undefined}
               disabled={!pro}
-              title={pro ? "Send certificate emails" : "Available on Pro"}
+              title={pro ? "Send certificate emails to everyone who has not received one yet" : "Available on Pro"}
             >
-              <Mail className="w-4 h-4" /> Email certificates{pro ? "" : " (Pro)"}
+              <Mail className="w-4 h-4" /> Email all unsent{pro ? "" : " (Pro)"}
+            </button>
+            <button
+              className="btn-primary"
+              onClick={pro ? emelTerpilih : undefined}
+              disabled={!pro || bilanganPilihEmel === 0}
+              title={pro ? "Send certificate emails to the selected certificates" : "Available on Pro"}
+            >
+              <Mail className="w-4 h-4" /> Email selected ({bilanganPilihEmel}){pro ? "" : " (Pro)"}
             </button>
           </div>
 
@@ -1246,7 +1311,18 @@ export default function CertificatesPage() {
                       </td>
                       <td className="py-2 pr-3">{r.display_name}</td>
                       <td className="py-2 pr-3">
-                        {r.name_confirmed ? r.certificate_name : <span className="text-amber-600">Waiting for name confirmation</span>}
+                        {/* KZ-007: nama sandaran (display name) dipapar dengan
+                            label kecil kelabu bila nama sijil belum disahkan. */}
+                        {r.name_confirmed ? (
+                          r.certificate_name
+                        ) : r.certificate_name ? (
+                          <span>
+                            {r.certificate_name}{" "}
+                            <span className="text-xs text-slate-400">(display name)</span>
+                          </span>
+                        ) : (
+                          <span className="text-amber-600">Waiting for name confirmation</span>
+                        )}
                       </td>
                       <td className="py-2 pr-3">{r.eligible ? "Yes" : "No"}</td>
                       <td className="py-2 pr-3 text-slate-500">{r.reason}</td>
@@ -1272,16 +1348,46 @@ export default function CertificatesPage() {
               <table className="w-full text-sm">
                 <thead>
                   <tr className="text-left text-slate-500 border-b border-hairline">
+                    <th className="py-2 pr-3">
+                      {/* KZ-007: pilih semua sijil yang boleh diemel. */}
+                      <input
+                        type="checkbox"
+                        title="Select all certificates that can be emailed"
+                        disabled={!pro}
+                        checked={semuaPilihEmel}
+                        onChange={(e) => {
+                          const pilih = e.target.checked;
+                          setPilihEmel((p) => {
+                            const baharu = { ...p };
+                            for (const s of sijil) {
+                              if (sijilBolehEmel(s)) baharu[s.id] = pilih;
+                            }
+                            return baharu;
+                          });
+                        }}
+                      />
+                    </th>
                     <th className="py-2 pr-3">Code</th>
                     <th className="py-2 pr-3">Name</th>
                     <th className="py-2 pr-3">Date</th>
                     <th className="py-2 pr-3">Status</th>
+                    <th className="py-2 pr-3">Email</th>
                     <th className="py-2 pr-3"></th>
                   </tr>
                 </thead>
                 <tbody>
                   {sijil.map((s) => (
                     <tr key={s.id} className="border-b border-hairline">
+                      <td className="py-2 pr-3">
+                        {sijilBolehEmel(s) && (
+                          <input
+                            type="checkbox"
+                            disabled={!pro}
+                            checked={!!pilihEmel[s.id]}
+                            onChange={(e) => setPilihEmel((p) => ({ ...p, [s.id]: e.target.checked }))}
+                          />
+                        )}
+                      </td>
                       <td className="py-2 pr-3 font-mono">{s.code}</td>
                       <td className="py-2 pr-3">{s.name_snapshot}</td>
                       <td className="py-2 pr-3">{new Date(s.issued_at).toLocaleDateString()}</td>
@@ -1292,7 +1398,21 @@ export default function CertificatesPage() {
                           <span className="text-emerald-600">Active</span>
                         )}
                       </td>
+                      {/* KZ-007: tarikh penghantaran emel atau Not sent. */}
+                      <td className="py-2 pr-3">
+                        {s.emailed_at ? new Date(s.emailed_at).toLocaleString() : "Not sent"}
+                      </td>
                       <td className="py-2 pr-3 whitespace-nowrap">
+                        {sijilBolehEmel(s) && (
+                          <button
+                            className="btn-quiet"
+                            disabled={!pro || emelBusy}
+                            title={pro ? (s.emailed_at ? "Send the certificate email again" : "Send the certificate email") : "Available on Pro"}
+                            onClick={() => emelSatu(s)}
+                          >
+                            <Mail className="w-4 h-4" /> {s.emailed_at ? "Resend" : "Send"}
+                          </button>
+                        )}
                         <button className="btn-quiet" onClick={() => muatTurun(s)}>
                           <Download className="w-4 h-4" /> Download
                         </button>
