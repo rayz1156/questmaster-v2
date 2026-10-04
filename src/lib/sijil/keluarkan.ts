@@ -38,6 +38,51 @@ export type HasilKeluarkan = {
   skipped: boolean;
 };
 
+/** Hasil RPC qm_issue_certificates selepas dinormalkan. */
+export type HasilRpcKeluarkan = { issued_count: number; issued_ids: string[] };
+
+/**
+ * Normalkan hasil RPC qm_issue_certificates (KZ-007). PostgREST memulangkan
+ * TATASUSUNAN [{issued_count, issued_ids}] untuk fungsi RETURNS TABLE, tetapi
+ * sesetengah pemanggil (alat MCP) terima objek tunggal. Tanpa normalisasi ini
+ * ids sentiasa [] dan PDF tidak pernah dijana (pdf_path kekal NULL).
+ */
+export function normaliseHasilKeluaran(
+  issued: unknown,
+): HasilRpcKeluarkan | null {
+  const r = (Array.isArray(issued) ? issued[0] : issued) as
+    | { issued_count?: number; issued_ids?: string[] }
+    | null;
+  if (!r || typeof r !== 'object') return null;
+  return {
+    issued_count: typeof r.issued_count === 'number' ? r.issued_count : 0,
+    issued_ids: Array.isArray(r.issued_ids) ? r.issued_ids : [],
+  };
+}
+
+/** UUID sah (huruf kecil dan besar, versi 1 hingga 8 bentuk longgar). */
+const REGEX_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** Had maksimum sijil yang boleh dipilih untuk emel (selari dengan RPC). */
+export const MAX_ID_EMEL = 200;
+
+/**
+ * Tapis senarai id sijil daripada badan permintaan (KZ-007): hanya rentetan
+ * UUID yang sah, dihapus pendua, maksimum 200. Baris bukan array atau yang
+ * tidak sah dibuang secara senyap (badan permintaan adalah input tidak dipercayai).
+ */
+export function tapiskanIdSijil(nilai: unknown): string[] {
+  if (!Array.isArray(nilai)) return [];
+  const keluar: string[] = [];
+  for (const v of nilai) {
+    if (typeof v === 'string' && REGEX_UUID.test(v) && !keluar.includes(v)) {
+      keluar.push(v);
+      if (keluar.length >= MAX_ID_EMEL) break;
+    }
+  }
+  return keluar;
+}
+
 /** Baca templat kelas ini; pulangkan null jika tiada atau bukan milik kelas. */
 export async function bacaTemplatKelas(
   supa: SupabaseClient,
@@ -72,7 +117,10 @@ export async function keluarkanSijil(
   if (issueErr) {
     throw new Error(issueErr.message);
   }
-  const ids: string[] = issued?.issued_ids ?? [];
+  // KZ-007: PostgREST memulangkan tatasusunan [{issued_count, issued_ids}]
+  // untuk fungsi RETURNS TABLE; normalisasi supaya ids tidak sentiasa [].
+  const hasilRpc = normaliseHasilKeluaran(issued);
+  const ids: string[] = hasilRpc?.issued_ids ?? [];
   if (ids.length === 0) {
     return { issued: 0, certificates: [], skipped: true };
   }
@@ -157,5 +205,5 @@ export async function keluarkanSijil(
     hasil.push({ id: s.id, code: s.code, pdf_path: namaFail });
   }
 
-  return { issued: issued?.issued_count ?? 0, certificates: hasil, skipped: false };
+  return { issued: hasilRpc?.issued_count ?? 0, certificates: hasil, skipped: false };
 }

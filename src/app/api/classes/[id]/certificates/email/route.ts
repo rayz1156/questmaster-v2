@@ -11,12 +11,18 @@
  * URL bertandatangan TIDAK dilampirkan. Had 200 emel setiap panggilan
  * (dikuatkuasakan oleh qm_certificate_email_targets). emailed_at dikemas
  * kini untuk setiap sijil yang berjaya dihantar.
+ *
+ * KZ-007: badan JSON pilihan { certificate_ids?, resend? }. Tanpa badan,
+ * tingkah laku tidak berubah (semua sijil yang belum diemel). Dengan
+ * certificate_ids, hanya sijil itu (UUID sah, maksimum 200); resend: true
+ * membolehkan penghantaran semula sijil yang sudah diemel.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
+import { tapiskanIdSijil } from '@/lib/sijil/keluarkan';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -45,6 +51,22 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
   if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+
+  // KZ-007: badan JSON pilihan; badan kosong/tidak sah bermakna semua yang
+  // belum diemel (tingkah laku lama kekal).
+  let certificateIds: string[] = [];
+  let resend = false;
+  try {
+    const badan = (await req.json()) as { certificate_ids?: unknown; resend?: unknown } | null;
+    if (badan && typeof badan === 'object') {
+      certificateIds = tapiskanIdSijil(badan.certificate_ids);
+      resend = badan.resend === true && certificateIds.length > 0;
+    }
+  } catch {
+    // Tiada badan atau bukan JSON: teruskan tanpa penapis sijil.
+    certificateIds = [];
+    resend = false;
+  }
 
   // Semakan pelan DI PELAYAN (kzsec S1): emel pukal ialah keistimewaan
   // KELAS, jadi pelan berkesan PEMILIK kelas yang mengawal, bukan pelan
@@ -81,10 +103,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   // Sasaran: RPC SECURITY DEFINER menyemak semula pendidik kelas dan mengapit
-  // had 200. PDF mesti sudah ada (pdf_path bukan NULL).
+  // had 200. PDF mesti sudah ada (pdf_path bukan NULL). KZ-007: p_ids dan
+  // p_resend membolehkan emel sijil terpilih dan penghantaran semula.
   const { data: sasaran, error: rpcErr } = await auth.supa.rpc('qm_certificate_email_targets', {
     p_class: classId,
     p_limit: 200,
+    p_ids: certificateIds.length > 0 ? certificateIds : null,
+    p_resend: resend,
   });
   if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 400 });
   const baris = (sasaran ?? []) as {
