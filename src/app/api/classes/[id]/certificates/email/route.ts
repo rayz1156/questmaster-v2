@@ -203,7 +203,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     // Ayat badan bergantung kepada lampiran; butang dan pautan sah kekal.
     const ayatLampiran = lampiran
       ? 'Your certificate is attached to this email as a PDF.'
-      : 'Download your certificate from Kuizen using the button above.';
+      : 'Download your certificate from Kuizen using the button below.';
     const html = `
       <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f9fafb;">
         <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
