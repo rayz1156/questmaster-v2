@@ -526,7 +526,7 @@ export default function CertificatesPage() {
   const emelPukal = async () => {
     const ok = await confirm({
       title: "Email certificates",
-      description: "Send certificate emails to participants who have not received one yet?",
+      description: "Send certificate emails to participants who have not received one yet? The certificate PDF will be attached.",
       confirmLabel: "Send",
     });
     if (!ok) return;
@@ -538,7 +538,7 @@ export default function CertificatesPage() {
     if (bilanganPilihEmel === 0) return;
     const ok = await confirm({
       title: "Email selected certificates",
-      description: `Send certificate emails to ${bilanganPilihEmel} selected participant${bilanganPilihEmel === 1 ? "" : "s"}? Anyone already emailed will receive it again.`,
+      description: `Send certificate emails to ${bilanganPilihEmel} selected participant${bilanganPilihEmel === 1 ? "" : "s"}? Anyone already emailed will receive it again. The certificate PDF will be attached.`,
       confirmLabel: "Send",
     });
     if (!ok) return;
@@ -549,33 +549,66 @@ export default function CertificatesPage() {
   const emelSatu = async (s: Sijil) => {
     const ok = await confirm({
       title: s.emailed_at ? "Resend certificate email" : "Send certificate email",
-      description: `Send the certificate email to ${s.name_snapshot}?`,
+      description: `Send the certificate email to ${s.name_snapshot}? The certificate PDF will be attached.`,
       confirmLabel: "Send",
     });
     if (!ok) return;
     await hantarEmel([s.id], true);
   };
 
-  /** Hantar permintaan emel dan papar mesej hasil; kosongkan pilihan dan muat semula. */
+  /**
+   * Hantar permintaan emel dan papar mesej hasil; kosongkan pilihan dan muat
+   * semula. KZ-008: pelayan menghantar maksimum 20 emel setiap panggilan
+   * (p_limit 20) supaya tidak melebihi timeout nginx 60 saat. Tanpa ids
+   * (Email all unsent): ulang panggilan selagi more === true dan sent > 0,
+   * maksimum 10 pusingan. Dengan ids (Email selected): pecahkan kepada
+   * kelompok 20 dan hantar berturutan.
+   */
   const hantarEmel = async (ids: string[] | null, resend: boolean) => {
     if (emelBusy) return;
     setEmelBusy(true);
     try {
-      const res = await fetch(`/api/classes/${classId}/certificates/email`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        // Tanpa ids: tiada badan bererti semua yang belum diemel ({} juga sah).
-        body: JSON.stringify(ids && ids.length > 0 ? { certificate_ids: ids, resend } : {}),
-      });
-      const j = await res.json().catch(() => ({}));
-      if (!res.ok) {
-        setMsg(j.error ?? "Could not send certificate emails.");
-        return;
+      const kelompok: (string[] | null)[] = [];
+      if (ids && ids.length > 0) {
+        for (let i = 0; i < ids.length; i += 20) kelompok.push(ids.slice(i, i + 20));
+      } else {
+        kelompok.push(null);
       }
-      const gagal = (j.failed ?? []) as { error?: string }[];
-      const ralatPertama = gagal[0]?.error;
+      let jumlahSent = 0;
+      let jumlahGagal = 0;
+      let jumlahTanpaLampiran = 0;
+      let ralatPertama: string | undefined;
+      for (let pusingan = 0; pusingan < kelompok.length; pusingan++) {
+        const senaraiIds = kelompok[pusingan];
+        const res = await fetch(`/api/classes/${classId}/certificates/email`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", ...(await authHeader()) },
+          // Tanpa ids: tiada badan bererti semua yang belum diemel ({} juga sah).
+          body: JSON.stringify(senaraiIds ? { certificate_ids: senaraiIds, resend } : {}),
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          setMsg(j.error ?? "Could not send certificate emails.");
+          return;
+        }
+        const gagal = (j.failed ?? []) as { error?: string }[];
+        jumlahSent += j.sent ?? 0;
+        jumlahGagal += gagal.length;
+        jumlahTanpaLampiran += j.no_attachment ?? 0;
+        ralatPertama = ralatPertama ?? gagal[0]?.error;
+        // Kemajuan semasa gelung kelompok; diganti oleh mesej akhir.
+        setMsg(`Sending... ${jumlahSent} sent so far.`);
+        // Tanpa ids: ulang selagi pelayan masih ada sasaran (more) dan ada
+        // yang berjaya dihantar; maksimum 10 pusingan (pusingan < 9).
+        if (senaraiIds === null && j.more === true && (j.sent ?? 0) > 0 && pusingan < 9) {
+          kelompok.push(null);
+        }
+      }
       setMsg(
-        `Emails sent: ${j.sent ?? 0}. Failed: ${gagal.length}.` +
+        `Emails sent: ${jumlahSent}. Failed: ${jumlahGagal}.` +
+          (jumlahTanpaLampiran > 0
+            ? ` ${jumlahTanpaLampiran} sent without the PDF attached (file missing or too large).`
+            : "") +
           (ralatPertama ? ` ${ralatPertama}` : ""),
       );
       setPilihEmel({});
