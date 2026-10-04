@@ -3,6 +3,7 @@ import Link from "next/link";
 import Logo from "@/components/Logo";
 import LandingSessionCheck from "@/components/LandingSessionCheck";
 import HeroVideo from "@/components/HeroVideo";
+import TutorialVideo from "@/components/TutorialVideo";
 import BahagianHarga from "@/components/landing/BahagianHarga";
 import { TEKS_LANDING, TAPAK, LALUAN, type Bahasa } from "@/lib/landing-copy";
 import { HARGA_PELAN } from "@/lib/pelan";
@@ -279,6 +280,12 @@ export default function LandingPage({ bahasa }: { bahasa: Bahasa }) {
                 </div>
               ))}
             </div>
+          </div>
+        </section>
+
+        <section id="tutorial" className="px-6 sm:px-8 pb-16 scroll-mt-20">
+          <div className="mx-auto w-full max-w-[960px]">
+            <TutorialVideo key={bahasa} bahasaAwal={bahasa} />
           </div>
         </section>
 

@@ -11,7 +11,7 @@ import { VIDEO_PENGENALAN, type BahasaVideo } from '@/lib/video-kuizen';
  * boleh dibaca enjin carian dan tidak menarik apa apa bait video.
  *
  * Bahasa video mengikut bahasa halaman: halaman BM memainkan video
- * pengenalan ringkas BM, halaman Inggeris memainkan versi Inggeris.
+ * pengenalan penuh BM, halaman Inggeris memainkan versi Inggeris.
  */
 
 const TEKS: Record<BahasaVideo, { tajuk: string; main: string; sedang: string; label: string }> = {
