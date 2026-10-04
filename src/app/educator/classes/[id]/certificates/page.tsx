@@ -536,11 +536,23 @@ export default function CertificatesPage() {
   /** KZ-007: emel sijil terpilih (resend supaya yang sudah diemel boleh dihantar semula). */
   const emelTerpilih = async () => {
     if (bilanganPilihEmel === 0) return;
+    const ok = await confirm({
+      title: "Email selected certificates",
+      description: `Send certificate emails to ${bilanganPilihEmel} selected participant${bilanganPilihEmel === 1 ? "" : "s"}? Anyone already emailed will receive it again.`,
+      confirmLabel: "Send",
+    });
+    if (!ok) return;
     await hantarEmel(terpilihEmel.map((s) => s.id), true);
   };
 
   /** KZ-007: emel satu sijil daripada baris jadual (Send atau Resend). */
   const emelSatu = async (s: Sijil) => {
+    const ok = await confirm({
+      title: s.emailed_at ? "Resend certificate email" : "Send certificate email",
+      description: `Send the certificate email to ${s.name_snapshot}?`,
+      confirmLabel: "Send",
+    });
+    if (!ok) return;
     await hantarEmel([s.id], true);
   };
 

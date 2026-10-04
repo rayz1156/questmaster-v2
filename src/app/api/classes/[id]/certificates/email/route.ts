@@ -58,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   let resend = false;
   try {
     const badan = (await req.json()) as { certificate_ids?: unknown; resend?: unknown } | null;
-    if (badan && typeof badan === 'object') {
+    if (badan && typeof badan === 'object' && !Array.isArray(badan)) {
       certificateIds = tapiskanIdSijil(badan.certificate_ids);
       resend = badan.resend === true && certificateIds.length > 0;
     }
@@ -187,7 +187,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       const { error: updErr } = await auth.supa
         .from('qm_certificates')
         .update({ emailed_at: new Date().toISOString() })
-        .eq('id', b.certificate_id);
+        .eq('id', b.certificate_id)
+        .is('revoked_at', null);
       if (updErr) {
         failed.push({ certificate_id: b.certificate_id, error: updErr.message });
       } else {
