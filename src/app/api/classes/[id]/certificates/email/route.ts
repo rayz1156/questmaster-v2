@@ -147,6 +147,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     port,
     secure: false,
     auth: { user: smtpUser, pass: smtpPass },
+    // CTO (kzsec S4): had masa supaya satu sambungan tergantung tidak melebihi 60 s nginx.
+    connectionTimeout: 10_000,
+    greetingTimeout: 10_000,
+    socketTimeout: 20_000,
   });
 
   // KZ-008: baca pdf_path untuk id sasaran dengan klien service role.
@@ -187,7 +191,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const pdfPath = petaPdf.get(b.certificate_id);
     if (pathSelamat(pdfPath, classId)) {
       try {
-        const { data: pdfData } = await svc.storage.from('certificates').download(pdfPath as string);
+        // CTO (kzsec S4): had masa 15 s supaya storan tergantung tidak menyekat kelompok.
+        const { data: pdfData } = await Promise.race([
+          svc.storage.from('certificates').download(pdfPath as string),
+          new Promise<{ data: null }>((selesai) => setTimeout(() => selesai({ data: null }), 15_000)),
+        ]);
         if (pdfData) {
           const bait = Buffer.from(await pdfData.arrayBuffer());
           if (bait.length <= MAKS_LAMPIRAN) {

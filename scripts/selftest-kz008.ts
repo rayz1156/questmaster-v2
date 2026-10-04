@@ -47,6 +47,9 @@ check('null ditolak', pathSelamat(null, kelas) === false);
 check('undefined ditolak', pathSelamat(undefined, kelas) === false);
 check('nombor ditolak', pathSelamat(12345, kelas) === false);
 check('rentetan kosong ditolak', pathSelamat('', kelas) === false);
+check('berkod URL %2e%2e ditolak', pathSelamat(`${kelas}/%2e%2e%2fx.pdf`, kelas) === false);
+check('subfolder ditolak', pathSelamat(`${kelas}/a/b.pdf`, kelas) === false);
+check('garis miring terbalik ditolak', pathSelamat(`${kelas}/a\\b.pdf`, kelas) === false);
 
 check('MAKS_LAMPIRAN 5 MB', MAKS_LAMPIRAN === 5 * 1024 * 1024, MAKS_LAMPIRAN);
 check('MAKS_SEKALI 20', MAKS_SEKALI === 20, MAKS_SEKALI);

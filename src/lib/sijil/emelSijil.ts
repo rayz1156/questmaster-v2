@@ -19,9 +19,10 @@ export const MAKS_SEKALI = 20;
 export function pathSelamat(pdfPath: unknown, classId: string): boolean {
   if (typeof pdfPath !== "string" || pdfPath.length === 0) return false;
   if (!pdfPath.startsWith(`${classId}/`)) return false;
-  if (!pdfPath.endsWith(".pdf")) return false;
-  if (pdfPath.includes("..")) return false;
-  return true;
+  // CTO (kzsec S1): senarai putih ketat. Nama fail hanya huruf, nombor, _
+  // dan -, diikuti .pdf. Menolak .., %2e%2e, \, subfolder dan aksara lain.
+  const namaFail = pdfPath.slice(classId.length + 1);
+  return /^[A-Za-z0-9_-]+\.pdf$/.test(namaFail);
 }
 
 /** Satu hasil untukSetiap: nilai fn atau ralat yang ditangkap. */
