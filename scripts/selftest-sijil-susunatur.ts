@@ -6,7 +6,8 @@
  *
  * Mod full_background diuji dengan latar PNG sintetik 1x1: teks lalai
  * (tajuk, program, tarikh, pengeluar) TIDAK boleh muncul manakala nama
- * dan (pilihan) QR dan kod sijil muncul pada kedudukan pecahan.
+ * dan (pilihan) QR muncul pada kedudukan pecahan. KZ-009: kod sijil
+ * TIDAK lagi dicetak pada kedua-dua mod (QR sahaja).
  */
 import { janaPdfSijil, type SusunAturSijil } from '../src/lib/sijil/janaPdf';
 import {
@@ -167,11 +168,12 @@ async function main() {
   semak('16-standard-tajuk', teksStd.includes(hexTeks('Sijil Penyertaan'))
     && teksStd.includes(hexTeks('Certificate of Participation')),
     'mod standard masih melukis tajuk dwibahasa lalai');
+  // KZ-009: baris kod sijil tidak lagi dicetak (QR sahaja).
   semak('17-standard-semua',
     teksStd.includes(hexTeks('Aisyah Binti Rahman'))
     && teksStd.includes(hexTeks('Kelas Sains'))
-    && teksStd.includes(hexTeks('Certificate code: AB3CD4EF5G')),
-    'mod standard masih melukis nama, program dan baris kod');
+    && !teksStd.includes(hexTeks('Certificate code: AB3CD4EF5G')),
+    'mod standard masih melukis nama dan program, tanpa baris kod');
 
   // ------------------------------------------------------------------
   // 18-21: full_background tidak melukis teks lalai
@@ -197,7 +199,9 @@ async function main() {
   // SMask), jadi bandingan delta, bukan nombor mutlak.
   semak('22-latqr-imej', kiraImej(fb) - kiraImej(fbTanpa) === 1 && kiraImej(fb) >= 2,
     `QR dilukis: tepat satu objek imej tambahan (${kiraImej(fbTanpa)} -> ${kiraImej(fb)})`);
-  semak('23-kod-ada', fb.includes(hexTeks('CONTOH0000')), 'kod sijil ADA di bawah QR');
+  // KZ-009: kod sijil tidak lagi dicetak walaupun layout (data lama)
+  // membawa kedudukan code; QR sahaja yang membawa URL pengesahan.
+  semak('23-kod-tiada', !fb.includes(hexTeks('CONTOH0000')), 'kod sijil TIADA walaupun layout ada code');
   semak('24-tera', fb.includes(hexTeks('Dijana dengan Kuizen')), 'tera dihormati bila tera=true');
   semak('25-qr-false', kiraImej(fbTanpa) >= 2 && kiraImej(fbTanpa) < kiraImej(fb),
     `qr:false -> latar tetap dilukis, QR tidak (${kiraImej(fbTanpa)} objek)`);
@@ -387,11 +391,11 @@ async function main() {
     teksStdKosong.includes(hexTeks('Sijil Penyertaan'))
       && teksStdKosong.includes(hexTeks('Aisyah Binti Rahman'))
       && teksStdKosong.includes(hexTeks('Kelas Sains'))
-      && teksStdKosong.includes(hexTeks('Certificate code: AB3CD4EF5G'))
+      && !teksStdKosong.includes(hexTeks('Certificate code: AB3CD4EF5G'))
       && !teksStdKosong.includes(hexTeks('Bengkel'))
       && !teksStdKosong.includes(hexTeks('Dewan Kuliah'))
       && !teksStdKosong.includes(hexTeks('Pensyarah Kanan')),
-    'mod standard tanpa nilai medan: tiada kursus/butiran/penandatangan dicetak');
+    'mod standard tanpa nilai medan: tiada kursus/butiran/penandatangan dan tiada baris kod (KZ-009)');
 
   // Teks terlalu panjang untuk maxWidth: saiz turun hingga minimum 8
   // kemudian dipangkas dengan elipsis.

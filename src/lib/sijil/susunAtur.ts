@@ -59,6 +59,12 @@ export type SusunAturSijil = {
   mode?: 'standard' | 'full_background';
   name?: SusunAturNama;
   qr?: SusunAturQr | false;
+  /**
+   * Kedudukan kod sijil. KZ-009: kunci ini MASIH diterima dalam
+   * normalisasi supaya layout lama (data sedia ada dalam pangkalan data)
+   * tidak dibuang atau berubah nilai bila disimpan semula, tetapi kod
+   * sijil tidak lagi dicetak pada PDF: QR sahaja. Jangan pecahkan jenis.
+   */
   code?: SusunAturKod | false;
   /** Kursus (baris teks, bentuk sama seperti name) (V2-016b). */
   course?: SusunAturNama | false;
@@ -166,6 +172,8 @@ export function normaliseSusunAtur(input: unknown): SusunAturSijil {
     }
   }
 
+  // KZ-009: kunci code masih dinormalkan (data lama) tetapi janaPdf
+  // tidak lagi menggunakannya; kod sijil tidak dicetak pada PDF.
   if (s.code === false) {
     out.code = false;
   } else if (typeof s.code === 'object' && s.code !== null && !Array.isArray(s.code)) {

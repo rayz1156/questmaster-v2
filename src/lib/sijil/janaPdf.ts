@@ -142,13 +142,15 @@ function hexRgb(h: string): ReturnType<typeof rgb> {
 /**
  * Jana PDF sijil A4 landskap dan pulangkan bait dokumen.
  * Templat lalai: sempadan berganda violet/indigo, tajuk dwibahasa,
- * nama besar di tengah, program, tarikh, pengeluar, kod sijil, URL
- * pengesahan dan kod QR. `tera` menambah teks kecil "Dijana dengan
+ * nama besar di tengah, program, tarikh, pengeluar dan kod QR.
+ * KZ-009: kod sijil dan URL pengesahan TIDAK lagi dicetak sebagai teks;
+ * QR sahaja yang membawa URL. `kod` dan `urlSah` kekal sebagai parameter
+ * (QR memerlukan `urlSah`). `tera` menambah teks kecil "Dijana dengan
  * Kuizen" di bawah.
  */
 export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
   const {
-    nama, program, tarikh, pengeluar, kod, urlSah,
+    nama, program, tarikh, pengeluar, urlSah,
     latar, logo, tera, layout = {},
   } = opsi;
 
@@ -221,7 +223,8 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
   // Mod latar reka bentuk penuh (V2-015): latar sudah dilukis penuh di
   // atas. JANGAN lukis sempadan, logo, tajuk, program, tarikh atau
   // pengeluar; reka bentuk sijil (Canva) sudah mengandungi semuanya.
-  // Lukis nama, QR dan kod sijil sahaja pada kedudukan yang diberikan.
+  // Lukis nama, medan isian dan QR sahaja pada kedudukan yang diberikan
+  // (KZ-009: kod sijil tidak lagi dicetak sebagai teks).
   if (susun.mode === 'full_background') {
     const nm = susun.name ?? {
       x: 0.5, y: 0.5, maxWidth: 0.8, size: 40,
@@ -278,6 +281,7 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
 
     // Kod QR; saiz ialah pecahan LEBAR halaman, y penjuru kiri atas dari
     // atas halaman. qr: false bermakna TIADA QR dilukis.
+    // KZ-009: kod sijil tidak lagi dicetak sebagai teks; QR sahaja.
     const QR_LALAI = { x: 0.815, y: 0.75, size: 0.08 };
     const qrSusun = susun.qr === false ? null : (susun.qr ?? QR_LALAI);
     if (qrSusun) {
@@ -289,31 +293,6 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
         y: A4_H - qrSusun.y * A4_H - qrLebar,
         width: qrLebar,
         height: qrLebar,
-      });
-    }
-
-    // Kod sijil; lalai di bawah QR (garis dasar), saiz 8, tengah.
-    if (susun.code !== false) {
-      // QR rujukan untuk kedudukan lalai kod: QR sebenar jika ada, jika
-      // tidak kedudukan QR lalai (kod tetap muncul di penjuru kanan bawah).
-      const rujukQr = qrSusun ?? QR_LALAI;
-      const cd = susun.code ?? {
-        x: rujukQr.x + rujukQr.size / 2,
-        y: rujukQr.y + (rujukQr.size * A4_W) / A4_H + 0.022,
-        size: 8,
-        color: WARNA_LALAI,
-        align: 'center' as const,
-      };
-      const lebarKod = fonTajuk.widthOfTextAtSize(kod, cd.size);
-      let xKod = cd.x * A4_W;
-      if (cd.align === 'center') xKod -= lebarKod / 2;
-      if (cd.align === 'right') xKod -= lebarKod;
-      page.drawText(kod, {
-        x: xKod,
-        y: A4_H - cd.y * A4_H,
-        size: cd.size,
-        font: fonTajuk,
-        color: hexRgb(cd.color),
       });
     }
 
@@ -386,9 +365,8 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
   tengah(program, fonTajuk, 16, yProg);
   tengah(`Completed on ${tarikh}`, fonTajuk, 11, yProg - 22);
 
-  // Kod sijil dan URL pengesahan di bawah
-  tengah(`Certificate code: ${kod}`, fonTajuk, 11, 86);
-  tengah(urlSah, fonTajuk, 10, 70);
+  // KZ-009: kod sijil dan URL pengesahan tidak lagi dicetak sebagai teks
+  // (Boss mahu QR sahaja); pengesahan dibuat melalui kod QR di bawah.
 
   // Pengeluar, kiri bawah
   page.drawText(pengeluar, { x: 56, y: 60, size: 11, font: fonBadan });
