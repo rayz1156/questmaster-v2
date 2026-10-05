@@ -6,6 +6,10 @@
  * Bahagian:
  *   - Senarai templat dan dialog cipta dengan tiga tab (V2-016a): galeri
  *     Kuizen, Templat saya dan Blank (aliran lama).
+ *   - Templat AKTIF kelas (KZ-009): lencana "Active", butang Set as active
+ *     (RPC qm_set_active_certificate_template), templat aktif dipilih
+ *     secara lalai; latar baharu pada templat standard menghidupkan
+ *     Complete design secara automatik.
  *   - Menu templat: "Copy to another class" dan "Save to My templates"
  *     (V2-016a; pelan Percuma disembunyi keupayaan dengan tooltip).
  *   - Panel "Certificate details" setiap templat (V2-016b): kursus, tarikh,
@@ -49,6 +53,9 @@ type Templat = {
   fields: Record<string, unknown> | null;
   signature_path: string | null;
   criteria: { type: string; hunt_id?: string; quiz_id?: string; min_score?: number };
+  // KZ-009: templat aktif kelas (satu sahaja per kelas); dipilih secara
+  // lalai dan ditukar melalui RPC qm_set_active_certificate_template.
+  is_active: boolean;
 };
 
 type PratontonBaris = {
@@ -181,6 +188,8 @@ export default function CertificatesPage() {
 
   // Pengeluaran: templat dipilih dan jadual kelayakan.
   const [pilihTemplat, setPilihTemplat] = useState("");
+  // KZ-009: butang Set as active yang sedang diproses (id templat).
+  const [aktifBusy, setAktifBusy] = useState<string | null>(null);
   const [layak, setLayak] = useState<PratontonBaris[]>([]);
   const [tick, setTick] = useState<Record<string, boolean>>({});
   const [sedangHantar, setSedangHantar] = useState(false);
@@ -189,7 +198,7 @@ export default function CertificatesPage() {
     const [{ data: t }, { data: c }, { data: h }, { data: q }] = await Promise.all([
       supabase
         .from("qm_certificate_templates")
-        .select("id, title, background_path, logo_path, layout, fields, signature_path, criteria")
+        .select("id, title, background_path, logo_path, layout, fields, signature_path, criteria, is_active")
         .eq("class_id", classId)
         .order("created_at", { ascending: true }),
       supabase
@@ -205,7 +214,12 @@ export default function CertificatesPage() {
     setSijil((c as Sijil[]) ?? []);
     setHunts((h as Pilihan[]) ?? []);
     setKuiz((q as Pilihan[]) ?? []);
-    if (!pilihTemplat && senarai.length) setPilihTemplat(senarai[0].id);
+    // KZ-009: templat AKTIF dipilih secara lalai (templat pertama jika
+    // kelas tiada templat aktif), bukan senarai[0] buta.
+    if (!pilihTemplat && senarai.length) {
+      const aktif = senarai.find((x) => x.is_active);
+      setPilihTemplat((aktif ?? senarai[0]).id);
+    }
     // Dipulangkan supaya pemanggil boleh mencari templat baharu yang
     // dimuat semula (layout dan background_path terkini).
     return senarai;
@@ -388,7 +402,7 @@ export default function CertificatesPage() {
     await muatSemula();
   };
 
-  const muatNaikAset = async (templateId: string, jenisAset: "background" | "logo", fail: File | null) => {
+  const muatNaikAset = async (t: Templat, jenisAset: "background" | "logo", fail: File | null) => {
     if (!fail) return;
     if (!fail.type.startsWith("image/")) {
       setMsg("Only image files are allowed.");
@@ -406,7 +420,7 @@ export default function CertificatesPage() {
       setMsg(error.message);
       return;
     }
-    const body: Record<string, unknown> = { template_id: templateId };
+    const body: Record<string, unknown> = { template_id: t.id };
     body[jenisAset === "background" ? "background_path" : "logo_path"] = laluan;
     const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
       method: "PATCH",
@@ -419,6 +433,16 @@ export default function CertificatesPage() {
       setMsg(j.error ?? "Could not attach the image.");
     } else {
       setMsg(null);
+      // KZ-009: latar dimuat naik pada templat mod standard menghidupkan
+      // "Complete design" secara automatik supaya sempadan dan tajuk
+      // lalai tidak bertindih dengan latar reka bentuk lengkap; Boss
+      // masih boleh nyahtanda suis selepas ini.
+      if (jenisAset === "background" && (t.layout?.mode as string) !== "full_background") {
+        const berjaya = await togolMod(t, true);
+        if (berjaya) {
+          setMsg('Background added. "Complete design" is on, so only the name, details, signature and QR are printed on top.');
+        }
+      }
     }
     await muatSemula();
   };
@@ -426,9 +450,11 @@ export default function CertificatesPage() {
   /**
    * Suis "latar ialah reka bentuk penuh": tetapkan mode layout templat
    * (V2-015) sambil mengekalkan kedudukan nama, QR dan kod yang sudah
-   * disimpan. Route PATCH yang menormalkan layout.
+   * disimpan. Route PATCH yang menormalkan layout. KZ-009: memulangkan
+   * berjaya/gagal supaya pemanggil (muatNaikAset) tahu bila mesej
+   * "Background added" wajar dipapar.
    */
-  const togolMod = async (t: Templat, penuh: boolean) => {
+  const togolMod = async (t: Templat, penuh: boolean): Promise<boolean> => {
     const susun = { ...normaliseSusunAtur(t.layout), mode: penuh ? ("full_background" as const) : ("standard" as const) };
     const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
       method: "PATCH",
@@ -438,10 +464,36 @@ export default function CertificatesPage() {
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
       setMsg(j.error ?? "Could not save the mode.");
-      return;
+      return false;
     }
     setMsg(null);
     await muatSemula();
+    return true;
+  };
+
+  /**
+   * KZ-009: tetapkan templat ini sebagai templat AKTIF kelas melalui RPC
+   * qm_set_active_certificate_template (menukar is_active secara atomik
+   * di pangkalan data; klien tidak boleh menulis lajur itu terus).
+   * Selepas muat semula, templat itu menjadi pilihan bahagian Issue.
+   */
+  const tetapAktif = async (t: Templat) => {
+    if (aktifBusy) return;
+    setAktifBusy(t.id);
+    try {
+      const { error } = await supabase.rpc("qm_set_active_certificate_template", {
+        p_template: t.id,
+      });
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
+      await muatSemula();
+      setPilihTemplat(t.id);
+      setMsg(`"${t.title}" is now the active certificate.`);
+    } finally {
+      setAktifBusy(null);
+    }
   };
 
   const pratontonPdf = async () => {
@@ -1042,7 +1094,15 @@ export default function CertificatesPage() {
                 <div className="rounded-xl border border-hairline bg-white p-4 flex items-start justify-between gap-4 flex-wrap">
                 <LakaranLatar classId={classId} t={t} onBuka={setEditor} />
                 <div className="min-w-0">
-                  <div className="font-semibold">{t.title}</div>
+                  <div className="font-semibold">
+                    {t.title}
+                    {/* KZ-009: lencana pil violet pada templat aktif kelas. */}
+                    {t.is_active && (
+                      <span className="ml-2 align-middle rounded-full bg-violet-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
+                        Active
+                      </span>
+                    )}
+                  </div>
                   <div className="text-sm text-slate-500">
                     {t.criteria?.type === "all_members" && "All members"}
                     {t.criteria?.type === "hunt_completed" && "Completed a specific activity"}
@@ -1051,13 +1111,25 @@ export default function CertificatesPage() {
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
+                  {/* KZ-009: tukar templat aktif melalui RPC; tiada pada
+                      templat yang sudah aktif (ia memakai lencana). */}
+                  {!t.is_active && (
+                    <button
+                      className="btn-quiet"
+                      disabled={aktifBusy === t.id}
+                      title="Use this template by default when opening this page"
+                      onClick={() => tetapAktif(t)}
+                    >
+                      Set as active
+                    </button>
+                  )}
                   <label className={`btn-quiet ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? "Upload background image" : "Available on Pro"}>
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
                       disabled={!pro}
-                      onChange={(e) => muatNaikAset(t.id, "background", e.target.files?.[0] ?? null)}
+                      onChange={(e) => muatNaikAset(t, "background", e.target.files?.[0] ?? null)}
                     />
                     Background {pro ? "" : "(Pro)"}
                   </label>
@@ -1067,7 +1139,7 @@ export default function CertificatesPage() {
                       accept="image/*"
                       className="hidden"
                       disabled={!pro}
-                      onChange={(e) => muatNaikAset(t.id, "logo", e.target.files?.[0] ?? null)}
+                      onChange={(e) => muatNaikAset(t, "logo", e.target.files?.[0] ?? null)}
                     />
                     Logo {pro ? "" : "(Pro)"}
                   </label>
@@ -1302,9 +1374,14 @@ export default function CertificatesPage() {
               <label className="block text-sm font-medium mb-1">Template</label>
               <select className="input" value={pilihTemplat} onChange={(e) => setPilihTemplat(e.target.value)}>
                 {templat.map((t) => (
-                  <option key={t.id} value={t.id}>{t.title}</option>
+                  // KZ-009: label templat aktif berakhir " (active)".
+                  <option key={t.id} value={t.id}>{t.title}{t.is_active ? " (active)" : ""}</option>
                 ))}
               </select>
+              {/* KZ-009: jelaskan beza pilihan semasa dengan templat aktif. */}
+              <p className="mt-1 text-xs text-slate-500">
+                Issuing uses the selected template. The active template is selected by default.
+              </p>
             </div>
             <button className="btn-primary" onClick={bacaKelayakan} disabled={sedangHantar || !pilihTemplat}>
               <RefreshCw className="w-4 h-4" /> Check eligibility

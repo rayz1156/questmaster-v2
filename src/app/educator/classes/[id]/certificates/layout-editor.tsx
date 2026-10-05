@@ -2,10 +2,14 @@
 
 /**
  * Editor susun atur sijil (V2-015): pratonton latar bertandatangan dalam
- * bekas nisbah A4 landskap dengan kotak nama "Participant Name", QR dan
- * kod sijil yang boleh diseret dengan tetikus atau sentuhan. Semua
- * kedudukan disimpan sebagai pecahan halaman 0 hingga 1, sama seperti
- * layout yang dibaca janaPdf.ts.
+ * bekas nisbah A4 landskap dengan kotak nama "Participant Name", QR,
+ * kursus, butiran, penandatangan dan tandatangan yang boleh diseret
+ * dengan tetikus atau sentuhan. Semua kedudukan disimpan sebagai pecahan
+ * halaman 0 hingga 1, sama seperti layout yang dibaca janaPdf.ts.
+ *
+ * KZ-009: penanda seret kod sijil dibuang. Kod sijil tidak lagi dicetak
+ * pada PDF (QR sahaja); kedudukan code lama masih disimpan semula supaya
+ * layout data lama tidak berubah nilai.
  *
  * "Save layout" menulis PATCH /certificates/templates (route yang
  * menormalkan layout); "Preview PDF" memanggil laluan sample dengan
@@ -99,7 +103,8 @@ function bacaSusun(layout: Record<string, unknown> | null | undefined): Susun {
   };
 }
 
-type SasaranSeret = "name" | "qr" | "code" | "course" | "details" | "signer" | "signature";
+// KZ-009: tiada lagi sasaran seret "code"; kod sijil tidak dicetak pada PDF.
+type SasaranSeret = "name" | "qr" | "course" | "details" | "signer" | "signature";
 
 export default function LayoutEditor({
   classId,
@@ -201,11 +206,10 @@ export default function LayoutEditor({
     const kotak =
       sasaran === "name" ? susun.name
         : sasaran === "qr" ? (susun.qr || QR_LALAI)
-          : sasaran === "code" ? (susun.code || KOD_LALAI)
-            : sasaran === "course" ? (susun.course || KURSUS_LALAI)
-              : sasaran === "details" ? (susun.details || BUTIRAN_LALAI)
-                : sasaran === "signer" ? (susun.signer || PENA_LALAI)
-                  : (susun.signature || SIG_LALAI);
+          : sasaran === "course" ? (susun.course || KURSUS_LALAI)
+            : sasaran === "details" ? (susun.details || BUTIRAN_LALAI)
+              : sasaran === "signer" ? (susun.signer || PENA_LALAI)
+                : (susun.signature || SIG_LALAI);
     seretRef.current = {
       sasaran,
       startX: e.clientX,
@@ -229,9 +233,6 @@ export default function LayoutEditor({
       if (s.sasaran === "name") return { ...p, name: { ...p.name, x, y } };
       if (s.sasaran === "qr") {
         return { ...p, qr: { ...(p.qr || QR_LALAI), x, y } };
-      }
-      if (s.sasaran === "code") {
-        return { ...p, code: { ...(p.code || KOD_LALAI), x, y } };
       }
       if (s.sasaran === "course") {
         return { ...p, course: { ...(p.course || KURSUS_LALAI), x, y } };
@@ -319,7 +320,7 @@ export default function LayoutEditor({
         </button>
       </div>
       <p className="text-sm text-slate-500">
-        Drag the name, QR, code, course, date and location, signer and signature boxes onto the
+        Drag the name, QR, course, date and location, signer and signature boxes onto the
         background. Positions are saved as page fractions. Boxes with empty fields show sample
         values; empty fields are never printed on the certificate.
       </p>
@@ -386,33 +387,9 @@ export default function LayoutEditor({
             </div>
           )}
 
-          {/* Kotak kod sijil */}
-          {susun.code !== false && (
-            <div
-              role="button"
-              tabIndex={0}
-              onPointerDown={mulaSeret("code")}
-              onPointerMove={gerakSeret}
-              onPointerUp={tamatSeret}
-              onPointerCancel={tamatSeret}
-              className="absolute cursor-move whitespace-nowrap"
-              style={{
-                left: `${susun.code.x * 100}%`,
-                top: `${susun.code.y * 100}%`,
-                fontSize: `${lebar ? (susun.code.size / A4_W) * lebar : 8}px`,
-                color: susun.code.color,
-                transform:
-                  susun.code.align === "center"
-                    ? "translate(-50%, -80%)"
-                    : susun.code.align === "right"
-                      ? "translate(-100%, -80%)"
-                      : "translateY(-80%)",
-                touchAction: "none",
-              }}
-            >
-              CONTOH0000
-            </div>
-          )}
+          {/* KZ-009: kotak seret kod sijil dibuang; kod tidak dicetak pada
+              PDF (QR sahaja). Kedudukan code lama kekal dalam layout yang
+              disimpan supaya data sedia ada tidak berubah. */}
 
           {/* Kotak kursus (V2-016b): teks sebenar atau nilai contoh */}
           {susun.course !== false && (
@@ -599,14 +576,8 @@ export default function LayoutEditor({
             />
             Print QR code
           </label>
-          <label className="flex items-center gap-2">
-            <input
-              type="checkbox"
-              checked={susun.code !== false}
-              onChange={(e) => setSusun((p) => ({ ...p, code: e.target.checked ? { ...KOD_LALAI } : false }))}
-            />
-            Print certificate code
-          </label>
+          {/* KZ-009: kotak semak "Print certificate code" dibuang; kod
+              sijil tidak dicetak lagi (QR sahaja). */}
           <label className="flex items-center gap-2">
             <input
               type="checkbox"
