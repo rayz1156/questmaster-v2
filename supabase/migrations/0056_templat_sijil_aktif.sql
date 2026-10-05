@@ -74,10 +74,19 @@ begin
   end if;
   -- Buka pagar is_active untuk kenyataan ini sahaja (transaction-local).
   perform set_config('qm.set_active', 'on', true);
+  -- Pembetulan CTO (ujian SQL sebenar): indeks unik separa disemak baris
+  -- demi baris, jadi satu UPDATE yang menukar dua baris boleh melanggar
+  -- indeks seketika. Nyahaktif templat lama dahulu, kemudian aktifkan
+  -- sasaran. Kedua-dua kenyataan dalam transaksi fungsi yang sama: atomik.
   update public.qm_certificate_templates
-     set is_active = (id = p_template)
+     set is_active = false
    where class_id = v_class
-     and (is_active or id = p_template);
+     and is_active
+     and id <> p_template;
+  update public.qm_certificate_templates
+     set is_active = true
+   where id = p_template
+     and not is_active;
 end;
 $fn$;
 
