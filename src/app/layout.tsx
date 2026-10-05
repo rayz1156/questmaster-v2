@@ -4,6 +4,7 @@ import "./globals.css";
 import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
+import BicarraChat from "@/components/BicarraChat";
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 
 // Inter: satu muka taip untuk seluruh aplikasi. Berat 400 hingga 700 sahaja;
@@ -86,6 +87,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <AnalyticsTracker />
+        <BicarraChat />
         <RegisterSW />
       </body>
     </html>
