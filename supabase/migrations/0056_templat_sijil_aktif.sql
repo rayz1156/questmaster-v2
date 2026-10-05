@@ -63,6 +63,10 @@ as $fn$
 declare
   v_class uuid;
 begin
+  -- CTO (kzsec S2): pertahanan berlapis; panggilan tanpa sesi ditolak awal.
+  if auth.uid() is null then
+    raise exception 'Not authenticated.';
+  end if;
   select t.class_id into v_class
     from public.qm_certificate_templates t
    where t.id = p_template;
@@ -156,5 +160,30 @@ drop trigger if exists tr_qm_cert_template_active_guard on public.qm_certificate
 create trigger tr_qm_cert_template_active_guard
   before update on public.qm_certificate_templates
   for each row execute function public.qm_certificate_template_active_guard();
+
+-- ---------------------------------------------------------------------
+-- 6. CTO (kzsec S1): pagar INSERT. Nilai is_active daripada klien
+--    diabaikan (dipaksa false); pencetus after insert di atas yang
+--    mengaktifkan templat pertama kelas. Bukan ralat, supaya laluan
+--    salin/pustaka sedia ada tidak gagal.
+-- ---------------------------------------------------------------------
+create or replace function public.qm_certificate_template_insert_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+begin
+  if new.is_active and current_setting('qm.set_active', true) is distinct from 'on' then
+    new.is_active := false;
+  end if;
+  return new;
+end;
+$fn$;
+
+drop trigger if exists tr_qm_cert_template_insert_guard on public.qm_certificate_templates;
+create trigger tr_qm_cert_template_insert_guard
+  before insert on public.qm_certificate_templates
+  for each row execute function public.qm_certificate_template_insert_guard();
 
 notify pgrst, 'reload schema';
