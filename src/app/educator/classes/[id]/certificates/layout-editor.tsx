@@ -114,6 +114,7 @@ export default function LayoutEditor({
   backgroundPath,
   medan,
   title,
+  namaKelas,
   latarUrl,
   onSimpan,
   onPratonton,
@@ -131,6 +132,9 @@ export default function LayoutEditor({
   /** Nama templat dipaparkan pada tajuk editor (pilihan; halaman admin
    *  tidak menghantarnya). */
   title?: string;
+  /** KZ-010: nama kelas sebagai nilai contoh kotak kursus bila medan
+   *  Course kosong (pilihan; halaman admin tidak menghantarnya). */
+  namaKelas?: string;
   /** URL latar sedia ditandatangan (guna halaman admin); lalai: route kelas. */
   latarUrl?: string | null;
   /** Simpan melalui pemanggil luar (guna halaman admin); lalai: PATCH kelas. */
@@ -321,7 +325,8 @@ export default function LayoutEditor({
       </div>
       <p className="text-sm text-slate-500">
         Drag the name, QR, course, date and location, signer and signature boxes onto the
-        background. Positions are saved as page fractions. Boxes with empty fields show sample
+        background. The course uses the class name when the Course field is empty. Positions
+        are saved as page fractions. Boxes with empty fields show sample
         values; empty fields are never printed on the certificate.
       </p>
       {msg && <div className="text-sm text-red-600">{msg}</div>}
@@ -417,7 +422,7 @@ export default function LayoutEditor({
               }}
               title="Course or programme printed on the certificate"
             >
-              {medanSijil.course || "Course / programme"}
+              {medanSijil.course || namaKelas || "Course / programme"}
             </div>
           )}
 

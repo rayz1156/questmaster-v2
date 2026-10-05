@@ -249,9 +249,12 @@ export async function janaPdfSijil(opsi: OpsiSijil): Promise<Uint8Array> {
     // Medan isian (V2-016b): cetak kursus, baris butiran (tarikh | tempat),
     // blok penandatangan dan imej tandatangan HANYA bila nilai dan
     // kedudukan ada; layout false mematikan cetakan walaupun nilai ada.
-    if (medan.course && susun.course) {
+    // KZ-010: kursus = medan Course jika ada, jika tidak nama kelas
+    // (dihantar sebagai `program` daripada program_snapshot sijil).
+    const teksKursus = medan.course || program;
+    if (teksKursus && susun.course) {
       lukisMedanTeks(
-        medan.course,
+        teksKursus,
         susun.course,
         susun.course.weight === 'regular' ? fonBadan : fonTajuk,
       );

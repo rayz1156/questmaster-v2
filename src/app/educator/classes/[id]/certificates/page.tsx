@@ -1233,8 +1233,10 @@ export default function CertificatesPage() {
                           value={borangMedan.course ?? ""}
                           maxLength={160}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, course: e.target.value }))}
-                          placeholder="Bengkel Robotik 2026"
+                          placeholder={klass?.name ?? "Bengkel Robotik 2026"}
                         />
+                        {/* KZ-010: medan kosong guna nama kelas pada sijil. */}
+                        <p className="text-xs text-slate-500 mt-1">Leave empty to use the class name.</p>
                       </div>
                       <div>
                         <label className="block text-sm font-medium mb-1">Location</label>
@@ -1357,6 +1359,7 @@ export default function CertificatesPage() {
                 layout={t.layout}
                 backgroundPath={t.background_path ?? ""}
                 medan={t.fields}
+                namaKelas={klass?.name}
                 onClose={() => setEditor(null)}
                 onSaved={async () => {
                   await muatSemula();
