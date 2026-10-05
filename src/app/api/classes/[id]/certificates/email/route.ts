@@ -109,7 +109,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const smtpUser = process.env.SMTP_USER || process.env.BREVO_SMTP_USER;
   const smtpPass = process.env.SMTP_PASS || process.env.BREVO_SMTP_PASS;
   const fromEmail =
-    process.env.SMTP_FROM_EMAIL || process.env.BREVO_FROM_EMAIL || 'noreply@airizintelligence.com';
+    process.env.SMTP_FROM_EMAIL || process.env.BREVO_FROM_EMAIL || 'noreply@veltrix.technology';
   const fromName = process.env.SMTP_FROM_NAME || process.env.BREVO_FROM_NAME || 'Kuizen';
   if (!host || !smtpUser || !smtpPass) {
     return NextResponse.json({ error: 'SMTP not configured' }, { status: 500 });
