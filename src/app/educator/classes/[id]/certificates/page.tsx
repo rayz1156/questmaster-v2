@@ -38,7 +38,7 @@ import { supabase } from "@/lib/supabase";
 import { authHeader } from "@/lib/peer-client";
 import { pelanSaya } from "@/lib/pelan";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
-import { tickLayak } from "@/lib/sijil/ui";
+import { idBolehPilih, pecahKelompok, tickLayak } from "@/lib/sijil/ui";
 import { normaliseSusunAtur } from "@/lib/sijil/susunAtur";
 import { normaliseMedan, type MedanSijil } from "@/lib/sijil/medan";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
@@ -193,6 +193,31 @@ export default function CertificatesPage() {
   const [layak, setLayak] = useState<PratontonBaris[]>([]);
   const [tick, setTick] = useState<Record<string, boolean>>({});
   const [sedangHantar, setSedangHantar] = useState(false);
+  // KZ-011: pengeluaran berkelompok (10 peserta setiap permintaan).
+  // issueBusy mengunci butang issue; kemajuan dipapar pada butang.
+  const [issueBusy, setIssueBusy] = useState(false);
+  const [kemajuan, setKemajuan] = useState<{ semasa: number; jumlah: number } | null>(null);
+  // KZ-011: ref kotak semak kepala untuk keadaan indeterminate.
+  const kepalaTickRef = useRef<HTMLInputElement>(null);
+
+  // KZ-011: baris jadual kelayakan yang boleh dipilih, keadaan kotak kepala
+  // dan ringkasan kecil di atas jadual.
+  const barisBolehPilih = layak.filter(idBolehPilih);
+  const semuaBolehPilihTicked =
+    barisBolehPilih.length > 0 &&
+    barisBolehPilih.every((r) => tick[r.participant_id] === true);
+  const bilanganLayak = layak.filter((r) => r.eligible).length;
+  const bilanganSudahDikeluarkan = layak.filter((r) => r.already_issued).length;
+  const bilanganTidakLayak = layak.length - bilanganLayak;
+
+  // KZ-011: kotak kepala indeterminate bila sebahagian sahaja ditanda.
+  useEffect(() => {
+    if (kepalaTickRef.current) {
+      kepalaTickRef.current.indeterminate =
+        barisBolehPilih.some((r) => tick[r.participant_id] === true) &&
+        !semuaBolehPilihTicked;
+    }
+  }, [barisBolehPilih, layak, tick, semuaBolehPilihTicked]);
 
   const muatSemula = useCallback(async () => {
     const [{ data: t }, { data: c }, { data: h }, { data: q }] = await Promise.all([
@@ -540,27 +565,51 @@ export default function CertificatesPage() {
       confirmLabel: "Issue",
     });
     if (!ok) return;
-    const res = await api(`/api/classes/${classId}/certificates/issue`, {
-      template_id: pilihTemplat,
-      participant_ids: ids,
-      confirm: true,
-    });
-    const j = await res.json().catch(() => ({}));
-    if (!res.ok) {
-      setMsg(j.error ?? "Could not issue certificates.");
-      return;
+    // KZ-011: pengeluaran berkelompok, 10 peserta setiap permintaan, berurutan.
+    // Setiap kelompok memanggil laluan issue sedia ada dengan confirm: true;
+    // PDF berat tidak lagi dijana semua sekali dalam satu permintaan.
+    setIssueBusy(true);
+    setKemajuan({ semasa: 0, jumlah: ids.length });
+    let jumlahDikeluarkan = 0;
+    let ralatKeluarkan: string | null = null;
+    try {
+      const kelompok = pecahKelompok(ids, 10);
+      for (let i = 0; i < kelompok.length; i++) {
+        // Kemajuan: bilangan peserta yang terhantar setelah kelompok ini tamat.
+        setKemajuan({ semasa: Math.min((i + 1) * 10, ids.length), jumlah: ids.length });
+        const res = await api(`/api/classes/${classId}/certificates/issue`, {
+          template_id: pilihTemplat,
+          participant_ids: kelompok[i],
+          confirm: true,
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          ralatKeluarkan = j.error ?? "Could not issue certificates.";
+          break;
+        }
+        const bilangan = typeof (j as { issued?: unknown }).issued === "number"
+          ? (j as { issued: number }).issued
+          : 0;
+        jumlahDikeluarkan += bilangan;
+      }
+    } finally {
+      setIssueBusy(false);
+      setKemajuan(null);
     }
     // KZ-007: sentiasa papar mesej selepas issue supaya pendidik tahu
-    // apa yang berlaku (dulu setMsg(null) memadam mesej dan issue 0
-    // kelihatan seperti tiada apa-apa berlaku).
-    const bilangan = typeof (j as { issued?: unknown }).issued === "number"
-      ? (j as { issued: number }).issued
-      : 0;
-    setMsg(
-      bilangan === 0
-        ? "No new certificates were issued. Everyone selected already has a certificate or has no name."
-        : `Issued ${bilangan} certificate${bilangan === 1 ? "" : "s"}.`,
-    );
+    // apa yang berlaku. KZ-011: jika satu kelompok gagal, mesej membawa
+    // bilangan yang sudah dikeluarkan sebelum berhenti.
+    if (ralatKeluarkan) {
+      setMsg(
+        `Issued ${jumlahDikeluarkan} certificate${jumlahDikeluarkan === 1 ? "" : "s"} before stopping: ${ralatKeluarkan}`,
+      );
+    } else if (jumlahDikeluarkan === 0) {
+      setMsg("No new certificates were issued. Everyone selected already has a certificate or has no name.");
+    } else {
+      setMsg(`Issued ${jumlahDikeluarkan} certificate${jumlahDikeluarkan === 1 ? "" : "s"}.`);
+    }
+    // KZ-011: segar semula sekali sahaja selepas semua kelompok tamat
+    // (termasuk apabila satu kelompok gagal), bukan selepas setiap kelompok.
     await bacaKelayakan();
     await muatSemula();
   };
@@ -1411,18 +1460,65 @@ export default function CertificatesPage() {
           </div>
 
           {layak.length > 0 && (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-hairline">
-                    <th className="py-2 pr-3"></th>
-                    <th className="py-2 pr-3">Name</th>
-                    <th className="py-2 pr-3">Certificate name</th>
-                    <th className="py-2 pr-3">Eligible</th>
-                    <th className="py-2 pr-3">Reason</th>
-                    <th className="py-2 pr-3">Issued</th>
-                  </tr>
-                </thead>
+            <div>
+              {/* KZ-011: ringkasan kecil dan butang pilih semua di atas jadual. */}
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <span className="text-sm text-slate-500">
+                  {bilanganLayak} eligible, {bilanganSudahDikeluarkan} already issued, {bilanganTidakLayak} not eligible.
+                </span>
+                <button
+                  className="btn-quiet"
+                  onClick={() => {
+                    setTick((p) => {
+                      const baharu = { ...p };
+                      for (const r of barisBolehPilih) baharu[r.participant_id] = true;
+                      return baharu;
+                    });
+                  }}
+                  disabled={barisBolehPilih.length === 0 || issueBusy}
+                >
+                  Select all eligible ({barisBolehPilih.length})
+                </button>
+                <button
+                  className="btn-quiet"
+                  onClick={() => setTick({})}
+                  disabled={bilanganTick === 0 || issueBusy}
+                >
+                  Clear
+                </button>
+              </div>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm">
+                  <thead>
+                    <tr className="text-left text-slate-500 border-b border-hairline">
+                      <th className="py-2 pr-3">
+                        {/* KZ-011: pilih semua baris yang boleh dipilih
+                            (layak dan belum dikeluarkan). */}
+                        <input
+                          ref={kepalaTickRef}
+                          type="checkbox"
+                          title="Select all eligible participants"
+                          disabled={barisBolehPilih.length === 0 || issueBusy}
+                          checked={semuaBolehPilihTicked}
+                          onChange={(e) => {
+                            const pilih = e.target.checked;
+                            setTick((p) => {
+                              const baharu = { ...p };
+                              for (const r of barisBolehPilih) {
+                                baharu[r.participant_id] = pilih;
+                              }
+                              return baharu;
+                            });
+                          }}
+                        />
+                      </th>
+                      <th className="py-2 pr-3">Name</th>
+                      <th className="py-2 pr-3">Certificate name</th>
+                      <th className="py-2 pr-3">Eligible</th>
+                      <th className="py-2 pr-3">Reason</th>
+                      <th className="py-2 pr-3">Issued</th>
+                    </tr>
+                  </thead>
                 <tbody>
                   {layak.map((r) => (
                     <tr key={r.participant_id} className="border-b border-hairline">
@@ -1456,8 +1552,16 @@ export default function CertificatesPage() {
                   ))}
                 </tbody>
               </table>
-              <button className="btn-primary mt-3" onClick={keluarkan} disabled={bilanganTick === 0}>
-                <Plus className="w-4 h-4" /> Issue to {bilanganTick} participant{bilanganTick === 1 ? "" : "s"}
+              </div>
+              <button
+                className="btn-primary mt-3"
+                onClick={keluarkan}
+                disabled={bilanganTick === 0 || issueBusy}
+              >
+                <Plus className="w-4 h-4" />{" "}
+                {kemajuan
+                  ? `Issuing ${kemajuan.semasa} of ${kemajuan.jumlah}...`
+                  : `Issue to ${bilanganTick} participant${bilanganTick === 1 ? "" : "s"}`}
               </button>
             </div>
           )}

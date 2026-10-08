@@ -44,3 +44,27 @@ export function labelNamaSijil(r: BarisKelayakan): string {
   if (!r.name_confirmed) return "Waiting for name confirmation";
   return r.certificate_name ?? r.display_name;
 }
+
+/**
+ * KZ-011: baris jadual kelayakan yang boleh ditandakan untuk pengeluaran:
+ * layak DAN belum dikeluarkan. Dipakai oleh kotak semak kepala, butang
+ * "Select all eligible" dan pengiraan ringkasan kecil di atas jadual.
+ */
+export function idBolehPilih(r: BarisKelayakan): boolean {
+  return r.eligible && !r.already_issued;
+}
+
+/**
+ * KZ-011: pecahkan senarai id kepada kelompok saiz tetap untuk pengeluaran
+ * berkelompok (kelompok 10 setiap permintaan, supaya PDF berat tidak
+ * melanggar had masa Nginx). Fungsi tulen; 0 item -> [], saiz >= panjang ->
+ * satu kelompok sahaja.
+ */
+export function pecahKelompok<T>(ids: T[], saiz: number): T[][] {
+  if (saiz <= 0) return [ids];
+  const kelompok: T[][] = [];
+  for (let i = 0; i < ids.length; i += saiz) {
+    kelompok.push(ids.slice(i, i + saiz));
+  }
+  return kelompok;
+}
