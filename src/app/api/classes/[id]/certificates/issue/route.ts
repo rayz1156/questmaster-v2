@@ -20,18 +20,17 @@ import { bacaTemplatKelas, keluarkanSijil } from '@/lib/sijil/keluarkan';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+// KZ-011: had 20 seminit untuk setiap kunci, selaras dengan tiket.
+const HAD_KELAYAKAN = 20;
+const HAD_ISSUE = 20;
+// KZ-011: satu permintaan pengeluaran tidak boleh membawa lebih 50 id.
+const MAX_ID_PERMINTAAN = 50;
+
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
   const classId = params.id;
   const userId = auth.user!.id;
-
-  if (!dalamHad(`cert-issue:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
-  }
 
   const body = await req.json().catch(() => ({}));
   const templateId = typeof body.template_id === 'string' ? body.template_id : '';
@@ -41,6 +40,29 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     : null;
   if (!templateId) {
     return NextResponse.json({ error: 'template_id is required.' }, { status: 400 });
+  }
+
+  // KZ-011: kunci berasingan mengikut jenis permintaan; pratonton dan
+  // pengeluaran tidak lagi berkongsi had yang sama.
+  if (!confirm && !dalamHad(`cert-eligibility:${userId}`, HAD_KELAYAKAN)) {
+    return NextResponse.json(
+      { error: 'Too many requests. Please wait a minute and try again.' },
+      { status: 429 },
+    );
+  }
+  if (confirm) {
+    if (participantIds && participantIds.length > MAX_ID_PERMINTAAN) {
+      return NextResponse.json(
+        { error: 'Too many participants in one request.' },
+        { status: 400 },
+      );
+    }
+    if (!dalamHad(`cert-issue:${userId}`, HAD_ISSUE)) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please wait a minute and try again.' },
+        { status: 429 },
+      );
+    }
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
