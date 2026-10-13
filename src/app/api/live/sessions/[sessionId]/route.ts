@@ -116,7 +116,10 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
       .from('qm_live_players')
       .select('id, nickname, score, total_ms, joined_at, streak, best_streak, race_distance, race_rank, race_frozen_until, race_finished_at')
       .eq('session_id', params.sessionId);
-    if (plErr) return NextResponse.json({ error: plErr.message }, { status: 500 });
+    if (plErr) {
+      console.error('race host players failed', plErr.code);
+      return NextResponse.json({ error: 'Could not load the racers.' }, { status: 500 });
+    }
     const papan = susunPapan((pemainLumba || []) as unknown as Array<BarisPapanLumba & Record<string, unknown>>);
 
     let review: Record<string, unknown> | null = null;
@@ -153,7 +156,14 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
       data: {
         session: sesi,
         quiz: quiz,
-        questions: allQuestions,
+        // Kunci jawapan TIDAK dihantar dalam senarai soalan sesi lumba; ia
+        // hanya keluar melalui review.question.correct_key selepas Reveal,
+        // kerana skrin ini selalunya ditayang kepada kelas.
+        questions: allQuestions.map((q) => {
+          const { correct_key: _kunci, ...tanpaKunci } = q as Record<string, unknown>;
+          void _kunci;
+          return tanpaKunci;
+        }),
         players: papan,
         playerCount: papan.length,
         currentQuestion: null,

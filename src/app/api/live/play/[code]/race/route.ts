@@ -1,7 +1,7 @@
 /**
  * /api/live/play/[code]/race, laluan pemain Speed Race (KZ-012).
  *
- * GET  ?playerId=&playerToken=   keadaan pemain (qm_race_state) + review
+ * GET  ?playerId=  + pengepala x-player-token   keadaan pemain (qm_race_state) + review
  * POST {playerId, playerToken, questionId, choiceKey}   hantar jawapan
  *
  * Keselamatan:
@@ -75,8 +75,8 @@ async function sahkanPemain(code: string, playerId: string, playerToken: string)
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   const code = String(params.code || '').toUpperCase();
   const playerId = req.nextUrl.searchParams.get('playerId') || '';
-  const playerToken =
-    req.headers.get('x-player-token') || req.nextUrl.searchParams.get('playerToken') || '';
+  // Token hanya dalam pengepala: token dalam URL akan tercatat dalam log Nginx.
+  const playerToken = req.headers.get('x-player-token') || '';
 
   const sah = await sahkanPemain(code, playerId, playerToken);
   if (!sah.ok) return sah.response;

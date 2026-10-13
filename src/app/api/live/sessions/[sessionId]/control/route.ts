@@ -24,7 +24,8 @@ async function kemasKiniDanBalas(
         .select(LAJUR_BALAS)
         .single();
   if (upErr || !updated) {
-    return NextResponse.json({ error: upErr?.message || 'Could not update the session.' }, { status: 500 });
+    if (upErr) console.error('race control update failed', upErr.code);
+    return NextResponse.json({ error: 'Could not update the session.' }, { status: 500 });
   }
   return NextResponse.json({ data: updated });
 }
@@ -77,7 +78,10 @@ async function kawalLumba(
     return NextResponse.json({ error: 'The session is over and cannot be reset.' }, { status: 400 });
   }
   const { error: delErr } = await svc.from('qm_live_answers').delete().eq('session_id', sessionId);
-  if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+  if (delErr) {
+    console.error('race reset answers failed', delErr.code);
+    return NextResponse.json({ error: 'The race could not be reset.' }, { status: 500 });
+  }
   const { error: pErr } = await svc
     .from('qm_live_players')
     .update({
@@ -86,7 +90,10 @@ async function kawalLumba(
       race_finished_at: null, race_question_id: null, race_served_at: null, race_queue: [],
     })
     .eq('session_id', sessionId);
-  if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
+  if (pErr) {
+    console.error('race reset players failed', pErr.code);
+    return NextResponse.json({ error: 'The race could not be reset.' }, { status: 500 });
+  }
   return kemasKiniDanBalas(svc, sessionId, {
     status: 'lobby', current_index: -1, question_started_at: null,
     race_ends_at: null, race_finished: 0, review_index: -1, review_revealed: false,
