@@ -1,6 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUser } from '@/lib/supabase-route';
+import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import type { LiveSessionRow } from '@/lib/live-quiz';
+import {
+  susunPapan,
+  taburanCubaanPertama,
+  type BarisJawapanLumba,
+  type BarisPapanLumba,
+} from '@/lib/lumba-laju';
+
+/** Baris sesi hos, termasuk lajur Speed Race (KZ-012). */
+interface SesiHos extends LiveSessionRow {
+  game_mode?: string | null;
+  race_minutes?: number | null;
+  race_ends_at?: string | null;
+  race_finished?: number | null;
+  review_index?: number | null;
+  review_revealed?: boolean | null;
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,12 +37,15 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
   interface QuizRef { class_id: string; owner_id: string }
   interface ProfileRef { role: string; suspended: boolean | null }
   interface AnswerRef { choice_key: string }
+  const LAJUR_SESI =
+    'id, quiz_id, host_id, code, status, current_index, question_started_at, max_players, created_at, ended_at, ' +
+    'game_mode, race_minutes, race_ends_at, race_finished, review_index, review_revealed';
   const { data: session } = await auth.supa
     .from('qm_live_sessions')
-    .select('id, quiz_id, host_id, code, status, current_index, question_started_at, max_players, created_at, ended_at')
+    .select(LAJUR_SESI)
     .eq('id', params.sessionId)
     .maybeSingle();
-  const ses = session as LiveSessionRow | null;
+  let ses = session as unknown as SesiHos | null;
   if (!ses) return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
 
   const isHost = ses.host_id === auth.user!.id;
@@ -77,6 +96,73 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     .order('order_idx');
   if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
   const allQuestions = questions || [];
+
+  // KZ-012: sesi Speed Race mempunyai bentuk balasan sendiri.
+  if (ses.game_mode === 'race') {
+    const svc = getServiceSupabase();
+    // Tamatkan lumba bila masa habis walaupun tiada pemain sedang meninjau.
+    if (ses.status === 'asking' && ses.race_ends_at && Date.parse(ses.race_ends_at) <= Date.now()) {
+      await svc.rpc('qm_race_end', { p_session: params.sessionId });
+      const { data: semula } = await auth.supa
+        .from('qm_live_sessions')
+        .select(LAJUR_SESI)
+        .eq('id', params.sessionId)
+        .maybeSingle();
+      if (semula) ses = semula as unknown as SesiHos;
+    }
+    const sesi = ses!;
+
+    const { data: pemainLumba, error: plErr } = await auth.supa
+      .from('qm_live_players')
+      .select('id, nickname, score, total_ms, joined_at, streak, best_streak, race_distance, race_rank, race_frozen_until, race_finished_at')
+      .eq('session_id', params.sessionId);
+    if (plErr) return NextResponse.json({ error: plErr.message }, { status: 500 });
+    const papan = susunPapan((pemainLumba || []) as unknown as Array<BarisPapanLumba & Record<string, unknown>>);
+
+    let review: Record<string, unknown> | null = null;
+    const idx = typeof sesi.review_index === 'number' ? sesi.review_index : -1;
+    if (sesi.status === 'ended' && idx >= 0 && idx < allQuestions.length) {
+      const q = allQuestions[idx] as {
+        id: string; order_idx: number; prompt: string; options: { key: string; text: string }[];
+        correct_key: string; time_limit_sec: number; double_points: boolean;
+      };
+      const { data: jawapan } = await auth.supa
+        .from('qm_live_answers')
+        .select('player_id, choice_key, is_correct, attempt')
+        .eq('session_id', params.sessionId)
+        .eq('question_id', q.id);
+      const dedah = sesi.review_revealed === true;
+      review = {
+        index: idx,
+        total: allQuestions.length,
+        revealed: dedah,
+        question: {
+          id: q.id,
+          prompt: q.prompt,
+          options: q.options,
+          correct_key: dedah ? q.correct_key : null,
+        },
+        distribution: taburanCubaanPertama(
+          (jawapan || []) as BarisJawapanLumba[],
+          (q.options || []).map((o) => o.key),
+        ),
+      };
+    }
+
+    return NextResponse.json({
+      data: {
+        session: sesi,
+        quiz: quiz,
+        questions: allQuestions,
+        players: papan,
+        playerCount: papan.length,
+        currentQuestion: null,
+        distribution: null,
+        serverNow: new Date().toISOString(),
+        review,
+      },
+    });
+  }
 
   const { data: players, error: pErr } = await auth.supa
     .from('qm_live_players')

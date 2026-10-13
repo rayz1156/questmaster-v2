@@ -25,6 +25,7 @@ interface SessionRow {
   status: string;
   current_index: number;
   question_started_at: string | null;
+  game_mode?: string | null;
 }
 interface PlayerRow { id: string; score: number; }
 interface QuestionRow {
@@ -58,7 +59,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
   const { data: session } = (await supa
     .from('qm_live_sessions')
-    .select('id, quiz_id, status, current_index, question_started_at')
+    .select('id, quiz_id, status, current_index, question_started_at, game_mode')
     .eq('code', code)
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
@@ -102,6 +103,24 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
   const allQuestions = (questions || []) as QuestionRow[];
   const totalQuestions = allQuestions.length;
+
+  // KZ-012: sesi Speed Race. Klien beralih ke laluan /race sebaik melihat
+  // gameMode 'race'. Pulangkan awal tanpa myAnswer/reveal kerana pemain boleh
+  // menjawab soalan yang sama berulang kali dalam lumba.
+  if (session.game_mode === 'race') {
+    const versionLumba = createHash('sha256')
+      .update(allQuestions.map((q) => `${q.id}|${q.order_idx}`).join(';'))
+      .digest('hex')
+      .slice(0, 16);
+    return NextResponse.json({
+      fp,
+      status: session.status,
+      gameMode: 'race',
+      serverNow: new Date().toISOString(),
+      totalQuestions,
+      version: versionLumba,
+    });
+  }
   const currentQuestion =
     session.current_index >= 0 && session.current_index < totalQuestions
       ? allQuestions[session.current_index]
@@ -118,6 +137,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const payload: Record<string, unknown> = {
     fp,
     status: session.status,
+    gameMode: 'classic',
     questionIndex: session.current_index,
     totalQuestions,
     serverNow: new Date().toISOString(),

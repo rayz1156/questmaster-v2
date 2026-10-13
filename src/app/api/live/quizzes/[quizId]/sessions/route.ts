@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost, generateSessionCode } from '@/lib/live-quiz';
+import { RACE_DEFAULT_MINUTES, sahMinitLumba, sahModPermainan } from '@/lib/lumba-laju';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,6 +14,25 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   const host = await requireQuizHost(req, params.quizId);
   if (host.response || !host.quiz) {
     return host.response || NextResponse.json({ error: 'Quiz not found.' }, { status: 404 });
+  }
+
+  // KZ-012: badan pilihan { mode, raceMinutes }. Badan kosong = classic,
+  // supaya klien lama dan alat MCP lama berkelakuan sama seperti dahulu.
+  const badan = (await req.json().catch(() => ({}))) as { mode?: unknown; raceMinutes?: unknown };
+  const mod = sahModPermainan(badan?.mode);
+  if (!mod) {
+    return NextResponse.json({ error: 'Invalid game mode.' }, { status: 400 });
+  }
+  let minitLumba = RACE_DEFAULT_MINUTES;
+  if (mod === 'race') {
+    const m = sahMinitLumba(badan?.raceMinutes);
+    if (m === null) {
+      return NextResponse.json(
+        { error: 'Race time must be a whole number of minutes from 1 to 60.' },
+        { status: 400 },
+      );
+    }
+    minitLumba = m;
   }
 
   const { data: questions } = await host.supa
@@ -50,12 +70,17 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       // Petik tetapan bonus rentetan kuiz sekarang, supaya menukarnya
       // kemudian tidak mengubah sesi yang sedang berjalan.
       streak_bonus: host.quiz.streak_bonus !== false,
+      game_mode: mod,
+      race_minutes: minitLumba,
     })
-    .select('id, quiz_id, code, status, current_index')
+    .select('id, quiz_id, code, status, current_index, game_mode')
     .single();
 
   if (error || !session) {
     return NextResponse.json({ error: error?.message || 'The session could not be created.' }, { status: 500 });
   }
-  return NextResponse.json({ data: { sessionId: session.id, code: session.code } }, { status: 201 });
+  return NextResponse.json(
+    { data: { sessionId: session.id, code: session.code, gameMode: session.game_mode ?? mod } },
+    { status: 201 },
+  );
 }
