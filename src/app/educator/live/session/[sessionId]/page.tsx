@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
@@ -8,6 +8,7 @@ import { EDU_TABS } from "@/lib/eduTabs";
 import { Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check, Maximize2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
+import RaceHostPanel, { type PemainLumba, type ReviewHos } from "@/components/RaceHostPanel";
 
 interface Pilihan { key: string; text: string }
 interface Soalan {
@@ -23,6 +24,13 @@ interface Sesi {
   id: string; code: string; status: string; current_index: number;
   question_started_at: string | null;
   max_players?: number;
+  // KZ-012: Speed Race
+  game_mode?: string | null;
+  race_minutes?: number | null;
+  race_ends_at?: string | null;
+  race_finished?: number | null;
+  review_index?: number | null;
+  review_revealed?: boolean | null;
 }
 interface KeadaanHos {
   session: Sesi;
@@ -32,6 +40,8 @@ interface KeadaanHos {
   playerCount: number;
   currentQuestion: Soalan | null;
   distribution: Record<string, number> | null;
+  serverNow?: string;
+  review?: ReviewHos | null;
 }
 
 async function authedFetch(url: string, init?: RequestInit) {
@@ -86,12 +96,20 @@ export default function PanelHosSesi() {
     }
   };
 
+  // Tinjauan setiap 2 saat; setiap 1 saat semasa Speed Race berjalan supaya
+  // kereta bergerak lancar di skrin projektor (KZ-012).
+  const pantasRef = useRef(false);
+  pantasRef.current = state?.session.game_mode === "race" && state?.session.status === "asking";
   useEffect(() => {
     if (!sessionId) return;
-    muat();
-    // Tinjauan setiap 2 saat.
-    const id = setInterval(muat, 2000);
-    return () => clearInterval(id);
+    let hidup = true;
+    let pemasa: ReturnType<typeof setTimeout> | null = null;
+    const kitar = async () => {
+      await muat();
+      if (hidup) pemasa = setTimeout(kitar, pantasRef.current ? 1000 : 2000);
+    };
+    kitar();
+    return () => { hidup = false; if (pemasa) clearTimeout(pemasa); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sessionId]);
 
@@ -145,6 +163,7 @@ export default function PanelHosSesi() {
 
   const { session, quiz, questions, players, playerCount, currentQuestion, distribution } = state;
   const totalSoalan = questions.length;
+  const lumba = session.game_mode === "race";
   const hadPemain = session.max_players ?? null;
   const sesiPenuh = hadPemain !== null && playerCount >= hadPemain;
   const pautanSertai = asal + "/live/" + session.code;
@@ -166,11 +185,18 @@ export default function PanelHosSesi() {
           <Link href="/educator/live" className="text-xs text-gray-500 hover:text-gray-800">← All quizzes</Link>
         </div>
         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${session.status === "ended" ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-700"}`}>
-          {LABEL_STATUS[session.status] || session.status}
+          {lumba && session.status === "asking"
+            ? "Racing"
+            : lumba && session.status === "ended" && (session.review_index ?? -1) >= 0
+              ? "Class discussion"
+              : LABEL_STATUS[session.status] || session.status}
         </span>
       </div>
 
-      {/* Tiga cara masuk: imbas QR, buka pautan, atau taip kod di /live. */}
+      {/* Tiga cara masuk: imbas QR, buka pautan, atau taip kod di /live.
+          Speed Race: disorok selepas lumba tamat supaya podium dan
+          perbincangan berada di atas. */}
+      {(!lumba || session.status !== "ended") && (
       <div className="card mb-4">
         <div className="flex items-start gap-5 flex-wrap">
           <div className="text-center shrink-0">
@@ -227,6 +253,7 @@ export default function PanelHosSesi() {
           <span className="font-mono">{pautanAsas}</span> and type the code.
         </p>
       </div>
+      )}
 
       {sesiPenuh && (
         <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
@@ -234,6 +261,18 @@ export default function PanelHosSesi() {
         </div>
       )}
 
+      {lumba ? (
+        <RaceHostPanel
+          session={session}
+          players={players as unknown as PemainLumba[]}
+          questionCount={totalSoalan}
+          serverNow={state.serverNow ?? null}
+          review={state.review ?? null}
+          busy={busy}
+          kawal={kawal}
+        />
+      ) : (
+      <>
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         {session.status === "lobby" && (
           <button onClick={() => kawal("start")} disabled={busy} className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1">
@@ -330,6 +369,8 @@ export default function PanelHosSesi() {
           rows={barisPapan}
           subtitle={`${playerCount} taking part, ranked by points then speed.`}
         />
+      )}
+      </>
       )}
       {/* Paparan skrin penuh untuk projektor kelas. */}
       {paparPenuh && (

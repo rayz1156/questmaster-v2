@@ -7,6 +7,8 @@ import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
 import { Plus, Trash2, Play, Upload, Pencil, Check, X, Download, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import PanelMulaSesi from "@/components/PanelMulaSesi";
+import { RACE_DEFAULT_MINUTES, sahMinitLumba } from "@/lib/lumba-laju";
 
 interface Pilihan { key: string; text: string }
 interface Soalan {
@@ -254,15 +256,27 @@ export default function EditorKuizLangsung() {
   const onMulaSesi = async () => {
     setErr(null);
     if (soalan.length === 0) { setErr("The quiz needs at least one question."); return; }
+    // KZ-012: Speed Race perlu minit yang sah sebelum sesi dicipta.
+    const minit = sahMinitLumba(minitTeks);
+    if (modPilih === "race" && minit === null) return;
     setBusy(true);
     try {
-      const json = await authedFetch(`/api/live/quizzes/${quizId}/sessions`, { method: "POST" });
+      const badan = modPilih === "race" ? { mode: "race", raceMinutes: minit } : { mode: "classic" };
+      const json = await authedFetch(`/api/live/quizzes/${quizId}/sessions`, {
+        method: "POST",
+        body: JSON.stringify(badan),
+      });
       router.push(`/educator/live/session/${json.data.sessionId}`);
     } catch (e: any) {
       setErr(e.message || "The session could not be started.");
       setBusy(false);
     }
   };
+
+  // Panel pilihan mod (KZ-012).
+  const [panelMula, setPanelMula] = useState(false);
+  const [modPilih, setModPilih] = useState<"classic" | "race">("classic");
+  const [minitTeks, setMinitTeks] = useState(String(RACE_DEFAULT_MINUTES));
 
   if (loading) {
     return (
@@ -288,11 +302,24 @@ export default function EditorKuizLangsung() {
         </div>
         <div className="flex items-center gap-2">
           <Link href="/educator/live" className="text-xs text-gray-500 hover:text-gray-800">← All quizzes</Link>
-          <button onClick={onMulaSesi} disabled={busy} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
+          <button onClick={() => setPanelMula((v) => !v)} disabled={busy} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
             <Play className="w-4 h-4" /> Start session
           </button>
         </div>
       </div>
+
+      {panelMula && (
+        <PanelMulaSesi
+          bilSoalan={soalan.length}
+          mod={modPilih}
+          setMod={setModPilih}
+          minitTeks={minitTeks}
+          setMinitTeks={setMinitTeks}
+          busy={busy}
+          onMula={onMulaSesi}
+          onBatal={() => setPanelMula(false)}
+        />
+      )}
 
       {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
 

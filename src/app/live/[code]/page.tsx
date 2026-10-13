@@ -5,6 +5,7 @@ import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import { Trophy, Users, Timer, Check, X, Flame } from "lucide-react";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
+import RacePlayer, { type SoalanLumba } from "@/components/RacePlayer";
 import { supabase } from "@/lib/supabase";
 
 interface Pilihan { key: string; text: string }
@@ -14,6 +15,7 @@ interface CacheSoalan { version: string; questions: SoalanPemain[] }
 interface Keadaan {
   fp: string;
   status: string;
+  gameMode?: "classic" | "race";
   questionIndex: number;
   totalQuestions: number;
   serverNow: string;
@@ -202,7 +204,9 @@ export default function SkrinMainLangsung() {
 
   // Tinjauan papan pendahulu bila soalan ditutup atau sesi tamat.
   useEffect(() => {
-    const perluPapan = keadaan && (keadaan.status === "revealed" || keadaan.status === "ended");
+    // Speed Race memaparkan kedudukan sendiri, tiada papan pendahulu klasik.
+    const perluPapan = keadaan && keadaan.gameMode !== "race"
+      && (keadaan.status === "revealed" || keadaan.status === "ended");
     if (!perluPapan) { setPapan(null); return; }
     let hidup = true;
     const muat = async () => {
@@ -215,7 +219,7 @@ export default function SkrinMainLangsung() {
     muat();
     const t = setInterval(muat, 2000);
     return () => { hidup = false; clearInterval(t); };
-  }, [keadaan?.status, kod]);
+  }, [keadaan?.status, keadaan?.gameMode, kod]);
 
   // Tinjauan keadaan setiap 2 saat; hantar fp terakhir diterima.
   useEffect(() => {
@@ -418,6 +422,29 @@ export default function SkrinMainLangsung() {
   }
 
   const k = keadaan;
+
+  // KZ-012: sesi Speed Race mempunyai skrin sendiri. Aliran masuk di atas
+  // (nama berdaftar, kuiz kelas) kekal sama untuk kedua-dua mod.
+  if (k.gameMode === "race") {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4">
+        <div className="w-full max-w-md py-4">
+          <RacePlayer
+            kod={kod}
+            playerId={identiti.playerId}
+            playerToken={identiti.playerToken}
+            nickname={identiti.nickname}
+            soalan={(soalan?.questions || []) as SoalanLumba[]}
+            onKeluar={keluar}
+          />
+          <div className="text-center mt-4">
+            <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">Leave session</button>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // Render soalan daripada cache klien, bukan daripada balasan state.
   const soalanSemasa =
     soalan && k.questionId

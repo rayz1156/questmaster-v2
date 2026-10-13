@@ -8,6 +8,7 @@
 
 import { callApi } from "./api";
 import { validateOptions, parseQuizCsv, parseAiken } from "@/lib/live-quiz";
+import { RACE_DEFAULT_MINUTES, sahMinitLumba, sahModPermainan } from "@/lib/lumba-laju";
 
 /** Had soalan per panggilan, selari had import CSV (QUIZ_CSV_MAX_QUESTIONS). */
 export const LIVE_MAX_QUESTIONS_PER_CALL = 100;
@@ -173,7 +174,10 @@ export function parseImportArgs(
   return { ok: true, format, mode, content: args.content };
 }
 
-export type LiveControlAction = "start" | "next" | "reveal" | "end" | "reset";
+export type LiveControlAction =
+  | "start" | "next" | "reveal" | "end" | "reset"
+  // KZ-012: mod perbincangan selepas Speed Race tamat
+  | "review_start" | "review_next" | "review_prev" | "review_reveal" | "review_end";
 
 /**
  * Tindakan kawalan sesi yang sah. `end` dan `reset` memusnahkan keadaan sesi
@@ -181,7 +185,10 @@ export type LiveControlAction = "start" | "next" | "reveal" | "end" | "reset";
  * Tiket menuntut confirm untuk end; reset diberi perlindungan sama kerana
  * ia tidak boleh dibuat asal.
  */
-export const LIVE_CONTROL_ACTIONS: LiveControlAction[] = ["start", "next", "reveal", "end", "reset"];
+export const LIVE_CONTROL_ACTIONS: LiveControlAction[] = [
+  "start", "next", "reveal", "end", "reset",
+  "review_start", "review_next", "review_prev", "review_reveal", "review_end",
+];
 
 /** Sahkan tindakan kawalan dan bendera confirm. */
 export function checkControlArgs(
@@ -332,12 +339,22 @@ export async function deleteLiveQuestion(
 /** Mula sesi baharu dan pulangkan kod, pautan sertai dan pautan QR. */
 export async function startLiveSession(
   accessToken: string,
-  quizId: string
+  quizId: string,
+  args: { mode?: unknown; race_minutes?: unknown } = {}
 ): Promise<Record<string, unknown>> {
-  const res = await callApi<{ data?: { sessionId?: string; code?: string } }>(
+  // KZ-012: mode pilihan. Tiada mode = classic, sama seperti sebelum ini.
+  const mode = sahModPermainan(args?.mode);
+  if (!mode) throw new Error("mode mesti classic atau race");
+  let body: Record<string, unknown> | undefined;
+  if (mode === "race") {
+    const minit = args?.race_minutes === undefined ? RACE_DEFAULT_MINUTES : sahMinitLumba(args.race_minutes);
+    if (minit === null) throw new Error("race_minutes mesti nombor bulat 1 hingga 60");
+    body = { mode: "race", raceMinutes: minit };
+  }
+  const res = await callApi<{ data?: { sessionId?: string; code?: string; gameMode?: string } }>(
     accessToken,
     `/api/live/quizzes/${quizId}/sessions`,
-    { method: "POST" }
+    body ? { method: "POST", body } : { method: "POST" }
   );
   const data = res?.data ?? (res as unknown as { sessionId?: string; code?: string });
   const links = liveSessionLinks(String(data?.code ?? ""));
@@ -345,6 +362,7 @@ export async function startLiveSession(
     session_id: data?.sessionId ?? null,
     code: data?.code ?? null,
     status: "lobby",
+    game_mode: (data as { gameMode?: string } | undefined)?.gameMode ?? mode,
     join_url: links.join_url,
     qr_url: links.qr_url,
   };
