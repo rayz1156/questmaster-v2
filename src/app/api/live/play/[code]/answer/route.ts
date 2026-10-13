@@ -28,6 +28,7 @@ interface SessionRow {
   current_index: number;
   question_started_at: string | null;
   streak_bonus: boolean;
+  game_mode?: string | null;
 }
 interface PlayerRow {
   id: string; player_token: string; score: number; total_ms: number;
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   const { data: session } = (await supa
     .from('qm_live_sessions')
-    .select('id, quiz_id, status, current_index, question_started_at, streak_bonus')
+    .select('id, quiz_id, status, current_index, question_started_at, streak_bonus, game_mode')
     .eq('code', code)
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
@@ -83,6 +84,17 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   }
 
   // Sahkan status dan soalan semasa (senarai lajur eksplisit, tanpa correct_key).
+  // KZ-012: sesi Speed Race hanya menerima jawapan melalui laluan /race.
+  // Tanpa semakan ini, qm_race_start menetapkan current_index 0 dan
+  // question_started_at, jadi laluan klasik akan menerima jawapan untuk soalan
+  // pertama dan menambah mata klasik ke markah lumba.
+  if (session.game_mode === 'race') {
+    return NextResponse.json(
+      { error: 'This session is a Speed Race. Answers go through the race screen.' },
+      { status: 409 },
+    );
+  }
+
   if (session.status !== 'asking') {
     return NextResponse.json(
       { error: 'Your answer was rejected because the question is closed.' },

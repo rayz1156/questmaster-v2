@@ -92,19 +92,25 @@ export default function RaceHostPanel({ session, players, questionCount, serverN
 
   // Pintasan papan kekunci dalam mod perbincangan (bukan semasa menaip).
   const dalamReview = session.status === "ended" && (session.review_index ?? -1) >= 0;
+  const rvIndeks = review?.index ?? -1;
+  const rvJumlah = review?.total ?? 0;
+  const rvDedah = review?.revealed === true;
   useEffect(() => {
     if (!dalamReview) return;
     const onKey = (e: KeyboardEvent) => {
       const t = e.target as HTMLElement | null;
       if (t && (t.tagName === "INPUT" || t.tagName === "TEXTAREA" || t.isContentEditable)) return;
+      // Ctrl+R / Cmd+R (muat semula) dan pintasan lain tidak boleh mendedahkan jawapan.
+      if (e.ctrlKey || e.metaKey || e.altKey || e.repeat) return;
       if (busy) return;
-      if (e.key === "ArrowRight") kawal("review_next");
-      else if (e.key === "ArrowLeft") kawal("review_prev");
-      else if (e.key === "r" || e.key === "R") kawal("review_reveal");
+      // Kawal sempadan di klien supaya tiada amaran pelayar di projektor.
+      if (e.key === "ArrowRight" && rvIndeks >= 0 && rvIndeks < rvJumlah - 1) kawal("review_next");
+      else if (e.key === "ArrowLeft" && rvIndeks > 0) kawal("review_prev");
+      else if ((e.key === "r" || e.key === "R") && !rvDedah) kawal("review_reveal");
     };
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [dalamReview, busy, kawal]);
+  }, [dalamReview, busy, kawal, rvIndeks, rvJumlah, rvDedah]);
 
   const jamPelayan = kini - sorokRef.current;
   const bakiMs = session.race_ends_at ? Date.parse(session.race_ends_at) - jamPelayan : null;

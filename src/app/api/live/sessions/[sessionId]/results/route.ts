@@ -36,6 +36,7 @@ interface BarisSesi {
   status: string;
   created_at: string;
   ended_at: string | null;
+  game_mode?: string | null;
 }
 
 interface BarisKuiz {
@@ -97,7 +98,7 @@ export async function GET(
   // di sini kerana RLS qm_live_sessions tidak merangkumi pemilik kelas.
   const { data: sesiRow } = await svc
     .from('qm_live_sessions')
-    .select('id, quiz_id, host_id, status, created_at, ended_at')
+    .select('id, quiz_id, host_id, status, created_at, ended_at, game_mode')
     .eq('id', params.sessionId)
     .maybeSingle();
   const sesi = sesiRow as BarisSesi | null;
@@ -146,13 +147,17 @@ export async function GET(
 
   const { data: jawapanData, error: errJawapan } = await svc
     .from('qm_live_answers')
-    .select('player_id, question_id, choice_key, is_correct, ms_taken')
+    .select('player_id, question_id, choice_key, is_correct, ms_taken, attempt')
     .eq('session_id', params.sessionId);
   if (errJawapan) {
     console.error('live results answers failed');
     return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
   }
-  const jawapan = (jawapanData || []) as BarisJawapan[];
+  // KZ-012: dalam Speed Race soalan dikitar semula, jadi hanya cubaan
+  // pertama setiap soalan dikira supaya "answered" dan ketepatan setanding
+  // dengan sesi klasik. Markah pemain tetap jumlah semua cubaan.
+  const jawapan = ((jawapanData || []) as Array<BarisJawapan & { attempt?: number | null }>)
+    .filter((a) => sesi.game_mode !== 'race' || (a.attempt ?? 1) === 1);
 
   // Nama berdaftar bagi pemain yang log masuk; hanya display_name, tiada emel.
   const idsProfil = Array.from(

@@ -19,6 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
+import { susunPapan, type BarisPapanLumba } from '@/lib/lumba-laju';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -87,6 +88,22 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     return NextResponse.json({ error: 'Could not read the race.' }, { status: 500 });
   }
   const k = keadaan as Record<string, unknown>;
+
+  // Kedudukan dikira dengan susunPapan yang sama dengan skrin guru, supaya
+  // dua pemain pada jarak sama tidak kedua-duanya nampak "1st" di telefon
+  // sedangkan podium menunjukkan 1 dan 2. Hanya lajur kedudukan dibaca.
+  const { data: semuaPemain } = await supa
+    .from('qm_live_players')
+    .select('id, nickname, score, race_distance, race_rank')
+    .eq('session_id', sah.sesi.id);
+  if (semuaPemain && semuaPemain.length > 0) {
+    const papan = susunPapan(semuaPemain as BarisPapanLumba[]);
+    const saya = papan.find((p) => p.id === sah.playerId);
+    if (saya) {
+      k.position = saya.kedudukan;
+      k.playerCount = papan.length;
+    }
+  }
 
   // Mod perbincangan: soalan semasa guru, jawapan pertama pemain ini, dan
   // kunci jawapan HANYA selepas guru menekan Reveal.

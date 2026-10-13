@@ -72,14 +72,20 @@ export default function RacePlayer({ kod, playerId, playerToken, nickname, soala
   const [kini, setKini] = useState(() => Date.now());
   const sorokRef = useRef(0); // beza jam pelayar dengan pelayan (ms)
   const kunciRef = useRef(false);
+  // Nombor jujukan: balasan tinjauan yang dihantar sebelum jawapan terakhir
+  // dibuang, supaya soalan yang sudah dijawab tidak muncul semula.
+  const jujukanRef = useRef(0);
+  const jujukanJawabRef = useRef(0);
 
   const muat = useCallback(async () => {
+    const nombor = ++jujukanRef.current;
     try {
       const r = await fetch(
         `/api/live/play/${kod}/race?playerId=${encodeURIComponent(playerId)}`,
         { headers: { "x-player-token": playerToken }, cache: "no-store" },
       );
       const j = await r.json();
+      if (nombor <= jujukanJawabRef.current) return; // balasan lapuk
       if (!r.ok) { setErr(j.error || "Could not read the race."); return; }
       setErr(null);
       if (j.serverNow) sorokRef.current = Date.now() - new Date(j.serverNow).getTime();
@@ -124,6 +130,8 @@ export default function RacePlayer({ kod, playerId, playerToken, nickname, soala
     if (!k || !k.questionId || kunciRef.current || beku) return;
     kunciRef.current = true;
     setKunci(true);
+    // Semua tinjauan yang sudah dihantar sebelum saat ini kini lapuk.
+    jujukanJawabRef.current = jujukanRef.current;
     let tunggu = 600;
     try {
       const r = await fetch(`/api/live/play/${kod}/race`, {
@@ -328,8 +336,10 @@ export default function RacePlayer({ kod, playerId, playerToken, nickname, soala
                     ${betul ? "border-green-500 bg-green-50" : dipilih ? "border-red-400 bg-red-50" : "border-gray-200 hover:border-violet-400 hover:bg-violet-50"}
                     ${kunci && !dipilih && !betul ? "opacity-50" : ""}`}
                 >
-                  <span className={`w-7 h-7 rounded-lg grid place-items-center text-white text-xs font-bold shrink-0 ${WARNA_PILIHAN[i % WARNA_PILIHAN.length]}`}>
-                    {"ABCDEF"[i]}
+                  {/* Tiada huruf semasa lumba: pilihan dikocok, jadi huruf kedudukan
+                      tidak sepadan dengan huruf asal yang dipapar semasa perbincangan. */}
+                  <span aria-hidden className={`w-7 h-7 rounded-lg grid place-items-center shrink-0 ${WARNA_PILIHAN[i % WARNA_PILIHAN.length]}`}>
+                    <span className="w-2.5 h-2.5 rounded-full bg-white/90" />
                   </span>
                   <span className="flex-1">{o.text}</span>
                   {betul && <Check className="w-4 h-4 text-green-600" />}
