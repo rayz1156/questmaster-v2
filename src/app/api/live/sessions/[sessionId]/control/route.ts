@@ -16,17 +16,18 @@ async function kemasKiniDanBalas(
 ) {
   // Tampalan kosong: baca semula sahaja (keadaan sudah diubah oleh fungsi RPC).
   const { data: updated, error: upErr } = Object.keys(tampal).length === 0
-    ? await supa.from('qm_live_sessions').select(LAJUR_BALAS).eq('id', sessionId).single()
+    ? await supa.from('qm_live_sessions').select(LAJUR_BALAS).eq('id', sessionId).maybeSingle()
     : await supa
         .from('qm_live_sessions')
         .update(tampal)
         .eq('id', sessionId)
         .select(LAJUR_BALAS)
-        .single();
-  if (upErr || !updated) {
-    if (upErr) console.error('race control update failed', upErr.code);
+        .maybeSingle();
+  if (upErr) {
+    console.error('race control update failed', upErr.code);
     return NextResponse.json({ error: 'Could not update the session.' }, { status: 500 });
   }
+  if (!updated) return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
   return NextResponse.json({ data: updated });
 }
 
@@ -77,12 +78,14 @@ async function kawalLumba(
   if (status === 'ended') {
     return NextResponse.json({ error: 'The session is over and cannot be reset.' }, { status: 400 });
   }
-  const { error: delErr } = await svc.from('qm_live_answers').delete().eq('session_id', sessionId);
+  // Reset guna klien pengguna supaya RLS hos terpakai, sama seperti reset
+  // klasik. Klien service hanya untuk fungsi qm_race_* (kzsec KZ-012).
+  const { error: delErr } = await supa.from('qm_live_answers').delete().eq('session_id', sessionId);
   if (delErr) {
     console.error('race reset answers failed', delErr.code);
     return NextResponse.json({ error: 'The race could not be reset.' }, { status: 500 });
   }
-  const { error: pErr } = await svc
+  const { error: pErr } = await supa
     .from('qm_live_players')
     .update({
       score: 0, total_ms: 0, streak: 0, best_streak: 0,
@@ -94,7 +97,7 @@ async function kawalLumba(
     console.error('race reset players failed', pErr.code);
     return NextResponse.json({ error: 'The race could not be reset.' }, { status: 500 });
   }
-  return kemasKiniDanBalas(svc, sessionId, {
+  return kemasKiniDanBalas(supa, sessionId, {
     status: 'lobby', current_index: -1, question_started_at: null,
     race_ends_at: null, race_finished: 0, review_index: -1, review_revealed: false,
   });

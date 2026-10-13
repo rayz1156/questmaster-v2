@@ -147,7 +147,16 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     }
   }
 
-  return NextResponse.json({ ...k, review });
+  // Senarai medan yang dibenarkan sahaja (kzsec KZ-012): jika qm_race_state
+  // diubah kelak dan memulangkan medan baharu, ia tidak bocor ke pemain.
+  const MEDAN_KEADAAN = [
+    'status', 'gameMode', 'endsAt', 'serverNow', 'distance', 'score', 'streak',
+    'wrongStreak', 'frozenUntil', 'rank', 'position', 'playerCount', 'finishedCount',
+    'questionId', 'servedAt',
+  ] as const;
+  const balas: Record<string, unknown> = {};
+  for (const m of MEDAN_KEADAAN) balas[m] = k[m] ?? null;
+  return NextResponse.json({ ...balas, review });
 }
 
 export async function POST(req: NextRequest, { params }: { params: { code: string } }) {
