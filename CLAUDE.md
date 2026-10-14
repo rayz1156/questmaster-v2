@@ -273,6 +273,15 @@ Menukar nama sasaran `INTO` sahaja TIDAK mencukupi.
 Nota keempat: `returns table` memerlukan `return next`. `return` kosong
 memulangkan sifar baris walaupun sisipan berjaya.
 
+**Sasaran `FOR ... IN SELECT` berbilang lajur mesti `record`.** Dalam
+`qm_import_class_teams` (0033), pemboleh ubah `r jsonb` diguna semula untuk
+`SELECT t.name, tm.user_id`. PL/pgSQL memasukkan lajur pertama ke dalam jsonb
+melalui fungsi input, jadi nama kumpulan "IRIS" gagal dengan
+`invalid input syntax for type json`. Gelung itu hanya berjalan bila kelas
+sudah ada ahli kumpulan, maka import pertama lulus dan setiap import kedua
+gagal (dibetulkan dalam 0061). Uji fungsi import dengan import KEDUA ke kelas
+yang sama, bukan sekali sahaja (`supabase/tests/KZ-014.sql`).
+
 Pengajaran am: fungsi plpgsql tidak disahkan oleh `npx tsc` mahupun
 `npm run build`. Panggil ia terhadap pangkalan data sebenar sebelum percaya ia
 berfungsi.

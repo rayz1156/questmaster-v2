@@ -65,11 +65,28 @@ function initials(name: string): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
+/**
+ * Bilangan ahli bagi setiap kumpulan. qm_teams TIADA lajur member_count,
+ * jadi kiraan dibaca melalui RPC qm_team_member_counts, sumber yang sama
+ * dengan halaman Manage teams (/educator/teams), supaya kedua-dua halaman
+ * memaparkan angka yang sama. Gagal membaca tidak merosakkan halaman: peta
+ * kosong, paparan jatuh kepada 0 seperti sebelum ini.
+ */
+async function kiraAhliKumpulan(classId: string): Promise<Record<string, number>> {
+  if (!classId) return {};
+  const { data, error } = await supabase.rpc("qm_team_member_counts", { p_class_id: classId });
+  if (error || !data) return {};
+  const peta: Record<string, number> = {};
+  for (const r of data as { team_id: string; cnt: number | string }[]) peta[String(r.team_id)] = Number(r.cnt) || 0;
+  return peta;
+}
+
 export default function ClassPeoplePage() {
   const { id } = useParams<{ id: string }>() as { id: string };
   const [sub, setSub] = useState<Sub>("students");
   const [members, setMembers] = useState<Record<string, unknown>[]>([]);
   const [teams, setTeams] = useState<Record<string, unknown>[]>([]);
+  const [bilAhli, setBilAhli] = useState<Record<string, number>>({});
   const [scores, setScores] = useState<Record<string, number>>({});
   const [q, setQ] = useState("");
     // V2-013: markah individu daripada view qm_class_individual_scores dan
@@ -142,6 +159,7 @@ export default function ClassPeoplePage() {
       ]);
       setTeams((ts || []) as Record<string, unknown>[]);
       setInvites((iv.data || []) as InviteRow[]);
+      setBilAhli(await kiraAhliKumpulan(id).catch(() => ({} as Record<string, number>)));
     };
 
     useEffect(() => {
@@ -168,6 +186,8 @@ export default function ClassPeoplePage() {
           setTeams((ts || []) as Record<string, unknown>[]);
           setInvites((iv.data || []) as InviteRow[]);
           setMarkahInd((mi || []) as ClassIndividualScore[]);
+          const bil = await kiraAhliKumpulan(id).catch(() => ({} as Record<string, number>));
+          if (alive) setBilAhli(bil);
           const map: Record<string, number> = {};
           for (const s of ss || []) map[s.team_id] = Number(s.total_score) || 0;
           setScores(map);
@@ -646,7 +666,7 @@ export default function ClassPeoplePage() {
               </div>
               {shownTeams.map((t, i) => {
                 const max = Number(t.max_members) || 6;
-                const filled = Number(t.member_count ?? t.members_count ?? 0);
+                const filled = bilAhli[String(t.id)] ?? Number(t.member_count ?? t.members_count ?? 0);
                 const pendingRows = invites.filter((iv) => iv.team_id === String(t.id));
                 return (
                   <div key={String(t.id || i)} className="t-row px-5 py-3.5">

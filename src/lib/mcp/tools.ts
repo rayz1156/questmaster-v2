@@ -611,14 +611,16 @@ export const TOOLS: ToolDef[] = [
       if (teams.length === 0) return { teams: [] };
 
       // Satu pertanyaan berpagar RLS untuk semua kumpulan, bukan satu
-      // pertanyaan setiap kumpulan.
+      // pertanyaan setiap kumpulan. qm_team_members TIADA lajur joined_at
+      // (hanya team_id, user_id, role), jadi jangan pilih lajur itu:
+      // PostgREST menolak seluruh pertanyaan jika satu lajur tidak wujud.
       const members = unwrapList(
         await s.db
           .from("qm_team_members")
-          .select("team_id, user_id, role, joined_at")
+          .select("team_id, user_id, role")
           .in("team_id", teams.map((t) => t.id)),
         "Ahli kumpulan"
-      ) as Array<{ team_id: string; user_id: string; role: string; joined_at: string }>;
+      ) as Array<{ team_id: string; user_id: string; role: string }>;
 
       const grouped = groupTeamsWithMembers(teams, members);
       return {
@@ -631,7 +633,6 @@ export const TOOLS: ToolDef[] = [
             members: (g?.members ?? []).map((m) => ({
               user_id: m.user_id,
               role: m.role,
-              joined_at: m.joined_at,
             })),
           };
         }),
