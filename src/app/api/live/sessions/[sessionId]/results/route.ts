@@ -155,9 +155,13 @@ export async function GET(
   }
   // KZ-012: dalam Speed Race soalan dikitar semula, jadi hanya cubaan
   // pertama setiap soalan dikira supaya "answered" dan ketepatan setanding
-  // dengan sesi klasik. Markah pemain tetap jumlah semua cubaan.
+  // dengan sesi klasik. KZ-013: sesi Boss Battle turut mengitar soalan, jadi
+  // penapis yang sama digunakan. Markah pemain tetap jumlah semua cubaan.
   const jawapan = ((jawapanData || []) as Array<BarisJawapan & { attempt?: number | null }>)
-    .filter((a) => sesi.game_mode !== 'race' || (a.attempt ?? 1) === 1);
+    .filter(
+      (a) =>
+        (sesi.game_mode !== 'race' && sesi.game_mode !== 'boss') || (a.attempt ?? 1) === 1,
+    );
 
   // Nama berdaftar bagi pemain yang log masuk; hanya display_name, tiada emel.
   const idsProfil = Array.from(

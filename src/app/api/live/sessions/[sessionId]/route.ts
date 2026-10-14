@@ -1,14 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import type { LiveSessionRow } from '@/lib/live-quiz';
 import {
   susunPapan,
+  susunPenyerang,
   taburanCubaanPertama,
   type BarisJawapanLumba,
   type BarisPapanLumba,
+  type BarisPenyerang,
 } from '@/lib/lumba-laju';
 
-/** Baris sesi hos, termasuk lajur Speed Race (KZ-012). */
+/** Baris sesi hos, termasuk lajur Speed Race (KZ-012) dan Boss Battle (KZ-013). */
 interface SesiHos extends LiveSessionRow {
   game_mode?: string | null;
   race_minutes?: number | null;
@@ -16,6 +19,14 @@ interface SesiHos extends LiveSessionRow {
   race_finished?: number | null;
   review_index?: number | null;
   review_revealed?: boolean | null;
+  // KZ-013
+  boss_k?: number | null;
+  boss_max_hp?: number | null;
+  boss_hp?: number | null;
+  boss_crits?: number | null;
+  boss_healed?: number | null;
+  boss_last_hit?: string | null;
+  boss_result?: string | null;
 }
 
 export const runtime = 'nodejs';
@@ -24,6 +35,46 @@ export const dynamic = 'force-dynamic';
 // lalai, yang membekukan keadaan sesi langsung (status kekal 'asking' walaupun
 // pangkalan data sudah 'revealed'). Paksa setiap bacaan pergi ke pangkalan data.
 export const fetchCache = 'force-no-store';
+
+/**
+ * Mod perbincangan untuk sesi race dan boss (KZ-013 dipindahkan keluar dari
+ * cabang race supaya kedua-dua cabang memanggil logik yang sama, bukan salinan).
+ * correct_key hanya keluar selepas guru menekan Reveal.
+ */
+async function binaReviewHos(
+  supa: SupabaseClient,
+  sessionId: string,
+  sesi: SesiHos,
+  allQuestions: unknown[],
+): Promise<Record<string, unknown> | null> {
+  const idx = typeof sesi.review_index === 'number' ? sesi.review_index : -1;
+  if (sesi.status !== 'ended' || idx < 0 || idx >= allQuestions.length) return null;
+  const q = allQuestions[idx] as {
+    id: string; prompt: string; options: { key: string; text: string }[];
+    correct_key: string;
+  };
+  const { data: jawapan } = await supa
+    .from('qm_live_answers')
+    .select('player_id, choice_key, is_correct, attempt')
+    .eq('session_id', sessionId)
+    .eq('question_id', q.id);
+  const dedah = sesi.review_revealed === true;
+  return {
+    index: idx,
+    total: allQuestions.length,
+    revealed: dedah,
+    question: {
+      id: q.id,
+      prompt: q.prompt,
+      options: q.options,
+      correct_key: dedah ? q.correct_key : null,
+    },
+    distribution: taburanCubaanPertama(
+      (jawapan || []) as BarisJawapanLumba[],
+      (q.options || []).map((o) => o.key),
+    ),
+  };
+}
 
 /**
  * GET /api/live/sessions/[sessionId], keadaan hos penuh.
@@ -39,7 +90,9 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
   interface AnswerRef { choice_key: string }
   const LAJUR_SESI =
     'id, quiz_id, host_id, code, status, current_index, question_started_at, max_players, created_at, ended_at, ' +
-    'game_mode, race_minutes, race_ends_at, race_finished, review_index, review_revealed';
+    'game_mode, race_minutes, race_ends_at, race_finished, review_index, review_revealed, ' +
+    // KZ-013: keadaan raksasa untuk panel hos.
+    'boss_k, boss_max_hp, boss_hp, boss_crits, boss_healed, boss_last_hit, boss_result';
   const { data: session } = await auth.supa
     .from('qm_live_sessions')
     .select(LAJUR_SESI)
@@ -122,35 +175,8 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     }
     const papan = susunPapan((pemainLumba || []) as unknown as Array<BarisPapanLumba & Record<string, unknown>>);
 
-    let review: Record<string, unknown> | null = null;
-    const idx = typeof sesi.review_index === 'number' ? sesi.review_index : -1;
-    if (sesi.status === 'ended' && idx >= 0 && idx < allQuestions.length) {
-      const q = allQuestions[idx] as {
-        id: string; order_idx: number; prompt: string; options: { key: string; text: string }[];
-        correct_key: string; time_limit_sec: number; double_points: boolean;
-      };
-      const { data: jawapan } = await auth.supa
-        .from('qm_live_answers')
-        .select('player_id, choice_key, is_correct, attempt')
-        .eq('session_id', params.sessionId)
-        .eq('question_id', q.id);
-      const dedah = sesi.review_revealed === true;
-      review = {
-        index: idx,
-        total: allQuestions.length,
-        revealed: dedah,
-        question: {
-          id: q.id,
-          prompt: q.prompt,
-          options: q.options,
-          correct_key: dedah ? q.correct_key : null,
-        },
-        distribution: taburanCubaanPertama(
-          (jawapan || []) as BarisJawapanLumba[],
-          (q.options || []).map((o) => o.key),
-        ),
-      };
-    }
+    // Mod perbincangan: logik kongsi dengan sesi boss (fungsi binaReviewHos).
+    const review = await binaReviewHos(auth.supa, params.sessionId, sesi, allQuestions);
 
     return NextResponse.json({
       data: {
@@ -170,6 +196,108 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
         distribution: null,
         serverNow: new Date().toISOString(),
         review,
+      },
+    });
+  }
+
+  // KZ-013: sesi Lawan Raksasa mempunyai bentuk balasan sendiri (corak cabang
+  // race di atas).
+  if (ses.game_mode === 'boss') {
+    const svc = getServiceSupabase();
+    // Tamatkan pertarungan bila masa habis walaupun tiada pemain sedang meninjau.
+    if (ses.status === 'asking' && ses.race_ends_at && Date.parse(ses.race_ends_at) <= Date.now()) {
+      await svc.rpc('qm_boss_end', { p_session: params.sessionId, p_result: 'lose' });
+      const { data: semula } = await auth.supa
+        .from('qm_live_sessions')
+        .select(LAJUR_SESI)
+        .eq('id', params.sessionId)
+        .maybeSingle();
+      if (semula) ses = semula as unknown as SesiHos;
+    }
+    const sesi = ses!;
+
+    const { data: pemainRaksasa, error: prErr } = await auth.supa
+      .from('qm_live_players')
+      .select('id, nickname, score, streak, best_streak, boss_damage, race_frozen_until')
+      .eq('session_id', params.sessionId);
+    if (prErr) {
+      console.error('boss host players failed', prErr.code);
+      return NextResponse.json({ error: 'Could not load the players.' }, { status: 500 });
+    }
+    const papan = susunPenyerang(
+      (pemainRaksasa || []) as unknown as Array<BarisPenyerang & Record<string, unknown>>,
+    );
+    const namaPemain = new Map(papan.map((p) => [p.id, p.nickname]));
+
+    // Feed serangan: 8 jawapan terkini. Tiada choice_key dan tiada question_id
+    // supaya skrin yang ditayang tidak membocorkan pilihan pemain (kzsec).
+    const { data: feedRows, error: feedErr } = await auth.supa
+      .from('qm_live_answers')
+      .select('player_id, is_correct, boss_effect, boss_crit, created_at')
+      .eq('session_id', params.sessionId)
+      .order('created_at', { ascending: false })
+      .limit(8);
+    if (feedErr) {
+      console.error('boss host feed failed', feedErr.code);
+      return NextResponse.json({ error: 'Could not load the battle.' }, { status: 500 });
+    }
+    const feed = ((feedRows || []) as Array<{
+      player_id: string; is_correct: boolean; boss_effect: number; boss_crit: boolean; created_at: string;
+    }>).map((a) => ({
+      nickname: namaPemain.get(a.player_id) ?? null,
+      effect: a.boss_effect,
+      crit: a.boss_crit,
+      at: a.created_at,
+    }));
+
+    // Pemain yang mendarat pukulan terakhir.
+    const lastHitName = sesi.boss_last_hit ? namaPemain.get(sesi.boss_last_hit) ?? null : null;
+
+    // Statistik akhir: peratus betul pada cubaan pertama (satu perpuluhan).
+    let stats: Record<string, unknown> | null = null;
+    if (sesi.status === 'ended') {
+      const { data: semua } = await auth.supa
+        .from('qm_live_answers')
+        .select('is_correct, attempt')
+        .eq('session_id', params.sessionId);
+      let pertama = 0;
+      let betul = 0;
+      for (const a of (semua || []) as Array<{ is_correct: boolean; attempt: number | null }>) {
+        if ((a.attempt ?? 1) !== 1) continue;
+        pertama += 1;
+        if (a.is_correct) betul += 1;
+      }
+      stats = {
+        correctPct: pertama > 0 ? Math.round((betul / pertama) * 1000) / 10 : null,
+        crits: sesi.boss_crits ?? 0,
+        healed: sesi.boss_healed ?? 0,
+      };
+    }
+
+    const review = await binaReviewHos(auth.supa, params.sessionId, sesi, allQuestions);
+
+    return NextResponse.json({
+      data: {
+        session: sesi,
+        quiz: quiz,
+        // Kunci jawapan TIDAK dihantar dalam senarai soalan sesi raksasa; ia
+        // hanya keluar melalui review.question.correct_key selepas Reveal,
+        // kerana skrin ini selalunya ditayang kepada kelas.
+        questions: allQuestions.map((q) => {
+          const { correct_key: _kunci, ...tanpaKunci } = q as Record<string, unknown>;
+          void _kunci;
+          return tanpaKunci;
+        }),
+        players: papan,
+        playerCount: papan.length,
+        currentQuestion: null,
+        distribution: null,
+        serverNow: new Date().toISOString(),
+        review,
+        // KZ-013: medan tambahan untuk panel raksasa.
+        feed,
+        lastHitName,
+        stats,
       },
     });
   }

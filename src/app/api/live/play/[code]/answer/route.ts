@@ -94,6 +94,12 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
       { status: 409 },
     );
   }
+  if (session.game_mode === 'boss') {
+    return NextResponse.json(
+      { error: 'This session is a Boss Battle. Answers go through the battle screen.' },
+      { status: 409 },
+    );
+  }
 
   if (session.status !== 'asking') {
     return NextResponse.json(

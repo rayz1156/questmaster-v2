@@ -6,7 +6,9 @@ import { TINDAKAN_REVIEW, langkahReview, type TindakanReview } from '@/lib/lumba
 
 const TINDAKAN_ASAS = ['start', 'next', 'reveal', 'end', 'reset'];
 const LAJUR_BALAS =
-  'id, quiz_id, code, status, current_index, question_started_at, ended_at, game_mode, race_ends_at, review_index, review_revealed';
+  'id, quiz_id, code, status, current_index, question_started_at, ended_at, game_mode, race_ends_at, review_index, review_revealed, ' +
+  // KZ-013: lajur raksasa supaya panel hos boleh memaparkan nyawa selepas kawalan.
+  'boss_k, boss_max_hp, boss_hp, boss_crits, boss_healed, boss_last_hit, boss_result';
 
 /** Kemas kini sesi dan pulangkan barisnya (bentuk balasan sama dengan klasik). */
 async function kemasKiniDanBalas(
@@ -103,6 +105,78 @@ async function kawalLumba(
   });
 }
 
+/**
+ * KZ-013: kawalan sesi Lawan Raksasa (Boss Battle). Corak yang sama dengan
+ * kawalLumba: dipanggil HANYA selepas semakan hos, klien service hanya untuk
+ * fungsi qm_boss_* yang tidak boleh dipanggil oleh klien RLS.
+ */
+async function kawalRaksasa(
+  supa: SupabaseClient,
+  sessionId: string,
+  status: string,
+  action: string,
+) {
+  const svc = getServiceSupabase();
+  if (action === 'next' || action === 'reveal') {
+    return NextResponse.json({ error: 'This action is not used in a Boss Battle.' }, { status: 400 });
+  }
+  if (action === 'start') {
+    const { error } = await svc.rpc('qm_boss_start', { p_session: sessionId });
+    if (error) {
+      if (error.code === 'BOSS1') return NextResponse.json({ error: 'This quiz has no questions.' }, { status: 400 });
+      if (error.code === 'BOSS2') {
+        return NextResponse.json({ error: 'The battle is not in the lobby. Reset it first.' }, { status: 400 });
+      }
+      if (error.code === 'BOSS3') {
+        return NextResponse.json({ error: 'Wait for at least one player to join.' }, { status: 400 });
+      }
+      console.error('qm_boss_start failed', error.code);
+      return NextResponse.json({ error: 'The battle could not be started.' }, { status: 500 });
+    }
+    return kemasKiniDanBalas(supa, sessionId, {});
+  }
+  if (action === 'end') {
+    if (status === 'ended') {
+      return NextResponse.json({ error: 'The session is already over.' }, { status: 400 });
+    }
+    const { error } = await svc.rpc('qm_boss_end', { p_session: sessionId, p_result: 'stopped' });
+    if (error) {
+      console.error('qm_boss_end failed', error.code);
+      return NextResponse.json({ error: 'The battle could not be stopped.' }, { status: 500 });
+    }
+    return kemasKiniDanBalas(supa, sessionId, {});
+  }
+  // reset
+  if (status === 'ended') {
+    return NextResponse.json({ error: 'The session is over and cannot be reset.' }, { status: 400 });
+  }
+  // Reset guna klien pengguna supaya RLS hos terpakai, sama seperti reset
+  // lumba dan klasik (kzsec KZ-013). Klien service hanya untuk fungsi qm_boss_*.
+  const { error: delErr } = await supa.from('qm_live_answers').delete().eq('session_id', sessionId);
+  if (delErr) {
+    console.error('boss reset answers failed', delErr.code);
+    return NextResponse.json({ error: 'The battle could not be reset.' }, { status: 500 });
+  }
+  const { error: pErr } = await supa
+    .from('qm_live_players')
+    .update({
+      score: 0, total_ms: 0, streak: 0, best_streak: 0,
+      boss_damage: 0, race_wrong: 0, race_frozen_until: null,
+      race_question_id: null, race_served_at: null, race_queue: [],
+    })
+    .eq('session_id', sessionId);
+  if (pErr) {
+    console.error('boss reset players failed', pErr.code);
+    return NextResponse.json({ error: 'The battle could not be reset.' }, { status: 500 });
+  }
+  return kemasKiniDanBalas(supa, sessionId, {
+    status: 'lobby', current_index: -1, question_started_at: null,
+    race_ends_at: null, review_index: -1, review_revealed: false,
+    boss_max_hp: 0, boss_hp: 0, boss_crits: 0, boss_healed: 0,
+    boss_last_hit: null, boss_result: null,
+  });
+}
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // Next.js men-cache panggilan fetch Supabase di dalam route handler secara
@@ -125,6 +199,10 @@ export const fetchCache = 'force-no-store';
  *   mengosongkan lajur race_* dan review_*. next dan reveal ditolak.
  * - review_start | review_next | review_prev | review_reveal | review_end:
  *   mod perbincangan selepas lumba tamat (sesi race berstatus ended sahaja).
+ *
+ * KZ-013, sesi Lawan Raksasa (game_mode = 'boss'): sama seperti lumba tetapi
+ * start memanggil qm_boss_start, end memanggil qm_boss_end('stopped'), reset
+ * turut mengosongkan lajur boss_*, dan review_* turut dibenarkan selepas tamat.
  */
 export async function POST(req: NextRequest, { params }: { params: { sessionId: string } }) {
   const auth = await requireUser(req);
@@ -200,10 +278,12 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     .eq('id', params.sessionId)
     .maybeSingle()) as { data: { game_mode: string | null; review_index: number | null } | null };
   const lumba = modRow?.game_mode === 'race';
+  // KZ-013: sesi Lawan Raksasa berkongsi mod perbincangan dengan lumba.
+  const raksasa = modRow?.game_mode === 'boss';
 
-  // Tindakan perbincangan: hanya sesi lumba yang sudah tamat.
+  // Tindakan perbincangan: hanya sesi lumba atau raksasa yang sudah tamat.
   if ((TINDAKAN_REVIEW as readonly string[]).includes(action)) {
-    if (!lumba || ses.status !== 'ended') {
+    if ((!lumba && !raksasa) || ses.status !== 'ended') {
       return NextResponse.json(
         { error: 'Question review is available after the race ends.' },
         { status: 400 },
@@ -218,6 +298,9 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
 
   if (lumba) {
     return kawalLumba(auth.supa, params.sessionId, ses.status, action);
+  }
+  if (raksasa) {
+    return kawalRaksasa(auth.supa, params.sessionId, ses.status, action);
   }
 
   const patch: Record<string, unknown> = {};

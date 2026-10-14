@@ -104,10 +104,10 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const allQuestions = (questions || []) as QuestionRow[];
   const totalQuestions = allQuestions.length;
 
-  // KZ-012: sesi Speed Race. Klien beralih ke laluan /race sebaik melihat
-  // gameMode 'race'. Pulangkan awal tanpa myAnswer/reveal kerana pemain boleh
-  // menjawab soalan yang sama berulang kali dalam lumba.
-  if (session.game_mode === 'race') {
+  // KZ-012: sesi Speed Race. KZ-013: sesi Lawan Raksasa turut pulangkan awal;
+  // klien beralih ke laluan /race atau /boss sebaik melihat gameMode. Pulangkan
+  // tanpa myAnswer/reveal kerana pemain menjawab soalan yang sama berulang kali.
+  if (session.game_mode === 'race' || session.game_mode === 'boss') {
     const versionLumba = createHash('sha256')
       .update(allQuestions.map((q) => `${q.id}|${q.order_idx}`).join(';'))
       .digest('hex')
@@ -115,7 +115,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     return NextResponse.json({
       fp,
       status: session.status,
-      gameMode: 'race',
+      gameMode: session.game_mode,
       serverNow: new Date().toISOString(),
       totalQuestions,
       version: versionLumba,

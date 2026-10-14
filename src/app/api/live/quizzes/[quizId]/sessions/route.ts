@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost, generateSessionCode } from '@/lib/live-quiz';
-import { RACE_DEFAULT_MINUTES, sahMinitLumba, sahModPermainan } from '@/lib/lumba-laju';
+import {
+  RACE_DEFAULT_MINUTES,
+  TAHAP_RAKSASA,
+  sahMinitLumba,
+  sahModPermainan,
+  sahTahapRaksasa,
+} from '@/lib/lumba-laju';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,13 +24,18 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
 
   // KZ-012: badan pilihan { mode, raceMinutes }. Badan kosong = classic,
   // supaya klien lama dan alat MCP lama berkelakuan sama seperti dahulu.
-  const badan = (await req.json().catch(() => ({}))) as { mode?: unknown; raceMinutes?: unknown };
+  // KZ-013: mode 'boss' menambah bossLevel (easy/medium/hard, lalai medium).
+  const badan = (await req.json().catch(() => ({}))) as {
+    mode?: unknown;
+    raceMinutes?: unknown;
+    bossLevel?: unknown;
+  };
   const mod = sahModPermainan(badan?.mode);
   if (!mod) {
     return NextResponse.json({ error: 'Invalid game mode.' }, { status: 400 });
   }
   let minitLumba = RACE_DEFAULT_MINUTES;
-  if (mod === 'race') {
+  if (mod === 'race' || mod === 'boss') {
     const m = sahMinitLumba(badan?.raceMinutes);
     if (m === null) {
       return NextResponse.json(
@@ -33,6 +44,14 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       );
     }
     minitLumba = m;
+  }
+  let tahapRaksasa: 'easy' | 'medium' | 'hard' = 'medium';
+  if (mod === 'boss') {
+    const t = sahTahapRaksasa(badan?.bossLevel);
+    if (t === null) {
+      return NextResponse.json({ error: 'Invalid boss level.' }, { status: 400 });
+    }
+    tahapRaksasa = t;
   }
 
   const { data: questions } = await host.supa
@@ -72,6 +91,9 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       streak_bonus: host.quiz.streak_bonus !== false,
       game_mode: mod,
       race_minutes: minitLumba,
+      // KZ-013: tahap raksasa dipetik kepada pemalar k sekarang, supaya
+      // menukarnya kemudian tidak mengubah sesi yang sedang berjalan.
+      ...(mod === 'boss' ? { boss_k: TAHAP_RAKSASA[tahapRaksasa] } : {}),
     })
     .select('id, quiz_id, code, status, current_index, game_mode')
     .single();
