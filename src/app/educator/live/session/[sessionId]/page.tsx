@@ -9,6 +9,7 @@ import { Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check, Maximize
 import { supabase } from "@/lib/supabase";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
 import RaceHostPanel, { type PemainLumba, type ReviewHos } from "@/components/RaceHostPanel";
+import BossHostPanel, { type PemainRaksasa, type SeranganFeed, type StatsRaksasa } from "@/components/BossHostPanel";
 
 interface Pilihan { key: string; text: string }
 interface Soalan {
@@ -31,6 +32,14 @@ interface Sesi {
   race_finished?: number | null;
   review_index?: number | null;
   review_revealed?: boolean | null;
+  // KZ-013: Boss Battle
+  boss_k?: number | null;
+  boss_max_hp?: number | null;
+  boss_hp?: number | null;
+  boss_crits?: number | null;
+  boss_healed?: number | null;
+  boss_last_hit?: string | null;
+  boss_result?: string | null;
 }
 interface KeadaanHos {
   session: Sesi;
@@ -42,6 +51,10 @@ interface KeadaanHos {
   distribution: Record<string, number> | null;
   serverNow?: string;
   review?: ReviewHos | null;
+  // KZ-013: medan tambahan sesi Boss Battle.
+  feed?: SeranganFeed[] | null;
+  lastHitName?: string | null;
+  stats?: StatsRaksasa | null;
 }
 
 async function authedFetch(url: string, init?: RequestInit) {
@@ -96,10 +109,13 @@ export default function PanelHosSesi() {
     }
   };
 
-  // Tinjauan setiap 2 saat; setiap 1 saat semasa Speed Race berjalan supaya
-  // kereta bergerak lancar di skrin projektor (KZ-012).
+  // Tinjauan setiap 2 saat; setiap 1 saat semasa Speed Race atau Boss Battle
+  // berjalan supaya arena dan kereta bergerak lancar di skrin projektor
+  // (KZ-012, KZ-013).
   const pantasRef = useRef(false);
-  pantasRef.current = state?.session.game_mode === "race" && state?.session.status === "asking";
+  pantasRef.current =
+    (state?.session.game_mode === "race" || state?.session.game_mode === "boss") &&
+    state?.session.status === "asking";
   useEffect(() => {
     if (!sessionId) return;
     let hidup = true;
@@ -164,6 +180,7 @@ export default function PanelHosSesi() {
   const { session, quiz, questions, players, playerCount, currentQuestion, distribution } = state;
   const totalSoalan = questions.length;
   const lumba = session.game_mode === "race";
+  const raksasa = session.game_mode === "boss";
   const hadPemain = session.max_players ?? null;
   const sesiPenuh = hadPemain !== null && playerCount >= hadPemain;
   const pautanSertai = asal + "/live/" + session.code;
@@ -185,18 +202,20 @@ export default function PanelHosSesi() {
           <Link href="/educator/live" className="text-xs text-gray-500 hover:text-gray-800">← All quizzes</Link>
         </div>
         <span className={`text-xs font-semibold px-2 py-1 rounded-full ${session.status === "ended" ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-700"}`}>
-          {lumba && session.status === "asking"
-            ? "Racing"
-            : lumba && session.status === "ended" && (session.review_index ?? -1) >= 0
+          {(lumba || raksasa) && session.status === "asking"
+            ? raksasa
+              ? "Battling"
+              : "Racing"
+            : (lumba || raksasa) && session.status === "ended" && (session.review_index ?? -1) >= 0
               ? "Class discussion"
               : LABEL_STATUS[session.status] || session.status}
         </span>
       </div>
 
       {/* Tiga cara masuk: imbas QR, buka pautan, atau taip kod di /live.
-          Speed Race: disorok selepas lumba tamat supaya podium dan
-          perbincangan berada di atas. */}
-      {(!lumba || session.status !== "ended") && (
+          Speed Race / Boss Battle: disorok selepas permainan tamat supaya
+          keputusan dan perbincangan berada di atas. */}
+      {(!(lumba || raksasa) || session.status !== "ended") && (
       <div className="card mb-4">
         <div className="flex items-start gap-5 flex-wrap">
           <div className="text-center shrink-0">
@@ -268,6 +287,19 @@ export default function PanelHosSesi() {
           questionCount={totalSoalan}
           serverNow={state.serverNow ?? null}
           review={state.review ?? null}
+          busy={busy}
+          kawal={kawal}
+        />
+      ) : raksasa ? (
+        <BossHostPanel
+          session={session}
+          players={players as unknown as PemainRaksasa[]}
+          questionCount={totalSoalan}
+          serverNow={state.serverNow ?? null}
+          review={state.review ?? null}
+          feed={state.feed ?? []}
+          lastHitName={state.lastHitName ?? null}
+          stats={state.stats ?? null}
           busy={busy}
           kawal={kawal}
         />

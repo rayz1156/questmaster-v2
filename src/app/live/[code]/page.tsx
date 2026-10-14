@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Trophy, Users, Timer, Check, X, Flame } from "lucide-react";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
 import RacePlayer, { type SoalanLumba } from "@/components/RacePlayer";
+import BossPlayer, { type SoalanRaksasa } from "@/components/BossPlayer";
 import { supabase } from "@/lib/supabase";
 
 interface Pilihan { key: string; text: string }
@@ -15,7 +16,7 @@ interface CacheSoalan { version: string; questions: SoalanPemain[] }
 interface Keadaan {
   fp: string;
   status: string;
-  gameMode?: "classic" | "race";
+  gameMode?: "classic" | "race" | "boss";
   questionIndex: number;
   totalQuestions: number;
   serverNow: string;
@@ -204,8 +205,9 @@ export default function SkrinMainLangsung() {
 
   // Tinjauan papan pendahulu bila soalan ditutup atau sesi tamat.
   useEffect(() => {
-    // Speed Race memaparkan kedudukan sendiri, tiada papan pendahulu klasik.
-    const perluPapan = keadaan && keadaan.gameMode !== "race"
+    // Speed Race dan Boss Battle memaparkan kedudukan sendiri, tiada papan
+    // pendahulu klasik (KZ-012, KZ-013).
+    const perluPapan = keadaan && keadaan.gameMode !== "race" && keadaan.gameMode !== "boss"
       && (keadaan.status === "revealed" || keadaan.status === "ended");
     if (!perluPapan) { setPapan(null); return; }
     let hidup = true;
@@ -424,19 +426,31 @@ export default function SkrinMainLangsung() {
   const k = keadaan;
 
   // KZ-012: sesi Speed Race mempunyai skrin sendiri. Aliran masuk di atas
-  // (nama berdaftar, kuiz kelas) kekal sama untuk kedua-dua mod.
-  if (k.gameMode === "race") {
+  // (nama berdaftar, kuiz kelas) kekal sama untuk semua mod.
+  if (k.gameMode === "race" || k.gameMode === "boss") {
+    const soalanPemain = (soalan?.questions || []) as Array<SoalanLumba & SoalanRaksasa>;
     return (
       <div className="min-h-screen bg-gray-50 flex items-start sm:items-center justify-center p-4">
         <div className="w-full max-w-md py-4">
-          <RacePlayer
-            kod={kod}
-            playerId={identiti.playerId}
-            playerToken={identiti.playerToken}
-            nickname={identiti.nickname}
-            soalan={(soalan?.questions || []) as SoalanLumba[]}
-            onKeluar={keluar}
-          />
+          {k.gameMode === "boss" ? (
+            <BossPlayer
+              kod={kod}
+              playerId={identiti.playerId}
+              playerToken={identiti.playerToken}
+              nickname={identiti.nickname}
+              soalan={soalanPemain}
+              onKeluar={keluar}
+            />
+          ) : (
+            <RacePlayer
+              kod={kod}
+              playerId={identiti.playerId}
+              playerToken={identiti.playerToken}
+              nickname={identiti.nickname}
+              soalan={soalanPemain}
+              onKeluar={keluar}
+            />
+          )}
           <div className="text-center mt-4">
             <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">Leave session</button>
           </div>

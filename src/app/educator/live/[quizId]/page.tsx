@@ -8,7 +8,7 @@ import { EDU_TABS } from "@/lib/eduTabs";
 import { Plus, Trash2, Play, Upload, Pencil, Check, X, Download, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import PanelMulaSesi from "@/components/PanelMulaSesi";
-import { RACE_DEFAULT_MINUTES, sahMinitLumba } from "@/lib/lumba-laju";
+import { RACE_DEFAULT_MINUTES, sahMinitLumba, type TahapRaksasa } from "@/lib/lumba-laju";
 
 interface Pilihan { key: string; text: string }
 interface Soalan {
@@ -257,11 +257,17 @@ export default function EditorKuizLangsung() {
     setErr(null);
     if (soalan.length === 0) { setErr("The quiz needs at least one question."); return; }
     // KZ-012: Speed Race perlu minit yang sah sebelum sesi dicipta.
+    // KZ-013: Boss Battle juga menggunakan raceMinutes dan menambah bossLevel.
     const minit = sahMinitLumba(minitTeks);
-    if (modPilih === "race" && minit === null) return;
+    if ((modPilih === "race" || modPilih === "boss") && minit === null) return;
     setBusy(true);
     try {
-      const badan = modPilih === "race" ? { mode: "race", raceMinutes: minit } : { mode: "classic" };
+      const badan =
+        modPilih === "race"
+          ? { mode: "race", raceMinutes: minit }
+          : modPilih === "boss"
+            ? { mode: "boss", raceMinutes: minit, bossLevel: tahapPilih }
+            : { mode: "classic" };
       const json = await authedFetch(`/api/live/quizzes/${quizId}/sessions`, {
         method: "POST",
         body: JSON.stringify(badan),
@@ -273,10 +279,11 @@ export default function EditorKuizLangsung() {
     }
   };
 
-  // Panel pilihan mod (KZ-012).
+  // Panel pilihan mod (KZ-012, KZ-013).
   const [panelMula, setPanelMula] = useState(false);
-  const [modPilih, setModPilih] = useState<"classic" | "race">("classic");
+  const [modPilih, setModPilih] = useState<"classic" | "race" | "boss">("classic");
   const [minitTeks, setMinitTeks] = useState(String(RACE_DEFAULT_MINUTES));
+  const [tahapPilih, setTahapPilih] = useState<TahapRaksasa>("medium");
 
   if (loading) {
     return (
@@ -315,6 +322,8 @@ export default function EditorKuizLangsung() {
           setMod={setModPilih}
           minitTeks={minitTeks}
           setMinitTeks={setMinitTeks}
+          tahap={tahapPilih}
+          setTahap={setTahapPilih}
           busy={busy}
           onMula={onMulaSesi}
           onBatal={() => setPanelMula(false)}
