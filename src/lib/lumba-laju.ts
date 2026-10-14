@@ -13,7 +13,7 @@ export const RACE_MAX_MINUTES = 60;
 export const RACE_DEFAULT_MINUTES = 5;
 
 /** Mod permainan sesi. */
-export type ModPermainan = 'classic' | 'race';
+export type ModPermainan = 'classic' | 'race' | 'boss';
 
 /** Integer 1..60 sahaja; selain itu null. Rentetan nombor bulat diterima. */
 export function sahMinitLumba(v: unknown): number | null {
@@ -29,7 +29,7 @@ export function sahMinitLumba(v: unknown): number | null {
 /** Sahkan mod permainan daripada badan permintaan. Tiada = classic. */
 export function sahModPermainan(v: unknown): ModPermainan | null {
   if (v === undefined || v === null || v === '') return 'classic';
-  if (v === 'classic' || v === 'race') return v;
+  if (v === 'classic' || v === 'race' || v === 'boss') return v;
   return null;
 }
 
@@ -196,6 +196,95 @@ export function kocok<T>(senarai: T[], rawak: () => number = Math.random): T[] {
     [b[i], b[j]] = [b[j], b[i]];
   }
   return b;
+}
+
+/* ============================================================
+ * Mod Lawan Raksasa (Boss Battle), KZ-013. Fungsi tulen sahaja;
+ * pengiraan sebenar nyawa dan kerosakan berlaku dalam fungsi
+ * pangkalan data qm_boss_* (migrasi 0060).
+ * ============================================================ */
+
+/** Pemalar kesukaran raksasa: nyawa setiap pemain setiap minit. */
+export const TAHAP_RAKSASA = { easy: 55, medium: 65, hard: 70 } as const;
+export type TahapRaksasa = keyof typeof TAHAP_RAKSASA;
+
+/**
+ * Sahkan tahap raksasa daripada badan permintaan. Tiada atau kosong = medium
+ * (lalai), supaya klien lama yang tidak menghantar bossLevel tetap berfungsi.
+ */
+export function sahTahapRaksasa(v: unknown): TahapRaksasa | null {
+  if (v === undefined || v === null || v === '') return 'medium';
+  if (v === 'easy' || v === 'medium' || v === 'hard') return v;
+  return null;
+}
+
+/** Nyawa raksasa: bilangan pemain x minit x k, sekurang-kurangnya 1. */
+export function nyawaRaksasa(bilPemain: number, minit: number, k: number): number {
+  const n = Math.max(0, Math.floor(bilPemain));
+  const m = Math.max(0, Math.floor(minit));
+  return Math.max(1, Math.round(n * m * k));
+}
+
+/**
+ * Bilangan soalan yang disyorkan untuk satu pertarungan supaya soalan tidak
+ * berulang. Pelajar biasa menjawab setiap 5 saat, jadi jumlah jawapan yang
+ * sempat dibuat ialah floor(minit*60/5); dibundar ke atas kepada gandaan 5,
+ * minimum 5. Rujukan: 1 minit -> 15, 3 minit -> 40, 5 minit -> 60.
+ */
+export function cadanganSoalanRaksasa(minit: number): number {
+  const jawapan = Math.floor(Math.max(0, minit) * 60 / 5);
+  return Math.max(5, Math.ceil(jawapan / 5) * 5);
+}
+
+/**
+ * Jangkaan hasil pertarungan bagi panel guru (Inggeris, untuk pengguna),
+ * daripada simulasi CTO 400 pertarungan setiap tahap pada kelas biasa.
+ */
+export function jangkaanRaksasa(tahap: TahapRaksasa): string {
+  switch (tahap) {
+    case 'easy':
+      return 'The class almost always wins; the boss usually falls about three quarters of the way through.';
+    case 'hard':
+      return 'A tense fight; a less accurate class can lose, especially in short battles.';
+    default:
+      return 'The class usually wins in the final moments (around 85% of the time used).';
+  }
+}
+
+export interface BarisPenyerang {
+  id: string;
+  nickname: string;
+  boss_damage: number | string | null;
+}
+
+/**
+ * Susun penyerang: kerosakan menurun, seri dipecahkan ikut nama (huruf kecil)
+ * menaik. `kedudukan` 1..N. Peraturan yang sama dengan qm_boss_state.position
+ * supaya skrin guru dan telefon pemain sepadan.
+ */
+export function susunPenyerang<T extends BarisPenyerang>(pemain: T[]): (T & { kedudukan: number })[] {
+  return [...pemain]
+    .sort(
+      (a, b) =>
+        (Number(b.boss_damage) || 0) - (Number(a.boss_damage) || 0) ||
+        (a.nickname.toLowerCase() < b.nickname.toLowerCase() ? -1
+          : a.nickname.toLowerCase() > b.nickname.toLowerCase() ? 1 : 0),
+    )
+    .map((p, i) => ({ ...p, kedudukan: i + 1 }));
+}
+
+export type FasaRaksasa = 'calm' | 'angry' | 'rage';
+
+/**
+ * Fasa raksasa ikut baki nyawa: calm bila melebihi 50%, angry bila melebihi
+ * 25%, rage selainnya. maxHp 0 (belum bermula) dianggap calm.
+ */
+export function fasaRaksasa(hp: number, maxHp: number): FasaRaksasa {
+  if (!(maxHp > 0)) return 'calm';
+  const nisbah = hp / maxHp;
+  if (nisbah > 0.5) return 'calm';
+  if (nisbah > 0.25) return 'angry';
+  return 'rage';
 }
 
 /** Tindakan kawalan mod perbincangan (hanya sesi race yang sudah tamat). */
