@@ -241,6 +241,35 @@ async function ujianPenolakan() {
   }
   check("control_live_session: end tanpa confirm dihalang sebelum rangkaian", ok3h);
 
+  // 3i. KZ-013: boss_level tidak sah dihalang sebelum rangkaian.
+  silentFetch();
+  let ok3i = false;
+  try {
+    await startLiveSession(TOKEN, "uuid-kuiz", { mode: "boss", race_minutes: 5, boss_level: "extreme" });
+  } catch (e) {
+    ok3i = e instanceof Error && /boss_level/.test(e.message) && networkTouched === false;
+  }
+  check("start_live_session: boss_level tidak sah dihalang sebelum rangkaian", ok3i);
+
+  // 3j. KZ-013: mod boss menghantar raceMinutes dan bossLevel ke route.
+  const postedBoss: Array<{ body: Record<string, unknown> }> = [];
+  globalThis.fetch = (async (_input: unknown, init?: { body?: string }) => {
+    postedBoss.push({ body: JSON.parse(init?.body ?? "{}") as Record<string, unknown> });
+    return new Response(JSON.stringify({ data: { sessionId: "s-2", code: "XY3AB9" } }), {
+      status: 201,
+      headers: { "content-type": "application/json" },
+    });
+  }) as typeof fetch;
+  await startLiveSession(TOKEN, "uuid-kuiz", { mode: "boss", race_minutes: 10, boss_level: "hard" });
+  const badanBoss = postedBoss[0]?.body as
+    | { mode?: string; raceMinutes?: number; bossLevel?: string }
+    | undefined;
+  check("start_live_session: mod boss menghantar raceMinutes dan bossLevel",
+    badanBoss?.mode === "boss" &&
+      badanBoss?.raceMinutes === 10 &&
+      badanBoss?.bossLevel === "hard",
+    postedBoss);
+
   globalThis.fetch = realFetch;
 }
 

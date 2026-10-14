@@ -1670,17 +1670,21 @@ export const TOOLS: ToolDef[] = [
     description:
       "Cipta sesi Live Quiz baharu dalam lobi untuk satu kuiz. Kuiz perlu sekurang-kurangnya " +
       "satu soalan. Pulangkan session_id, kod sertai 6 aksara, pautan sertai dan pautan QR. " +
-      "mode: classic (lalai, soalan demi soalan gaya Kahoot) atau race (Speed Race: setiap pelajar " +
-      "menjawab ikut rentak sendiri dan kereta maju di trek). Untuk race, race_minutes 1 hingga 60 " +
-      "(lalai 5). Selepas ini gunakan control_live_session dengan action start.",
+      "mode: classic (lalai, soalan demi soalan gaya Kahoot), race (Speed Race: setiap pelajar " +
+      "menjawab ikut rentak sendiri dan kereta maju di trek) atau boss (Boss Battle: seluruh " +
+      "kelas bekerjasama melawan satu raksasa; jawapan betul mencederakannya, jawapan salah " +
+      "memulihkannya). Untuk race dan boss, race_minutes 1 hingga 60 (lalai 5) menetapkan masa " +
+      "permainan. Untuk boss, boss_level easy, medium (lalai) atau hard menetapkan kesukaran " +
+      "raksasa. Selepas ini gunakan control_live_session dengan action start.",
     roles: STAFF,
     write: true,
     inputSchema: {
       type: "object",
       properties: {
         quiz_id: { type: "string" },
-        mode: { type: "string", enum: ["classic", "race"], description: "Lalai classic" },
-        race_minutes: { type: "integer", minimum: 1, maximum: 60, description: "Masa lumba (minit), mode race sahaja. Lalai 5." },
+        mode: { type: "string", enum: ["classic", "race", "boss"], description: "Lalai classic" },
+        race_minutes: { type: "integer", minimum: 1, maximum: 60, description: "Masa permainan (minit), untuk mode race dan boss. Lalai 5." },
+        boss_level: { type: "string", enum: ["easy", "medium", "hard"], description: "Kesukaran raksasa, mode boss sahaja. Lalai medium." },
       },
       required: ["quiz_id"],
     },
@@ -1697,9 +1701,10 @@ export const TOOLS: ToolDef[] = [
       "Kawal sesi Live Quiz: action start (lobi ke soalan pertama), next (soalan berikutnya), " +
       "reveal (tunjuk jawapan), end (tamat, WAJIB confirm: true) atau reset (kembali ke lobi dan " +
       "padam semua jawapan, WAJIB confirm: true). Sesi Speed Race: start memulakan lumba, end " +
-      "menghentikannya; next dan reveal tidak digunakan. Selepas Speed Race tamat, mod perbincangan: " +
-      "review_start (soalan pertama), review_next, review_prev, review_reveal (dedah jawapan betul) " +
-      "dan review_end.",
+      "menghentikannya; next dan reveal tidak digunakan. Sesi Boss Battle: start memulakan " +
+      "pertarungan, end menghentikannya; next dan reveal juga tidak digunakan. Selepas Speed " +
+      "Race ATAU Boss Battle tamat, mod perbincangan: review_start (soalan pertama), review_next, " +
+      "review_prev, review_reveal (dedah jawapan betul) dan review_end.",
     roles: STAFF,
     write: true,
     inputSchema: {

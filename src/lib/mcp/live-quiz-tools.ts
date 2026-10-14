@@ -8,7 +8,12 @@
 
 import { callApi } from "./api";
 import { validateOptions, parseQuizCsv, parseAiken } from "@/lib/live-quiz";
-import { RACE_DEFAULT_MINUTES, sahMinitLumba, sahModPermainan } from "@/lib/lumba-laju";
+import {
+  RACE_DEFAULT_MINUTES,
+  sahMinitLumba,
+  sahModPermainan,
+  sahTahapRaksasa,
+} from "@/lib/lumba-laju";
 
 /** Had soalan per panggilan, selari had import CSV (QUIZ_CSV_MAX_QUESTIONS). */
 export const LIVE_MAX_QUESTIONS_PER_CALL = 100;
@@ -340,16 +345,24 @@ export async function deleteLiveQuestion(
 export async function startLiveSession(
   accessToken: string,
   quizId: string,
-  args: { mode?: unknown; race_minutes?: unknown } = {}
+  args: { mode?: unknown; race_minutes?: unknown; boss_level?: unknown } = {}
 ): Promise<Record<string, unknown>> {
   // KZ-012: mode pilihan. Tiada mode = classic, sama seperti sebelum ini.
+  // KZ-013: mode 'boss' (Boss Battle), boss_level lalai medium.
   const mode = sahModPermainan(args?.mode);
-  if (!mode) throw new Error("mode mesti classic atau race");
+  if (!mode) throw new Error("mode mesti classic, race atau boss");
   let body: Record<string, unknown> | undefined;
   if (mode === "race") {
     const minit = args?.race_minutes === undefined ? RACE_DEFAULT_MINUTES : sahMinitLumba(args.race_minutes);
     if (minit === null) throw new Error("race_minutes mesti nombor bulat 1 hingga 60");
     body = { mode: "race", raceMinutes: minit };
+  } else if (mode === "boss") {
+    // Boss Battle menggunakan race_minutes untuk masa pertarungan.
+    const minit = args?.race_minutes === undefined ? RACE_DEFAULT_MINUTES : sahMinitLumba(args.race_minutes);
+    if (minit === null) throw new Error("race_minutes mesti nombor bulat 1 hingga 60");
+    const tahap = sahTahapRaksasa(args?.boss_level);
+    if (tahap === null) throw new Error("boss_level mesti easy, medium atau hard");
+    body = { mode: "boss", raceMinutes: minit, bossLevel: tahap };
   }
   const res = await callApi<{ data?: { sessionId?: string; code?: string; gameMode?: string } }>(
     accessToken,
