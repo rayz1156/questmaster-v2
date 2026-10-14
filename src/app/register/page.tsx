@@ -12,6 +12,31 @@ import { supabase } from '@/lib/supabase';
 import Logo from '@/components/Logo';
 import GoogleButton from '@/components/GoogleButton';
 
+/**
+ * Mesej apabila emel sudah berdaftar. Ikut bahasa pelayar pengguna:
+ * Bahasa Melayu jika navigator.language bermula dengan "ms", selain itu
+ * Inggeris (bahasa lalai antara muka aplikasi).
+ */
+const MESEJ_EMEL_WUJUD = {
+  ms: {
+    educator: 'Emel ini sudah berdaftar sebagai peserta. Hubungi pentadbir untuk menaik taraf akaun.',
+    participant: 'Emel ini sudah berdaftar. Sila log masuk.',
+  },
+  en: {
+    educator: 'This email is already registered as a participant. Contact the administrator to upgrade your account.',
+    participant: 'This email is already registered. Please log in.',
+  },
+} as const;
+
+function bahasaPengguna(): 'ms' | 'en' {
+  try {
+    const senarai = [...(navigator.languages || []), navigator.language || ''];
+    return senarai.some((l) => String(l).toLowerCase().startsWith('ms')) ? 'ms' : 'en';
+  } catch {
+    return 'en';
+  }
+}
+
 export default function Register() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -28,11 +53,18 @@ export default function Register() {
     e.preventDefault();
     setBusy(true); setErr('');
     const redirectTo = `${window.location.origin}/auth/callback`;
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email, password,
       options: { emailRedirectTo: redirectTo, data: { name, display_name: name, role } },
     });
     setBusy(false);
+    // Emel sudah wujud: Supabase sama ada memulangkan ralat "already
+    // registered", atau (bila pengesahan emel aktif) pengguna dengan
+    // identities kosong tanpa ralat.
+    const emelWujud =
+      (error && /already\s+(been\s+)?registered|already exists/i.test(error.message || '')) ||
+      (!error && Array.isArray(data?.user?.identities) && data.user.identities.length === 0);
+    if (emelWujud) { setErr(MESEJ_EMEL_WUJUD[bahasaPengguna()][role]); return; }
     if (error) { setErr(error.message); return; }
     if (role === 'educator') {
       fetch('/api/notify-educator-pending', {
