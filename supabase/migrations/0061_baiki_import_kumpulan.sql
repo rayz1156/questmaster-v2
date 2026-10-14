@@ -22,8 +22,10 @@
 -- Selainnya badan fungsi sama seperti 0033: semakan pemanggil, validasi,
 -- sekatan pelan, konflik ketua dan satu transaksi tidak berubah.
 -- Tandatangan, SECURITY DEFINER, search_path dan geran kekal.
-
-BEGIN;
+--
+-- Fail ini TIADA BEGIN/COMMIT (peraturan pasukan, dapatan kzsec KZ-014).
+-- Jalankan sebagai satu transaksi:
+--   docker exec -i supabase-db psql -U supabase_admin -d postgres -v ON_ERROR_STOP=1 -1 -f - < supabase/migrations/0061_baiki_import_kumpulan.sql
 
 CREATE OR REPLACE FUNCTION public.qm_import_class_teams(
   p_class_id uuid,
@@ -370,7 +372,5 @@ $fn$;
 
 revoke all on function public.qm_import_class_teams(uuid, jsonb, boolean, boolean) from PUBLIC, anon;
 grant execute on function public.qm_import_class_teams(uuid, jsonb, boolean, boolean) to authenticated, service_role;
-
-COMMIT;
 
 NOTIFY pgrst, 'reload schema';
