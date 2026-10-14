@@ -64,7 +64,7 @@ export default function QuestionReviewPlayer({ rv, q }: Props) {
       </div>
       <div className="mt-3 text-sm text-center">
         {!rv.myFirstChoice ? (
-          <span className="text-gray-500">You did not answer this one during the race.</span>
+          <span className="text-gray-500">You did not answer this one during the game.</span>
         ) : !rv.revealed ? (
           <span className="text-gray-500">Think about it. Your teacher will reveal the answer soon.</span>
         ) : rv.myFirstCorrect ? (

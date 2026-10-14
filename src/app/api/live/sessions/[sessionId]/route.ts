@@ -256,17 +256,16 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     // Statistik akhir: peratus betul pada cubaan pertama (satu perpuluhan).
     let stats: Record<string, unknown> | null = null;
     if (sesi.status === 'ended') {
-      const { data: semua } = await auth.supa
-        .from('qm_live_answers')
-        .select('is_correct, attempt')
-        .eq('session_id', params.sessionId);
-      let pertama = 0;
-      let betul = 0;
-      for (const a of (semua || []) as Array<{ is_correct: boolean; attempt: number | null }>) {
-        if ((a.attempt ?? 1) !== 1) continue;
-        pertama += 1;
-        if (a.is_correct) betul += 1;
-      }
+      // Kiraan di pangkalan data (head: true), bukan semua baris: sesi besar
+      // boleh melebihi had baris PostgREST dan memesongkan peratus.
+      const [{ count: kiraPertama }, { count: kiraBetul }] = await Promise.all([
+        auth.supa.from('qm_live_answers').select('id', { count: 'exact', head: true })
+          .eq('session_id', params.sessionId).eq('attempt', 1),
+        auth.supa.from('qm_live_answers').select('id', { count: 'exact', head: true })
+          .eq('session_id', params.sessionId).eq('attempt', 1).eq('is_correct', true),
+      ]);
+      const pertama = kiraPertama ?? 0;
+      const betul = kiraBetul ?? 0;
       stats = {
         correctPct: pertama > 0 ? Math.round((betul / pertama) * 1000) / 10 : null,
         crits: sesi.boss_crits ?? 0,

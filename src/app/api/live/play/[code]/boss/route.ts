@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
+import { susunPenyerang } from '@/lib/lumba-laju';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -129,6 +130,21 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     }
   }
 
+  // Kedudukan dikira dengan susunPenyerang yang sama dengan skrin guru:
+  // susunan nama dalam Postgres (collation) dan JS boleh berbeza untuk seri.
+  const { data: semuaPemain } = await supa
+    .from('qm_live_players')
+    .select('id, nickname, boss_damage')
+    .eq('session_id', sah.sesi.id);
+  if (semuaPemain && semuaPemain.length > 0) {
+    const papan = susunPenyerang(semuaPemain as Array<{ id: string; nickname: string; boss_damage: number }>);
+    const saya = papan.find((p) => p.id === sah.playerId);
+    if (saya) {
+      k.position = saya.kedudukan;
+      k.playerCount = papan.length;
+    }
+  }
+
   // Senarai medan yang dibenarkan sahaja (kzsec KZ-013): jika qm_boss_state
   // diubah kelak dan memulangkan medan baharu, ia tidak bocor ke pemain.
   const MEDAN_KEADAAN = [
@@ -179,5 +195,15 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     console.error('qm_boss_submit failed', error?.code);
     return NextResponse.json({ error: 'Your answer could not be saved.' }, { status: 500 });
   }
-  return NextResponse.json(data);
+  // Senarai medan yang dibenarkan sahaja, sama seperti GET. correctKey
+  // selepas menjawab adalah disengajakan (keputusan Boss, 14 Okt 2026).
+  const MEDAN_JAWAPAN = [
+    'ok', 'reason', 'correct', 'correctKey', 'damage', 'heal', 'crit', 'streakBonus',
+    'points', 'hp', 'maxHp', 'streak', 'wrongStreak', 'frozenUntil', 'defeated',
+    'nextQuestionId', 'questionId',
+  ] as const;
+  const hasil = data as Record<string, unknown>;
+  const balasJawapan: Record<string, unknown> = {};
+  for (const m of MEDAN_JAWAPAN) if (m in hasil) balasJawapan[m] = hasil[m];
+  return NextResponse.json(balasJawapan);
 }

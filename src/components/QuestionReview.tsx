@@ -100,7 +100,7 @@ export default function QuestionReview({ review: rv, busy, kawal, penuh, setPenu
               ({rv.distribution.betulPertama} of {rv.distribution.jumlahPertama} students). Total attempts: {rv.distribution.jumlahSemuaCubaan}.
             </>
           ) : (
-            "Nobody answered this question during the race."
+            "Nobody answered this question during the game."
           )
         ) : (
           <>Bars show each student&apos;s first answer. Ask the class why before you reveal.</>

@@ -285,7 +285,7 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
   if ((TINDAKAN_REVIEW as readonly string[]).includes(action)) {
     if ((!lumba && !raksasa) || ses.status !== 'ended') {
       return NextResponse.json(
-        { error: 'Question review is available after the race ends.' },
+        { error: 'Question review is available after the game ends.' },
         { status: 400 },
       );
     }

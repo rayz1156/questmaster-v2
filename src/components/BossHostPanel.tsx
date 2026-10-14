@@ -163,9 +163,19 @@ export default function BossHostPanel({
   }, [hp]);
 
   // Angka terapung bagi entri feed BAHARU sejak tinjauan terakhir, dikenal
-  // pasti ikut "at" + nama. Maksimum 6 serentak; setiap satu lenyap selepas
-  // animasi. reduced-motion: angka kekal statik sekejap tanpa animasi.
+  // pasti ikut "at" + nama. Maksimum 6 serentak. Setiap angka ada pemasa
+  // pembuangnya sendiri dalam ref, jadi tinjauan seterusnya (feed baharu
+  // setiap saat) tidak membatalkannya. Tinjauan PERTAMA hanya merekod feed
+  // sedia ada sebagai sudah dilihat, supaya muat semula halaman tidak
+  // memainkan semula 8 serangan lama.
+  const pemasaRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
+  const feedSediaRef = useRef(false);
   useEffect(() => {
+    if (!feedSediaRef.current) {
+      for (const f of feed) feedDilihatRef.current.add(`${f.at}|${f.nickname}`);
+      feedSediaRef.current = true;
+      return;
+    }
     const baharu: AngkaTerapung[] = [];
     for (const f of feed) {
       const kunci = `${f.at}|${f.nickname}`;
@@ -174,14 +184,23 @@ export default function BossHostPanel({
       if (f.effect > 0) baharu.push({ kunci, teks: `-${f.effect}${f.crit ? "!" : ""}`, kritikal: f.crit, pulih: false });
       else if (f.effect < 0) baharu.push({ kunci, teks: `+${-f.effect}`, kritikal: false, pulih: true });
     }
-    if (baharu.length > 0) {
-      setTerapung((lama) => [...lama, ...baharu].slice(-6));
-      const t = setTimeout(() => {
-        setTerapung((lama) => lama.filter((a) => !baharu.some((b) => b.kunci === a.kunci)));
-      }, 1300);
-      return () => clearTimeout(t);
+    if (baharu.length === 0) return;
+    setTerapung((lama) => [...lama, ...baharu].slice(-6));
+    for (const a of baharu) {
+      pemasaRef.current.set(
+        a.kunci,
+        setTimeout(() => {
+          pemasaRef.current.delete(a.kunci);
+          setTerapung((lama) => lama.filter((x) => x.kunci !== a.kunci));
+        }, 1300),
+      );
     }
   }, [feed]);
+  // Bersihkan semua pemasa bila komponen dibuang sahaja.
+  useEffect(() => {
+    const peta = pemasaRef.current;
+    return () => { peta.forEach((t) => clearTimeout(t)); peta.clear(); };
+  }, []);
 
   const butangHenti = (
     <button

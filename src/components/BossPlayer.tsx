@@ -149,7 +149,9 @@ export default function BossPlayer({ kod, playerId, playerToken, nickname, soala
           mesej = `${j.crit ? "Critical hit!" : "Hit!"} -${pukulan} HP${j.streakBonus ? " + streak bonus" : ""}`;
         } else {
           const pulih = Number(j.heal) || 0;
-          mesej = `Wrong. The boss healed +${pulih} (${j.wrongStreak}/3)`;
+          mesej = j.frozenUntil
+            ? `Wrong again. The boss healed +${pulih} (3/3)`
+            : `Wrong. The boss healed +${pulih} (${j.wrongStreak}/3)`;
         }
         setMaklum({ betul, dipilih: kunciPilihan, kunciBetul: j.correctKey ?? null, mesej });
         tunggu = betul ? 600 : 1000;
