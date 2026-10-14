@@ -12,7 +12,7 @@ begin
   if v_quiz is null then raise exception 'tiada kuiz untuk diuji'; end if;
 
   insert into qm_live_sessions (quiz_id, host_id, code, status, current_index, game_mode, race_minutes, boss_k)
-    values (v_quiz, v_host, 'BOSSZZ', 'lobby', -1, 'boss', 1, 65) returning id into v_sess;
+    values (v_quiz, v_host, 'BXSSZZ', 'lobby', -1, 'boss', 1, 65) returning id into v_sess;
 
   -- B1: tiada pemain -> BOSS3
   begin
@@ -97,7 +97,7 @@ begin
 
   -- B12: sesi kedua kalah masa, dan hentian guru
   insert into qm_live_sessions (quiz_id, host_id, code, status, current_index, game_mode, race_minutes, boss_k)
-    values (v_quiz, v_host, 'BOSSZY', 'lobby', -1, 'boss', 2, 55) returning id into v_s2;
+    values (v_quiz, v_host, 'BXSSZY', 'lobby', -1, 'boss', 2, 55) returning id into v_s2;
   insert into qm_live_players (session_id, nickname, player_token) values (v_s2, 'Ujian C', repeat('c', 32)) returning id into v_c;
   r := qm_boss_start(v_s2);
   raise notice 'B12 sesi 2 maxHp=% (jangka 1 x 2 x 55 = 110)', r->>'maxHp';
