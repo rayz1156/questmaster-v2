@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { assertCapability } from '@/lib/capabilities';
 import { fileluUpload, fileluShareUrl, fileluDelete } from '@/lib/filelu';
-import { fetchRemoteToDisk, checkRateLimit, readTmp, UploadGuardError } from '@/lib/upload-guard';
+import { fetchRemoteToDisk, checkRateLimit, readTmp, UploadGuardError, imejRasterSebenar } from '@/lib/upload-guard';
+import { normMime } from '@/lib/sajianSelamat';
 import { s5ObjectKey, s5PutStream, s5FileCode } from '@/lib/s5';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
@@ -64,8 +65,10 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
 
-  const cap = await assertCapability(owner.supa, owner.user!.id, 'files');
-  if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
+  // KZ-017: semakan keupayaan DIKETEGAKAN mengikut jenis fail. Imej raster
+  // sebenar (dihidu daripada bait, lihat imejRasterSebenar) tidak pernah
+  // disekat oleh keupayaan, jadi gate dipindahkan ke tempat bait diketahui,
+  // bukan di sini sebelum badan dibaca.
 
   // --- Laluan source_url: pelayan yang mengambil fail, bukan model ---
   //
@@ -98,6 +101,16 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
     }
 
+    // KZ-017 P2 (pembetulan kzsec penemuan 2 dan 3): semakan keupayaan KEMBALI
+    // ke SEBELUM fetchRemoteToDisk. Tiada pengecualian imej di sini: MIME jauh
+    // belum diketahui sebelum pengambilan, dan mengharapkan pelayan memuat
+    // turun fail penuh hanya untuk menolak selepas itu ialah pembaziran kerja
+    // pelayan dan vektor isian cakera. Jenis fail tetap ditapis oleh senarai
+    // dibenarkan selepas bait dihidu. Pemanggil sudah disahkan ahli kelas oleh
+    // requireClassMember.
+    const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
+    if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
+
     let remote;
     try {
       remote = await fetchRemoteToDisk(sourceUrl, {
@@ -114,22 +127,30 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       return NextResponse.json({ error: e?.message || 'Fetch failed' }, { status });
     }
 
-    // Semakan kuota dengan saiz sebenar yang diterima (bukan yang diisytihar).
-    const kuotaSebenar = await reserveMuatNaik(owner.supa, params.classId, remote.bytes, remote.mimeType);
-    if (kuotaSebenar) return NextResponse.json(kuotaSebenar.body, { status: kuotaSebenar.status });
-
+    // Setiap laluan keluar selepas fetchRemoteToDisk berjaya mesti lalui
+    // finally di bawah (remote.cleanup) supaya fail sementara qm-src-* tidak
+    // tertinggal yatim pada cakera (kzsec penemuan 2).
     try {
+      // KZ-017 R2-2: MIME yang dihidu daripada bait ternormal (huruf kecil,
+      // tanpa parameter) sebelum digunakan untuk kuota, penyimpanan dan rekod,
+      // supaya nilai seperti "image/SVG+XML" tidak kekal begitu dalam storan.
+      const mimeSebenar = normMime(remote.mimeType) || 'application/octet-stream';
+
+      // Semakan kuota dengan saiz sebenar yang diterima (bukan yang diisytihar).
+      const kuotaSebenar = await reserveMuatNaik(owner.supa, params.classId, remote.bytes, mimeSebenar);
+      if (kuotaSebenar) return NextResponse.json(kuotaSebenar.body, { status: kuotaSebenar.status });
+
       const fileName =
         (typeof body.fileName === 'string' && body.fileName.trim()) || fileNameFromUrl(remote.finalUrl);
       const key = s5ObjectKey(fileName);
-      await s5PutStream(key, readTmp(remote.tmpPath), remote.bytes, remote.mimeType);
+      await s5PutStream(key, readTmp(remote.tmpPath), remote.bytes, mimeSebenar);
       const fileCode = s5FileCode(key);
 
       // Rekod ialah penentu akhir kuota. Jika gagal (contoh kuota penuh
       // semasa fail ditransit), cuba padam fail daripada storan supaya
       // tidak ada fail yatim yang tidak dikira (kzsec 2/3).
       const rekod = await rekodMuatNaik(
-        owner.supa, params.classId, fileCode, remote.bytes, remote.mimeType, 'learning_board_url');
+        owner.supa, params.classId, fileCode, remote.bytes, mimeSebenar, 'learning_board_url');
       if (rekod) {
         const padam = await fileluDelete(fileCode);
         console.error(`[upload-file/source_url] rekod gagal, padam=${padam} code=${fileCode}`);
@@ -139,7 +160,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       console.log(
         `[upload-file/source_url] user=${owner.user!.id} class=${params.classId} ` +
           `url=${remote.finalUrl} ips=${remote.resolvedIps.join(',')} ` +
-          `bytes=${remote.bytes} mime=${remote.mimeType}`,
+          `bytes=${remote.bytes} mime=${mimeSebenar}`,
       );
 
       return NextResponse.json({
@@ -147,7 +168,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
         fileUrl: fileluShareUrl(fileCode),
         fileluFileUrl: `/api/learning-boards/${params.classId}/file-redirect/${fileCode}`,
         fileName,
-        fileMimeType: remote.mimeType,
+        fileMimeType: mimeSebenar,
         fileSizeBytes: remote.bytes,
         fileExtension: extOf(fileName) || null,
         sourceUrl: remote.finalUrl,
@@ -155,6 +176,28 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     } finally {
       await remote.cleanup();
     }
+  }
+
+  // KZ-017 R2-3 (pembetulan kzsec pusingan 2, penemuan 2): semakan pantas
+  // SEBELUM badan berbilang bahagian dibaca. req.formData() menimbal seluruh
+  // badan dalam memori, jadi permintaan besar daripada peminta tanpa hak
+  // ditolak lebih awal. Semakan ini adalah gagal-cepat sahaja; semakan tepat
+  // selepas penghiduan bait dikekalkan di bawah.
+  const rate = checkRateLimit(owner.user!.id);
+  if (!rate.ok) {
+    return NextResponse.json(
+      { error: `Too many uploads. Try again in ${rate.retryAfterSec}s` },
+      { status: 429, headers: { 'Retry-After': String(rate.retryAfterSec) } },
+    );
+  }
+  // Keupayaan dikira SEKALI di sini dan diguna semula selepas penghiduan bait
+  // (jangan panggil assertCapability kali kedua). Pengguna tanpa keupayaan
+  // fail hanya boleh memuat naik imej raster, jadi had 25 MB pada badan yang
+  // diumumkan adalah munasabah sebagai tolakan awal tanpa membaca badan.
+  const capAwal = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
+  const panjangDiumum = Number(req.headers.get('content-length') || 0);
+  if (!capAwal.ok && panjangDiumum > 25 * 1024 * 1024) {
+    return NextResponse.json({ error: 'Image too large. Maximum 25 MB.' }, { status: 413 });
   }
 
   const form = await req.formData().catch(() => null);
@@ -173,10 +216,28 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     );
   }
 
-  const mime = file.type || 'application/octet-stream';
+  const mime = (file.type || 'application/octet-stream').split(';')[0].trim().toLowerCase();
   const isAllowed = ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p));
   if (!isAllowed) {
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
+  }
+
+  // KZ-017 P1 (pembetulan kzsec penemuan 1): bait dibaca SEKALI di sini, sebelum
+  // keputusan keupayaan, supaya jenis MIME untuk keupayaan dihidu daripada
+  // tandatangan bait sebenar. PERHATIAN: file.type ialah Content-Type bahagian
+  // multipart yang DIKAWAL KLIEN, jadi ia TIDAK dipercayai untuk keputusan
+  // keupayaan (ia kekal dipakai untuk senarai dibenarkan dan FileLu sahaja).
+  // Imej raster sebenar (PNG/JPEG/GIF/WebP) tidak disekat oleh keupayaan; SVG
+  // dan apa-apa yang mengisytihar image/* tetapi bukan raster perlu
+  // keupayaan fail, diwarisi daripada pemilik kelas. Pemanggil sudah disahkan
+  // ahli kelas oleh requireClassMember.
+  const arrayBuf = await file.arrayBuffer();
+  const bytes = Buffer.from(arrayBuf);
+  const imejRaster = imejRasterSebenar(new Uint8Array(arrayBuf));
+  if (!imejRaster && !capAwal.ok) {
+    // R2-3: capAwal dikira sekali sebelum formData() dan diguna semula di
+    // sini, bukan semakan kedua. Imej raster sebenar tidak perlu keupayaan.
+    return NextResponse.json({ error: capAwal.message }, { status: capAwal.status });
   }
 
   // Kuota disemak SEBELUM bait dihantar ke FileLu (tiket V2-002b).
@@ -184,8 +245,6 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
 
   const ext = extOf(file.name);
-  const arrayBuf = await file.arrayBuffer();
-  const bytes = Buffer.from(arrayBuf);
 
   let uploaded;
   try {

@@ -22,7 +22,9 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
 
-  const cap = await assertCapability(owner.supa, owner.user!.id, 'files');
+  // KZ-017: jenis MIME yang diisytihar klien tidak dipercayai, jadi tiada
+  // pengecualian imej di sini. Keupayaan fail diwarisi daripada pemilik kelas.
+  const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
   if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
 
   const body = await req.json().catch(() => ({} as any));
