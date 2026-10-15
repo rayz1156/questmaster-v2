@@ -1,23 +1,53 @@
 "use client";
+
+/**
+ * Papan pemuka peserta, Versi 1 gaya HiStudy (KZ-018).
+ *
+ * Logik sedia ada dikekalkan: pilih kelas aktif (susunKelas/statusKelas),
+ * banner kelas tamat, CertificateNameBanner, PeerReviewBanner, keadaan
+ * kosong "Join your first class", borang sertai kelas, dan "Leave this
+ * class". Susun atur baharu direka daripada komponen dalam
+ * `src/components/participant-home/` dengan logik tulen daripada
+ * `src/lib/papanPemukaPeserta.ts`.
+ */
+
 import ParticipantShell from "@/components/ParticipantShell";
-import { useEffect, useMemo, useState } from "react";
-import Link from "next/link";
-import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound, BookOpen } from "lucide-react";
+import BannerProfil from "@/components/participant-home/BannerProfil";
+import KadStatistik from "@/components/participant-home/KadStatistik";
+import SenaraiAktiviti, { type BarisAktiviti } from "@/components/participant-home/SenaraiAktiviti";
+import PanelPendahulu, { type BarisSkor } from "@/components/participant-home/PanelPendahulu";
+import PautanKelas from "@/components/participant-home/PautanKelas";
+import { useEffect, useMemo, useRef, useState } from "react";
+import {
+  listQuestsForParticipant,
+  listEnrolledClasses,
+  getMyProfile,
+  listClassTeamScores,
+  listClassIndividualScores,
+  joinClassByCode,
+  normalizeClassCode,
+  leaveClassAsStudent,
+  listMyClassActivity,
+  type Hunt,
+  type ClassIndividualScore,
+} from "@/lib/data";
 import { useSession } from "@/lib/session";
-import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, normalizeClassCode, leaveClassAsStudent, listMyClassActivity, type Hunt } from "@/lib/data";
 import { statusKelas, susunKelas, type AktivitiKelas, type KelasUntukStatus } from "@/lib/kelasStatus";
+import { bahagiAktiviti, kedudukanSaya, peneranganTarikh } from "@/lib/papanPemukaPeserta";
 import { supabase } from "@/lib/supabaseClient";
 import PeerReviewBanner from "@/components/PeerReviewBanner";
 import CertificateNameBanner from "@/components/CertificateNameBanner";
 
-
-function initials(s: string) {
-  const parts = (s || '').trim().split(/\s+/).slice(0,2);
-  return parts.map(p => p[0]?.toUpperCase() || '').join('') || '?';
-}
+// Format tarikh ringkas untuk baris maklumat kad aktiviti (kalendar en-GB).
+const formatTarikh = (iso: string | null | undefined) => {
+  if (!iso) return "";
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+};
 
 export default function Page() {
-  const { user } = useSession('participant');
+  const { user } = useSession("participant");
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [classes, setClasses] = useState<any[]>([]);
   const [aktiviti, setAktiviti] = useState<AktivitiKelas[]>([]);
@@ -25,10 +55,17 @@ export default function Page() {
   const [dataReady, setDataReady] = useState(false);
   const [activeClassId, setActiveClassId] = useState<string>("");
   const [scores, setScores] = useState<any[]>([]);
+  const [indivScores, setIndivScores] = useState<ClassIndividualScore[]>([]);
   const [joinCode, setJoinCode] = useState<string>("");
   const [joinBusy, setJoinBusy] = useState(false);
   const [joinErr, setJoinErr] = useState<string | null>(null);
   const [joinOk, setJoinOk] = useState<string | null>(null);
+  const [bukaSertai, setBukaSertai] = useState(false);
+  const [myTeamId, setMyTeamId] = useState<string | null>(null);
+  const [scoresLoading, setScoresLoading] = useState(false);
+  // Rujukan borang sertai di kaki halaman; butang banner membuka dan menatal ke sana.
+  const rujukanSertai = useRef<HTMLDetailsElement>(null);
+
   const onJoinClass = async (e: any) => {
     e.preventDefault();
     if (!joinCode.trim()) return;
@@ -45,8 +82,12 @@ export default function Page() {
       setJoinBusy(false);
     }
   };
-  const [myTeamId, setMyTeamId] = useState<string | null>(null);
-  const [scoresLoading, setScoresLoading] = useState(false);
+
+  const bukaBorangSertai = () => {
+    setBukaSertai(true);
+    // Tatal lembut ke borang sedia ada di kaki halaman (tiada laluan baharu).
+    requestAnimationFrame(() => rujukanSertai.current?.scrollIntoView({ behavior: "smooth", block: "center" }));
+  };
 
   useEffect(() => { if (!user) return; (async () => {
     const [h, c, p, ak] = await Promise.all([
@@ -56,7 +97,7 @@ export default function Page() {
       listMyClassActivity().catch(() => [] as AktivitiKelas[]),
     ]);
     setHunts(h);
-    setClasses(c);
+    setClasses(c as any[]);
     setAktiviti(ak);
     setName(p?.display_name || "");
     // Kelas lalai: kelas aktif pertama ikut susunKelas; jika tiada kelas
@@ -67,9 +108,9 @@ export default function Page() {
     setDataReady(true);
   })(); }, [user]);
 
-  // Fetch class leaderboard + my team for active class
+  // Markah kelas aktif: pasukan, individu dan pasukan saya.
   useEffect(() => {
-    if (!activeClassId || !user) { setScores([]); setMyTeamId(null); return; }
+    if (!activeClassId || !user) { setScores([]); setIndivScores([]); setMyTeamId(null); return; }
     setScoresLoading(true);
     (async () => {
       try {
@@ -77,6 +118,10 @@ export default function Page() {
         const sorted = (list as any[]).slice().sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0));
         setScores(sorted);
       } catch { setScores([]); }
+      try {
+        const is = await listClassIndividualScores(activeClassId);
+        setIndivScores(is.slice().sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0)));
+      } catch { setIndivScores([]); }
       try {
         const { data } = await supabase
           .from('qm_team_members')
@@ -94,45 +139,100 @@ export default function Page() {
   const activeQuests = useMemo(() => hunts.filter((h: any) => activeClassId ? h.class_id === activeClassId : true), [hunts, activeClassId]);
   const activeQuestCount = activeQuests.length;
   const myTeamRow = useMemo(() => scores.find((s: any) => s.team_id === myTeamId), [scores, myTeamId]);
-  const myRank = useMemo(() => myTeamId ? (scores.findIndex((s: any) => s.team_id === myTeamId) + 1) : 0, [scores, myTeamId]);
-  const totalPoints = Number(myTeamRow?.total_score) || 0;
-  const top4 = scores.slice(0, 4);
+  const myUserId = (user as any)?.id ? String((user as any).id) : null;
+  const myIndivRow = useMemo(
+    () => indivScores.find((s) => s.user_id === myUserId) ?? null,
+    [indivScores, myUserId]
+  );
 
-  const medalBg = ['bg-gradient-to-br from-amber-300 to-yellow-500', 'bg-gradient-to-br from-slate-300 to-slate-400', 'bg-gradient-to-br from-orange-400 to-amber-700'];
-  const teamPalette = ['bg-emerald-100 text-emerald-700','bg-purple-100 text-purple-700','bg-pink-100 text-pink-700','bg-sky-100 text-sky-700','bg-amber-100 text-amber-700'];
+  // Kelas dalam mod individu: kedudukan dan mata daripada view markah individu.
+  const modIndividu = (activeClass as any)?.scoring_mode === "individual";
+  const totalPoints = modIndividu
+    ? Number(myIndivRow?.total_score) || 0
+    : Number(myTeamRow?.total_score) || 0;
+  const myRank = modIndividu
+    ? kedudukanSaya(indivScores, (s) => s.user_id, (s) => Number(s.total_score) || 0, myUserId)
+    : kedudukanSaya(scores, (s) => s.team_id, (s) => Number(s.total_score) || 0, myTeamId);
+  const bilKelasAktif = useMemo(
+    () => classes.filter((c: KelasUntukStatus) => statusKelas(c) === "aktif").length,
+    [classes, aktiviti]
+  );
+
+  // Pembahagian tab aktiviti: Active / Ended (keputusan direkod dalam
+  // papanPemukaPeserta.ts dan laporan KZ-018-dev.md).
+  const tabAktiviti = useMemo(() => bahagiAktiviti(activeQuests), [activeQuests]);
+
+  // Peta nama kelas untuk cip dalam kad aktiviti.
+  const namaKelas = useMemo(() => {
+    const peta = new Map<string, string>();
+    for (const c of classes) peta.set(c.id, c.name);
+    return peta;
+  }, [classes]);
+  const senaraiAktiviti = (senarai: Hunt[]): BarisAktiviti[] =>
+    senarai.map((h) => ({
+      id: h.id,
+      tajuk: h.title,
+      kelasNama: namaKelas.get(h.class_id ?? "") || "Class",
+      tarikh: peneranganTarikh(formatTarikh(h.start_at) || null, formatTarikh(h.end_at) || null),
+      // Laluan sedia ada: halaman activities dengan parameter hunt.
+      href: `/participant/activities?hunt=${encodeURIComponent(h.id)}`,
+    }));
+
+  // Baris papan pendahulu ternormalisasi (pasukan dan individu sumber berbeza).
+  const barisPasukan: BarisSkor[] = useMemo(
+    () => scores.map((r) => ({
+      id: r.team_id,
+      label: r.team_name || "Team " + String(r.team_id).slice(0, 8),
+      skor: Number(r.total_score) || 0,
+    })),
+    [scores]
+  );
+  const barisIndividu: BarisSkor[] = useMemo(
+    // Papar nama paparan sahaja; tiada emel dan tiada id pengguna lain.
+    () => indivScores.map((r) => ({
+      id: r.user_id,
+      label: r.display_name || "Student",
+      skor: Number(r.total_score) || 0,
+    })),
+    [indivScores]
+  );
 
   return (
     <ParticipantShell>
       <div className="max-w-shell mx-auto px-6 py-10">
-        <div className="flex flex-wrap items-end justify-between gap-4">
-          <div className="min-w-0">
-            <div className="eyebrow mb-1">Welcome back</div>
-            <h1 className="page-title truncate">{dataReady ? (name || "Participant") : " "}</h1>
-            <p className="page-subtitle">
-              {activeClass ? activeClass.name : dataReady ? "You have not joined a class yet." : " "}
-            </p>
-          </div>
-          {classes.length > 1 && (
-            <select
-              value={activeClassId}
-              onChange={e => setActiveClassId(e.target.value)}
-              aria-label="Active class"
-              className="input w-auto min-w-[220px]"
-            >
-              {/* Pemilih mengasingkan kelas aktif dan kelas tamat (V2-005). */}
-              <optgroup label="Active">
-                {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "aktif"), aktiviti).map((c: KelasUntukStatus) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </optgroup>
-              <optgroup label="Ended">
-                {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "tamat"), aktiviti).map((c: KelasUntukStatus) => (
-                  <option key={c.id} value={c.id}>{c.name}</option>
-                ))}
-              </optgroup>
-            </select>
-          )}
-        </div>
+        {/* 1. Banner profil. */}
+        <BannerProfil
+          nama={name}
+          kelihatan={dataReady && classes.length > 0}
+          cip={[
+            ...(activeClass ? [{ teks: activeClass.name }] : []),
+            ...(myTeamRow?.team_name ? [{ teks: myTeamRow.team_name }] : []),
+            { teks: `${bilKelasAktif} active classes` },
+          ]}
+          pemilihKelas={
+            classes.length > 1 ? (
+              <select
+                value={activeClassId}
+                onChange={e => setActiveClassId(e.target.value)}
+                aria-label="Active class"
+                className="w-full sm:w-auto min-w-[220px] rounded-xl bg-white/15 text-white border border-white/30 px-3 py-2 text-sm"
+              >
+                {/* Pemilih mengasingkan kelas aktif dan kelas tamat (V2-005). */}
+                <optgroup label="Active">
+                  {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "aktif"), aktiviti).map((c: KelasUntukStatus) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </optgroup>
+                <optgroup label="Ended">
+                  {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "tamat"), aktiviti).map((c: KelasUntukStatus) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </optgroup>
+              </select>
+            ) : null
+          }
+          onBukaSertai={bukaBorangSertai}
+        />
 
         {activeClass?.ended_at && (
           <div data-class-banner="ended" className="mt-6 rounded-xl bg-[#FEF6E7] px-4 py-3 text-sm text-[#8A6100]">
@@ -144,6 +244,7 @@ export default function Page() {
         <PeerReviewBanner />
 
         {dataReady && classes.length === 0 ? (
+          // Keadaan kosong: peserta tanpa kelas masih boleh sertai kelas seperti sekarang.
           <div className="mt-10 max-w-md">
             <div className="section-title">Join your first class</div>
             <p className="text-sm text-ink-muted mt-1">Enter the class code your educator gave you.</p>
@@ -166,87 +267,48 @@ export default function Page() {
           </div>
         ) : (
           <>
-            <div className="mt-8 grid gap-4 sm:grid-cols-3">
-              <div className="card">
-                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{dataReady ? activeQuestCount : 0}</div>
-                <div className="text-sm text-ink-muted mt-1.5">Active activities</div>
-                <Link href="/participant/activities" className="btn-quiet text-brand-purple mt-2">Go to activities</Link>
+            {/* 2. Empat kad statistik. */}
+            {dataReady && (
+              <div className="mt-6">
+                <KadStatistik
+                  bilKelas={classes.length}
+                  aktivitiAktif={activeQuestCount}
+                  mata={totalPoints}
+                  kedudukan={myRank}
+                />
               </div>
-              <div className="card">
-                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{totalPoints.toLocaleString()}</div>
-                <div className="text-sm text-ink-muted mt-1.5">Total points</div>
-                <div className="text-xs text-ink-faint mt-2">{totalPoints > 0 ? "Earned with your team." : "Join a team to start earning."}</div>
-              </div>
-              <div className="card">
-                <div className="text-[26px] leading-none font-semibold tracking-tight text-ink tabular-nums">{myRank > 0 ? `#${myRank}` : ","}</div>
-                <div className="text-sm text-ink-muted mt-1.5">Leaderboard rank</div>
-                <div className="text-xs text-ink-faint mt-2">{myRank > 0 && myRank <= 3 ? "Top three. Keep it up." : myRank > 0 ? "Climb higher." : "Join a team to be ranked."}</div>
-              </div>
-            </div>
+            )}
 
-            <div className="mt-12">
-              <div className="section-title mb-1">Your class</div>
-              <div className="surface">
-                <Link
-                  href={activeClassId ? `/participant/classes/${activeClassId}/board` : "#"}
-                  aria-disabled={!activeClassId}
-                  className={`flex items-center gap-4 px-5 py-4 ${activeClassId ? "hover:bg-[#FAFAFB]" : "pointer-events-none opacity-50"}`}
-                >
-                  <span className="w-10 h-10 rounded-full bg-[#EAE6FC] text-brand-purple flex items-center justify-center shrink-0"><ClipboardList className="w-5 h-5" /></span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[15px] font-medium text-ink">Intro Board</span>
-                    <span className="block text-sm text-ink-muted mt-0.5">Class information, announcements and guidelines.</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-ink-faint shrink-0" />
-                </Link>
-                <Link
-                  href={activeClassId ? `/participant/classes/${activeClassId}/learning-board` : "#"}
-                  aria-disabled={!activeClassId}
-                  className={`t-row flex items-center gap-4 px-5 py-4 ${activeClassId ? "hover:bg-[#FAFAFB]" : "pointer-events-none opacity-50"}`}
-                >
-                  <span className="w-10 h-10 rounded-full bg-[#EAE6FC] text-brand-purple flex items-center justify-center shrink-0"><BookOpen className="w-5 h-5" /></span>
-                  <span className="flex-1 min-w-0">
-                    <span className="block text-[15px] font-medium text-ink">Learning Board</span>
-                    <span className="block text-sm text-ink-muted mt-0.5">Modules, lessons and materials, session by session.</span>
-                  </span>
-                  <ArrowRight className="w-4 h-4 text-ink-faint shrink-0" />
-                </Link>
+            {/* 3. My Activities. */}
+            {dataReady && (
+              <div className="mt-10">
+                <SenaraiAktiviti
+                  aktif={senaraiAktiviti(tabAktiviti.aktif)}
+                  tamat={senaraiAktiviti(tabAktiviti.tamat)}
+                  sedia={dataReady}
+                />
               </div>
-            </div>
+            )}
 
-            <div className="mt-12">
-              <div className="flex items-baseline justify-between gap-3 mb-1">
-                <div className="section-title">Leaderboard</div>
-                <Link href="/participant/leaderboard" className="btn-quiet text-brand-purple">View all</Link>
+            {/* 4. Dua lajur: papan pendahulu dan pautan kelas. Tiada bahagian kuiz langsung: peserta tidak dibenarkan membaca qm_live_sessions (RLS 0018); tiket membenarkan bahagian digugurkan. */}
+            {dataReady && (
+              <div className="mt-10 flex flex-wrap items-stretch gap-6">
+                <PanelPendahulu
+                  key={activeClassId}
+                  barisPasukan={barisPasukan}
+                  barisIndividu={barisIndividu}
+                  myTeamId={myTeamId}
+                  myUserId={myUserId}
+                  defaultMod={modIndividu ? "individu" : "pasukan"}
+                  loading={scoresLoading}
+                />
+                <PautanKelas classId={activeClassId || null} />
               </div>
-              {scoresLoading ? (
-                <div className="space-y-2 mt-3">{[1, 2, 3].map(i => <div key={i} className="h-14 rounded-xl bg-[#F4F4F6] animate-pulse" />)}</div>
-              ) : top4.length === 0 ? (
-                <p className="text-sm text-ink-muted py-6">No team scores yet for this class.</p>
-              ) : (
-                <div className="surface mt-3">
-                  {top4.map((r: any, idx: number) => {
-                    const isMine = r.team_id === myTeamId;
-                    return (
-                      <div key={r.team_id} className={`flex items-center gap-3 px-5 py-3.5 ${idx > 0 ? "t-row" : ""} ${isMine ? "bg-[#F7F6FD]" : ""}`}>
-                        <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-sm ${idx < 3 ? `${medalBg[idx]} text-white` : "bg-[#F4F4F6] text-ink-muted"}`}>{idx + 1}</span>
-                        <span className={`shrink-0 w-8 h-8 rounded-full flex items-center justify-center font-semibold text-xs ${teamPalette[idx % teamPalette.length]}`}>
-                          {initials(r.team_name || ("Team " + String(r.team_id).slice(0, 2)))}
-                        </span>
-                        <span className="flex-1 min-w-0 text-[15px] text-ink truncate">
-                          {r.team_name || ("Team " + String(r.team_id).slice(0, 8))}
-                          {isMine && <span className="ml-2 text-xs text-brand-purple">Your team</span>}
-                        </span>
-                        <span className="text-sm font-semibold text-ink tabular-nums whitespace-nowrap">{(Number(r.total_score) || 0).toLocaleString()} pts</span>
-                      </div>
-                    );
-                  })}
-                </div>
-              )}
-            </div>
+            )}
 
+            {/* 5. Kaki: sertai kelas lain dan tinggalkan kelas (logik sedia ada). */}
             <div className="mt-16 mb-4 border-t border-hairline pt-6 flex flex-wrap items-start justify-between gap-4">
-              <details className="min-w-0">
+              <details ref={rujukanSertai} open={bukaSertai} className="min-w-0">
                 <summary className="btn-quiet cursor-pointer list-none text-brand-purple">Join another class</summary>
                 <form onSubmit={onJoinClass} className="mt-3 flex flex-wrap items-center gap-2">
                   <input
