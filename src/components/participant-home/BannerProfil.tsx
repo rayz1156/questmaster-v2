@@ -50,8 +50,8 @@ export default function BannerProfil({
           <p className="text-sm text-white/80">Welcome back,</p>
           <h1 className="text-2xl sm:text-3xl font-bold truncate">{nama || "Participant"}</h1>
           <div className="mt-2.5 flex flex-wrap gap-2">
-            {cip.map((c) => (
-              <span key={c.teks} className="inline-flex items-center bg-white/15 rounded-full px-3 py-1 text-sm">
+            {cip.map((c, i) => (
+              <span key={`${i}-${c.teks}`} className="inline-flex items-center bg-white/15 rounded-full px-3 py-1 text-sm">
                 {c.teks}
               </span>
             ))}

@@ -67,9 +67,10 @@ export function atas5DenganSaya<T>(
   myId: string | null,
   had: number = 5
 ): PendahuluPemotongan<T> {
-  const atas: BarisPendahulu<T>[] = baris.slice(0, had).map((r, i) => ({
+  const atas: BarisPendahulu<T>[] = baris.slice(0, had).map((r) => ({
     baris: r,
-    kedudukan: i + 1,
+    // Seri berkongsi kedudukan: 1 + bilangan baris dengan markah lebih tinggi.
+    kedudukan: 1 + baris.filter((x) => (skorOf(x) || 0) > (skorOf(r) || 0)).length,
     saya: !!myId && idOf(r) === myId,
   }));
   if (!myId) return { atas, saya: null, terpisah: false };
