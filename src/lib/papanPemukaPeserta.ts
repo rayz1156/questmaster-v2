@@ -3,9 +3,8 @@
  *
  * Semua fungsi di sini tulen: tiada Supabase, tiada jaringan, tiada
  * ketergantungan React. Halaman `src/app/participant/home/page.tsx`
- * dan komponen `src/components/participant-home/*` memanggil fungsi
- * ini dengan data yang diambil melalui fungsi sedia ada dalam
- * `src/lib/data.ts`. Ujian: `scripts/selftest-kz018.ts`.
+ * memanggil fungsi ini dengan data yang diambil melalui fungsi sedia
+ * ada dalam `src/lib/data.ts`. Ujian: `scripts/selftest-kz018.ts`.
  */
 
 import type { Hunt } from "./types";
@@ -282,4 +281,71 @@ const PALET_KELAS: readonly string[] = ["#7c3aed", "#0e7490", "#b45309", "#be185
 export function warnaKelas(indeks: number): string {
   if (indeks < 0) return PALET_KELAS[0];
   return PALET_KELAS[indeks % PALET_KELAS.length];
+}
+
+/* ============================================================
+ * Fungsi KZ-020 (papan pemuka LMS). Semua tulen; tiada Supabase,
+ * tiada jaringan. Ujian: scripts/selftest-kz020.ts.
+ * ============================================================ */
+
+/**
+ * Pasangan warna untuk avatar/petak inisial ikut indeks (KZ-020):
+ * latar lembut dan warna teks/aksen ke atasnya. Enam pasangan tetap,
+ * dipilih mengikut indeks baris supaya stabil.
+ */
+export type PasanganWarna = { latar: string; teks: string };
+
+const PALET_INDEKS: readonly PasanganWarna[] = [
+  { latar: "#ebe2ff", teks: "#854fff" },
+  { latar: "#e5e9ff", teks: "#6576ff" },
+  { latar: "#d2f9ee", teks: "#1ee0ac" },
+  { latar: "#fdf3d3", teks: "#f4bd0e" },
+  { latar: "#fbe5e3", teks: "#e85347" },
+  { latar: "#ceeef6", teks: "#09c2de" },
+];
+
+export function warnaIndeks(indeks: number): PasanganWarna {
+  if (indeks < 0) return PALET_INDEKS[0];
+  return PALET_INDEKS[indeks % PALET_INDEKS.length];
+}
+
+/**
+ * Satu baris carta bar yang sudah siap untuk dipaparkan (KZ-020).
+ * `nisbah` ialah tinggi bar relatif kepada bar tertinggi (0 hingga 1).
+ */
+export type BarisCarta<T> = {
+  baris: T;
+  label: string;
+  skor: number;
+  nisbah: number;
+  saya: boolean;
+};
+
+/**
+ * Data carta bar markah kelas (KZ-020): isih menurun, ambil `had` baris
+ * teratas, dan kira nisbah tinggi setiap bar terhadap markah tertinggi.
+ * Bar tertinggi sentiasa nisbah 1; senarai kosong atau semua markah 0
+ * menghasilkan nisbah 0 untuk semua bar (baris masih dipapar sebagai
+ * tunas kecil supaya pengguna tahu ada berapa entri).
+ */
+export function dataCartaBar<T>(
+  baris: T[] | null | undefined,
+  idOf: (r: T) => string,
+  labelOf: (r: T) => string,
+  skorOf: (r: T) => number,
+  myId: string | null,
+  had: number = 12
+): BarisCarta<T>[] {
+  const senarai = (baris || [])
+    .slice()
+    .sort((a, b) => (skorOf(b) || 0) - (skorOf(a) || 0))
+    .slice(0, Math.max(1, had));
+  const maks = senarai.reduce((m, r) => Math.max(m, skorOf(r) || 0), 0);
+  return senarai.map((r) => ({
+    baris: r,
+    label: labelOf(r),
+    skor: skorOf(r) || 0,
+    nisbah: maks > 0 ? (skorOf(r) || 0) / maks : 0,
+    saya: !!myId && idOf(r) === myId,
+  }));
 }

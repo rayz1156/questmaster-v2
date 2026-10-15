@@ -1,31 +1,26 @@
 "use client";
 
 /**
- * Papan pemuka peserta, Versi 2 fokus satu tindakan (KZ-018b).
+ * Papan pemuka peserta, rupa LMS Oktober 2026 (KZ-020).
  *
- * SETIA kepada pratonton Versi2-pratonton.dc.html: nilai gaya sebaris
- * pratonton diterjemah kepada kelas Tailwind arbitrari yang sama
- * (rounded-[20px], text-[#5b5878], p-[28px], text-[34px] dsb.) dan kelas
- * reka bentuk lama (card, section-title, btn-primary) TIDAK digunakan
- * dalam bahagian baharu.
+ * Susun atur papan pemuka gaya LMS: kepala blok "Dashboard", kad
+ * lebar penuh "My Progress" dengan carta bar markah kelas, kad
+ * "Live now" / "Next up", kad "My Activities" / "Leaderboard",
+ * kad "Your class" dan kaki tindakan kelas.
  *
- * Kekal dari Versi 1: pilih kelas aktif (susunKelas/statusKelas), banner
- * kelas tamat, CertificateNameBanner, PeerReviewBanner, keadaan kosong
- * "Join your first class", borang kod kelas (joinClassByCode /
+ * Kekal dari KZ-018/KZ-018b: pilih kelas aktif (susunKelas/statusKelas),
+ * banner kelas tamat, CertificateNameBanner, PeerReviewBanner, keadaan
+ * kosong "Join your first class", borang kod kelas (joinClassByCode /
  * normalizeClassCode) dan "Leave this class". Logik tulen berada dalam
- * src/lib/papanPemukaPeserta.ts (KZ-018 + bahagian KZ-018b).
+ * src/lib/papanPemukaPeserta.ts. Komponen Versi 2 tidak digunakan lagi.
  */
 
+import Link from "next/link";
+import { useEffect, useMemo, useState } from "react";
+import { ArrowRight, BookOpen, ClipboardList, CopyPlus } from "lucide-react";
 import ParticipantShell from "@/components/ParticipantShell";
 import PeerReviewBanner from "@/components/PeerReviewBanner";
 import CertificateNameBanner from "@/components/CertificateNameBanner";
-import KadTindakan, { type SesiLive, type AktivitiSeterusnya } from "@/components/participant-home/KadTindakan";
-import KadKemajuan, { type BarisAtas } from "@/components/participant-home/KadKemajuan";
-import SenaraiQuest, { type BarisQuest } from "@/components/participant-home/SenaraiQuest";
-import PapanPendahulu, { type BarisSkor } from "@/components/participant-home/PapanPendahulu";
-import KadKelas from "@/components/participant-home/KadKelas";
-import { bricolage, jakarta } from "@/components/participant-home/fon";
-import { useEffect, useMemo, useState } from "react";
 import {
   listQuestsForParticipant,
   listEnrolledClasses,
@@ -44,59 +39,52 @@ import {
 import { useSession } from "@/lib/session";
 import { statusKelas, susunKelas, type AktivitiKelas, type KelasUntukStatus } from "@/lib/kelasStatus";
 import {
+  atas5DenganSaya,
+  ayatKedudukan,
   bahagiAktiviti,
+  dataCartaBar,
+  inisial,
   kedudukanSaya,
   labelTarikhQuest,
   pilihAktivitiSeterusnya,
   pilihSesiTerkini,
   sesiBolehMasuk,
-  warnaKelas,
+  warnaIndeks,
 } from "@/lib/papanPemukaPeserta";
 import { supabase } from "@/lib/supabaseClient";
 
-/** Tarikh ringkas "24 Oct" untuk label kanan baris quest. */
+/** Satu sesi kuiz langsung daripada /api/participant/live-now. */
+type SesiLive = {
+  code: string;
+  title: string | null;
+  class_id: string | null;
+  class_name: string | null;
+  status: string;
+  player_count: number;
+  started_at: string | null;
+};
+
+/** Baris teratas papan pendahulu yang siap dipapar. */
+type BarisSkor = { id: string; label: string; skor: number };
+
+/** Baris senarai "My Activities" yang siap dipapar. */
+type BarisAktivitiUi = {
+  id: string;
+  tajuk: string;
+  kelasNama: string;
+  indeksKelas: number;
+  labelTarikh: string;
+  segera: boolean;
+  tamat: boolean;
+  href: string;
+};
+
+/** Tarikh ringkas "24 Oct" untuk lajur tarikh. */
 function tarikhRingkas(iso: string | null | undefined): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
-}
-
-/** Susun quest ikut end_at: aktif terdekat dahulu, tamat baru dahulu. */
-function susunIkutTarikh(senarai: Hunt[], tamat: boolean): Hunt[] {
-  return senarai.slice().sort((a, b) => {
-    const ma = a.end_at ? new Date(a.end_at).getTime() : null;
-    const mb = b.end_at ? new Date(b.end_at).getTime() : null;
-    if (ma === null && mb === null)
-      return new Date(b.created_at).getTime() - new Date(a.created_at).getTime();
-    if (ma === null) return 1;
-    if (mb === null) return -1;
-    // Aktif: end_at terdekat dahulu. Tamat: yang baru berakhir dahulu.
-    return tamat ? mb - ma : ma - mb;
-  });
-}
-
-/** Bina baris quest siap papar daripada senarai aktiviti. */
-function kawalBarisQuest(
-  senarai: Hunt[],
-  tamat: boolean,
-  namaKelas: Map<string, string>,
-  indeksKelas: Map<string, number>
-): BarisQuest[] {
-  return susunIkutTarikh(senarai, tamat).map((h) => {
-    const label = labelTarikhQuest(h.end_at, tamat);
-    return {
-      id: h.id,
-      tajuk: h.title,
-      kelasNama: namaKelas.get(h.class_id ?? "") || "Class",
-      warna: warnaKelas(indeksKelas.get(h.class_id ?? "") ?? 0),
-      ayatTarikh: label.label,
-      labelTarikh: label.segera ? label.label : tamat ? "Ended" : tarikhRingkas(h.end_at),
-      segera: label.segera,
-      tamat,
-      href: `/participant/activities?hunt=${encodeURIComponent(h.id)}`,
-    };
-  });
 }
 
 export default function Page() {
@@ -113,12 +101,16 @@ export default function Page() {
   const [joinBusy, setJoinBusy] = useState(false);
   const [joinErr, setJoinErr] = useState<string | null>(null);
   const [joinOk, setJoinOk] = useState<string | null>(null);
+  const [borangJoin, setBorangJoin] = useState(false);
 
-  // Pasukan saya merentas kelas: peta class_id -> { team_id, team_name },
-  // untuk ayat "Your team is waiting." pada kad LIVE.
+  // Pasukan saya merentas kelas: peta class_id -> { team_id, team_name }.
   const [pasukanSaya, setPasukanSaya] = useState<Map<string, { team_id: string; team_name: string | null }>>(new Map());
   // Sesi kuiz langsung yang boleh dimasuki, daripada /api/participant/live-now.
   const [sesiLive, setSesiLive] = useState<SesiLive[]>([]);
+  // Penapis "My Activities": Active / Ended.
+  const [tabAktiviti, setTabAktiviti] = useState<"Active" | "Ended">("Active");
+  // Togol "Leaderboard": Teams / Individuals, lalai ikut scoring_mode kelas.
+  const [modPapan, setModPapan] = useState<"Teams" | "Individuals">("Teams");
 
   const onJoinClass = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -189,7 +181,6 @@ export default function Page() {
         const is = await listClassIndividualScores(activeClassId);
         setIndivScores(is.slice().sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0)));
       } catch { setIndivScores([]); }
-      // Pasukan saya diperoleh daripada peta merentas kelas di atas.
     })();
   }, [activeClassId, user, pasukanSaya]);
 
@@ -248,9 +239,9 @@ export default function Page() {
     ? kedudukanSaya(indivScores, (s) => s.user_id, (s) => Number(s.total_score) || 0, myUserId)
     : kedudukanSaya(scores, (s) => s.team_id, (s) => Number(s.total_score) || 0, myTeamId);
 
-  // Baris di atas saya (untuk ayat jarak kotak amber). Kedudukan baris
-  // atas dikira mengikut markah sebenar, jadi ayat kekal betul bila seri.
-  const barisAtas: BarisAtas | null = useMemo(() => {
+  // Baris di atas saya (untuk ayat jarak). Kedudukan baris atas dikira
+  // mengikut markah sebenar, jadi ayat kekal betul bila seri.
+  const barisAtas: { nama: string; skor: number; kedudukan: number } | null = useMemo(() => {
     if (myRank <= 1) return null;
     const senarai: Array<{ id: string; nama: string; skor: number }> = modIndividu
       ? indivScores.map((s) => ({ id: s.user_id, nama: s.display_name || "Student", skor: Number(s.total_score) || 0 }))
@@ -264,8 +255,9 @@ export default function Page() {
       kedudukan: kedudukanSaya(senarai, (r) => r.id, (r) => r.skor, atas.id),
     };
   }, [myRank, modIndividu, indivScores, scores, totalPoints]);
+  const ayatJarak = ayatKedudukan(myRank, totalPoints, barisAtas);
 
-  // Peta nama kelas dan indeks kelas (untuk warna jalur stabil).
+  // Peta nama kelas dan indeks kelas (untuk warna petak inisial stabil).
   const namaKelas = useMemo(() => {
     const peta = new Map<string, string>();
     for (const c of classes) peta.set(c.id, c.name);
@@ -278,19 +270,20 @@ export default function Page() {
     return peta;
   }, [classes, aktiviti]);
 
-  // Semua quest merentas kelas, dibahagi tab Active / Ended.
+  // Semua quest merentas kelas, dibahagi penapis Active / Ended.
   const semuaTab = useMemo(() => bahagiAktiviti(hunts), [hunts]);
-  const barisAktif = useMemo(
-    () => kawalBarisQuest(semuaTab.aktif, false, namaKelas, indeksKelas),
+  const barisAktif: BarisAktivitiUi[] = useMemo(
+    () => kawalBarisAktiviti(semuaTab.aktif, false, namaKelas, indeksKelas),
     [semuaTab, namaKelas, indeksKelas]
   );
-  const barisTamat = useMemo(
-    () => kawalBarisQuest(semuaTab.tamat, true, namaKelas, indeksKelas),
+  const barisTamat: BarisAktivitiUi[] = useMemo(
+    () => kawalBarisAktiviti(semuaTab.tamat, true, namaKelas, indeksKelas),
     [semuaTab, namaKelas, indeksKelas]
   );
+  const barisPapar = tabAktiviti === "Active" ? barisAktif : barisTamat;
 
-  // Aktiviti NEXT UP: aktif dengan end_at terdekat (logik tulen).
-  const aktivitiSeterusnya: AktivitiSeterusnya | null = useMemo(() => {
+  // Aktiviti "Next up": aktif dengan end_at terdekat (logik tulen).
+  const aktivitiSeterusnya: { id: string; title: string; kelasNama: string; labelTarikh: string } | null = useMemo(() => {
     const pilihan = pilihAktivitiSeterusnya(semuaTab.aktif);
     if (!pilihan) return null;
     return {
@@ -305,11 +298,10 @@ export default function Page() {
   const sesiSusun = useMemo(() => {
     const sen = (sesiLive || []).filter((s) => sesiBolehMasuk(s.status));
     const hero = pilihSesiTerkini(sen);
-    if (!hero) return [];
+    if (!hero) return [] as SesiLive[];
     return [hero, ...sen.filter((s) => s !== hero)];
   }, [sesiLive]);
   const sesiHero = sesiSusun[0] ?? null;
-  const adaPasukanLive = !!sesiHero && pasukanSaya.has(sesiHero.class_id ?? "");
 
   // Baris papan pendahulu ternormalizasi (pasukan dan individu).
   const barisPasukan: BarisSkor[] = useMemo(
@@ -330,21 +322,40 @@ export default function Page() {
     [indivScores]
   );
 
+  // Mod papan lalai mengikut scoring_mode kelas aktif.
+  useEffect(() => { setModPapan(modIndividu ? "Individuals" : "Teams"); }, [modIndividu]);
+  const barisPapan = modPapan === "Teams" ? barisPasukan : barisIndividu;
+  const idPapan = modPapan === "Teams" ? myTeamId : myUserId;
+  const potongan = atas5DenganSaya(barisPapan, (r) => r.id, (r) => r.skor, idPapan);
+
+  // Data carta bar My Progress: 12 teratas kelas ikut mod pemarkahan.
+  const carta = useMemo(
+    () => dataCartaBar(
+      modIndividu ? barisIndividu : barisPasukan,
+      (r) => r.id,
+      (r) => r.label,
+      (r) => r.skor,
+      modIndividu ? myUserId : myTeamId,
+      12
+    ),
+    [modIndividu, barisIndividu, barisPasukan, myUserId, myTeamId]
+  );
+
   return (
     <ParticipantShell>
-      <div
-        className={`${bricolage.variable} ${jakarta.variable} font-[family-name:var(--pp-jakarta)] -mx-5 -mt-8 min-w-0 bg-[#f6f5fb] px-5 pb-12 pt-6 text-[#1e1b3a]`}
-      >
-        <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
+      <div className="flex min-w-0 flex-col gap-6">
 
-          {/* Baris atas: pemilih kelas (jika >1) dan borang kod kelas. */}
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            {classes.length > 1 ? (
+        {/* Kepala blok: tajuk, keterangan, pemilih kelas, butang kanan. */}
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="min-w-0">
+            <h1 className="page-title">Dashboard</h1>
+            <p className="page-subtitle">Welcome back, {name || "student"}.</p>
+            {classes.length > 1 && (
               <select
                 value={activeClassId}
                 onChange={e => setActiveClassId(e.target.value)}
                 aria-label="Active class"
-                className="rounded-[12px] border border-[#e7e5f2] bg-[#f6f5fb] px-3 py-2.5 text-sm text-[#1e1b3a]"
+                className="input mt-3 w-auto"
               >
                 {/* Pemilih mengasingkan kelas aktif dan kelas tamat (V2-005). */}
                 <optgroup label="Active">
@@ -358,20 +369,23 @@ export default function Page() {
                   ))}
                 </optgroup>
               </select>
-            ) : (
-              <span className="text-sm font-semibold text-[#5b5878]">
-                {activeClass?.name || ""}
-              </span>
             )}
-            <form
-              onSubmit={onJoinClass}
-              className="flex items-center gap-1.5 rounded-[12px] border border-[#e7e5f2] bg-[#f6f5fb] py-1 pl-3 pr-1"
-            >
-              <label htmlFor="kod-kelas" className="whitespace-nowrap text-[13px] text-[#5b5878]">
-                Class code
-              </label>
+          </div>
+          <div className="flex flex-wrap items-center gap-2">
+            <button type="button" onClick={() => setBorangJoin(v => !v)} className="btn-secondary">
+              <CopyPlus className="w-4 h-4" /> Enter class code
+            </button>
+            <Link href="/live" className="btn-primary">Join live quiz</Link>
+          </div>
+        </div>
+
+        {/* Borang kod kelas, dibuka butang "Enter class code". */}
+        {borangJoin && (
+          <section className="card">
+            <h2 className="section-title">Enter class code</h2>
+            <p className="mt-1 text-[13px] text-ink-faint">Enter the class code your educator gave you.</p>
+            <form onSubmit={onJoinClass} className="mt-4 flex flex-wrap items-center gap-2">
               <input
-                id="kod-kelas"
                 type="text"
                 inputMode="text"
                 autoComplete="off"
@@ -379,127 +393,377 @@ export default function Page() {
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
                 placeholder="e.g. AB12CD"
                 maxLength={16}
-                className="w-[110px] border-0 bg-transparent text-sm font-semibold tracking-[0.08em] text-[#1e1b3a] outline-none"
+                aria-label="Class code"
+                className="input w-[180px]"
               />
-              <button
-                type="submit"
-                disabled={joinBusy || !joinCode.trim()}
-                className="min-h-9 rounded-[9px] bg-[#1e1b3a] px-3.5 text-[13px] font-bold text-white disabled:opacity-50"
-              >
+              <button type="submit" disabled={joinBusy || !joinCode.trim()} className="btn-primary">
                 {joinBusy ? "Joining…" : "Join"}
               </button>
             </form>
+            {joinErr && <p className="mt-2 text-sm text-kz-down">{joinErr}</p>}
+            {joinOk && <p className="mt-2 text-sm text-kz-up">{joinOk}</p>}
+          </section>
+        )}
+
+        {/* Banner sedia ada: kelas tamat, nama sijil, semakan rakan. */}
+        {activeClass?.ended_at && (
+          <div data-class-banner="ended" className="card border-l-4 border-l-kz-warn p-4 text-sm text-ink-muted">
+            <span className="font-bold text-ink">This class has ended.</span> You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.
           </div>
+        )}
+        <CertificateNameBanner />
+        <PeerReviewBanner />
 
-          {/* Banner sedia ada: kelas tamat, nama sijil, semakan rakan. */}
-          {activeClass?.ended_at && (
-            <div data-class-banner="ended" className="rounded-[12px] bg-[#FEF6E7] px-4 py-3 text-sm text-[#8A6100]">
-              <span className="font-medium">This class has ended.</span> You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.
-            </div>
-          )}
-          <CertificateNameBanner />
-          <PeerReviewBanner />
+        {dataReady && classes.length === 0 ? (
+          // Keadaan kosong: peserta tanpa kelas.
+          <section className="card">
+            <h2 className="section-title">Join your first class</h2>
+            <p className="mt-1 text-sm text-ink-muted">
+              Enter the class code your educator gave you.
+            </p>
+            <form onSubmit={onJoinClass} className="mt-4 flex flex-wrap items-center gap-2">
+              <input
+                type="text"
+                inputMode="text"
+                autoComplete="off"
+                value={joinCode}
+                onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
+                placeholder="e.g. AB12CD"
+                maxLength={16}
+                required
+                aria-label="Class code"
+                className="input w-[180px]"
+              />
+              <button type="submit" disabled={joinBusy || !joinCode.trim()} className="btn-primary">
+                {joinBusy ? "Joining…" : "Join"}
+              </button>
+            </form>
+            {joinErr && <p className="mt-2 text-sm text-kz-down">{joinErr}</p>}
+            {joinOk && <p className="mt-2 text-sm text-kz-up">{joinOk}</p>}
+          </section>
+        ) : (
+          <>
 
-          {dataReady && classes.length === 0 ? (
-            // Keadaan kosong: peserta tanpa kelas, gaya kad pratonton.
-            <section className="rounded-[20px] border border-[#e7e5f2] bg-white p-[22px]">
-              <h2 className="m-0 text-[19px] font-extrabold">Join your first class</h2>
-              <p className="mt-1 text-sm text-[#5b5878]">
-                Enter the class code your educator gave you.
-              </p>
-              <form onSubmit={onJoinClass} className="mt-4 flex flex-wrap items-center gap-1.5 rounded-[12px] border border-[#e7e5f2] bg-[#f6f5fb] py-1 pl-3 pr-1">
-                <label htmlFor="kod-pertama" className="whitespace-nowrap text-[13px] text-[#5b5878]">
-                  Class code
-                </label>
-                <input
-                  id="kod-pertama"
-                  type="text"
-                  inputMode="text"
-                  autoComplete="off"
-                  value={joinCode}
-                  onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
-                  placeholder="e.g. AB12CD"
-                  maxLength={16}
-                  required
-                  className="min-w-0 flex-1 border-0 bg-transparent text-sm font-semibold tracking-[0.08em] text-[#1e1b3a] outline-none"
-                />
-                <button
-                  type="submit"
-                  disabled={joinBusy || !joinCode.trim()}
-                  className="min-h-9 rounded-[9px] bg-[#1e1b3a] px-3.5 text-[13px] font-bold text-white disabled:opacity-50"
-                >
-                  {joinBusy ? "Joining…" : "Join"}
-                </button>
-              </form>
-              {joinErr && <p className="mt-2 text-sm text-[#C0392B]">{joinErr}</p>}
-              {joinOk && <p className="mt-2 text-sm text-[#2E7D4F]">{joinOk}</p>}
-            </section>
-          ) : (
-            <>
-              {/* Baris wira: kad tindakan dan kad kemajuan. */}
-              {dataReady && (
-                <div className="flex flex-wrap items-stretch gap-5">
-                  <KadTindakan sesi={sesiSusun} aktiviti={aktivitiSeterusnya} adaPasukan={adaPasukanLive} />
-                  <KadKemajuan
-                    nama={name}
-                    namaPasukan={myTeamRow?.team_name ?? pasukanSaya.get(activeClassId)?.team_name ?? null}
-                    jumlahMata={totalPoints}
-                    kedudukan={myRank}
-                    barisAtas={barisAtas}
-                  />
-                </div>
-              )}
-
-              {/* Baris bawah: My Quests dan lajur kanan. */}
-              {dataReady && (
-                <div className="flex flex-wrap items-start gap-6">
-                  <SenaraiQuest aktif={barisAktif} tamat={barisTamat} />
-                  <div className="flex min-w-0 flex-[1_1_300px] flex-col gap-6">
-                    <PapanPendahulu
-                      key={activeClassId}
-                      barisPasukan={barisPasukan}
-                      barisIndividu={barisIndividu}
-                      myTeamId={myTeamId}
-                      myUserId={myUserId}
-                      defaultMod={modIndividu ? "individu" : "pasukan"}
-                      namaKelas={activeClass?.name || ""}
-                    />
-                    <KadKelas classId={activeClassId || null} />
+            {/* Kad lebar penuh: My Progress + carta bar markah kelas. */}
+            {dataReady && (
+              <section className="card" aria-label="My progress">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h2 className="section-title">My Progress</h2>
+                    <p className="text-[13px] text-ink-faint">{activeClass?.name || ""}</p>
                   </div>
                 </div>
-              )}
 
-              {/* Kaki: tinggalkan kelas (pautan kecil merah). */}
-              <div className="flex justify-end border-t border-[#e7e5f2] pt-4">
-                {activeClassId && (
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      const target = classes.find((c) => c.id === activeClassId);
-                      if (!target) return;
-                      if (!confirm(`Leave "${target.name}"? You will lose access to its activities and rankings.`)) return;
-                      try {
-                        await leaveClassAsStudent(activeClassId);
-                        const remaining = classes.filter((c) => c.id !== activeClassId);
-                        setClasses(remaining);
-                        // Pilih semula kelas lalai: aktif dahulu, kemudian tamat.
-                        const urutanBaki = susunKelas(remaining, aktiviti);
-                        const lalai = urutanBaki.find(k => statusKelas(k) === "aktif") ?? urutanBaki[0];
-                        setActiveClassId(lalai ? lalai.id : "");
-                      } catch (err: unknown) {
-                        alert((err as { message?: string })?.message || "Failed to leave class");
-                      }
-                    }}
-                    className="text-[13px] font-semibold text-[#b91c1c]"
-                  >
-                    Leave this class
-                  </button>
+                <div className="mt-5 flex flex-wrap items-start gap-x-14 gap-y-4">
+                  <div>
+                    <div className="amount">{totalPoints.toLocaleString()}</div>
+                    <div className="mt-1 text-[13px] text-ink-faint">Total points</div>
+                  </div>
+                  <div>
+                    <div className="amount">{myRank > 0 ? `#${myRank}` : "-"}</div>
+                    <div className="mt-1 text-[13px] text-ink-faint">Class rank</div>
+                  </div>
+                  {ayatJarak && (
+                    <p className="max-w-[360px] self-end text-[13px] leading-snug text-ink-muted">
+                      #{myRank} {ayatJarak}
+                    </p>
+                  )}
+                </div>
+
+                {/* Carta bar mudah (div sahaja): 12 teratas kelas, bar saya biru. */}
+                {carta.length > 0 && (
+                  <div className="mt-6 flex h-[120px] items-end gap-1.5" role="img" aria-label="Class scores">
+                    {carta.map((b) => (
+                      <div
+                        key={b.baris.id}
+                        title={`${b.label}: ${b.skor.toLocaleString()} pts`}
+                        className="min-h-[2px] flex-1 rounded-t-[2px]"
+                        style={{
+                          height: `${Math.max(b.nisbah * 100, 1)}%`,
+                          backgroundColor: b.saya ? "#6576ff" : "#e5e9ff",
+                        }}
+                      />
+                    ))}
+                  </div>
                 )}
+              </section>
+            )}
+
+            {/* Baris dua kad: Live now dan Next up. */}
+            {dataReady && (
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <section className="card" aria-label="Live now">
+                  <div className="flex items-center gap-2">
+                    {sesiHero && (
+                      <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-kz-down">
+                        <span className="h-1.5 w-1.5 rounded-full bg-kz-down motion-safe:animate-pulse-dot" />
+                        LIVE
+                      </span>
+                    )}
+                    <h2 className="section-title">Live now</h2>
+                  </div>
+                  {sesiHero ? (
+                    <>
+                      <p className="mt-4 text-[15px] font-bold text-ink">{sesiHero.title || "Live Quiz"}</p>
+                      <p className="text-[13px] text-ink-faint">
+                        {sesiHero.class_name || "Class"} · {sesiHero.player_count} classmates in
+                      </p>
+                      <Link href={`/live/${encodeURIComponent(sesiHero.code)}`} className="btn-primary mt-4">
+                        Join now
+                      </Link>
+                      {sesiSusun.length > 1 && (
+                        <div className="mt-3 flex flex-col gap-1">
+                          {sesiSusun.slice(1).map((s) => (
+                            <Link
+                              key={s.code}
+                              href={`/live/${encodeURIComponent(s.code)}`}
+                              className="text-[13px] text-brand-purple hover:underline"
+                            >
+                              Also live: {s.title || "Live Quiz"} · {s.code}
+                            </Link>
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <p className="mt-4 text-sm text-ink-faint">No live quiz right now.</p>
+                  )}
+                </section>
+
+                <section className="card" aria-label="Next up">
+                  <h2 className="section-title">Next up</h2>
+                  {aktivitiSeterusnya ? (
+                    <>
+                      <p className="mt-4 text-[15px] font-bold text-ink">{aktivitiSeterusnya.title}</p>
+                      <p className="text-[13px] text-ink-faint">
+                        {aktivitiSeterusnya.kelasNama}
+                        {aktivitiSeterusnya.labelTarikh ? ` · ${aktivitiSeterusnya.labelTarikh}` : ""}
+                      </p>
+                      <Link
+                        href={`/participant/activities?hunt=${encodeURIComponent(aktivitiSeterusnya.id)}`}
+                        className="mt-4 inline-flex text-[13px] font-bold text-brand-purple hover:underline"
+                      >
+                        Continue
+                      </Link>
+                    </>
+                  ) : (
+                    <p className="mt-4 text-sm text-ink-faint">{"You're all caught up."}</p>
+                  )}
+                </section>
               </div>
-            </>
-          )}
-        </div>
+            )}
+
+            {/* Baris dua kad: My Activities dan Leaderboard. */}
+            {dataReady && (
+              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+                <section className="card p-0" aria-label="My activities">
+                  <div className="flex flex-wrap items-center justify-between gap-2 px-6 pb-3 pt-5">
+                    <h2 className="section-title">My Activities</h2>
+                    <div className="flex gap-1" role="tablist" aria-label="Activity status">
+                      {(["Active", "Ended"] as const).map((t) => (
+                        <button
+                          key={t}
+                          type="button"
+                          role="tab"
+                          aria-selected={tabAktiviti === t}
+                          onClick={() => setTabAktiviti(t)}
+                          className={`rounded-md px-2.5 py-1 text-[12px] font-bold transition ${
+                            tabAktiviti === t ? "bg-kz-menu-active text-brand-purple" : "text-ink-faint hover:text-ink"
+                          }`}
+                        >
+                          {t}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <div>
+                    {barisPapar.length === 0 ? (
+                      <p className="px-6 pb-5 pt-2 text-sm text-ink-faint">
+                        {tabAktiviti === "Active" ? "No active activities right now." : "No ended activities yet."}
+                      </p>
+                    ) : (
+                      barisPapar.map((q) => {
+                        const warna = warnaIndeks(q.indeksKelas);
+                        return (
+                          <div key={q.id} className="list-row flex items-center gap-3">
+                            <span
+                              className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] text-[14px] font-bold"
+                              style={{ backgroundColor: warna.latar, color: warna.teks }}
+                              aria-hidden="true"
+                            >
+                              {inisial(q.tajuk)}
+                            </span>
+                            <div className="min-w-0 flex-1">
+                              <Link href={q.href} className="block truncate text-[14px] font-medium text-ink hover:text-brand-purple">
+                                {q.tajuk}
+                              </Link>
+                              <div className="truncate text-xs text-ink-faint">{q.kelasNama}</div>
+                            </div>
+                            <span className={`shrink-0 text-[13px] ${q.segera ? "font-bold text-kz-down" : "text-ink-faint"}`}>
+                              {q.labelTarikh}
+                            </span>
+                          </div>
+                        );
+                      })
+                    )}
+                  </div>
+                </section>
+
+                <section className="card" aria-label="Leaderboard">
+                  <div className="flex flex-wrap items-center justify-between gap-2">
+                    <h2 className="section-title">Leaderboard</h2>
+                    <div className="flex gap-1" role="tablist" aria-label="Leaderboard mode">
+                      {(["Teams", "Individuals"] as const).map((m) => (
+                        <button
+                          key={m}
+                          type="button"
+                          role="tab"
+                          aria-selected={modPapan === m}
+                          onClick={() => setModPapan(m)}
+                          className={`rounded-md px-2.5 py-1 text-[12px] font-bold transition ${
+                            modPapan === m ? "bg-kz-menu-active text-brand-purple" : "text-ink-faint hover:text-ink"
+                          }`}
+                        >
+                          {m}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <ul className="mt-3 flex flex-col gap-0.5">
+                    {potongan.atas.length === 0 && (
+                      <li className="py-3 text-sm text-ink-faint">No scores yet.</li>
+                    )}
+                    {potongan.atas.map((p) => (
+                      <BarisPapanKunci key={p.baris.id} p={p} modPasukan={modPapan === "Teams"} indeks={p.kedudukan} />
+                    ))}
+                    {potongan.terpisah && <li className="my-1 border-t border-kz-line" aria-hidden="true" />}
+                    {potongan.saya && (
+                      <BarisPapanKunci p={potongan.saya} modPasukan={modPapan === "Teams"} indeks={potongan.saya.kedudukan} />
+                    )}
+                  </ul>
+                  <Link href="/participant/leaderboard" className="mt-4 inline-flex text-[13px] font-bold text-brand-purple hover:underline">
+                    View All
+                  </Link>
+                </section>
+              </div>
+            )}
+
+            {/* Kad Your class: Intro Board dan Learning Board. */}
+            {dataReady && (
+              <section className="card p-0" aria-label="Your class">
+                <h2 className="section-title px-6 pb-3 pt-5">Your class</h2>
+                {[
+                  { hrefSuffix: "/board", label: "Intro Board", ikon: ClipboardList },
+                  { hrefSuffix: "/learning-board", label: "Learning Board", ikon: BookOpen },
+                ].map((p) => {
+                  const aktif = !!activeClassId;
+                  const href = aktif
+                    ? `/participant/classes/${encodeURIComponent(activeClassId)}${p.hrefSuffix}`
+                    : "#";
+                  const Ikon = p.ikon;
+                  return (
+                    <Link
+                      key={p.label}
+                      href={href}
+                      aria-disabled={!aktif}
+                      className={`list-row flex items-center gap-3 transition hover:bg-canvas ${aktif ? "" : "pointer-events-none opacity-50"}`}
+                    >
+                      <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[4px] bg-kz-accent-soft text-brand-purple">
+                        <Ikon className="h-5 w-5" aria-hidden="true" />
+                      </span>
+                      <span className="flex-1 text-[14px] font-medium text-ink">{p.label}</span>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-ink-faint" aria-hidden="true" />
+                    </Link>
+                  );
+                })}
+              </section>
+            )}
+
+            {/* Kaki: sertai kelas lain dan tinggalkan kelas semasa. */}
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-kz-line pt-4">
+              <Link href="/participant/join" className="text-[13px] font-bold text-brand-purple hover:underline">
+                Join another class
+              </Link>
+              {activeClassId && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const target = classes.find((c) => c.id === activeClassId);
+                    if (!target) return;
+                    if (!confirm(`Leave "${target.name}"? You will lose access to its activities and rankings.`)) return;
+                    try {
+                      await leaveClassAsStudent(activeClassId);
+                      const remaining = classes.filter((c) => c.id !== activeClassId);
+                      setClasses(remaining);
+                      // Pilih semula kelas lalai: aktif dahulu, kemudian tamat.
+                      const urutanBaki = susunKelas(remaining, aktiviti);
+                      const lalai = urutanBaki.find(k => statusKelas(k) === "aktif") ?? urutanBaki[0];
+                      setActiveClassId(lalai ? lalai.id : "");
+                    } catch (err: unknown) {
+                      alert((err as { message?: string })?.message || "Failed to leave class");
+                    }
+                  }}
+                  className="text-[13px] font-bold text-kz-down hover:underline"
+                >
+                  Leave this class
+                </button>
+              )}
+            </div>
+          </>
+        )}
       </div>
     </ParticipantShell>
   );
+}
+
+/** Satu baris kad Leaderboard: avatar inisial, nama, sub, mata. */
+function BarisPapanKunci({
+  p,
+  modPasukan,
+  indeks,
+}: {
+  p: { baris: BarisSkor; kedudukan: number; saya: boolean };
+  modPasukan: boolean;
+  indeks: number;
+}) {
+  const warna = warnaIndeks(indeks - 1);
+  const sub = p.saya ? (modPasukan ? "Your team" : "You") : modPasukan ? "Team" : "";
+  return (
+    <li className={`flex items-center gap-3 rounded-md px-2 py-2 ${p.saya ? "bg-canvas" : ""}`}>
+      <span
+        className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-[13px] font-bold"
+        style={{ backgroundColor: warna.latar, color: warna.teks }}
+        aria-hidden="true"
+      >
+        {inisial(p.baris.label)}
+      </span>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-[14px] font-medium text-ink">{p.baris.label}</div>
+        {sub && <div className="text-xs text-ink-faint">{sub}</div>}
+      </div>
+      <span className="shrink-0 text-[14px] font-bold text-ink">{p.baris.skor.toLocaleString()}</span>
+    </li>
+  );
+}
+
+/** Bina baris My Activities siap papar daripada senarai aktiviti. */
+function kawalBarisAktiviti(
+  senarai: Hunt[],
+  tamat: boolean,
+  namaKelas: Map<string, string>,
+  indeksKelas: Map<string, number>
+): BarisAktivitiUi[] {
+  return senarai.map((h) => {
+    const label = labelTarikhQuest(h.end_at, tamat);
+    return {
+      id: h.id,
+      tajuk: h.title,
+      kelasNama: namaKelas.get(h.class_id ?? "") || "Class",
+      indeksKelas: indeksKelas.get(h.class_id ?? "") ?? 0,
+      labelTarikh: label.label || (tamat ? "Ended" : tarikhRingkas(h.end_at) || "Open"),
+      segera: label.segera,
+      tamat,
+      href: `/participant/activities?hunt=${encodeURIComponent(h.id)}`,
+    };
+  });
 }
