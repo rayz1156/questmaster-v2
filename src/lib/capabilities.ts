@@ -186,7 +186,11 @@ export async function getEffectiveCapabilities(
   }
 
   const files = putuskanKeupayaan({ keupayaan: 'files', pemanggil, pemilik });
-  const videos = putuskanKeupayaan({ keupayaan: 'videos', pemanggil, pemilik });
+  // Pembetulan CTO: muat naik VIDEO kekal untuk pemilik kelas sahaja (route
+  // video/start, upload/start, upload/complete menyemak owner_id), jadi
+  // keupayaan video TIDAK diwarisi daripada pemilik. Jika diwarisi, tab video
+  // dipaparkan kepada pelajar tetapi pelayan menolaknya dengan 403.
+  const videos = putuskanKeupayaan({ keupayaan: 'videos', pemanggil, pemilik: null });
   return {
     canUploadFiles: files.ok,
     canUploadVideos: videos.ok,
