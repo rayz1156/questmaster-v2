@@ -5,6 +5,28 @@ import { s5PresignGet } from '@/lib/s5';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+// KZ-017 P3 (pembetulan kzsec penemuan 1): jenis yang boleh menjalankan skrip
+// dalam pelayar tidak pernah disajikan inline. SVG ialah vektor stored XSS
+// utama: <script> dalam SVG yang disajikan sebagai image/svg+xml inline
+// tereksekusi pada origin aplikasi ini.
+const MIMES_BOLEH_SKRIP = ['image/svg+xml', 'text/html', 'application/xhtml+xml', 'text/xml', 'application/xml'];
+
+/**
+ * Pengepala pertahanan berlapis untuk respons yang menyajikan bait:
+ * - X-Content-Type-Options: nosniff pada SETIAP respons bait;
+ * - untuk jenis boleh-skrip: paksa attachment (bukan inline) dan CSP sandbox
+ *   supaya sebarang skrip dalam kandungan tidak tereksekusi.
+ */
+function tetapkanPengepalaSelamat(h: Headers, ct: string, inline: boolean, fname: string): void {
+  h.set('X-Content-Type-Options', 'nosniff');
+  if (MIMES_BOLEH_SKRIP.some((t) => ct.startsWith(t))) {
+    h.set('Content-Disposition', `attachment; filename="${fname.replace(/"/g, '')}"`);
+    h.set('Content-Security-Policy', "sandbox; default-src 'none'");
+    return;
+  }
+  h.set('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${fname.replace(/"/g, '')}"`);
+}
+
 /**
  * GET /api/learning-boards/[classId]/file-redirect/[fileCode]
  *
@@ -39,7 +61,7 @@ export async function GET(
       const h = new Headers();
       h.set('Content-Type', ct);
       const len = up.headers.get('content-length'); if (len) h.set('Content-Length', len);
-      h.set('Content-Disposition', `${isInline ? 'inline' : 'attachment'}; filename="${fname.replace(/"/g,'')}"`);
+      tetapkanPengepalaSelamat(h, ct, isInline, fname);
       h.set('Cache-Control', 'private, max-age=120');
       return new NextResponse(up.body, { status: 200, headers: h });
     } catch (e) {
@@ -96,10 +118,7 @@ export async function GET(
   headers.set('Content-Type', contentType);
   const upstreamLength = upstream.headers.get('content-length');
   if (upstreamLength) headers.set('Content-Length', upstreamLength);
-  headers.set(
-    'Content-Disposition',
-    `${inline ? 'inline' : 'attachment'}; filename="${filename.replace(/"/g, '')}"`,
-  );
+  tetapkanPengepalaSelamat(headers, contentType, inline, filename);
   headers.set('Cache-Control', 'private, max-age=120');
 
   return new NextResponse(upstream.body, { status: 200, headers });
