@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { assertCapability } from '@/lib/capabilities';
 import { fileluUpload, fileluShareUrl, fileluDelete } from '@/lib/filelu';
-import { fetchRemoteToDisk, checkRateLimit, readTmp, UploadGuardError } from '@/lib/upload-guard';
+import { fetchRemoteToDisk, checkRateLimit, readTmp, UploadGuardError, imejRasterSebenar } from '@/lib/upload-guard';
 import { s5ObjectKey, s5PutStream, s5FileCode } from '@/lib/s5';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
@@ -64,9 +64,10 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
 
-  // KZ-017: semakan keupayaan DIKETEGAKAN mengikut MIME. Imej tidak pernah
-  // disekat oleh keupayaan (lihat capabilities.ts), jadi gate dipindahkan ke
-  // tempat MIME sebenar diketahui, bukan di sini sebelum badan dibaca.
+  // KZ-017: semakan keupayaan DIKETEGAKAN mengikut jenis fail. Imej raster
+  // sebenar (dihidu daripada bait, lihat imejRasterSebenar) tidak pernah
+  // disekat oleh keupayaan, jadi gate dipindahkan ke tempat bait diketahui,
+  // bukan di sini sebelum badan dibaca.
 
   // --- Laluan source_url: pelayan yang mengambil fail, bukan model ---
   //
@@ -189,11 +190,19 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
   }
 
-  // KZ-017: MIME datang daripada fail yang diterima pelayan (file.type), bukan
-  // medan bebas klien. Imej tidak disekat oleh keupayaan; jenis lain perlu
+  // KZ-017 P1 (pembetulan kzsec penemuan 1): bait dibaca SEKALI di sini, sebelum
+  // keputusan keupayaan, supaya jenis MIME untuk keupayaan dihidu daripada
+  // tandatangan bait sebenar. PERHATIAN: file.type ialah Content-Type bahagian
+  // multipart yang DIKAWAL KLIEN, jadi ia TIDAK dipercayai untuk keputusan
+  // keupayaan (ia kekal dipakai untuk senarai dibenarkan dan FileLu sahaja).
+  // Imej raster sebenar (PNG/JPEG/GIF/WebP) tidak disekat oleh keupayaan; SVG
+  // dan apa-apa yang mengisytihar image/* tetapi bukan raster perlu
   // keupayaan fail, diwarisi daripada pemilik kelas. Pemanggil sudah disahkan
   // ahli kelas oleh requireClassMember.
-  if (!mime.startsWith('image/')) {
+  const arrayBuf = await file.arrayBuffer();
+  const bytes = Buffer.from(arrayBuf);
+  const imejRaster = imejRasterSebenar(new Uint8Array(arrayBuf));
+  if (!imejRaster) {
     const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
     if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
   }
@@ -203,8 +212,6 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
 
   const ext = extOf(file.name);
-  const arrayBuf = await file.arrayBuffer();
-  const bytes = Buffer.from(arrayBuf);
 
   let uploaded;
   try {

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { assertCapability } from '@/lib/capabilities';
 import { fileluUpload, fileluShareUrl, fileluDelete } from '@/lib/filelu';
+import { imejRasterSebenar } from '@/lib/upload-guard';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 
 export const dynamic = 'force-dynamic';
@@ -43,11 +44,18 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
   }
 
-  // KZ-017: MIME datang daripada fail yang diterima pelayan (file.type), bukan
-  // medan bebas klien. Imej tidak disekat oleh keupayaan (lihat
-  // capabilities.ts); jenis lain perlu keupayaan fail, diwarisi daripada
-  // pemilik kelas. Pemanggil sudah disahkan ahli kelas oleh requireClassMember.
-  if (!mime.startsWith('image/')) {
+  // KZ-017 P1 (pembetulan kzsec penemuan 1): bait dibaca SEKALI di sini, sebelum
+  // keputusan keupayaan, supaya jenis MIME untuk keupayaan dihidu daripada
+  // tandatangan bait sebenar. PERHATIAN: file.type ialah Content-Type bahagian
+  // multipart yang DIKAWAL KLIEN, jadi ia TIDAK dipercayai untuk keputusan
+  // keupayaan (ia kekal dipakai untuk senarai dibenarkan dan FileLu sahaja).
+  // Imej raster sebenar (PNG/JPEG/GIF/WebP) tidak disekat oleh keupayaan; SVG
+  // dan apa-apa yang mengisytihar image/* tetapi bukan raster perlu keupayaan
+  // fail, diwarisi daripada pemilik kelas. Pemanggil sudah disahkan ahli kelas
+  // oleh requireClassMember.
+  const bytes = Buffer.from(await file.arrayBuffer());
+  const imejRaster = imejRasterSebenar(bytes);
+  if (!imejRaster) {
     const cap = await assertCapability(auth.supa, auth.user!.id, 'files', { classId: params.classId });
     if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
   }
@@ -58,7 +66,6 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
 
   const ext = extOf(file.name);
-  const bytes = Buffer.from(await file.arrayBuffer());
   let uploaded;
   try {
     uploaded = await fileluUpload(bytes, file.name || `upload.${ext || 'bin'}`, mime);

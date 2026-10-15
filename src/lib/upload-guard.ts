@@ -142,6 +142,44 @@ export function sniffMime(head: Buffer): string | null {
   return null;
 }
 
+/**
+ * KZ-017 P1: hidu imej raster sebenar daripada tandatangan bait (magic bytes).
+ *
+ * sniffMime tidak cukup spesifik untuk keputusan keupayaan: tandatangan WebP
+ * di sana hanya RIFF (4 bait), yang juga sepadan dengan AVI/WAV, jadi ia boleh
+ * salah lulus. Fungsi ini lebih ketat dan TIDAK mengesan SVG (SVG ialah teks
+ * XML yang boleh menjalankan skrip, ia mesti digate sebagai fail biasa).
+ *
+ * Kepulangan null bermakna "bukan imej raster yang dikenali", dan pemanggil
+ * (route multipart) mesti semak keupayaan 'files'.
+ */
+export function imejRasterSebenar(bytes: Uint8Array): 'image/png' | 'image/jpeg' | 'image/gif' | 'image/webp' | null {
+  const b = bytes as ArrayLike<number>;
+  const at = (i: number): number | undefined => (i < b.length ? b[i] : undefined);
+
+  // PNG: 89 50 4E 47 0D 0A 1A 0A
+  if (
+    b.length >= 8 &&
+    at(0) === 0x89 && at(1) === 0x50 && at(2) === 0x4e && at(3) === 0x47 &&
+    at(4) === 0x0d && at(5) === 0x0a && at(6) === 0x1a && at(7) === 0x0a
+  ) return 'image/png';
+
+  // JPEG: FF D8 FF
+  if (b.length >= 3 && at(0) === 0xff && at(1) === 0xd8 && at(2) === 0xff) return 'image/jpeg';
+
+  // GIF: 47 49 46 38 (GIF87a / GIF89a)
+  if (b.length >= 4 && at(0) === 0x47 && at(1) === 0x49 && at(2) === 0x46 && at(3) === 0x38) return 'image/gif';
+
+  // WebP: 52 49 46 46 ?? ?? ?? ?? 57 45 42 50 (RIFF....WEBP)
+  if (
+    b.length >= 12 &&
+    at(0) === 0x52 && at(1) === 0x49 && at(2) === 0x46 && at(3) === 0x46 &&
+    at(8) === 0x57 && at(9) === 0x45 && at(10) === 0x42 && at(11) === 0x50
+  ) return 'image/webp';
+
+  return null;
+}
+
 // ---------------------------------------------------------------------------
 // Had kadar setiap pengguna. Dalam memori sudah memadai kerana aplikasi
 // berjalan sebagai satu proses PM2 fork tunggal.
