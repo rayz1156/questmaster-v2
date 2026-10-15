@@ -28,6 +28,9 @@ export const fetchCache = 'force-no-store';
  * atau jawapan.
  */
 
+/** Umur maksimum sesi yang dianggap masih langsung: 6 jam. */
+const UMUR_MAKS_SESI_MS = 6 * 60 * 60 * 1000;
+
 interface BarisSesi {
   id: string;
   quiz_id: string;
@@ -99,6 +102,9 @@ export async function GET(req: NextRequest) {
     .select('id, quiz_id, code, status, created_at')
     .in('quiz_id', Array.from(petaKuiz.keys()))
     .in('status', SESI_BOLEH_MASUK as unknown as string[])
+    // Sesi lobi yang tidak pernah ditutup tidak dianggap LIVE selepas 6 jam
+    // (pembetulan CTO KZ-018b), supaya kad "LIVE NOW" tidak basi.
+    .gte('created_at', new Date(Date.now() - UMUR_MAKS_SESI_MS).toISOString())
     .order('created_at', { ascending: false });
   if (errSesi) {
     console.error('live-now session read failed', errSesi.message);
