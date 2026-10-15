@@ -255,7 +255,8 @@ export default function Page() {
     const senarai: Array<{ id: string; nama: string; skor: number }> = modIndividu
       ? indivScores.map((s) => ({ id: s.user_id, nama: s.display_name || "Student", skor: Number(s.total_score) || 0 }))
       : scores.map((s) => ({ id: s.team_id, nama: s.team_name || "Team", skor: Number(s.total_score) || 0 }));
-    const atas = senarai.find((r) => r.skor > totalPoints);
+    // Baris tepat di atas saya: markah TERENDAH yang masih melebihi markah saya (kzsec M1).
+    const atas = senarai.reduce<(typeof senarai)[number] | null>((terbaik, r) => (r.skor > totalPoints && (!terbaik || r.skor < terbaik.skor) ? r : terbaik), null);
     if (!atas) return null;
     return {
       nama: atas.nama,
