@@ -100,6 +100,16 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
     }
 
+    // KZ-017 P2 (pembetulan kzsec penemuan 2 dan 3): semakan keupayaan KEMBALI
+    // ke SEBELUM fetchRemoteToDisk. Tiada pengecualian imej di sini: MIME jauh
+    // belum diketahui sebelum pengambilan, dan mengharapkan pelayan memuat
+    // turun fail penuh hanya untuk menolak selepas itu ialah pembaziran kerja
+    // pelayan dan vektor isian cakera. Jenis fail tetap ditapis oleh senarai
+    // dibenarkan selepas bait dihidu. Pemanggil sudah disahkan ahli kelas oleh
+    // requireClassMember.
+    const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
+    if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
+
     let remote;
     try {
       remote = await fetchRemoteToDisk(sourceUrl, {
@@ -116,20 +126,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       return NextResponse.json({ error: e?.message || 'Fetch failed' }, { status });
     }
 
-    // KZ-017: MIME di sini datang daripada bait sebenar yang diambil
-    // (upload-guard), bukan medan bebas klien. Imej tidak disekat oleh
-    // keupayaan; jenis lain perlu keupayaan fail, diwarisi daripada pemilik
-    // kelas. Pemanggil sudah disahkan ahli kelas oleh requireClassMember.
-    if (!remote.mimeType.startsWith('image/')) {
-      const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
-      if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
-    }
-
-    // Semakan kuota dengan saiz sebenar yang diterima (bukan yang diisytihar).
-    const kuotaSebenar = await reserveMuatNaik(owner.supa, params.classId, remote.bytes, remote.mimeType);
-    if (kuotaSebenar) return NextResponse.json(kuotaSebenar.body, { status: kuotaSebenar.status });
-
+    // Setiap laluan keluar selepas fetchRemoteToDisk berjaya mesti lalui
+    // finally di bawah (remote.cleanup) supaya fail sementara qm-src-* tidak
+    // tertinggal yatim pada cakera (kzsec penemuan 2).
     try {
+      // Semakan kuota dengan saiz sebenar yang diterima (bukan yang diisytihar).
+      const kuotaSebenar = await reserveMuatNaik(owner.supa, params.classId, remote.bytes, remote.mimeType);
+      if (kuotaSebenar) return NextResponse.json(kuotaSebenar.body, { status: kuotaSebenar.status });
+
       const fileName =
         (typeof body.fileName === 'string' && body.fileName.trim()) || fileNameFromUrl(remote.finalUrl);
       const key = s5ObjectKey(fileName);
