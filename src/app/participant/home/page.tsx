@@ -332,7 +332,7 @@ export default function Page() {
   return (
     <ParticipantShell>
       <div
-        className={`${bricolage.variable} ${jakarta.variable} font-[family-name:var(--pp-jakarta)] -mx-5 -mt-8 min-w-0 bg-[#f6f5fb] px-5 pb-12 pt-8 text-[#1e1b3a]`}
+        className={`${bricolage.variable} ${jakarta.variable} font-[family-name:var(--pp-jakarta)] -mx-5 -mt-8 min-w-0 bg-[#f6f5fb] px-5 pb-12 pt-6 text-[#1e1b3a]`}
       >
         <div className="mx-auto flex max-w-[1180px] flex-col gap-6">
 
