@@ -272,7 +272,7 @@ export default function Page() {
               <div className="mt-6">
                 <KadStatistik
                   bilKelas={classes.length}
-                  aktivitiAktif={activeQuestCount}
+                  aktivitiAktif={tabAktiviti.aktif.length}
                   mata={totalPoints}
                   kedudukan={myRank}
                 />

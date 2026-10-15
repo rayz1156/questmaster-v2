@@ -62,7 +62,7 @@ export default function KadStatistik({
           ? "Top three. Keep it up."
           : kedudukan > 0
             ? "Climb higher."
-            : "Join a team to be ranked.",
+            : "No ranking yet.",
       ikon: <Trophy className="w-6 h-6" aria-hidden="true" />,
       warna: "bg-emerald-100 text-emerald-700",
     },

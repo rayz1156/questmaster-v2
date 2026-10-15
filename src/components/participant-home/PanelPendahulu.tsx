@@ -18,7 +18,7 @@ import { atas5DenganSaya, inisial, type BarisPendahulu } from "@/lib/papanPemuka
 /** Baris markah ternormalisasi yang dibina oleh halaman. */
 export type BarisSkor = { id: string; label: string; skor: number };
 
-const MEDAL = ["bg-amber-400 text-white", "bg-slate-300 text-white", "bg-orange-500 text-white"];
+const MEDAL = ["bg-amber-400 text-white", "bg-slate-500 text-white", "bg-orange-500 text-white"];
 const PALET_INISIAL = [
   "bg-emerald-100 text-emerald-700",
   "bg-purple-100 text-purple-700",
