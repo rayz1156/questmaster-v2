@@ -1,30 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fileluDirectLink } from '@/lib/filelu';
 import { s5PresignGet } from '@/lib/s5';
+import { pengepalaSajian, normMime } from '@/lib/sajianSelamat';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-// KZ-017 P3 (pembetulan kzsec penemuan 1): jenis yang boleh menjalankan skrip
-// dalam pelayar tidak pernah disajikan inline. SVG ialah vektor stored XSS
-// utama: <script> dalam SVG yang disajikan sebagai image/svg+xml inline
-// tereksekusi pada origin aplikasi ini.
-const MIMES_BOLEH_SKRIP = ['image/svg+xml', 'text/html', 'application/xhtml+xml', 'text/xml', 'application/xml'];
-
 /**
- * Pengepala pertahanan berlapis untuk respons yang menyajikan bait:
- * - X-Content-Type-Options: nosniff pada SETIAP respons bait;
- * - untuk jenis boleh-skrip: paksa attachment (bukan inline) dan CSP sandbox
- *   supaya sebarang skrip dalam kandungan tidak tereksekusi.
+ * KZ-017 R2-1 (pembetulan kzsec pusingan 2, penemuan 1): senarai sekat
+ * MIMES_BOLEH_SKRIP yang lama adalah case-sensitive, sedangkan jenis MIME
+ * tidak sensitif huruf mengikut RFC 2045/7231, jadi "image/SVG+XML" boleh
+ * lintas senarai sekat dan disajikan inline (stored XSS pada origin).
+ * Digantikan dengan SENARAI BENARKAN dalam src/lib/sajianSelamat.ts: inline
+ * HANYA untuk senarai selamat (png/jpeg/gif/webp/pdf, video/*, audio/*); semua
+ * jenis lain, termasuk yang tidak dikenali atau kosong, dipaksa attachment
+ * dengan CSP sandbox. Semua keputusan dan pengepala Content-Type menggunakan
+ * nilai ternormal (normMime), bukan nilai mentah huluan.
  */
-function tetapkanPengepalaSelamat(h: Headers, ct: string, inline: boolean, fname: string): void {
+function susunPengepala(h: Headers, ctMentah: string, mahuInline: boolean, fname: string): void {
+  const p = pengepalaSajian(ctMentah, mahuInline);
   h.set('X-Content-Type-Options', 'nosniff');
-  if (MIMES_BOLEH_SKRIP.some((t) => ct.startsWith(t))) {
-    h.set('Content-Disposition', `attachment; filename="${fname.replace(/"/g, '')}"`);
-    h.set('Content-Security-Policy', "sandbox; default-src 'none'");
-    return;
-  }
-  h.set('Content-Disposition', `${inline ? 'inline' : 'attachment'}; filename="${fname.replace(/"/g, '')}"`);
+  h.set('Content-Type', p.contentType);
+  h.set('Content-Disposition', `${p.disposition}; filename="${fname.replace(/"/g, '')}"`);
+  if (p.csp) h.set('Content-Security-Policy', p.csp);
 }
 
 /**
@@ -53,15 +51,17 @@ export async function GET(
       if (!up.ok || !up.body) return NextResponse.json({ error: `Upstream ${up.status}` }, { status: 502 });
       const extM: Record<string,string> = { pdf:'application/pdf', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', svg:'image/svg+xml', mp4:'video/mp4', webm:'video/webm', mp3:'audio/mpeg', txt:'text/plain; charset=utf-8', csv:'text/csv; charset=utf-8', json:'application/json' };
       const kext = (key.split('.').pop() || '').toLowerCase();
-      const upct = up.headers.get('content-type') || '';
-      const ct = (upct && !upct.startsWith('application/octet-stream') ? upct : (extM[kext] || upct || 'application/octet-stream'));
+      // R2-1: penormalan awal supaya semua keputusan menggunakan ctNorm.
+      const upct = normMime(up.headers.get('content-type') || '');
+      const ctMentah = (upct && upct !== 'application/octet-stream' ? upct : (extM[kext] || upct || 'application/octet-stream'));
       const fname = decodeURIComponent(key.split('/').pop() || 'file');
+      // Pilihan inline route ini: imej/video/audio serta teks ringkas. Sajian
+      // akhir tetap ditapis oleh pengepalaSajian (senarai selamat R2-1).
       const inlineT = ['application/pdf','text/plain','text/csv','application/json'];
-      const isInline = ct.startsWith('image/') || ct.startsWith('video/') || ct.startsWith('audio/') || inlineT.some((t)=>ct.startsWith(t));
+      const isInline = ctMentah.startsWith('image/') || ctMentah.startsWith('video/') || ctMentah.startsWith('audio/') || inlineT.some((t)=>ctMentah.startsWith(t));
       const h = new Headers();
-      h.set('Content-Type', ct);
       const len = up.headers.get('content-length'); if (len) h.set('Content-Length', len);
-      tetapkanPengepalaSelamat(h, ct, isInline, fname);
+      susunPengepala(h, ctMentah, isInline, fname);
       h.set('Cache-Control', 'private, max-age=120');
       return new NextResponse(up.body, { status: 200, headers: h });
     } catch (e) {
@@ -104,10 +104,10 @@ export async function GET(
     csv: 'text/csv; charset=utf-8',
     json: 'application/json',
   };
-  const upstreamType = upstream.headers.get('content-type') || '';
+  const upstreamType = normMime(upstream.headers.get('content-type') || '');
   const contentType =
     extMime[ext] ||
-    (upstreamType && !upstreamType.startsWith('application/octet-stream') ? upstreamType : 'application/octet-stream');
+    (upstreamType && upstreamType !== 'application/octet-stream' ? upstreamType : 'application/octet-stream');
 
   // Files we render inline in the browser; everything else downloads.
   const inlineTypes = ['application/pdf', 'text/plain', 'text/csv', 'application/json'];
@@ -115,10 +115,9 @@ export async function GET(
   const filename = pathname.split('/').pop() || 'file';
 
   const headers = new Headers();
-  headers.set('Content-Type', contentType);
   const upstreamLength = upstream.headers.get('content-length');
   if (upstreamLength) headers.set('Content-Length', upstreamLength);
-  tetapkanPengepalaSelamat(headers, contentType, inline, filename);
+  susunPengepala(headers, contentType, inline, filename);
   headers.set('Cache-Control', 'private, max-age=120');
 
   return new NextResponse(upstream.body, { status: 200, headers });
