@@ -143,3 +143,143 @@ export function peneranganTarikh(
   if (mula) return `Starts: ${mula}`;
   return "";
 }
+
+/* ============================================================
+ * Fungsi KZ-018b (papan pemuka Versi 2, fokus satu tindakan).
+ * Semua tulen; tiada Supabase, tiada jaringan.
+ * ============================================================ */
+
+/**
+ * Aktiviti "NEXT UP" (KZ-018b): antara aktiviti aktif, pilih yang
+ * `end_at` terdekat. Aktiviti tanpa `end_at` diletak selepas yang
+ * bertarikh; antara mereka, pilih yang paling baharu dicipta
+ * "(tiada end_at: yang terbaru)". Memulangkan null jika senarai kosong.
+ */
+export function pilihAktivitiSeterusnya<
+  T extends Pick<Hunt, "end_at" | "created_at">,
+>(aktif: T[] | null | undefined): T | null {
+  const senarai = aktif || [];
+  if (senarai.length === 0) return null;
+  const masa = (r: T) => {
+    const t = r.end_at ? new Date(r.end_at).getTime() : Number.NaN;
+    return Number.isNaN(t) ? null : t;
+  };
+  // Bertarikh dahulu (end_at terdekat), kemudian yang tanpa tarikh ikut
+  // created_at terbaru. Baris dengan end_at terdekat menang keseluruhan.
+  const bertarikh = senarai
+    .filter((r) => masa(r) !== null)
+    .sort((a, b) => (masa(a) as number) - (masa(b) as number));
+  if (bertarikh.length > 0) return bertarikh[0];
+  const tanpaTarikh = senarai
+    .filter((r) => masa(r) === null)
+    .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+  return tanpaTarikh[0] ?? null;
+}
+
+/** Hasil label tarikh baris quest. `segera` = merah tebal (tamat <= 1 hari). */
+export type LabelTarikh = { label: string; segera: boolean };
+
+/**
+ * Label tarikh ringkas baris "My Quests" (KZ-018b), gaya pratonton:
+ * "Due tomorrow", "Due in 5 days", "Due 24 Oct" untuk aktif;
+ * "Ended 8 Oct" untuk yang tamat; "" jika tiada tarikh.
+ * `segera` benar jika tarikh akhir dalam <= 1 hari atau telah lepas
+ * (butang label dipapar MERAH #b91c1c tebal).
+ */
+export function labelTarikhQuest(
+  tamatPada: string | null | undefined,
+  sudahTamat: boolean,
+  kini: Date = new Date()
+): LabelTarikh {
+  const formatTarikh = (iso: string) => {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return "";
+    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  };
+  if (sudahTamat) {
+    const teks = tamatPada ? `Ended ${formatTarikh(tamatPada)}` : "Ended";
+    return { label: teks, segera: false };
+  }
+  if (!tamatPada) return { label: "", segera: false };
+  const tarikh = new Date(tamatPada);
+  if (Number.isNaN(tarikh.getTime())) return { label: "", segera: false };
+  const hari = Math.floor((tarikh.getTime() - kini.getTime()) / 86_400_000);
+  if (hari <= 1) {
+    // Hari ini, esok atau telah lepas: segera (merah).
+    if (hari <= 0) return { label: "Due today", segera: true };
+    return { label: "Due tomorrow", segera: true };
+  }
+  if (hari <= 7) return { label: `Due in ${hari} days`, segera: false };
+  return { label: `Due ${formatTarikh(tamatPada)}`, segera: false };
+}
+
+/**
+ * Ayat kotak amber kedudukan (KZ-018b). Mengambil kedudukan saya,
+ * markah baris di atas (jika ada) dan kedudukan baris itu. Memulangkan
+ * null jika tiada kedudukan (kotak amber disembunyikan).
+ * - Kedudukan 1: "in class. You are leading. Keep it up."
+ * - Lain: "in class. {gap} pts to overtake {nama} for #{kedudukan atas}."
+ *   `kedudukanAtas` ialah kedudukan sebenar baris di atas, bukan
+ *   rank-1 buta, supaya ayat kekal betul bila ada seri.
+ */
+export function ayatKedudukan(
+  kedudukan: number,
+  skorSaya: number,
+  barisAtas: { nama: string; skor: number; kedudukan: number } | null
+): string | null {
+  if (kedudukan <= 0) return null;
+  if (kedudukan === 1) return "in class. You are leading. Keep it up.";
+  if (!barisAtas) return null;
+  const gap = Math.max(1, (barisAtas.skor || 0) - (skorSaya || 0));
+  return `in class. ${gap} pts to overtake ${barisAtas.nama} for #${barisAtas.kedudukan}.`;
+}
+
+/**
+ * Ayat kecil kad LIVE (KZ-018b): "{class name} · {n} classmates already
+ * in." ditambah " Your team is waiting." jika peserta ada pasukan.
+ */
+export function ayatKadLive(namaKelas: string, bilPemain: number, adaPasukan: boolean): string {
+  // Teks tepat ikut tiket: "{class name} · {n} classmates already in."
+  const asas = `${namaKelas} · ${Math.max(0, bilPemain)} classmates already in.`;
+  return adaPasukan ? `${asas} Your team is waiting.` : asas;
+}
+
+/**
+ * Status sesi kuiz langsung yang boleh dimasuki peserta: lobi, soalan
+ * sedang ditanya, atau jawapan didedahkan. "ended" tidak boleh dimasuki.
+ * (Nilai status: migrasi 0017 baris 61.)
+ */
+export const SESI_BOLEH_MASUK: readonly string[] = ["lobby", "asking", "revealed"];
+
+export function sesiBolehMasuk(status: string | null | undefined): boolean {
+  return !!status && SESI_BOLEH_MASUK.includes(status);
+}
+
+/**
+ * Sesi LIVE terkini (KZ-018b): antara sesi yang boleh dimasuki, pilih
+ * yang paling baharu mengikut `started_at` (waktu sesi dicipta hos).
+ * Yang lain dipaparkan sebagai pautan "Also live: ..." di bawah butang.
+ */
+export function pilihSesiTerkini<
+  T extends { status: string; started_at: string | null },
+>(sesi: T[] | null | undefined): T | null {
+  const senarai = (sesi || []).filter((s) => sesiBolehMasuk(s.status));
+  if (senarai.length === 0) return null;
+  const masa = (s: T) => {
+    const t = s.started_at ? new Date(s.started_at).getTime() : Number.NaN;
+    return Number.isNaN(t) ? 0 : t;
+  };
+  return senarai.sort((a, b) => masa(b) - masa(a))[0];
+}
+
+/**
+ * Warna jalur stabil ikut kelas (KZ-018b): palet tetap dipilih dengan
+ * indeks kelas dalam senarai kelas peserta (bukan id UUID, supaya warna
+ * tidak melompat antara peranti).
+ */
+const PALET_KELAS: readonly string[] = ["#7c3aed", "#0e7490", "#b45309", "#be185d", "#15803d"];
+
+export function warnaKelas(indeks: number): string {
+  if (indeks < 0) return PALET_KELAS[0];
+  return PALET_KELAS[indeks % PALET_KELAS.length];
+}
