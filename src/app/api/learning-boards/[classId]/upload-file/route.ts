@@ -64,8 +64,9 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
 
-  const cap = await assertCapability(owner.supa, owner.user!.id, 'files');
-  if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
+  // KZ-017: semakan keupayaan DIKETEGAKAN mengikut MIME. Imej tidak pernah
+  // disekat oleh keupayaan (lihat capabilities.ts), jadi gate dipindahkan ke
+  // tempat MIME sebenar diketahui, bukan di sini sebelum badan dibaca.
 
   // --- Laluan source_url: pelayan yang mengambil fail, bukan model ---
   //
@@ -112,6 +113,15 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
         `[upload-file/source_url] ditolak user=${owner.user!.id} url=${sourceUrl} sebab=${e?.message || e}`,
       );
       return NextResponse.json({ error: e?.message || 'Fetch failed' }, { status });
+    }
+
+    // KZ-017: MIME di sini datang daripada bait sebenar yang diambil
+    // (upload-guard), bukan medan bebas klien. Imej tidak disekat oleh
+    // keupayaan; jenis lain perlu keupayaan fail, diwarisi daripada pemilik
+    // kelas. Pemanggil sudah disahkan ahli kelas oleh requireClassMember.
+    if (!remote.mimeType.startsWith('image/')) {
+      const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
+      if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
     }
 
     // Semakan kuota dengan saiz sebenar yang diterima (bukan yang diisytihar).
@@ -177,6 +187,15 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const isAllowed = ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p));
   if (!isAllowed) {
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
+  }
+
+  // KZ-017: MIME datang daripada fail yang diterima pelayan (file.type), bukan
+  // medan bebas klien. Imej tidak disekat oleh keupayaan; jenis lain perlu
+  // keupayaan fail, diwarisi daripada pemilik kelas. Pemanggil sudah disahkan
+  // ahli kelas oleh requireClassMember.
+  if (!mime.startsWith('image/')) {
+    const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
+    if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
   }
 
   // Kuota disemak SEBELUM bait dihantar ke FileLu (tiket V2-002b).

@@ -33,9 +33,6 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   const auth = await requireClassMember(req, params.classId);
   if (auth.response) return auth.response;
 
-  const cap = await assertCapability(auth.supa, auth.user!.id, 'files');
-  if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
-
   const form = await req.formData().catch(() => null);
   if (!form) return NextResponse.json({ error: 'multipart/form-data expected' }, { status: 400 });
   const file = form.get('file');
@@ -44,6 +41,15 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   const mime = file.type || 'application/octet-stream';
   if (!ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p))) {
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
+  }
+
+  // KZ-017: MIME datang daripada fail yang diterima pelayan (file.type), bukan
+  // medan bebas klien. Imej tidak disekat oleh keupayaan (lihat
+  // capabilities.ts); jenis lain perlu keupayaan fail, diwarisi daripada
+  // pemilik kelas. Pemanggil sudah disahkan ahli kelas oleh requireClassMember.
+  if (!mime.startsWith('image/')) {
+    const cap = await assertCapability(auth.supa, auth.user!.id, 'files', { classId: params.classId });
+    if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
   }
 
   // Kuota disemak SEBELUM bait dihantar ke FileLu (tiket V2-002b). Had fail
