@@ -104,15 +104,21 @@ const skorOf = (r: Baris) => r.skor;
 // 4. Pembahagian tab aktiviti ikut status dan end_at.
 {
   const kini = new Date("2026-10-15T00:00:00Z");
-  const aktiviti = [
+  // Jenis eksplisit supaya ujian lulus lint tanpa `as any`.
+  const aktiviti: {
+    id: string;
+    status: "active" | "archived" | "draft";
+    end_at: string | null;
+    start_at: string | null;
+  }[] = [
     { id: "a1", status: "active", end_at: "2026-12-01T00:00:00Z", start_at: null },
     { id: "a2", status: "active", end_at: "2026-10-01T00:00:00Z", start_at: null }, // end_at lepas
     { id: "a3", status: "active", end_at: null, start_at: null },
     { id: "a4", status: "archived", end_at: null, start_at: null },
     { id: "a5", status: "draft", end_at: null, start_at: null }, // draf tidak dipapar
   ];
-  const hasil = bahagiAktiviti(aktiviti as any, kini);
-  const id = (l: any[]) => l.map((x) => x.id).sort();
+  const hasil = bahagiAktiviti(aktiviti, kini);
+  const id = (l: typeof aktiviti) => l.map((x) => x.id).sort();
   semak("tab: aktif = a1, a3", String(id(hasil.aktif)) === "a1,a3", String(id(hasil.aktif)));
   semak("tab: tamat = a2, a4", String(id(hasil.tamat)) === "a2,a4", String(id(hasil.tamat)));
   semak("tab: draf dikecualikan", !id(hasil.aktif).includes("a5") && !id(hasil.tamat).includes("a5"));
