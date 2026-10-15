@@ -3,11 +3,12 @@
 @tailwind utilities;
 
 /* ============================================================
- * Sistem reka bentuk Kuizen, semakan September 2026
+ * Sistem reka bentuk Kuizen, semakan Oktober 2026 (KZ-020)
  * ============================================================
- * Prinsip: buang sebelum menambah. Satu tindakan utama setiap skrin, satu
- * warna aksen, pemisah garis rambut dan bukan kotak dalam kotak, dan
- * ruang lapang yang cukup supaya mata tahu ke mana hendak pergi.
+ * Nilai diukur daripada demo rujukan pada 1440px dan ditulis semula
+ * sendiri dengan Tailwind: aksen #854fff, tajuk #364a63, badan
+ * #526484, lembut #8094ae, latar #f5f6fa, sempadan #dbdfea,
+ * pemisah baris dalam kad #e5e9f2.
  *
  * Fail ini sengaja mengawal .card, .btn-primary, .input dan .page-title
  * kerana kelas itu dipakai di seluruh aplikasi. Menukarnya di sini menukar
@@ -15,24 +16,31 @@
  */
 
 :root {
-  --ink: 21 22 27;
-  --ink-muted: 91 96 113;
-  --ink-faint: 138 143 158;
-  --canvas: 251 251 252;
-  --hairline: 235 236 240;
-  --accent: 112 87 217;
+  /* #364a63 tajuk */
+  --ink: 54 74 99;
+  /* #526484 badan */
+  --ink-muted: 82 100 132;
+  /* #8094ae teks lembut */
+  --ink-faint: 128 148 174;
+  /* #f5f6fa latar halaman */
+  --canvas: 245 246 250;
+  /* #dbdfea sempadan */
+  --hairline: 219 223 234;
+  /* #e5e9f2 pemisah baris dalam kad */
+  --rowline: 229 233 242;
+  /* #854fff utama */
+  --accent: 133 79 255;
 }
 
 html { font-size: 16px; }
 
 html, body {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
+  font-family: 'DM Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', system-ui, sans-serif;
   background: rgb(var(--canvas));
-  color: rgb(var(--ink));
+  color: rgb(var(--ink-muted));
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  line-height: 1.5;
-  letter-spacing: -0.011em;
+  line-height: 1.65;
 }
 
 h1, h2, h3, h4 { letter-spacing: -0.021em; }
@@ -43,51 +51,52 @@ h1, h2, h3, h4 { letter-spacing: -0.021em; }
 
 @layer components {
   /* ----- Butang ----- */
-  /* Satu tindakan violet setiap skrin. Semua yang lain senyap. */
+  /* Butang utama: #854fff, putih, 13px tebal 700, tinggi 36px, sudut 4px. */
   .btn-primary {
-    @apply inline-flex items-center justify-center gap-2 bg-brand-purple text-white font-medium rounded-xl py-2.5 px-4 transition;
-    min-height: 40px;
-    font-size: 0.9375rem;
-    box-shadow: 0 1px 2px rgba(21, 22, 27, 0.06);
+    @apply inline-flex items-center justify-center gap-2 bg-brand-purple text-white font-bold rounded-[4px] py-[7px] px-[18px] transition;
+    min-height: 36px;
+    font-size: 0.8125rem;
+    letter-spacing: 0.26px;
   }
-  .btn-primary:hover { background-color: #5B42C4; }
+  .btn-primary:hover { background-color: #6b30ff; }
   .btn-primary:disabled { @apply opacity-40 cursor-not-allowed; }
   .btn-primary:focus-visible { outline: 2px solid rgb(var(--accent)); outline-offset: 2px; }
 
+  /* Butang garis: putih, sempadan #dbdfea, teks badan. */
   .btn-secondary {
-    @apply inline-flex items-center justify-center gap-2 bg-white text-ink font-medium rounded-xl py-2.5 px-4 transition;
+    @apply inline-flex items-center justify-center gap-2 bg-white text-ink-muted font-medium rounded-[4px] py-[7px] px-[18px] transition;
     border: 1px solid rgb(var(--hairline));
-    min-height: 40px;
-    font-size: 0.9375rem;
+    min-height: 36px;
+    font-size: 0.8125rem;
   }
-  .btn-secondary:hover { background-color: #F7F7F9; }
+  .btn-secondary:hover { background-color: rgb(var(--canvas)); }
   .btn-secondary:disabled { @apply opacity-40 cursor-not-allowed; }
 
   /* Tindakan ketiga: teks sahaja, tiada kotak. */
   .btn-quiet {
     @apply inline-flex items-center gap-1.5 text-ink-muted font-medium transition;
-    font-size: 0.875rem;
+    font-size: 0.8125rem;
   }
   .btn-quiet:hover { color: rgb(var(--ink)); }
 
   /* ----- Permukaan ----- */
-  /* Kad ialah garis rambut di atas putih, bukan kad terapung dengan bayang. */
+  /* Kad: putih, sudut 4px, tiada sempadan, bayang lembut. */
   .card {
-    @apply bg-white rounded-2xl p-5;
-    border: 1px solid rgb(var(--hairline));
+    @apply bg-white rounded-[4px] p-6;
+    box-shadow: 0 0 25px -12px rgba(31, 43, 58, 0.15);
   }
 
-  /* Untuk jadual dan senarai penuh lebar yang tidak perlu dibingkai dua kali. */
+  /* Untuk jadual dan senarai penuh lebar: kad tanpa padding dalaman. */
   .surface {
-    @apply bg-white rounded-2xl overflow-hidden;
-    border: 1px solid rgb(var(--hairline));
+    @apply bg-white rounded-[4px] overflow-hidden;
+    box-shadow: 0 0 25px -12px rgba(31, 43, 58, 0.15);
   }
 
   .hairline { border-color: rgb(var(--hairline)); }
 
   /* ----- Medan ----- */
   .input {
-    @apply w-full rounded-xl bg-white px-3.5 py-2.5 outline-none transition;
+    @apply w-full rounded-[4px] bg-white px-3.5 py-2.5 outline-none transition;
     border: 1px solid rgb(var(--hairline));
     min-height: 40px;
     font-size: 0.9375rem;
@@ -96,27 +105,38 @@ h1, h2, h3, h4 { letter-spacing: -0.021em; }
   .input::placeholder { color: rgb(var(--ink-faint)); }
   .input:focus {
     border-color: rgb(var(--accent));
-    box-shadow: 0 0 0 3px rgba(112, 87, 217, 0.12);
+    box-shadow: 0 0 0 3px rgba(133, 79, 255, 0.12);
   }
 
   /* ----- Tajuk ----- */
-  .page-title { @apply text-[28px] leading-tight font-semibold tracking-tight text-ink; }
-  .page-subtitle { @apply text-sm text-ink-muted mt-1; }
-  .section-title { @apply text-lg font-semibold tracking-tight text-ink; }
+  .page-title { @apply text-[28px] leading-tight font-bold tracking-[-0.03em] text-ink; }
+  .page-subtitle { @apply text-sm text-ink-faint mt-1; }
+  /* Tajuk kad: 16px tebal 700. */
+  .section-title { @apply text-base font-bold text-ink; }
   .eyebrow { @apply text-xs font-medium text-ink-faint; }
+
+  /* Nombor besar ("amount"): 28px berat 400. */
+  .amount { @apply text-[28px] font-normal leading-none text-ink; }
 
   /* ----- Kepingan kod kelas ----- */
   .code-chip {
     @apply font-mono px-2.5 py-1 rounded-lg text-sm font-semibold tracking-wider text-ink;
-    background-color: #F4F4F6;
+    background-color: rgb(var(--canvas));
   }
 
   /* ----- Jadual ----- */
   .t-head {
-    @apply text-xs font-medium text-ink-faint uppercase tracking-wide;
+    @apply text-[13px] font-normal text-ink-faint;
   }
-  .t-row { border-top: 1px solid rgb(var(--hairline)); }
-  .t-row:hover { background-color: #FAFAFB; }
+  .t-row { border-top: 1px solid rgb(var(--rowline)); }
+  .t-row:hover { background-color: rgb(var(--canvas)); }
+
+  /* Baris senarai dalam kad (KZ-020): pemisah #e5e9f2, padding 16px 24px. */
+  .list-row {
+    border-top: 1px solid rgb(var(--rowline));
+    padding: 16px 24px;
+  }
+  .list-row:first-child { border-top: 0; }
 }
 
 /* ----- Kebolehcapaian peserta (rabun-friendly) ----- */
@@ -126,7 +146,7 @@ h1, h2, h3, h4 { letter-spacing: -0.021em; }
 .eyes-friendly .btn-primary,
 .eyes-friendly .btn-secondary,
 .eyes-friendly .input { min-height: 52px; font-size: 1.05rem; }
-.eyes-friendly .card { @apply p-6; }
+.eyes-friendly .card { @apply p-7; }
 
 /* Sembunyikan chatbot Bicarra pada skrin kuiz langsung dan sijil */
 html.kz-hide-bicarra #airizbot-launcher,

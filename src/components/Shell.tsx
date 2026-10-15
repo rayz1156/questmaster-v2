@@ -1,22 +1,24 @@
 "use client";
 
 /**
- * Shell aplikasi, semakan September 2026.
+ * Shell aplikasi, rupa Oktober 2026 (KZ-020).
  *
- * Bar sisi gradien digantikan dengan satu bar atas setinggi 72px: wordmark
- * di kiri, tiga destinasi di tengah, Help dan avatar di kanan. Sebab: bar
- * sisi mengambil seperempat skrin untuk memaparkan tujuh pautan yang jarang
- * ditukar, sedangkan kandungan kelas memerlukan lebar itu.
+ * Susun atur bar sisi + kepala di atas kandungan: bar sisi kiri
+ * 290px pada desktop (>= 1200px), kepala 65px dengan hamburger,
+ * Help dan menu akaun. Pada skrin kecil bar sisi tersembunyi dan
+ * dibuka sebagai laci di atas lapisan gelap lutsinar; laci tutup
+ * bila klik luar atau Escape.
  *
  * Tandatangan komponen ini TIDAK berubah. Ia masih menerima `tabs`, jadi
  * setiap halaman sedia ada yang memanggil <Shell tabs={EDU_TABS}> terus
- * mendapat rupa baharu tanpa disunting. Tiada ciri hilang semasa peralihan.
+ * mendapat rupa baharu tanpa disunting. Logik sesi, profil, logo tersuai,
+ * menu akaun, log keluar, Help dan keadaan aktif `match` semuanya kekal.
  */
 
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LogOut, HelpCircle, ChevronDown, User as UserIcon } from "lucide-react";
+import { LogOut, HelpCircle, ChevronDown, Menu, X, User as UserIcon, CircleDot } from "lucide-react";
 import { getSession, clearSession } from "@/lib/session";
 import { LogoMark } from "@/components/Logo";
 import type { User, Profile } from "@/lib/types";
@@ -48,6 +50,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -90,6 +93,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
     };
   }, [router]);
 
+  // Menu akaun: tutup bila klik di luar atau Escape.
   useEffect(() => {
     if (!menuOpen) return;
     const onAway = (e: MouseEvent) => {
@@ -104,7 +108,16 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
     };
   }, [menuOpen]);
 
-  useEffect(() => { setMenuOpen(false); }, [pathname]);
+  // Laci telefon: tutup bila klik lapisan luar atau Escape.
+  useEffect(() => {
+    if (!drawerOpen) return;
+    const onEsc = (e: KeyboardEvent) => { if (e.key === "Escape") setDrawerOpen(false); };
+    document.addEventListener("keydown", onEsc);
+    return () => document.removeEventListener("keydown", onEsc);
+  }, [drawerOpen]);
+
+  // Menu dan laci tutup apabila destinasi bertukar.
+  useEffect(() => { setMenuOpen(false); setDrawerOpen(false); }, [pathname]);
 
   if (!user) return null;
 
@@ -118,138 +131,190 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
   const active = (href: string) => here(href);
   const activeTab = (t: Tab) => here(t.href) || (t.match || []).some(here);
 
-  return (
-    <div className="min-h-screen bg-canvas flex flex-col">
-      {/* ===== Bar atas 72px ===== */}
-      <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
-        <div className="mx-auto max-w-shell px-5 h-[72px] flex items-center gap-6">
-          <Link href="/educator/classes" className="shrink-0 inline-flex items-center gap-2.5" aria-label="Kuizen">
-            {profile?.logo_url ? (
-              <>
-                {/* Logo tersuai pendidik, seperti shell lama. Tanda Kuizen kekal
-                    di sebelahnya supaya pengguna masih tahu platform apa ini. */}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={profile.logo_url} alt="" className="h-7 w-auto max-w-[120px] object-contain" />
-                <span className="w-px h-5 bg-hairline" />
-                <LogoMark size={26} />
-              </>
-            ) : (
-              <>
-                <LogoMark size={28} />
-                <span className="hidden sm:inline text-[19px] font-semibold tracking-tight text-ink">Kuizen</span>
-              </>
-            )}
-          </Link>
+  const tahun = new Date().getFullYear();
 
-          {/* Destinasi utama, di tengah pada skrin lebar. */}
-          <nav className="hidden md:flex items-center gap-1 mx-auto h-full">
-            {tabs.map((t) => (
-              <Link
-                key={t.href}
-                href={t.href}
-                className={`relative h-full flex items-center px-3 text-[15px] transition ${
-                  activeTab(t)
-                    ? "text-brand-purple font-semibold"
-                    : "text-ink-muted hover:text-ink font-medium"
-                }`}
-              >
-                {t.label}
-                {activeTab(t) && (
-                  <span className="absolute left-3 right-3 bottom-0 h-[2px] bg-brand-purple rounded-full" />
-                )}
-              </Link>
-            ))}
-          </nav>
+  // Bar sisi dipaparkan dua kali: statik pada desktop dan laci pada
+  // telefon/tablet. Kedua-duanya guna blok menu yang sama.
+  const logoBarSisi = profile?.logo_url ? (
+    <>
+      {/* Logo tersuai pendidik, seperti shell lama. Tanda Kuizen kekal
+          di sebelahnya supaya pengguna masih tahu platform apa ini. */}
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img src={profile.logo_url} alt="" className="h-7 w-auto max-w-[120px] object-contain" />
+      <span className="w-px h-5 bg-hairline" />
+      <LogoMark size={26} />
+    </>
+  ) : (
+    <>
+      <LogoMark size={28} />
+      <span className="text-[20px] font-bold tracking-tight text-ink">Kuizen</span>
+    </>
+  );
 
-          <div className="ml-auto md:ml-0 flex items-center gap-1 shrink-0">
-            <Link
-              href="/help"
-              className={`hidden sm:inline-flex items-center gap-1.5 px-3 py-2 rounded-xl text-sm transition ${
-                active("/help") ? "text-brand-purple font-semibold" : "text-ink-muted hover:text-ink"
+  const senaraiMenu = (
+    <nav aria-label="Main" className="flex flex-col gap-0.5 px-3 pb-6">
+      <div className="px-3 pb-2 pt-4 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
+        Menu
+      </div>
+      {tabs.map((t) => {
+        const aktif = activeTab(t);
+        return (
+          <Link
+            key={t.href}
+            href={t.href}
+            aria-current={aktif ? "page" : undefined}
+            className={`flex h-11 items-center gap-2 rounded-md px-3 text-[15px] font-bold tracking-[0.15px] transition ${
+              aktif ? "bg-kz-menu-active text-brand-purple" : "text-ink hover:bg-canvas"
+            }`}
+          >
+            <span
+              className={`flex h-9 w-9 shrink-0 items-center justify-center ${
+                aktif ? "text-brand-purple" : "text-ink-faint"
               }`}
             >
-              <HelpCircle className="w-4 h-4" /> Help
-            </Link>
+              {/* Tab tanpa ikon guna ikon lalai. */}
+              {t.icon ?? <CircleDot className="h-5 w-5" />}
+            </span>
+            <span className="truncate">{t.label}</span>
+          </Link>
+        );
+      })}
+    </nav>
+  );
 
-            <span className="hidden sm:block w-px h-5 bg-hairline mx-1" />
+  return (
+    <div className="min-h-screen bg-canvas flex">
+      {/* ===== Bar sisi desktop (>= 1200px) ===== */}
+      <aside className="hidden xl:flex w-[290px] shrink-0 flex-col bg-white shadow-bar sticky top-0 h-screen">
+        <div className="flex h-[65px] shrink-0 items-center gap-2.5 px-6">
+          <Link href="/educator/classes" className="inline-flex items-center gap-2.5" aria-label="Kuizen">
+            {logoBarSisi}
+          </Link>
+        </div>
+        <div className="min-h-0 flex-1 overflow-y-auto">{senaraiMenu}</div>
+      </aside>
 
-            <div className="relative" ref={menuRef}>
+      {/* ===== Laci telefon/tablet: lapisan gelap lutsinar + panel ===== */}
+      {drawerOpen && (
+        <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+          <div
+            className="absolute inset-0 bg-black/50"
+            onClick={() => setDrawerOpen(false)}
+            aria-hidden="true"
+          />
+          <div className="absolute inset-y-0 left-0 flex w-[290px] flex-col bg-white shadow-raised">
+            <div className="flex h-[65px] shrink-0 items-center gap-2.5 px-6">
+              <Link href="/educator/classes" className="inline-flex items-center gap-2.5" aria-label="Kuizen">
+                {logoBarSisi}
+              </Link>
               <button
-                onClick={() => setMenuOpen((v) => !v)}
-                aria-haspopup="menu"
-                aria-expanded={menuOpen}
-                className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[#F4F4F6] transition"
+                type="button"
+                onClick={() => setDrawerOpen(false)}
+                aria-label="Close menu"
+                className="ml-auto flex h-9 w-9 items-center justify-center rounded-md text-ink-faint hover:text-ink"
               >
-                <span className="w-9 h-9 rounded-full bg-[#EAE6FC] text-brand-purple text-[13px] font-semibold flex items-center justify-center">
-                  {mark}
-                </span>
-                <ChevronDown className="w-4 h-4 text-ink-faint" />
+                <X className="h-5 w-5" />
               </button>
-
-              {menuOpen && (
-                <div
-                  role="menu"
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-hairline shadow-raised py-1.5 z-50"
-                >
-                  <div className="px-3.5 py-2.5">
-                    <div className="text-sm font-semibold text-ink truncate">
-                      {profile?.display_name || user.display_name}
-                    </div>
-                    <div className="text-xs text-ink-faint truncate">{user.role}</div>
-                  </div>
-                  <div className="h-px bg-hairline my-1" />
-                  <Link
-                    href="/educator/profile"
-                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
-                  >
-                    <UserIcon className="w-4 h-4 text-ink-faint" /> Account settings
-                  </Link>
-                  <Link
-                    href="/help"
-                    className="sm:hidden flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
-                  >
-                    <HelpCircle className="w-4 h-4 text-ink-faint" /> Help
-                  </Link>
-                  <div className="h-px bg-hairline my-1" />
-                  <button
-                    onClick={onLogout}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
-                  >
-                    <LogOut className="w-4 h-4 text-ink-faint" /> Sign out
-                  </button>
-                </div>
-              )}
             </div>
+            <div className="min-h-0 flex-1 overflow-y-auto">{senaraiMenu}</div>
           </div>
         </div>
+      )}
 
-        {/* Navigasi telefon: baris tatal, bukan bar bawah yang menutup kandungan. */}
-        <nav className="md:hidden flex items-center gap-1 px-4 pb-2 overflow-x-auto">
-          {tabs.map((t) => (
-            <Link
-              key={t.href}
-              href={t.href}
-              className={`shrink-0 px-3 py-1.5 rounded-lg text-sm transition ${
-                activeTab(t)
-                  ? "bg-[#EAE6FC] text-brand-purple font-semibold"
-                  : "text-ink-muted hover:text-ink"
-              }`}
+      {/* ===== Kolum kandungan ===== */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        <header className="sticky top-0 z-40 h-[65px] shrink-0 bg-white shadow-bar">
+          <div className="flex h-full items-center gap-3 px-[22px]">
+            <button
+              type="button"
+              onClick={() => setDrawerOpen(true)}
+              aria-label="Open menu"
+              className="xl:hidden flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:text-ink"
             >
-              {t.label}
+              <Menu className="h-5 w-5" />
+            </button>
+            <Link href="/educator/classes" className="xl:hidden inline-flex items-center gap-2" aria-label="Kuizen">
+              <LogoMark size={26} />
+              <span className="text-[17px] font-bold tracking-tight text-ink">Kuizen</span>
             </Link>
-          ))}
-        </nav>
-      </header>
 
-      <main className="flex-1 w-full">
-        <div className="mx-auto max-w-shell px-5 py-8">{children}</div>
-      </main>
+            <div className="ml-auto flex items-center gap-2 shrink-0">
+              <Link
+                href="/help"
+                className={`hidden sm:inline-flex items-center gap-1.5 px-2 py-2 rounded-md text-[15px] font-bold transition ${
+                  active("/help") ? "text-brand-purple" : "text-ink-faint hover:text-ink"
+                }`}
+              >
+                <HelpCircle className="w-5 h-5" /> Help
+              </Link>
 
-      <footer className="border-t border-hairline">
-        <div className="mx-auto max-w-shell px-5 py-5 text-center text-xs text-ink-faint tracking-wide">
-          UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix
-        </div>
-      </footer>
+              <div className="relative" ref={menuRef}>
+                <button
+                  onClick={() => setMenuOpen((v) => !v)}
+                  aria-haspopup="menu"
+                  aria-expanded={menuOpen}
+                  className="flex items-center gap-2 rounded-md px-1.5 py-1 transition hover:bg-canvas"
+                >
+                  <span className="w-9 h-9 rounded-full bg-brand-purple text-white text-[13px] font-semibold flex items-center justify-center">
+                    {mark}
+                  </span>
+                  <span className="hidden md:flex flex-col items-start leading-tight">
+                    <span className="max-w-[140px] truncate text-[14px] font-bold text-ink">
+                      {profile?.display_name || user.display_name}
+                    </span>
+                    <span className="text-[11px] capitalize text-ink-faint">{user.role}</span>
+                  </span>
+                  <ChevronDown className="w-4 h-4 text-ink-faint" />
+                </button>
+
+                {menuOpen && (
+                  <div
+                    role="menu"
+                    className="absolute right-0 mt-2 w-64 bg-white rounded-lg border border-hairline shadow-raised py-1.5 z-50"
+                  >
+                    <div className="px-3.5 py-2.5">
+                      <div className="text-sm font-semibold text-ink truncate">
+                        {profile?.display_name || user.display_name}
+                      </div>
+                      <div className="text-xs text-ink-faint truncate">{user.role}</div>
+                    </div>
+                    <div className="h-px bg-hairline my-1" />
+                    <Link
+                      href="/educator/profile"
+                      className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
+                    >
+                      <UserIcon className="w-4 h-4 text-ink-faint" /> Account settings
+                    </Link>
+                    <Link
+                      href="/help"
+                      className="sm:hidden flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
+                    >
+                      <HelpCircle className="w-4 h-4 text-ink-faint" /> Help
+                    </Link>
+                    <div className="h-px bg-hairline my-1" />
+                    <button
+                      onClick={onLogout}
+                      className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
+                    >
+                      <LogOut className="w-4 h-4 text-ink-faint" /> Sign out
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        </header>
+
+        <main className="flex-1 w-full min-w-0">
+          <div className="mx-auto max-w-shell px-[22px] py-8">{children}</div>
+        </main>
+
+        <footer className="bg-white">
+          <div className="mx-auto max-w-shell px-[22px] py-6 text-sm text-ink-faint">
+            © {tahun} Kuizen. UPSI · AFK · Veltrix
+          </div>
+        </footer>
+      </div>
     </div>
   );
 }

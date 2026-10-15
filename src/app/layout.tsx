@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Inter, Playfair_Display } from "next/font/google";
+import { DM_Sans, Playfair_Display } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
@@ -7,13 +7,14 @@ import AnalyticsTracker from "@/components/AnalyticsTracker";
 import BicarraChat from "@/components/BicarraChat";
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 
-// Inter: satu muka taip untuk seluruh aplikasi. Berat 400 hingga 700 sahaja;
-// apa-apa lebih daripada itu hanya menambah saiz muat turun.
-const inter = Inter({ subsets: ["latin"], weight: ["400", "500", "600", "700"] });
+// DM Sans: satu muka taip untuk seluruh aplikasi (KZ-020). Fon berubah-ubah
+// (variable), jadi tiada `weight` diberi: berat dijana melalui `font-weight`
+// pada elemen.
+const dmSans = DM_Sans({ subsets: ["latin"], display: "swap" });
 
 // Muka taip paparan untuk tajuk halaman utama. Ia diberikan sebagai pemboleh
-// ubah CSS dan bukan sebagai kelas pada body, supaya Inter kekal menjadi muka
-// taip badan dan hanya tajuk yang memilih untuk menggunakannya.
+// ubah CSS dan bukan sebagai kelas pada body, supaya DM Sans kekal menjadi
+// muka taip badan dan hanya tajuk yang memilih untuk menggunakannya.
 const playfair = Playfair_Display({
   subsets: ["latin"],
   weight: ["500", "600"],
@@ -55,7 +56,7 @@ export const metadata: Metadata = {
 };
 
 export const viewport: Viewport = {
-  themeColor: "#7057D9",
+  themeColor: "#854fff",
   width: "device-width",
   initialScale: 1,
 };
@@ -83,7 +84,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           }}
         />
       </head>
-      <body className={inter.className}>
+      <body className={dmSans.className}>
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <AnalyticsTracker />
