@@ -388,10 +388,12 @@ export async function createChallenge(huntId: string, title: string, prompt: str
 }
 
 // === SCORE ADJUSTMENTS ===
-export type ScoreAdjustment = { id: string; team_id: string; hunt_id: string; delta: number; reason: string | null; created_by: string | null; created_at: string };
-export async function addScoreAdjustment(huntId: string, teamId: string, delta: number, reason?: string) {
+export type ScoreAdjustment = { id: string; team_id: string; hunt_id: string | null; delta: number; reason: string | null; created_by: string | null; created_at: string };
+// huntId ialah null untuk bonus peringkat kelas (tanpa aktiviti); '' atau
+// nilai falsy lain ditukar kepada null supaya tidak menghasilkan ralat uuid.
+export async function addScoreAdjustment(huntId: string | null, teamId: string, delta: number, reason?: string) {
   const me = await uid();
-  const { data, error } = await supabase.from('qm_score_adjustments').insert({ hunt_id: huntId, team_id: teamId, delta, reason: reason || null, created_by: me }).select().single();
+  const { data, error } = await supabase.from('qm_score_adjustments').insert({ hunt_id: huntId || null, team_id: teamId, delta, reason: reason || null, created_by: me }).select().single();
   if (error) throw error; return data as ScoreAdjustment;
 }
 export async function listScoreAdjustments(huntId: string): Promise<ScoreAdjustment[]> {
