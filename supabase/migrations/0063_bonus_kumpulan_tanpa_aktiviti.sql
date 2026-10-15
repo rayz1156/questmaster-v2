@@ -52,15 +52,18 @@ grant execute on function public.qm_is_team_class_educator(uuid) to authenticate
 -- 3. Polisi pendidik: dua bentuk. hunt_id sah -> semakan lama ikut aktiviti;
 --    hunt_id null -> semakan ikut pemilikan kelas kumpulan itu. WITH CHECK
 --    turut menahan UPDATE yang menukar team_id kepada kumpulan kelas lain.
+--    Pembetulan CTO (kzsec penemuan 1): cawangan hunt_id sah juga menyemak
+--    kumpulan itu milik kelas pendidik, supaya kumpulan kelas lain tidak boleh
+--    diikat pada aktiviti sendiri.
 drop policy if exists p_sa_educator on public.qm_score_adjustments;
 create policy p_sa_educator on public.qm_score_adjustments for all
   using (
-    (hunt_id is not null and public.qm_is_hunt_class_educator(hunt_id))
+    (hunt_id is not null and public.qm_is_hunt_class_educator(hunt_id) and public.qm_is_team_class_educator(team_id))
     or
     (hunt_id is null and public.qm_is_team_class_educator(team_id))
   )
   with check (
-    (hunt_id is not null and public.qm_is_hunt_class_educator(hunt_id))
+    (hunt_id is not null and public.qm_is_hunt_class_educator(hunt_id) and public.qm_is_team_class_educator(team_id))
     or
     (hunt_id is null and public.qm_is_team_class_educator(team_id))
   );

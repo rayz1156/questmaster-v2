@@ -167,6 +167,21 @@ exception
     end if;
 end $u$;
 
+-- Pembetulan CTO: pendidik X tidak boleh mengikat kumpulan B (kelas Y) pada
+-- aktiviti kelas X sendiri.
+do $u$
+begin
+  insert into public.qm_score_adjustments (team_id, hunt_id, delta, reason, created_by)
+  values ('bbbbbbb2-0000-4000-8000-000000000002',
+          'ccccccc1-0000-4000-8000-000000000001', 8, 'Kumpulan kelas lain',
+          '11111111-1111-4111-8111-111111111111');
+  raise exception 'UJIAN 3 GAGAL: pendidik berjaya ikat kumpulan kelas lain pada aktiviti sendiri';
+exception
+  when others then
+    if sqlerrm like 'UJIAN 3 GAGAL%' then
+      raise;
+    end if;
+end $u$;
 -- ============================================================
 -- Ujian 4: ahli kumpulan A boleh membaca pelarasan kumpulan A
 -- tetapi TIDAK kumpulan B.
