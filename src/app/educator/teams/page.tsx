@@ -330,7 +330,8 @@ function TeamsInner() {
                     <div className="flex gap-2">
                       <button onClick={async()=>{
                         const n=parseInt(bonusInput,10);if(!Number.isFinite(n)||n===0)return;
-                        try{await addScoreAdjustment(activeId,sel.id,n,bonusReason);await reloadClassTeams(activeClassId);}catch(e:any){alert(e.message);}
+                        // Bonus peringkat kelas: huntId null, tidak diikat pada aktiviti mana-mana.
+                        try{await addScoreAdjustment(null,sel.id,n,bonusReason.trim()||undefined);await reloadClassTeams(activeClassId);}catch(e){alert((e as {message?:string}).message||'Failed to add bonus points');}
                         setBonusInput("");setBonusReason("Bonus");setShowBonusForm(null);
                       }} className="bg-purple-600 hover:bg-purple-700 text-white text-sm px-4 py-2 rounded-lg" data-testid="bonus-submit-btn">Submit</button>
                       <button onClick={()=>{setShowBonusForm(null);setBonusInput("");setBonusReason("Bonus");}} className="border border-gray-300 text-gray-600 text-sm px-4 py-2 rounded-lg">Cancel</button>
