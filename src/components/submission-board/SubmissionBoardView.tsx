@@ -364,6 +364,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
       {showSubmit && (
         <SubmitModal
           apiBase={apiBase}
+          classId={classId}
           isEducator={isEducator}
           columnId={pendingColumnId}
           onClose={() => setShowSubmit(false)}
@@ -662,9 +663,11 @@ function ItemTypeBadge({ type }: { type: SubmissionItemType }) {
 // ============================================================
 // Submit modal
 // ============================================================
-function SubmitModal({ apiBase, isEducator, columnId, onClose, onCreated }: { apiBase: string; isEducator: boolean; columnId: string | null; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
+function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreated }: { apiBase: string; classId: string; isEducator: boolean; columnId: string | null; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
   const [tab, setTab] = useState<TabType>('text');
-  const caps = useCapabilities();
+  // KZ-017: keupayaan dalam konteks kelas supaya pelajar mengikut kebenaran
+  // pemilik kelas, bukan hanya bendera akaun sendiri.
+  const caps = useCapabilities(classId);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [title, setTitle] = useState('');

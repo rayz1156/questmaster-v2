@@ -934,7 +934,9 @@ function AddCardModal({
   onCreated: () => void;
 }) {
   const [tab, setTab] = useState<LearningCardType | 'qr' | 'youtube'>('link');
-  const caps = useCapabilities();
+  // KZ-017: keupayaan dalam konteks kelas supaya pelajar mengikut kebenaran
+  // pemilik kelas, bukan hanya bendera akaun sendiri.
+  const caps = useCapabilities(classId);
   return (
   <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div
