@@ -1,17 +1,34 @@
 "use client";
 
 export const dynamic = "force-dynamic";
+/**
+ * Jemputan pendidik bersama, rupa v3 KZ-022.
+ *
+ * Borang terima guna Card + Field + Input + Button; senarai jemputan
+ * tergantung guna DataTable kit dengan penomboran pelanggan. Fungsi
+ * terima jemputan, muat semula dan pengalihan tidak berubah.
+ */
 import { Suspense, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from '@/lib/eduTabs';
-import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Mail, Check, Activity } from "lucide-react";
+import { Mail, Check } from "lucide-react";
 import {
   acceptClassEducatorInviteByCode,
   listMyClassEducatorInvites,
 } from "@/lib/data";
 import type { MyClassEducatorInvite } from "@/lib/types";
+import {
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  Field,
+  Input,
+  PageHead,
+  type DataColumn,
+} from "@/components/ui";
 
 function EducatorInvitesPageInner() {
   const router = useRouter();
@@ -20,19 +37,21 @@ function EducatorInvitesPageInner() {
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
   const [invites, setInvites] = useState<MyClassEducatorInvite[]>([]);
   const [loading, setLoading] = useState(true);
+  const [halaman, setHalaman] = useState(1);
 
   async function reload() {
     try {
       const list = await listMyClassEducatorInvites();
       setInvites(list);
-    } catch (err: any) {
-      setMsg({ type: "err", text: err?.message || "Failed to load invites" });
+    } catch (err: unknown) {
+      setMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to load invites" });
     } finally {
       setLoading(false);
     }
   }
   useEffect(() => {
     reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const search = useSearchParams();
@@ -50,81 +69,131 @@ function EducatorInvitesPageInner() {
       const classId = await acceptClassEducatorInviteByCode(c.trim());
       setMsg({ type: "ok", text: "Invite accepted! Redirecting to your class..." });
       setTimeout(() => router.push(`/educator/classes/${classId}`), 600);
-    } catch (err: any) {
-      setMsg({ type: "err", text: err?.message || "Failed to accept invite" });
+    } catch (err: unknown) {
+      setMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to accept invite" });
     } finally {
       setBusy(false);
     }
   }
 
+  const lajur: DataColumn<MyClassEducatorInvite>[] = [
+    {
+      key: "class",
+      header: "Class",
+      render: (i) => (
+        <span className="flex items-center gap-3 py-3">
+          <span
+            aria-hidden="true"
+            className="h-10 w-10 shrink-0 rounded-[4px]"
+            style={{ backgroundColor: i.class_color || "#6366f1" }}
+          />
+          <span className="min-w-0">
+            <span className="block text-[13px] font-bold text-ink truncate">{i.class_name}</span>
+            <span className="block text-[12px] text-ink-faint truncate">
+              Invited by {i.inviter_name || "another educator"}
+            </span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "expires",
+      header: "Expires",
+      hideOnMobile: true,
+      render: (i) => (
+        <span className="text-[13px] text-ink-faint">
+          {new Date(i.expires_at).toLocaleDateString()}
+        </span>
+      ),
+    },
+    {
+      key: "code",
+      header: "Code",
+      render: (i) => (
+        <code className="font-mono text-[12px] bg-canvas border border-hairline rounded-[4px] px-2 py-1 text-ink-muted">
+          {i.code}
+        </code>
+      ),
+    },
+    {
+      key: "aksi",
+      header: "",
+      className: "text-right",
+      render: (i) => (
+        <Button size="sm" disabled={busy} onClick={() => accept(i.code)}>
+          <Check className="w-4 h-4" /> Accept
+        </Button>
+      ),
+    },
+  ];
+
   return (
     <Shell tabs={EDU_TABS}>
       <div className="flex items-center gap-2 mb-3">
-        <Link href="/educator/classes" className="text-sm text-gray-500">← Classes</Link>
+        <Link href="/educator/classes" className="text-sm text-ink-faint hover:text-ink transition">← Classes</Link>
       </div>
 
-      <div className="card mb-3">
-        <div className="font-semibold mb-2 flex items-center gap-2"><Mail className="w-4 h-4" /> Accept an educator invite</div>
-        <p className="text-xs text-gray-500 mb-3">
-          Paste the 8-character invite code your colleague shared with you. The invite must be addressed to the email you signed in with.
-        </p>
+      <PageHead
+        title="Educator invites"
+        description="Accept an educator invite."
+      />
+
+      <Card className="mb-4">
+        <CardHead
+          title="Accept an educator invite"
+          subtitle="Paste the 8-character invite code your colleague shared with you. The invite must be addressed to the email you signed in with."
+        />
         <form
           onSubmit={(e) => {
             e.preventDefault();
             accept(code);
           }}
-          className="flex gap-2"
+          className="flex flex-wrap items-end gap-3 mt-4"
         >
-          <input
-            value={code}
-            onChange={(e) => setCode(e.target.value.toUpperCase())}
-            placeholder="e.g. K7M9P3X2"
-            className="input flex-1 font-mono uppercase tracking-wider text-center"
-            maxLength={12}
-            autoFocus
-          />
-          <button type="submit" disabled={busy || !code.trim()} className="btn-primary py-2 px-4 flex items-center gap-1">
+          <Field label="Invite code" htmlFor="kod-jemputan" className="flex-1 min-w-[220px]">
+            <Input
+              id="kod-jemputan"
+              value={code}
+              onChange={(e) => setCode(e.target.value.toUpperCase())}
+              placeholder="e.g. K7M9P3X2"
+              className="font-mono uppercase tracking-wider"
+              maxLength={12}
+              autoFocus
+            />
+          </Field>
+          <Button type="submit" disabled={busy || !code.trim()}>
             <Check className="w-4 h-4" /> Accept
-          </button>
+          </Button>
         </form>
         {msg && (
-          <div className={"text-xs mt-2 " + (msg.type === "ok" ? "text-green-700" : "text-red-600")}>{msg.text}</div>
+          <div className={"text-xs mt-2 " + (msg.type === "ok" ? "text-kz-up" : "text-kz-down")}>{msg.text}</div>
         )}
-      </div>
+      </Card>
 
-      <div className="card">
-        <div className="font-semibold mb-2">Pending invites for you ({invites.length})</div>
-        {loading ? (
-          <p className="text-xs text-gray-500">Loading...</p>
-        ) : invites.length === 0 ? (
-          <p className="text-xs text-gray-500">You have no pending educator invites.</p>
-        ) : (
-          <div className="space-y-2">
-            {invites.map((i) => (
-              <div key={i.id} className="flex items-center gap-2 py-2 border-b last:border-0">
-                <div
-                  className="w-8 h-8 rounded-lg shrink-0"
-                  style={{ background: i.class_color || "#6366f1" }}
-                />
-                <div className="flex-1 min-w-0">
-                  <div className="font-medium truncate">{i.class_name}</div>
-                  <div className="text-xs text-gray-500 truncate">
-                    Invited by {i.inviter_name || "another educator"} · expires {new Date(i.expires_at).toLocaleDateString()}
-                  </div>
-                </div>
-                <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{i.code}</code>
-                <button
-                  disabled={busy}
-                  onClick={() => accept(i.code)}
-                  className="btn-primary py-1 px-3 text-sm flex items-center gap-1"
-                >
-                  <Check className="w-4 h-4" /> Accept
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      <CardHead
+        title={`Pending invites for you (${invites.length})`}
+        subtitle="Invites addressed to your email that you have not accepted yet."
+        className="mb-3"
+      />
+      {loading ? (
+        <p className="text-sm text-ink-muted">Loading...</p>
+      ) : (
+        <DataTable
+          label="Pending educator invites"
+          columns={lajur}
+          rows={invites}
+          rowKey={(i) => i.id}
+          halaman={halaman}
+          saizHalaman={10}
+          onHalaman={setHalaman}
+          empty={
+            <div className="py-8 text-center">
+              <Mail className="w-6 h-6 mx-auto mb-2 text-ink-faint" aria-hidden="true" />
+              <p className="text-[14px] text-ink-faint">You have no pending educator invites.</p>
+            </div>
+          }
+        />
+      )}
     </Shell>
   );
 }

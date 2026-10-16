@@ -1,11 +1,30 @@
 "use client";
+/**
+ * Learning outcomes pendidik, rupa v3 KZ-022.
+ *
+ * Borang tambah dalam Card + Field; senarai outcomes guna DataTable kit
+ * (menu tindakan, penomboran pelanggan). Fungsi authedFetch, muat data,
+ * cipta/sunting/padam dan toggle tag tidak berubah.
+ */
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from '@/lib/eduTabs';
-import { GraduationCap, ListChecks, Users, BarChart3, User as UserIcon, Activity, Target, Plus, Trash2, Save, X, Tag } from "lucide-react";
+import { Pencil, Plus, Save, Tag, Trash2, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { useSearchParams } from "next/navigation";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import {
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  EmptyState,
+  Field,
+  Input,
+  PageHead,
+  Select,
+  type DataColumn,
+} from "@/components/ui";
 
 type Outcome = { id: string; class_id: string; code: string | null; label: string; description: string | null };
 type Hunt = { id: string; title: string };
@@ -38,6 +57,7 @@ function OutcomesPageInner() {
   const [editing, setEditing] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<{ code: string; label: string; description: string }>({ code: "", label: "", description: "" });
   const [tagOpen, setTagOpen] = useState<string | null>(null);
+  const [halaman, setHalaman] = useState(1);
 
   // Load classes the educator can edit
   useEffect(() => {
@@ -160,135 +180,195 @@ function OutcomesPageInner() {
     });
   }
 
+  const lajur: DataColumn<Outcome>[] = [
+    {
+      key: "outcome",
+      header: "Outcome",
+      render: (o) => (
+        <span className="block min-w-0 py-2">
+          <span className="flex items-baseline gap-1.5">
+            {o.code && <span className="text-[12px] text-ink-faint">{o.code}</span>}
+            <span className="text-[14px] font-bold text-ink truncate">{o.label}</span>
+          </span>
+          {o.description && <span className="block text-[12px] text-ink-faint truncate">{o.description}</span>}
+        </span>
+      ),
+    },
+    {
+      key: "tagged",
+      header: "Tagged challenges",
+      render: (o) => {
+        const n = tagsByOutcome[o.id]?.size ?? 0;
+        return <span className="text-[13px] text-ink-faint tabular-nums">{n}</span>;
+      },
+    },
+  ];
+
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="p-4 md:p-6 max-w-5xl mx-auto space-y-4">
-        <div className="flex items-center gap-3">
-          <Target className="w-6 h-6 text-indigo-500" />
-          <h1 className="text-2xl font-bold text-gray-900">Learning outcomes</h1>
-        </div>
-        <p className="text-sm text-gray-600 -mt-2">Define what you want students to learn, then tag the challenges that address each outcome. Mastery is computed from approved/rejected submissions on those tagged challenges.</p>
+      <PageHead
+        title="Learning outcomes"
+        description="Define what you want students to learn, then tag the challenges that address each outcome. Mastery is computed from approved/rejected submissions on those tagged challenges."
+      />
 
-        <div className="flex items-center gap-2">
-          <label className="text-sm text-gray-700">Class</label>
-          <select
-            value={classId ?? ""}
-            onChange={(e) => setClassId(e.target.value || null)}
-            className="text-sm rounded-md border border-gray-300 px-2 py-1.5 bg-white"
-          >
-            <option value="">Select a class…</option>
-            {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-        </div>
-
-        {error && <div className="text-sm text-rose-600">{error}</div>}
-
-        {classId && (
-          <div className="rounded-2xl border border-gray-200 bg-white p-4 space-y-3">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Add a new outcome</div>
-            <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-              <input value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="Code (e.g. LO1)" className="md:col-span-2 text-sm rounded-md border border-gray-300 px-2 py-1.5" />
-              <input value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Label (required)" className="md:col-span-4 text-sm rounded-md border border-gray-300 px-2 py-1.5" />
-              <input value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description (optional)" className="md:col-span-5 text-sm rounded-md border border-gray-300 px-2 py-1.5" />
-              <button onClick={createOutcome} disabled={!newLabel.trim()} className="md:col-span-1 inline-flex items-center justify-center gap-1 text-sm rounded-md bg-indigo-600 text-white px-2 py-1.5 disabled:opacity-50">
-                <Plus className="w-4 h-4" /> Add
-              </button>
-            </div>
-          </div>
-        )}
-
-        {classId && (
-          <div className="rounded-2xl border border-gray-200 bg-white">
-            <div className="px-4 py-3 border-b border-gray-100 text-xs font-semibold uppercase tracking-wide text-gray-500">
-              Outcomes ({outcomes.length}){loading ? " \u00b7 loading\u2026" : ""}
-            </div>
-            {outcomes.length === 0 && !loading && (
-              <div className="p-4 text-sm text-gray-500">No outcomes yet. Add one above.</div>
-            )}
-            <div className="divide-y divide-gray-100">
-              {outcomes.map((o) => {
-                const isEditing = editing === o.id;
-                const isTagging = tagOpen === o.id;
-                const tagSet = tagsByOutcome[o.id] ?? new Set<string>();
-                return (
-                  <div key={o.id} className="p-4">
-                    {!isEditing ? (
-                      <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-gray-900">
-                            {o.code ? <span className="text-gray-500 mr-1">{o.code}</span> : null}{o.label}
-                          </div>
-                          {o.description && <div className="text-xs text-gray-600 mt-0.5">{o.description}</div>}
-                          <div className="text-xs text-gray-500 mt-1">{tagSet.size} tagged challenge{tagSet.size === 1 ? "" : "s"}</div>
-                        </div>
-                        <div className="shrink-0 flex items-center gap-1">
-                          <button onClick={() => { setEditing(o.id); setEditForm({ code: o.code ?? "", label: o.label, description: o.description ?? "" }); }} className="text-xs px-2 py-1 rounded-md ring-1 ring-inset ring-gray-200 text-gray-700 hover:bg-gray-50">Edit</button>
-                          <button onClick={() => setTagOpen(isTagging ? null : o.id)} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md ring-1 ring-inset ring-indigo-200 text-indigo-700 hover:bg-indigo-50">
-                            <Tag className="w-3 h-3" /> {isTagging ? "Close" : "Tag challenges"}
-                          </button>
-                          <button onClick={() => deleteOutcome(o.id)} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md ring-1 ring-inset ring-rose-200 text-rose-700 hover:bg-rose-50">
-                            <Trash2 className="w-3 h-3" />
-                          </button>
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="space-y-2">
-                        <div className="grid grid-cols-1 md:grid-cols-12 gap-2">
-                          <input value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} placeholder="Code" className="md:col-span-2 text-sm rounded-md border border-gray-300 px-2 py-1.5" />
-                          <input value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} placeholder="Label" className="md:col-span-4 text-sm rounded-md border border-gray-300 px-2 py-1.5" />
-                          <input value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" className="md:col-span-6 text-sm rounded-md border border-gray-300 px-2 py-1.5" />
-                        </div>
-                        <div className="flex items-center gap-1">
-                          <button onClick={() => saveEdit(o.id)} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-indigo-600 text-white"><Save className="w-3 h-3" /> Save</button>
-                          <button onClick={() => setEditing(null)} className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md ring-1 ring-inset ring-gray-200 text-gray-700"><X className="w-3 h-3" /> Cancel</button>
-                        </div>
-                      </div>
-                    )}
-                    {isTagging && (
-                      <div className="mt-3 rounded-md ring-1 ring-inset ring-gray-200 p-3 bg-gray-50/40">
-                        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Tag challenges</div>
-                        {hunts.length === 0 && <div className="text-xs text-gray-500">No hunts in this class yet.</div>}
-                        {hunts.map((h) => {
-                          const list = challengesByHunt.get(h.id) ?? [];
-                          if (list.length === 0) return null;
-                          return (
-                            <div key={h.id} className="mb-2">
-                              <div className="text-xs font-medium text-gray-700 mb-1">{h.title}</div>
-                              <div className="flex flex-wrap gap-1">
-                                {list.map((c) => {
-                                  const tagged = tagSet.has(c.id);
-                                  const preview = (c.prompt || "Challenge").slice(0, 60);
-                                  return (
-                                    <button
-                                      key={c.id}
-                                      onClick={() => toggleTag(o.id, c.id, tagged)}
-                                      className={`text-[11px] px-2 py-1 rounded-full ring-1 ring-inset ${tagged ? "bg-indigo-600 text-white ring-indigo-600" : "bg-white text-gray-700 ring-gray-200 hover:bg-gray-50"}`}
-                                      title={c.prompt}
-                                    >
-                                      {tagged ? "\u2713 " : "+ "}#{c.order_idx + 1} {preview}{(c.prompt || "").length > 60 ? "\u2026" : ""}
-                                    </button>
-                                  );
-                                })}
-                              </div>
-                            </div>
-                          );
-                        })}
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          </div>
-        )}
+      <div className="flex items-center gap-2 mb-4">
+        <Select
+          value={classId ?? ""}
+          onChange={(e) => setClassId(e.target.value || null)}
+          aria-label="Select class"
+          className="w-auto"
+        >
+          <option value="">Select a class…</option>
+          {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+        </Select>
       </div>
+
+      {error && <div className="text-sm text-kz-down mb-4">{error}</div>}
+
+      {classId && (
+        <Card className="mb-4">
+          <CardHead title="Add a new outcome" subtitle="Code is optional; the label is required." />
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-4">
+            <Field label="Code" htmlFor="outcome-kode">
+              <Input id="outcome-kode" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="e.g. LO1" />
+            </Field>
+            <Field label="Label" htmlFor="outcome-label" className="md:col-span-4">
+              <Input id="outcome-label" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Label (required)" />
+            </Field>
+            <Field label="Description" htmlFor="outcome-desc" className="md:col-span-5">
+              <Input id="outcome-desc" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description (optional)" />
+            </Field>
+            <div className="md:col-span-2 flex items-end">
+              <Button onClick={createOutcome} disabled={!newLabel.trim()} className="w-full">
+                <Plus className="w-4 h-4" /> Add
+              </Button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {classId && (
+        <DataTable
+          label={`Learning outcomes (${outcomes.length})${loading ? " · loading…" : ""}`}
+          columns={lajur}
+          rows={outcomes}
+          rowKey={(o) => o.id}
+          menuItems={(o) => [
+            {
+              label: editing === o.id ? "Close editor" : "Edit",
+              icon: <Pencil className="w-4 h-4" />,
+              onSelect: () => {
+                if (editing === o.id) { setEditing(null); return; }
+                setEditing(o.id);
+                setEditForm({ code: o.code ?? "", label: o.label, description: o.description ?? "" });
+              },
+            },
+            {
+              label: tagOpen === o.id ? "Close tagging" : "Tag challenges",
+              icon: <Tag className="w-4 h-4" />,
+              onSelect: () => setTagOpen(tagOpen === o.id ? null : o.id),
+            },
+            {
+              label: "Delete",
+              icon: <Trash2 className="w-4 h-4" />,
+              danger: true,
+              onSelect: () => deleteOutcome(o.id),
+            },
+          ]}
+          menuLabel="Outcome actions"
+          renderRowExtra={(o) => {
+            const isEditing = editing === o.id;
+            const isTagging = tagOpen === o.id;
+            const tagSet = tagsByOutcome[o.id] ?? new Set<string>();
+            if (!isEditing && !isTagging) return null;
+            return (
+              <div className="py-3 space-y-3">
+                {isEditing && (
+                  <div>
+                    <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
+                      <div className="md:col-span-2">
+                        <Field label="Code" htmlFor={`sunting-kode-${o.id}`}>
+                          <Input id={`sunting-kode-${o.id}`} value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} placeholder="Code" />
+                        </Field>
+                      </div>
+                      <div className="md:col-span-4">
+                        <Field label="Label" htmlFor={`sunting-label-${o.id}`}>
+                          <Input id={`sunting-label-${o.id}`} value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} placeholder="Label" />
+                        </Field>
+                      </div>
+                      <div className="md:col-span-6">
+                        <Field label="Description" htmlFor={`sunting-desc-${o.id}`}>
+                          <Input id={`sunting-desc-${o.id}`} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" />
+                        </Field>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 mt-3">
+                      <Button onClick={() => saveEdit(o.id)}>
+                        <Save className="w-4 h-4" /> Save
+                      </Button>
+                      <Button variant="outline" onClick={() => setEditing(null)}>
+                        <X className="w-4 h-4" /> Cancel
+                      </Button>
+                    </div>
+                  </div>
+                )}
+                {isTagging && (
+                  <div className="rounded-[4px] border border-hairline p-3 bg-canvas">
+                    <div className="text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint mb-2">Tag challenges</div>
+                    {hunts.length === 0 && <div className="text-xs text-ink-faint">No hunts in this class yet.</div>}
+                    {hunts.map((h) => {
+                      const list = challengesByHunt.get(h.id) ?? [];
+                      if (list.length === 0) return null;
+                      return (
+                        <div key={h.id} className="mb-2">
+                          <div className="text-[13px] font-medium text-ink-muted mb-1">{h.title}</div>
+                          <div className="flex flex-wrap gap-1">
+                            {list.map((c) => {
+                              const tagged = tagSet.has(c.id);
+                              const preview = (c.prompt || "Challenge").slice(0, 60);
+                              return (
+                                <button
+                                  key={c.id}
+                                  onClick={() => toggleTag(o.id, c.id, tagged)}
+                                  className={`text-[11px] px-2 py-1 rounded-[3px] border transition ${
+                                    tagged
+                                      ? "bg-brand-purple text-white border-brand-purple"
+                                      : "bg-white text-ink-muted border-hairline hover:bg-[#f8f9fc]"
+                                  }`}
+                                  title={c.prompt ?? undefined}
+                                >
+                                  {tagged ? "\u2713 " : "+ "}#{c.order_idx + 1} {preview}{(c.prompt || "").length > 60 ? "\u2026" : ""}
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            );
+          }}
+          halaman={halaman}
+          saizHalaman={8}
+          onHalaman={setHalaman}
+          empty={
+            <EmptyState
+              icon={<Tag className="w-6 h-6" />}
+              title="No outcomes yet."
+              text="Add one above to start tagging challenges."
+            />
+          }
+        />
+      )}
     </Shell>
   );
 }
 
 export default function Page() {
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-gray-500">Loading…</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-ink-muted">Loading…</div>}>
       <OutcomesPageInner />
     </Suspense>
   );
