@@ -61,9 +61,9 @@ export function initials(name?: string | null): string {
  * Komponen paparan
  * ========================================================= */
 
-/** Kad asas; token reka bentuk admin yang sama di mana-mana. */
+/** Kad asas; token v3 (KZ-024): putih, sudut 4px, tiada sempadan, bayang kad. */
 export function Card({ className = '', children }: { className?: string; children: ReactNode }) {
-  return <div className={`bg-white border border-hairline rounded-2xl shadow-card ${className}`}>{children}</div>;
+  return <div className={`bg-white rounded-[4px] shadow-card ${className}`}>{children}</div>;
 }
 
 /** Pil status: hijau Verified/Active, kuning Pending/Unverified, merah Suspended, violet peranan, kelabu neutral. */
@@ -78,10 +78,10 @@ export function Pill({ tone = 'gray', children }: { tone?: 'green' | 'yellow' | 
           : tone === 'violet'
             ? 'bg-[#EAE6FC] text-brand-purple'
             : 'bg-gray-100 text-gray-600';
-  return <span className={`text-xs rounded-full px-2 py-0.5 font-medium ${kelas}`}>{children}</span>;
+  return <span className={`text-[10.8px] rounded-[3px] px-1.5 h-5 inline-flex items-center font-medium ${kelas}`}>{children}</span>;
 }
 
-/** Kad statistik kecil dengan pautan pilihan. */
+/** Kad statistik kecil dengan pautan pilihan (token v3: label 14px, nombor 24px+). */
 export function StatCard({
   label,
   value,
@@ -96,13 +96,13 @@ export function StatCard({
   icon?: ReactNode;
 }) {
   const isi = (
-    <div className="bg-white border border-hairline rounded-2xl shadow-card p-4 h-full">
+    <div className="bg-white rounded-[4px] shadow-card p-6 h-full">
       <div className="flex items-start justify-between gap-2">
-        <span className="text-xs font-medium uppercase tracking-wide text-ink-faint">{label}</span>
+        <span className="text-[14px] text-ink-muted">{label}</span>
         {icon && <span className="text-brand-purple shrink-0">{icon}</span>}
       </div>
-      <div className="text-2xl font-semibold text-ink mt-2">{value}</div>
-      {hint && <div className="text-xs text-ink-muted mt-1">{hint}</div>}
+      <div className="text-[28px] font-normal leading-tight text-ink mt-1">{value}</div>
+      {hint && <div className="text-[13px] text-ink-faint mt-1">{hint}</div>}
     </div>
   );
   if (href) {
@@ -115,7 +115,7 @@ export function StatCard({
   return isi;
 }
 
-/** Tab garis bawah violet. */
+/** Tab garis bawah violet (token v3: 14px 700, garis 3px). */
 export function Tabs({
   items,
   value,
@@ -126,7 +126,7 @@ export function Tabs({
   onChange: (key: string) => void;
 }) {
   return (
-    <div className="flex items-center gap-5 border-b border-hairline overflow-x-auto">
+    <div className="flex items-center gap-8 border-b border-hairline overflow-x-auto">
       {items.map((t) => {
         const aktif = t.key === value;
         return (
@@ -134,10 +134,10 @@ export function Tabs({
             key={t.key}
             type="button"
             onClick={() => onChange(t.key)}
-            className={`relative shrink-0 pb-3 pt-1 text-sm border-b-2 -mb-px transition ${
+            className={`relative shrink-0 pb-4 pt-4 text-[14px] font-bold border-b-[3px] -mb-px transition ${
               aktif
-                ? 'border-brand-purple text-brand-purple font-semibold'
-                : 'border-transparent text-ink-muted hover:text-ink font-medium'
+                ? 'border-brand-purple text-brand-purple'
+                : 'border-transparent text-ink-muted hover:text-ink'
             }`}
           >
             {t.label}
@@ -155,8 +155,8 @@ export function Tabs({
 export function EmptyState({ title, body }: { title: string; body?: string }) {
   return (
     <div className="text-center py-10 px-4">
-      <div className="text-sm font-medium text-ink">{title}</div>
-      {body && <div className="text-sm text-ink-muted mt-1">{body}</div>}
+      <div className="text-[16px] font-bold text-ink">{title}</div>
+      {body && <div className="text-[14px] text-ink-faint mt-1">{body}</div>}
     </div>
   );
 }
@@ -195,8 +195,8 @@ export function ReasonDialog({
 
   return (
     <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-      <div className="bg-white rounded-2xl border border-hairline shadow-raised w-full max-w-md p-5">
-        <h3 className="text-base font-semibold text-ink">{title}</h3>
+      <div className="bg-white rounded-[5px] border border-hairline shadow-raised w-full max-w-md p-5">
+        <h3 className="text-[18px] font-bold text-ink">{title}</h3>
         <textarea
           autoFocus
           rows={4}
@@ -204,7 +204,7 @@ export function ReasonDialog({
           value={alasan}
           onChange={(e) => setAlasan(e.target.value)}
           placeholder="Explain what happened and why this action is needed"
-          className="w-full mt-3 border border-hairline rounded-xl p-3 text-sm text-ink resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
+          className="w-full mt-3 border border-hairline rounded-[4px] p-3 text-sm text-ink resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
         />
         <div className="flex items-center justify-between mt-1">
           <span className="text-xs text-ink-faint">{bersih.length}/500</span>
@@ -214,7 +214,7 @@ export function ReasonDialog({
           <button
             type="button"
             onClick={onClose}
-            className="bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink"
+            className="bg-white border border-hairline rounded-[4px] px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink"
           >
             Cancel
           </button>
@@ -224,8 +224,8 @@ export function ReasonDialog({
             onClick={() => onConfirm(bersih)}
             className={
               tone === 'danger'
-                ? 'bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40'
-                : 'bg-brand-purple text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40'
+                ? 'bg-red-600 text-white rounded-[4px] px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40'
+                : 'bg-brand-purple text-white rounded-[4px] px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40'
             }
           >
             {confirmLabel}

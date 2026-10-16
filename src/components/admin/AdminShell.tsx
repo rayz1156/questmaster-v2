@@ -215,7 +215,9 @@ export default function AdminShell({
 
   // ===== Kandungan bar sisi, dikongsi desktop dan laci =====
   // Kumpulan mengikut medan `group` adminTabs (KZ-021): tajuk overline
-  // 11px 700 uppercase ls 2.2px, padding 24px.
+  // 11px 700 uppercase ls 2.2px, padding 24px. Item menu 15px 700 dengan
+  // kotak ikon 36px, aktif latar kz-menu-active (#ebeef2) teks ungu,
+  // sama seperti Shell.tsx (KZ-DS-v3 bahagian 3).
   const blok: { label?: string; items: typeof NAV }[] = [];
   for (const t of NAV) {
     const label = (t as { group?: string }).group;
@@ -225,7 +227,7 @@ export default function AdminShell({
   }
 
   const binaIsi = (padat: boolean) => (
-    <nav aria-label="Admin" className={`${padat ? 'px-2 pt-2' : 'px-3'} pb-4 space-y-1`}>
+    <nav aria-label="Admin" className={`flex flex-col gap-0.5 ${padat ? 'px-2 pt-2' : 'px-3'} pb-6`}>
       {blok.map((k, i) => (
         <div key={k.label ?? `blok-${i}`}>
           {k.label && !padat && (
@@ -233,26 +235,34 @@ export default function AdminShell({
               {k.label}
             </div>
           )}
-          {k.label && padat && i > 0 && <div className="mx-2 my-2 h-px bg-hairline" />}
+          {k.label && padat && i > 0 && <div className="mx-3 my-2 h-px bg-hairline" />}
           {k.items.map((t) => {
             const n = t.lencana ? lencana[t.lencana] : null;
             const ada = typeof n === 'number' && n > 0;
+            const on = aktif(t.href);
             return (
               <Link
                 key={t.href}
                 href={t.href}
-                aria-current={aktif(t.href) ? 'page' : undefined}
+                aria-current={on ? 'page' : undefined}
                 aria-label={padat ? t.label : undefined}
                 title={padat ? t.label : undefined}
-                className={`relative flex items-center text-sm rounded-xl transition ${
-                  padat ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-3 py-2'
-                } ${
-                  aktif(t.href)
-                    ? 'bg-[#F1EEFC] text-brand-purple font-semibold'
-                    : 'text-ink-muted hover:text-ink hover:bg-[#F7F7F9] font-medium'
+                className={`relative flex items-center rounded-md transition ${
+                  padat
+                    ? `mx-auto h-11 w-11 justify-center ${
+                        on ? 'bg-kz-menu-active text-brand-purple' : 'text-ink-faint hover:bg-canvas hover:text-ink'
+                      }`
+                    : `h-11 gap-2 px-3 text-[15px] font-bold tracking-[0.15px] ${
+                        on ? 'bg-kz-menu-active text-brand-purple' : 'text-ink hover:bg-canvas'
+                      }`
                 }`}
               >
-                {t.icon}
+                <span
+                  aria-hidden="true"
+                  className={`flex h-9 w-9 shrink-0 items-center justify-center ${on ? 'text-brand-purple' : 'text-ink-faint'}`}
+                >
+                  {t.icon}
+                </span>
                 {!padat && <span className="truncate">{t.label}</span>}
                 {ada && !padat && (
                   <span className="ml-auto shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-purple text-white text-[10px] font-semibold flex items-center justify-center">
@@ -267,40 +277,48 @@ export default function AdminShell({
           })}
         </div>
       ))}
-      <div className="h-px bg-hairline my-3" />
+      <div className="mx-3 my-2 h-px bg-hairline" />
       <Link
         href="/help"
         aria-label={padat ? 'Help' : undefined}
         title={padat ? 'Help' : undefined}
-        className={`flex items-center text-sm rounded-xl transition ${
-          padat ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-3 py-2'
-        } ${
-          aktif('/help')
-            ? 'bg-[#F1EEFC] text-brand-purple font-semibold'
-            : 'text-ink-muted hover:text-ink hover:bg-[#F7F7F9] font-medium'
+        className={`flex items-center rounded-md transition ${
+          padat
+            ? `mx-auto h-11 w-11 justify-center ${
+                aktif('/help') ? 'bg-kz-menu-active text-brand-purple' : 'text-ink-faint hover:bg-canvas hover:text-ink'
+              }`
+            : `h-11 gap-2 px-3 text-[15px] font-bold tracking-[0.15px] ${
+                aktif('/help') ? 'bg-kz-menu-active text-brand-purple' : 'text-ink hover:bg-canvas'
+              }`
         }`}
       >
-        <HelpCircle className="w-4 h-4 shrink-0" />
+        <span
+          aria-hidden="true"
+          className={`flex h-9 w-9 shrink-0 items-center justify-center ${aktif('/help') ? 'text-brand-purple' : 'text-ink-faint'}`}
+        >
+          <HelpCircle className="w-5 h-5" />
+        </span>
         {!padat && <span>Help</span>}
       </Link>
     </nav>
   );
 
   // ===== Rangka semasa memuat / tiada kebenaran =====
+  // (Rupa mengikut Shell v3: bar sisi 290px, kepala 65px.)
   if (!dibenarkan) {
     return (
       <div className="min-h-screen bg-canvas flex">
-        <div className="hidden md:block w-[240px] shrink-0 bg-white border-r border-hairline p-4">
+        <div className="hidden xl:block w-[290px] shrink-0 bg-white shadow-bar p-4">
           <div className="h-7 w-32 bg-[#F4F4F6] rounded-lg animate-pulse mb-8" />
           {[0, 1, 2, 3, 4, 5, 6, 7].map((i) => (
-            <div key={i} className="h-9 bg-[#F4F4F6] rounded-xl animate-pulse mb-2" />
+            <div key={i} className="h-11 bg-[#F4F4F6] rounded-xl animate-pulse mb-2" />
           ))}
         </div>
         <div className="flex-1">
-          <div className="h-16 bg-white border-b border-hairline px-6 flex items-center gap-4">
+          <div className="h-[65px] bg-white shadow-bar px-6 flex items-center gap-4">
             <div className="h-9 w-48 bg-[#F4F4F6] rounded-xl animate-pulse" />
           </div>
-          <div className="max-w-[1200px] px-6 py-6">
+          <div className="max-w-shell px-6 py-6">
             <div className="h-8 w-40 bg-[#F4F4F6] rounded-lg animate-pulse mb-6" />
             <div className="h-48 bg-[#F4F4F6] rounded-2xl animate-pulse" />
           </div>
@@ -313,15 +331,15 @@ export default function AdminShell({
 
   return (
     <div className="min-h-screen bg-canvas flex">
-      {/* ===== Bar sisi desktop: penuh 240px atau lajur ikon 72px ===== */}
+      {/* ===== Bar sisi desktop (>= 1200px): penuh 290px atau lajur ikon 72px ===== */}
       <aside
-        className={`hidden md:flex flex-col ${kecil ? 'w-[72px]' : 'w-[240px]'} shrink-0 bg-white border-r border-hairline sticky top-0 h-screen transition-[width] duration-200`}
+        className={`hidden xl:flex flex-col ${kecil ? 'w-[72px]' : 'w-[290px]'} shrink-0 bg-white shadow-bar sticky top-0 h-screen transition-[width] duration-200`}
       >
-        <div className={`h-16 flex items-center gap-2 border-b border-hairline shrink-0 ${kecil ? 'justify-center px-2' : 'px-5'}`}>
+        <div className={`flex h-[65px] shrink-0 items-center gap-2.5 ${kecil ? 'justify-center px-2' : 'px-6'}`}>
           {!kecil && (
             <span className="inline-flex items-center gap-2.5">
               <LogoMark size={28} />
-              <span className="text-[19px] font-semibold tracking-tight text-ink">Kuizen</span>
+              <span className="text-[20px] font-bold tracking-tight text-ink">Kuizen</span>
             </span>
           )}
           <button
@@ -336,49 +354,49 @@ export default function AdminShell({
           </button>
         </div>
         {!kecil && (
-          <div className="px-5 pt-5 pb-2">
+          <div className="px-6 pt-5 pb-2">
             <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
               Admin workspace
             </span>
           </div>
         )}
-        <div className="flex-1 overflow-y-auto overflow-x-hidden">{binaIsi(kecil)}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">{binaIsi(kecil)}</div>
       </aside>
 
       {/* ===== Laci bar sisi pada skrin kecil ===== */}
       {laciOpen && (
-        <div className="md:hidden fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/40" onClick={() => setLaciOpen(false)} />
-          <aside className="absolute left-0 top-0 bottom-0 w-[260px] max-w-[85vw] bg-white border-r border-hairline flex flex-col">
-            <div className="px-5 h-16 flex items-center justify-between border-b border-hairline shrink-0">
+        <div className="xl:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Menu">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setLaciOpen(false)} aria-hidden="true" />
+          <aside className="absolute left-0 top-0 bottom-0 w-[290px] max-w-[85vw] bg-white shadow-raised flex flex-col">
+            <div className="px-6 h-[65px] flex items-center justify-between shrink-0">
               <span className="inline-flex items-center gap-2.5">
                 <LogoMark size={28} />
-                <span className="text-[19px] font-semibold tracking-tight text-ink">Kuizen</span>
+                <span className="text-[20px] font-bold tracking-tight text-ink">Kuizen</span>
               </span>
               <button type="button" onClick={() => setLaciOpen(false)} aria-label="Close menu">
                 <X className="w-5 h-5 text-ink-muted" />
               </button>
             </div>
-            <div className="px-5 pt-5 pb-2">
+            <div className="px-6 pt-5 pb-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
                 Admin workspace
               </span>
             </div>
-            <div className="flex-1 overflow-y-auto">{binaIsi(false)}</div>
+            <div className="min-h-0 flex-1 overflow-y-auto">{binaIsi(false)}</div>
           </aside>
         </div>
       )}
 
       {/* ===== Bahagian utama ===== */}
       <div className="flex-1 min-w-0 flex flex-col">
-        {/* Bar atas 64px */}
-        <header className="sticky top-0 z-40 bg-white/85 backdrop-blur-md border-b border-hairline">
-          <div className="h-16 px-4 sm:px-6 flex items-center gap-3 sm:gap-4">
+        {/* Bar atas 65px (rupa Shell v3) */}
+        <header className="sticky top-0 z-40 h-[65px] shrink-0 bg-white shadow-bar">
+          <div className="flex h-full items-center gap-3 px-[22px]">
             <button
               type="button"
               onClick={() => setLaciOpen(true)}
               aria-label="Open menu"
-              className="md:hidden shrink-0 p-2 -ml-1 rounded-xl text-ink-muted hover:text-ink hover:bg-[#F7F7F9]"
+              className="xl:hidden shrink-0 flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:text-ink"
             >
               <MenuIcon className="w-5 h-5" />
             </button>
@@ -423,9 +441,9 @@ export default function AdminShell({
                 onClick={() => setMenuOpen((v) => !v)}
                 aria-haspopup="menu"
                 aria-expanded={menuOpen}
-                className="flex items-center gap-1.5 pl-1 pr-2 py-1 rounded-xl hover:bg-[#F4F4F6] transition"
+                className="flex items-center gap-1.5 rounded-md px-1.5 py-1 transition hover:bg-canvas"
               >
-                <span className="w-9 h-9 rounded-full bg-[#EAE6FC] text-brand-purple text-[13px] font-semibold flex items-center justify-center">
+                <span className="w-9 h-9 rounded-full bg-brand-purple text-white text-[13px] font-semibold flex items-center justify-center">
                   {tanda}
                 </span>
                 <ChevronDown className="w-4 h-4 text-ink-faint" />
@@ -434,24 +452,24 @@ export default function AdminShell({
               {menuOpen && (
                 <div
                   role="menu"
-                  className="absolute right-0 mt-2 w-64 bg-white rounded-2xl border border-hairline shadow-raised py-1.5 z-50"
+                  className="absolute right-0 mt-2 w-64 bg-white rounded-lg border border-hairline shadow-raised py-1.5 z-50"
                 >
                   <div className="px-3.5 py-2.5">
                     <div className="text-sm font-semibold text-ink truncate">
                       {profile?.display_name || user.display_name}
                     </div>
-                    <div className="text-xs text-ink-faint truncate">{user.role}</div>
+                    <div className="text-xs text-ink-faint capitalize truncate">{user.role}</div>
                   </div>
                   <div className="h-px bg-hairline my-1" />
                   <Link
                     href="/educator/profile"
-                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                   >
                     <UserIcon className="w-4 h-4 text-ink-faint" /> Account settings
                   </Link>
                   <Link
                     href="/educator/classes"
-                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
+                    className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                   >
                     <GraduationCap className="w-4 h-4 text-ink-faint" /> Back to educator view
                   </Link>
@@ -459,7 +477,7 @@ export default function AdminShell({
                   <button
                     type="button"
                     onClick={onLogout}
-                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-[#F7F7F9] transition"
+                    className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                   >
                     <LogOut className="w-4 h-4 text-ink-faint" /> Sign out
                   </button>
@@ -470,8 +488,8 @@ export default function AdminShell({
         </header>
 
         {/* Kandungan */}
-        <main className="flex-1 w-full">
-          <div className="max-w-[1200px] px-4 sm:px-6 py-6">
+        <main className="flex-1 w-full min-w-0">
+          <div className="mx-auto max-w-shell px-4 sm:px-[22px] py-8">
             {title && (
               <div className="flex items-start justify-between gap-4 mb-6">
                 <h1 className="text-2xl font-semibold text-ink">{title}</h1>
