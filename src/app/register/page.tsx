@@ -9,8 +9,8 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import Logo from '@/components/Logo';
 import GoogleButton from '@/components/GoogleButton';
+import AuthSplit from '@/components/ui/AuthSplit';
 
 /**
  * Mesej apabila emel sudah berdaftar. Ikut bahasa pelayar pengguna:
@@ -88,24 +88,19 @@ export default function Register() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#FCFBF9' }}>
-      <div className="px-8 pt-7">
-        <Logo size={30} />
-      </div>
+    <AuthSplit>
+      <div className="w-full max-w-[380px]">
+        <div className="text-center mb-8">
+          <h1 className="text-[20px] font-bold tracking-tight text-ink">
+            {done ? 'Check your email.' : 'Start here.'}
+          </h1>
+          <p className="text-[14px] text-ink-muted mt-1">
+            {done ? `We sent a verification link to ${email}.` : 'One account for every class you teach or join.'}
+          </p>
+        </div>
 
-      <div className="flex-1 flex items-center justify-center px-6 py-10">
-        <div className="w-full max-w-[380px]">
-          <div className="text-center mb-8">
-            <h1 className="text-[40px] leading-[1.1] font-semibold tracking-tight text-ink">
-              {done ? 'Check your email.' : 'Start here.'}
-            </h1>
-            <p className="text-[17px] text-ink-muted mt-2">
-              {done ? `We sent a verification link to ${email}.` : 'One account for every class you teach or join.'}
-            </p>
-          </div>
-
-          {done ? (
-            <div className="bg-white rounded-2xl border border-hairline p-6">
+        {done ? (
+          <div className="bg-white rounded-[4px] border border-hairline p-6 shadow-card">
               <p className="text-sm text-ink-muted">
                 Open the link to confirm your account, then sign in. If it is not there in a minute, check your spam folder.
               </p>
@@ -212,16 +207,7 @@ export default function Register() {
               </p>
             </div>
           )}
-        </div>
       </div>
-
-      <div className="pb-8 text-center text-xs text-ink-faint tracking-wide space-y-2">
-        <div>UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix</div>
-        <div className="space-x-4">
-          <Link href="/privacy" className="hover:text-ink-muted">Privacy</Link>
-          <Link href="/terms" className="hover:text-ink-muted">Terms</Link>
-        </div>
-      </div>
-    </div>
+    </AuthSplit>
   );
 }

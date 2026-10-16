@@ -4,6 +4,10 @@ import { useEffect, useState, Suspense } from 'react';
 import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabaseClient';
+import AuthSplit from '@/components/ui/AuthSplit';
+
+// Reset password (KZ-021: dibungkus AuthSplit). Tingkah laku pengesahan
+// token dan kemaskini kata laluan tidak berubah.
 function ResetInner(){
   const router = useRouter();
   const [ready,setReady]=useState(false);
@@ -30,10 +34,29 @@ function ResetInner(){
     setBusy(false); if (error){ setErr(error.message); return; } setDone(true);
     setTimeout(()=> router.replace('/login'), 2500);
   }
-  return (<div className="min-h-screen flex flex-col bg-gradient-to-br from-purple-600 to-blue-600 px-6 py-10"><div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto"><div className="text-center mb-8"><div className="text-4xl mb-2">🔐</div><h1 className="text-3xl font-bold text-white">Set new password</h1></div>
-  {done?<div className="bg-white rounded-2xl shadow-xl p-6 space-y-3"><h2 className="text-xl font-bold">Password updated</h2><p className="text-sm text-gray-600">Redirecting to sign in…</p></div>:
-   <form onSubmit={submit} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">{!ready && <p className="text-sm text-amber-700">Validating reset link… If this stays, request a new link.</p>}<div><label className="block text-sm font-medium text-gray-700 mb-1">New password</label><input type="password" minLength={8} value={password} onChange={e=>setPassword(e.target.value)} required className="w-full border border-gray-200 rounded-xl px-3 py-2" placeholder="At least 8 characters"/></div>{err&&<p className="text-sm text-red-600">{err}</p>}<button disabled={busy||!ready} className="w-full py-3 rounded-xl text-white font-semibold bg-gradient-to-r from-purple-600 to-blue-600 disabled:opacity-60">{busy?'Saving…':'Update password'}</button><p className="text-sm text-center text-gray-600"><Link href="/forgot-password" className="text-purple-600 font-medium">Request new link</Link></p></form>}
-  </div></div>);
+  return (<AuthSplit>
+    <div className="w-full max-w-[380px]">
+      <div className="text-center mb-8">
+        <h1 className="text-[20px] font-bold tracking-tight text-ink">Set new password</h1>
+      </div>
+      {done?
+        <div className="bg-white rounded-[4px] border border-hairline p-6 space-y-3 shadow-card">
+          <h2 className="text-[16px] font-bold text-ink">Password updated</h2>
+          <p className="text-sm text-ink-muted">Redirecting to sign in…</p>
+        </div>
+        :
+        <form onSubmit={submit} className="bg-white rounded-[4px] border border-hairline p-6 space-y-4 shadow-card">
+          {!ready && <p className="text-sm text-[#8A6100] bg-[#FEF6E7] rounded-[4px] px-3.5 py-2.5">Validating reset link… If this stays, request a new link.</p>}
+          <div>
+            <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="password">New password</label>
+            <input id="password" type="password" minLength={8} value={password} onChange={e=>setPassword(e.target.value)} required className="input" placeholder="At least 8 characters"/>
+          </div>
+          {err&&<p className="text-sm text-kz-down">{err}</p>}
+          <button disabled={busy||!ready} className="btn-primary w-full disabled:opacity-60">{busy?'Saving…':'Update password'}</button>
+          <p className="text-sm text-center text-ink-muted"><Link href="/forgot-password" className="text-brand-purple font-medium">Request new link</Link></p>
+        </form>}
+    </div>
+  </AuthSplit>);
 }
 
-export default function Reset(){ return <Suspense fallback={<div>Loading...</div>}><ResetInner/></Suspense>; }
+export default function Reset(){ return <Suspense fallback={<AuthSplit><div className="w-full max-w-[380px] text-center text-sm text-ink-muted">Loading...</div></AuthSplit>}><ResetInner/></Suspense>; }

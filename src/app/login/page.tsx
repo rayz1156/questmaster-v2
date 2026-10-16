@@ -18,8 +18,8 @@ import Link from 'next/link';
 import { Eye, EyeOff } from 'lucide-react';
 import { supabase, setRememberMe } from '@/lib/supabase';
 import { pautanDalamanSelamat } from '@/lib/pautan';
-import Logo from '@/components/Logo';
 import GoogleButton from '@/components/GoogleButton';
+import AuthSplit from '@/components/ui/AuthSplit';
 
 function LoginInner() {
   const router = useRouter();
@@ -92,19 +92,14 @@ function LoginInner() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#FCFBF9' }}>
-      <div className="px-8 pt-7">
-        <Logo size={30} />
-      </div>
+    <AuthSplit>
+      <div className="w-full max-w-[380px]">
+        <div className="text-center mb-8">
+          <h1 className="text-[20px] font-bold tracking-tight text-ink">Welcome back.</h1>
+          <p className="text-[14px] text-ink-muted mt-1">Your next great class starts here.</p>
+        </div>
 
-      <div className="flex-1 flex items-center justify-center px-6 py-10">
-        <div className="w-full max-w-[380px]">
-          <div className="text-center mb-8">
-            <h1 className="text-[40px] leading-[1.1] font-semibold tracking-tight text-ink">Welcome back.</h1>
-            <p className="text-[17px] text-ink-muted mt-2">Your next great class starts here.</p>
-          </div>
-
-          <div className="bg-white rounded-2xl border border-hairline p-6">
+        <div className="bg-white rounded-[4px] border border-hairline p-6 shadow-card">
             <GoogleButton next={searchParams?.get('next') || undefined} className="mb-5 empty:hidden" />
 
             <form onSubmit={signIn}>
@@ -182,18 +177,9 @@ function LoginInner() {
                 Create an account
               </Link>
             </div>
-          </div>
         </div>
       </div>
-
-      <div className="pb-8 text-center text-xs text-ink-faint tracking-wide space-y-2">
-        <div>UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix</div>
-        <div className="space-x-4">
-          <Link href="/privacy" className="hover:text-ink-muted">Privacy</Link>
-          <Link href="/terms" className="hover:text-ink-muted">Terms</Link>
-        </div>
-      </div>
-    </div>
+    </AuthSplit>
   );
 }
 
@@ -214,20 +200,15 @@ export default function LoginPage() {
  */
 function LoginShell() {
   return (
-    <div className="min-h-screen flex flex-col" style={{ background: '#FCFBF9' }}>
-      <div className="px-8 pt-7">
-        <Logo size={30} />
+    <AuthSplit>
+      <div className="w-full max-w-[380px] text-center">
+        <h1 className="text-[20px] font-bold tracking-tight text-ink">
+          Welcome back.
+        </h1>
+        <p className="text-[14px] text-ink-muted mt-1">
+          Your next great class starts here.
+        </p>
       </div>
-      <div className="flex-1 flex items-center justify-center px-6 py-10">
-        <div className="w-full max-w-[380px] text-center">
-          <h1 className="text-[40px] leading-[1.1] font-semibold tracking-tight text-ink">
-            Welcome back.
-          </h1>
-          <p className="text-[17px] text-ink-muted mt-2">
-            Your next great class starts here.
-          </p>
-        </div>
-      </div>
-    </div>
+    </AuthSplit>
   );
 }
