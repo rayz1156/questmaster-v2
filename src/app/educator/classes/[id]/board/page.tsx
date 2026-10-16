@@ -2,7 +2,6 @@
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
-import { GraduationCap, ListChecks, Users, BarChart3, Settings as SettingsIcon, User as UserIcon, ArrowLeft, Activity } from "lucide-react";
 import Shell from "@/components/Shell";
 import ClassShell from "@/components/ClassShell";
 import { EDU_TABS } from '@/lib/eduTabs';
@@ -25,14 +24,14 @@ export default function ClassBoardPage() {
         setUserId(u.user?.id || null);
         const b = await getBoardForClass(classId);
         setBoard(b);
-      } catch (e: any) { setErr(e.message || String(e)); }
+      } catch (e) { setErr(e instanceof Error ? e.message : String(e)); }
       finally { setLoading(false); }
     })();
   }, [classId]);
 
   return (
     <Shell tabs={EDU_TABS}>
-      <ClassShell classId={classId} current="learning">
+      <ClassShell classId={classId} current="board">
         <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
           <div>
             <h2 className="section-title">Intro board</h2>

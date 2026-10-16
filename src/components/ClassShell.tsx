@@ -1,36 +1,48 @@
 "use client";
 
 /**
- * Kepala kelas yang dikongsi oleh setiap skrin dalam sesebuah kelas.
+ * Kepala kelas yang dikongsi oleh setiap skrin dalam sesebuah kelas, rupa v3
+ * (KZ-022b).
  *
- * Sebelum ini setiap skrin kelas membina kepalanya sendiri, jadi tajuk,
- * kod kelas dan jubin navigasi berubah rupa dari satu tab ke satu tab.
- * Satu komponen menyelesaikannya: breadcrumb, nama kelas, kod kelas, satu
- * tindakan utama, dan enam tab nipis.
+ * Kepala guna PageHead varian breadcrumb ("Classes / <nama kelas>") dengan
+ * keterangan ringkas sedia ada (penerangan kelas dan bilangan pelajar), dan
+ * navigasi antara halaman kelas guna Tabs kit sebagai pautan. Tab aktif
+ * datang daripada prop `current` melalui prop `aktif` pada setiap item (lihat
+ * Tabs) supaya tepat untuk setiap laluan kelas; halaman global yang meminjam
+ * kepala ini (Activities, Live Quiz, Rankings, Teams) tidak menyalakan
+ * mana-mana tab kerana ia bukan halaman kelas.
  *
- * Enam tab itu ialah keseluruhan kelas:
- *   Overview    kod, jemputan, pendidik, tetapan
- *   Learning    papan pembelajaran dan papan pengenalan
- *   Activities  kerja yang dihantar dan dinilai
- *   Quizzes     kuiz langsung
- *   People      pelajar, kumpulan, pendidik
- *   Rankings    markah kumpulan
+ * Enam tab kelas (laluan SEDIA ADA sahaja, ikut tiket KZ-022b):
+ *   Overview        kod, jemputan, pendidik, tetapan
+ *   People          pelajar, kumpulan, pendidik
+ *   Board           papan pengenalan kelas
+ *   Learning Board  papan pembelajaran
+ *   Certificates    sijil
+ *   Peer review     penilaian rakan sebaya
+ *
+ * Aliran data tidak berubah: kelas dimuat sekali (atau diterima melalui prop
+ * `klass`), kod kelas disalin ke papan keratan, pautan jemputan kekal pada
+ * laluan yang sama seperti sebelum ini.
  */
 
-import Link from "next/link";
-import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Copy, Check, UserPlus } from "lucide-react";
 import { getClass, type Klass } from "@/lib/data";
+import { PageHead, Tabs } from "@/components/ui";
 
 export type ClassTabKey =
   | "overview"
+  | "people"
+  | "board"
   | "learning"
+  | "certificates"
+  | "peer-review"
+  // Kunci yang terus diterima supaya pemanggil sedia ada (halaman global
+  // Activities, Live Quiz, Rankings, Teams) tidak pecah. Tiada tab kelas
+  // padan, jadi tiada tab disalakan pada halaman tersebut.
   | "activities"
   | "quizzes"
-  | "people"
-  | "rankings"
-  | "certificates";
+  | "rankings";
 
 export default function ClassShell({
   classId,
@@ -44,8 +56,6 @@ export default function ClassShell({
   klass?: Klass | null;
   children: React.ReactNode;
 }) {
-  const pathname = usePathname();
-  const sp = useSearchParams();
   const [klass, setKlass] = useState<Klass | null>(klassProp ?? null);
   const [copied, setCopied] = useState(false);
 
@@ -60,12 +70,11 @@ export default function ClassShell({
 
   const tabs: { key: ClassTabKey; label: string; href: string }[] = [
     { key: "overview", label: "Overview", href: `/educator/classes/${classId}` },
-    { key: "learning", label: "Learning", href: `/educator/classes/${classId}/learning-board` },
-    { key: "activities", label: "Activities", href: `/educator/activities?classId=${classId}` },
-    { key: "quizzes", label: "Quizzes", href: `/educator/live?classId=${classId}` },
     { key: "people", label: "People", href: `/educator/classes/${classId}/people` },
-    { key: "rankings", label: "Rankings", href: `/educator/rankings?classId=${classId}` },
+    { key: "board", label: "Board", href: `/educator/classes/${classId}/board` },
+    { key: "learning", label: "Learning Board", href: `/educator/classes/${classId}/learning-board` },
     { key: "certificates", label: "Certificates", href: `/educator/classes/${classId}/certificates` },
+    { key: "peer-review", label: "Peer review", href: `/educator/classes/${classId}/peer-review` },
   ];
 
   const copyCode = async () => {
@@ -79,71 +88,44 @@ export default function ClassShell({
 
   const studentCount = (klass as unknown as { member_count?: number } | null)?.member_count;
 
+  // Keterangan ringkas sedia ada: penerangan kelas dan bilangan pelajar.
+  const huraian = [
+    klass?.description || null,
+    typeof studentCount === "number"
+      ? `${studentCount} ${studentCount === 1 ? "student" : "students"}`
+      : null,
+  ]
+    .filter((x) => x != null)
+    .join(" · ");
+
   return (
     <div>
-      {/* Breadcrumb */}
-      <nav className="flex items-center gap-2 text-sm text-ink-faint mb-3">
-        <Link href="/educator/classes" className="hover:text-ink transition">Classes</Link>
-        <span aria-hidden>›</span>
-        <span className="text-ink-muted truncate max-w-[40ch]">{klass?.name || "Class"}</span>
-      </nav>
+      <PageHead
+        crumb="Classes"
+        name={klass?.name || "Class"}
+        description={huraian || undefined}
+        secondaryActions={
+          klass?.join_code
+            ? [
+                {
+                  label: copied ? "Class code copied" : `Class code ${klass.join_code}`,
+                  icon: copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />,
+                  onSelect: copyCode,
+                },
+              ]
+            : []
+        }
+        primaryAction={{
+          label: "Invite people",
+          icon: <UserPlus className="w-4 h-4" />,
+          href: `/educator/classes/${classId}`,
+        }}
+      />
 
-      {/* Tajuk, kod kelas, satu tindakan utama */}
-      <div className="flex items-start justify-between gap-5 flex-wrap mb-5">
-        <div className="min-w-0">
-          <h1 className="page-title truncate">{klass?.name || " "}</h1>
-          {(klass?.description || typeof studentCount === "number") && (
-            <p className="page-subtitle">
-              {klass?.description ? klass.description : null}
-              {klass?.description && typeof studentCount === "number" ? " · " : null}
-              {typeof studentCount === "number"
-                ? `${studentCount} ${studentCount === 1 ? "student" : "students"}`
-                : null}
-            </p>
-          )}
-        </div>
-
-        <div className="flex items-center gap-3 shrink-0">
-          {klass?.join_code && (
-            <div className="flex items-center gap-3 rounded-xl border border-hairline bg-white px-3.5 py-2">
-              <div>
-                <div className="text-[11px] text-ink-faint leading-none mb-1">Class code</div>
-                <div className="font-mono text-sm font-semibold tracking-wider text-ink leading-none">
-                  {klass.join_code}
-                </div>
-              </div>
-              <button onClick={copyCode} className="btn-quiet text-brand-purple" title="Copy class code">
-                {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                <span className="hidden sm:inline">{copied ? "Copied" : "Copy"}</span>
-              </button>
-            </div>
-          )}
-          <Link href={`/educator/classes/${classId}`} className="btn-primary">
-            <UserPlus className="w-4 h-4" /> Invite people
-          </Link>
-        </div>
-      </div>
-
-      {/* Tab nipis */}
-      <div className="border-b border-hairline mb-7 -mx-5 px-5 overflow-x-auto">
-        <div className="flex items-center gap-1 min-w-max">
-          {tabs.map((t) => {
-            const on = t.key === current;
-            return (
-              <Link
-                key={t.key}
-                href={t.href}
-                className={`relative px-3 pb-3 pt-1 text-[15px] transition ${
-                  on ? "text-brand-purple font-semibold" : "text-ink-muted hover:text-ink font-medium"
-                }`}
-              >
-                {t.label}
-                {on && <span className="absolute left-3 right-3 -bottom-px h-[2px] bg-brand-purple rounded-full" />}
-              </Link>
-            );
-          })}
-        </div>
-      </div>
+      <Tabs
+        className="mb-7"
+        items={tabs.map((t) => ({ label: t.label, href: t.href, aktif: t.key === current }))}
+      />
 
       {children}
     </div>

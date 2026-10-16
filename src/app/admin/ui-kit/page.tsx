@@ -309,7 +309,7 @@ export default function UiKitPage() {
       </Seksyen>
 
       {/* ===== Tabs ===== */}
-      <Seksyen title="Tabs" note="14px 700, active #854fff with 3px underline, gap 32px, base line #dbdfea; state tabs render buttons">
+      <Seksyen title="Tabs" note="14px 700, active #854fff with 3px underline, gap 32px, base line #dbdfea; state tabs render buttons; `aktif` overrides path matching on link tabs (KZ-022b)">
         <Card>
           <Tabs
             items={[
@@ -327,6 +327,17 @@ export default function UiKitPage() {
               { label: "Sample state tab B", onSelect: () => {} },
             ]}
           />
+        </Card>
+        <Card className="mt-4">
+          <Tabs
+            items={[
+              { label: "Sample link tab A", href: "/admin/overview", aktif: true },
+              { label: "Sample link tab B", href: "/admin/overview", aktif: false },
+            ]}
+          />
+          <p className="text-[12px] text-ink-faint mt-3">
+            Link tabs can pass `aktif` to force the active state instead of path matching (used by ClassShell).
+          </p>
         </Card>
       </Seksyen>
 

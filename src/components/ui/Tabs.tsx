@@ -17,9 +17,14 @@ export type TabItem = {
   /**
    * Tab keadaan (KZ-022): bila ada, render butang bukan pautan.
    * `aktif` menentukan kariah aktif.
+   *
+   * KZ-022b: pada tab pautan, `aktif` yang diberikan mengatasi padanan
+   * laluan (contoh ClassShell: laluan induk tidak boleh disalakan pada
+   * semua sub-laluan). Selari ke belakang: pemanggil lama yang tidak
+   * menghantar `aktif` kekal dengan padanan laluan seperti biasa.
    */
   onSelect?: () => void;
-  /** Kariah ini aktif (untuk tab keadaan). */
+  /** Kariah ini aktif (untuk tab keadaan, atau override tab pautan). */
   aktif?: boolean;
 };
 
@@ -27,7 +32,11 @@ export default function Tabs({ items, className = "" }: { items: TabItem[]; clas
   const pathname = usePathname();
   const here = (href: string) => pathname === href || !!pathname?.startsWith(href + "/");
   const aktif = (t: TabItem) =>
-    t.onSelect != null ? !!t.aktif : t.href != null && (here(t.href) || (t.match || []).some(here));
+    t.aktif !== undefined
+      ? t.aktif
+      : t.onSelect != null
+        ? false
+        : t.href != null && (here(t.href) || (t.match || []).some(here));
 
   return (
     <div
