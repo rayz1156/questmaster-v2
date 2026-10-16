@@ -183,17 +183,24 @@ export default function Page() {
   // Markah kelas aktif: pasukan dan individu.
   useEffect(() => {
     if (!activeClassId || !user) { setScores([]); setIndivScores([]); return; }
+    // Keselamatan (KZ-023 B1): apabila pendidik menyembunyikan leaderboard
+    // kelas ini, simpan baris milik sendiri sahaja (mata sendiri kekal),
+    // supaya markah dan nama rakan sekelas tidak dipapar.
+    const sorok = classes.find((c) => c.id === activeClassId)?.leaderboard_visible === false;
+    const pasukanIni = pasukanSaya.get(activeClassId)?.team_id ?? null;
     (async () => {
       try {
         const list = await listClassTeamScores(activeClassId);
-        setScores(list.slice().sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0)));
+        const tapis = sorok ? list.filter((r) => r.team_id === pasukanIni) : list;
+        setScores(tapis.slice().sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0)));
       } catch { setScores([]); }
       try {
         const is = await listClassIndividualScores(activeClassId);
-        setIndivScores(is.slice().sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0)));
+        const tapis = sorok ? is.filter((r) => r.user_id === user.id) : is;
+        setIndivScores(tapis.slice().sort((a, b) => (Number(b.total_score)||0) - (Number(a.total_score)||0)));
       } catch { setIndivScores([]); }
     })();
-  }, [activeClassId, user, pasukanSaya]);
+  }, [activeClassId, user, pasukanSaya, classes]);
 
   // Tinjau sesi langsung setiap 30 saat; berhenti apabila tab tersembunyi.
   useEffect(() => {
@@ -249,6 +256,8 @@ export default function Page() {
   const myRank = modIndividu
     ? kedudukanSaya(indivScores, (s) => s.user_id, (s) => Number(s.total_score) || 0, myUserId)
     : kedudukanSaya(scores, (s) => s.team_id, (s) => Number(s.total_score) || 0, myTeamId);
+  // Leaderboard disembunyikan pendidik: tiada kedudukan, carta atau papan kedudukan.
+  const papanSorok = activeClass?.leaderboard_visible === false;
 
   // Baris di atas saya (untuk ayat jarak). Kedudukan baris atas dikira
   // mengikut markah sebenar, jadi ayat kekal betul bila seri.
@@ -470,11 +479,13 @@ export default function Page() {
                     <div className="amount">{totalPoints.toLocaleString()}</div>
                     <div className="mt-1 text-[13px] text-ink-faint">Total points</div>
                   </div>
-                  <div>
-                    <div className="amount">{myRank > 0 ? `#${myRank}` : "-"}</div>
-                    <div className="mt-1 text-[13px] text-ink-faint">Class rank</div>
-                  </div>
-                  {ayatJarak && (
+                  {!papanSorok && (
+                    <div>
+                      <div className="amount">{myRank > 0 ? `#${myRank}` : "-"}</div>
+                      <div className="mt-1 text-[13px] text-ink-faint">Class rank</div>
+                    </div>
+                  )}
+                  {ayatJarak && !papanSorok && (
                     <p className="max-w-[360px] self-end text-[13px] leading-snug text-ink-muted">
                       #{myRank} {ayatJarak}
                     </p>
@@ -482,7 +493,7 @@ export default function Page() {
                 </div>
 
                 {/* Carta bar mudah (div sahaja): 12 teratas kelas, bar saya biru. */}
-                {carta.length > 0 && (
+                {carta.length > 0 && !papanSorok && (
                   <div className="mt-6 flex h-[120px] items-end gap-1.5" role="img" aria-label="Class scores">
                     {carta.map((b) => (
                       <div
@@ -566,7 +577,7 @@ export default function Page() {
 
             {/* Baris dua kad: My Activities dan Leaderboard. */}
             {dataReady && (
-              <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
+              <div className={`grid grid-cols-1 gap-6 ${papanSorok ? "" : "xl:grid-cols-2"}`}>
                 <section className="card p-0" aria-label="My activities">
                   <div className="flex flex-wrap items-center justify-between gap-2 px-6 pb-3 pt-5">
                     <h2 className="section-title">My Activities</h2>
@@ -620,7 +631,7 @@ export default function Page() {
                   </div>
                 </section>
 
-                <section className="card" aria-label="Leaderboard">
+                {!papanSorok && (<section className="card" aria-label="Leaderboard">
                   <div className="flex flex-wrap items-center justify-between gap-2">
                     <h2 className="section-title">Leaderboard</h2>
                     <div className="flex gap-1" role="tablist" aria-label="Leaderboard mode">
@@ -655,7 +666,7 @@ export default function Page() {
                   <Link href="/participant/leaderboard" className="mt-4 inline-flex text-[13px] font-bold text-brand-purple hover:underline">
                     View All
                   </Link>
-                </section>
+                </section>)}
               </div>
             )}
 
