@@ -3,7 +3,7 @@
 import type { ReactNode } from "react";
 import { MoreHorizontal } from "lucide-react";
 import Button from "./Button";
-import Dropdown, { type DropdownItem } from "./Dropdown";
+import Dropdown from "./Dropdown";
 
 /**
  * Kepala halaman kit UI (KZ-021, nilai KZ-DS-v3).

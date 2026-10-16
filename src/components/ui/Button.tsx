@@ -59,7 +59,6 @@ function kelasAsas(variant: ButtonVariant, size: ButtonSize, warna: WarnaKit): s
     return `${asas} ${saiz} ${fokus} text-ink-muted hover:bg-[#ebeef2] disabled:opacity-40`;
   }
   // dim: latar lembut warna + teks warna.
-  const w = WARNA_KIT[warna];
   return `${asas} ${saiz} ${fokus} disabled:opacity-40`;
 }
 

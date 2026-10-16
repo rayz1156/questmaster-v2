@@ -64,7 +64,7 @@ export function BarChart({
               rx="3"
               fill={warna}
             >
-              <title>{`${b.label}: ${b.nilai}`}</title>
+              <title>{`${b.label}: ${formatNilai ? formatNilai(b.nilai) : b.nilai}`}</title>
             </rect>
             <text
               x={x + lebarBar / 2}

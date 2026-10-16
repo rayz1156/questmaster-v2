@@ -13,19 +13,22 @@ function ResetInner(){
   const [ready,setReady]=useState(false);
   const [password,setPassword]=useState(''); const [busy,setBusy]=useState(false); const [err,setErr]=useState(''); const [done,setDone]=useState(false);
   const params = useSearchParams();
+  // Jenis OTP dan langganan ditaip daripada tandatangan supaya tiada `any`.
+  type JenisOtp = Extract<Parameters<typeof supabase.auth.verifyOtp>[0], { token_hash?: unknown }>["type"];
+  type Langganan = ReturnType<typeof supabase.auth.onAuthStateChange>["data"]["subscription"];
   useEffect(()=>{
-    let unsub:any;
+    let unsub: Langganan | undefined;
     (async()=>{
       try{
         const th=params.get('token_hash');
         const code=params.get('code');
-        const type=(params.get('type')||'recovery') as any;
+        const type=(params.get('type')||'recovery') as JenisOtp;
         if(th){const r=await supabase.auth.verifyOtp({token_hash:th,type});if(r.error){setErr('Link invalid or expired. Request a new one.');return;}setReady(true);return;}
         if(code){const r=await supabase.auth.exchangeCodeForSession(code);if(r.error){setErr('Link invalid or expired. Request a new one.');return;}setReady(true);return;}
         if(typeof window!=='undefined'&&window.location.hash.includes('access_token')){const sub=supabase.auth.onAuthStateChange((e)=>{if(e==='PASSWORD_RECOVERY'||e==='SIGNED_IN')setReady(true);});unsub=sub.data.subscription;const s=await supabase.auth.getSession();if(s.data.session)setReady(true);return;}
         const s=await supabase.auth.getSession();if(s.data.session){setReady(true);return;}
         setErr('No reset token in URL. Request a new link.');
-      }catch(e:any){setErr(e.message||'Validation failed');}
+      }catch(e){setErr(e instanceof Error? e.message : 'Validation failed');}
     })();
     return ()=>{if(unsub)unsub.unsubscribe();};
   },[params]);

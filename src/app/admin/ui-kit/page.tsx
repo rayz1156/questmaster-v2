@@ -9,7 +9,6 @@
 // admin lain; data sebenar kekal dilindungi RLS di pelayan.
 
 import { useState, type ReactNode } from "react";
-import Link from "next/link";
 import {
   Search,
   Settings,
@@ -343,7 +342,7 @@ export default function UiKitPage() {
           onToggleAll={(semua) =>
             setDipilih(semua ? new Set(BARIS_CONTOH.map((r) => r.id)) : new Set())
           }
-          menuItems={(r) => [
+          menuItems={() => [
             { label: "View profile", icon: <Eye className="w-4 h-4" />, onSelect: () => {} },
             { label: "Message", icon: <Mail className="w-4 h-4" />, onSelect: () => {} },
             { label: "Delete", icon: <Trash2 className="w-4 h-4" />, onSelect: () => {}, danger: true },
