@@ -11,15 +11,23 @@ import { usePathname } from "next/navigation";
 
 export type TabItem = {
   label: string;
-  href: string;
+  href?: string;
   /** Awalan laluan tambahan yang dikira aktif untuk tab ini. */
   match?: string[];
+  /**
+   * Tab keadaan (KZ-022): bila ada, render butang bukan pautan.
+   * `aktif` menentukan kariah aktif.
+   */
+  onSelect?: () => void;
+  /** Kariah ini aktif (untuk tab keadaan). */
+  aktif?: boolean;
 };
 
 export default function Tabs({ items, className = "" }: { items: TabItem[]; className?: string }) {
   const pathname = usePathname();
   const here = (href: string) => pathname === href || !!pathname?.startsWith(href + "/");
-  const aktif = (t: TabItem) => here(t.href) || (t.match || []).some(here);
+  const aktif = (t: TabItem) =>
+    t.onSelect != null ? !!t.aktif : t.href != null && (here(t.href) || (t.match || []).some(here));
 
   return (
     <div
@@ -29,16 +37,8 @@ export default function Tabs({ items, className = "" }: { items: TabItem[]; clas
     >
       {items.map((t) => {
         const on = aktif(t);
-        return (
-          <Link
-            key={t.href}
-            href={t.href}
-            role="tab"
-            aria-selected={on}
-            className={`relative shrink-0 py-4 text-[14px] font-bold transition ${
-              on ? "text-brand-purple" : "text-ink-muted hover:text-ink"
-            }`}
-          >
+        const isi = (
+          <>
             {t.label}
             {on && (
               <span
@@ -46,6 +46,34 @@ export default function Tabs({ items, className = "" }: { items: TabItem[]; clas
                 className="absolute left-0 right-0 bottom-[-1px] h-[3px] rounded-full bg-brand-purple"
               />
             )}
+          </>
+        );
+        const kelas = `relative shrink-0 py-4 text-[14px] font-bold transition ${
+          on ? "text-brand-purple" : "text-ink-muted hover:text-ink"
+        }`;
+        if (t.onSelect != null) {
+          return (
+            <button
+              key={t.label}
+              type="button"
+              role="tab"
+              aria-selected={on}
+              onClick={t.onSelect}
+              className={kelas}
+            >
+              {isi}
+            </button>
+          );
+        }
+        return (
+          <Link
+            key={t.href}
+            href={t.href ?? "#"}
+            role="tab"
+            aria-selected={on}
+            className={kelas}
+          >
+            {isi}
           </Link>
         );
       })}

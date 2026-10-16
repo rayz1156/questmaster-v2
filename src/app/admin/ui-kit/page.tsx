@@ -309,7 +309,7 @@ export default function UiKitPage() {
       </Seksyen>
 
       {/* ===== Tabs ===== */}
-      <Seksyen title="Tabs" note="14px 700, active #854fff with 3px underline, gap 32px, base line #dbdfea">
+      <Seksyen title="Tabs" note="14px 700, active #854fff with 3px underline, gap 32px, base line #dbdfea; state tabs render buttons">
         <Card>
           <Tabs
             items={[
@@ -317,6 +317,14 @@ export default function UiKitPage() {
               { label: "Users", href: "/admin/users" },
               { label: "Classes", href: "/admin/classes", match: ["/admin/classes", "/admin/ui-kit"] },
               { label: "Settings", href: "/admin/settings" },
+            ]}
+          />
+        </Card>
+        <Card className="mt-4">
+          <Tabs
+            items={[
+              { label: "Sample state tab A", onSelect: () => {}, aktif: true },
+              { label: "Sample state tab B", onSelect: () => {} },
             ]}
           />
         </Card>
