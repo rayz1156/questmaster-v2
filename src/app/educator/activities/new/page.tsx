@@ -1,11 +1,26 @@
 'use client';
+/**
+ * Borang cipta aktiviti baharu.
+ *
+ * KZ-022: rupa v3 (PageHead, Card, Field, Alert, Button); keadaan, fungsi
+ * submit dan laluan selepas cipta tidak berubah.
+ */
 import { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, Check, GraduationCap, ListChecks, Users, BarChart3, Activity, User as UserIcon } from 'lucide-react';
+import { ArrowLeft, Check, Info } from 'lucide-react';
 import { listMyClasses, createHuntInClass, updateQuestDetails, type Klass } from '@/lib/data';
 import Shell from '@/components/Shell';
 import { EDU_TABS } from '@/lib/eduTabs';
+import {
+  Alert,
+  Button,
+  Card,
+  Field,
+  Input,
+  PageHead,
+  Select,
+  Textarea,
+} from '@/components/ui';
 
 function Inner() {
   const router = useRouter();
@@ -22,7 +37,10 @@ function Inner() {
   const [points, setPoints] = useState<string>("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  useEffect(() => { listMyClasses().then(cs => { setClasses(cs); if (!classId && cs[0]) setClassId(cs[0].id); }); }, []);
+  useEffect(() => {
+    listMyClasses().then(cs => { setClasses(cs); if (!classId && cs[0]) setClassId(cs[0].id); });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
   const submit = async () => {
     if (!title.trim()) { setErr("Title required"); return; }
     if (!classId) { setErr("Please select a class"); return; }
@@ -39,58 +57,83 @@ function Inner() {
         points: Number(points) || 0,
       });
       router.push(`/educator/activities/${hunt.id}`);
-    } catch (e: any) { setErr(e.message); setBusy(false); }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "Failed to create activity"); setBusy(false); }
   };
   return (
-    <div className="min-h-screen bg-gray-50 max-w-md mx-auto">
-      <div className="bg-brand-gradient text-white p-5 rounded-b-3xl">
-        <button onClick={()=>router.back()} className="mb-2 flex items-center gap-1 text-sm opacity-90"><ArrowLeft className="w-4 h-4"/>Back</button>
-        <h1 className="text-xl font-bold">Create New Activity</h1>
-      </div>
-      <div className="p-4 space-y-3">
-        {classes.length === 0 ? (
-          <div className="card text-sm"><p className="text-gray-600 mb-2">You need to create a class first. Each activity belongs to a class.</p><Link href="/educator/classes" className="btn-primary inline-block py-2 px-3">Create a class</Link></div>
-        ) : (<>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Class</div>
-            <select value={classId} onChange={e=>setClassId(e.target.value)} className="input w-full">{classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select>
-          </label>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Title</div>
-            <input className="input w-full" placeholder="Activity title" value={title} onChange={e=>setTitle(e.target.value)}/>
-          </label>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Status</div>
-            <select className="input w-full" value={status} onChange={e=>setStatus(e.target.value as any)}>
+    <div className="max-w-2xl">
+      <PageHead
+        title="Create New Activity"
+        description="Set the class, the basics, and where students hand in their work."
+        secondaryActions={[{ label: "Back", icon: <ArrowLeft className="w-4 h-4" />, onSelect: () => router.back() }]}
+      />
+
+      {classes.length === 0 ? (
+        <Card>
+          <p className="text-[14px] text-ink-muted mb-4">You need to create a class first. Each activity belongs to a class.</p>
+          <Button href="/educator/classes">Create a class</Button>
+        </Card>
+      ) : (
+        <Card className="space-y-5">
+          <Field label="Class" htmlFor="new-activity-class">
+            <Select id="new-activity-class" value={classId} onChange={e => setClassId(e.target.value)}>
+              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+            </Select>
+          </Field>
+          <Field label="Title" htmlFor="new-activity-title">
+            <Input id="new-activity-title" placeholder="Activity title" value={title} onChange={e => setTitle(e.target.value)} />
+          </Field>
+          <Field label="Status" htmlFor="new-activity-status">
+            <Select id="new-activity-status" value={status} onChange={e => setStatus(e.target.value as 'draft'|'active'|'archived')}>
               <option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option>
-            </select>
-          </label>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Short description</div>
-            <input className="input w-full" value={desc} onChange={e=>setDesc(e.target.value)}/>
-          </label>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Instructions</div>
-            <textarea className="input w-full min-h-[100px]" placeholder="What teams need to do to complete this quest..." value={instructions} onChange={e=>setInstructions(e.target.value)}/>
-          </label>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Instruction Link 1 (any URL)</div>
-            <input className="input w-full" value={link1} onChange={e=>setLink1(e.target.value)} placeholder="https://drive.google.com/..."/>
-          </label>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Instruction Link 2 (any URL)</div>
-            <input className="input w-full" value={link2} onChange={e=>setLink2(e.target.value)} placeholder="https://youtu.be/..."/>
-          </label>
-          <div className="mt-2 p-3 rounded-lg border bg-purple-50/40 space-y-2">
-            <div className="text-sm font-semibold text-purple-800">Submission link (optional)</div>
-            <div className="text-xs text-gray-600">When set, the activity board replaces team-column submissions with this link (Google Drive, Dropbox, Padlet, etc).</div>
-          <div className="text-xs text-gray-500">Prefer students to post their work directly inside Kuizen? Leave this blank and create a <span className="font-medium">Kuizen submission board</span> from the manage page after you save this activity.</div>
-            <label className="text-sm block"><div className="text-gray-600 mb-1">Submission URL</div>
-              <input className="input w-full" type="url" value={submissionLink} onChange={e=>setSubmissionLink(e.target.value)} placeholder="https://drive.google.com/drive/folders/..."/>
-            </label>
-          </div>
-          <label className="text-sm block"><div className="text-gray-600 mb-1">Completion points</div>
-            <input type="number" min={0} max={1000} className="input w-full" value={points} onChange={e=>setPoints(e.target.value === "" ? "" : String(parseInt(e.target.value, 10)))}/>
-          </label>
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <button disabled={busy} onClick={submit} className="btn-primary w-full flex items-center justify-center gap-1"><Check className="w-4 h-4"/>{busy ? "Creating..." : "Create Activity"}</button>
-        </>)}
-      </div>
+            </Select>
+          </Field>
+          <Field label="Short description" htmlFor="new-activity-desc">
+            <Input id="new-activity-desc" value={desc} onChange={e => setDesc(e.target.value)} />
+          </Field>
+          <Field label="Instructions" htmlFor="new-activity-instructions">
+            <Textarea id="new-activity-instructions" placeholder="What teams need to do to complete this quest..." value={instructions} onChange={e => setInstructions(e.target.value)} />
+          </Field>
+          <Field label="Instruction Link 1 (any URL)" htmlFor="new-activity-link1">
+            <Input id="new-activity-link1" value={link1} onChange={e => setLink1(e.target.value)} placeholder="https://drive.google.com/..." />
+          </Field>
+          <Field label="Instruction Link 2 (any URL)" htmlFor="new-activity-link2">
+            <Input id="new-activity-link2" value={link2} onChange={e => setLink2(e.target.value)} placeholder="https://youtu.be/..." />
+          </Field>
+          <Alert tone="info" icon={<Info className="w-4 h-4" />}>
+            Submission link (optional). When set, the activity board replaces team-column
+            submissions with this link (Google Drive, Dropbox, Padlet, etc). Prefer students
+            to post their work directly inside Kuizen? Leave this blank and create a Kuizen
+            submission board from the manage page after you save this activity.
+          </Alert>
+          <Field label="Submission URL" htmlFor="new-activity-submission" note="Optional">
+            <Input
+              id="new-activity-submission"
+              type="url"
+              value={submissionLink}
+              onChange={e => setSubmissionLink(e.target.value)}
+              placeholder="https://drive.google.com/drive/folders/..."
+            />
+          </Field>
+          <Field label="Completion points" htmlFor="new-activity-points" note="0 to 1000">
+            <Input
+              id="new-activity-points"
+              type="number"
+              min={0}
+              max={1000}
+              value={points}
+              onChange={e => setPoints(e.target.value === "" ? "" : String(parseInt(e.target.value, 10)))}
+            />
+          </Field>
+          {err && <p className="text-[14px] text-kz-down">{err}</p>}
+          <Button disabled={busy} onClick={submit} className="w-full">
+            <Check className="w-4 h-4" />{busy ? "Creating..." : "Create Activity"}
+          </Button>
+        </Card>
+      )}
     </div>
   );
 }
 
-export default function NewHunt() { return <Shell tabs={EDU_TABS}><Suspense fallback={<div className="p-4 text-sm text-gray-500">Loading...</div>}><Inner/></Suspense></Shell>; }
+export default function NewHunt() {
+  return <Shell tabs={EDU_TABS}><Suspense fallback={<div className="p-4 text-sm text-ink-faint">Loading...</div>}><Inner/></Suspense></Shell>;
+}

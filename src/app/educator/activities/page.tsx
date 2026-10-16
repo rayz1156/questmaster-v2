@@ -3,35 +3,49 @@
 /**
  * Activities. Satu halaman, dua konteks.
  *
- * Tanpa classId ia ialah Library: jadual penuh lebar merentas semua kelas,
+ * Tanpa classId ia ialah Library: grid kad projek merentas semua kelas,
  * dengan tab Activities dan Quizzes. Dengan classId ia ialah tab Activities
  * di dalam kelas: senarai lapang tanpa lencana kelas berulang, kerana nama
  * kelas sudah ada pada tajuk.
  *
- * Tindakan memusnah berpindah ke menu elipsis. Butang merah pada setiap
- * baris menarik mata ke perkara paling jarang dan paling berbahaya.
+ * KZ-022: rupa v3 (PageHead, Tabs, ProjectCard, EmptyState); logik data,
+ * pengendali klik dan laluan tidak berubah daripada versi jadual.
  */
 
 import { useEffect, useMemo, useState, Suspense } from 'react';
 import { useSearchParams } from "next/navigation";
-import Link from 'next/link';
-import { Search, Plus, FileText, Link as LinkIcon, Trash2, ListChecks } from "lucide-react";
+import { Search, Plus, FileText, Link as LinkIcon, Trash2, ListChecks, ClipboardList } from "lucide-react";
 import { useSession } from '@/lib/session';
 import Shell from '@/components/Shell';
 import ClassShell from '@/components/ClassShell';
-import RowMenu from '@/components/ui/RowMenu';
 import { EDU_TABS } from '@/lib/eduTabs';
 import { listMyHunts, deleteHunt, listMyClasses, type Hunt, type Klass } from '@/lib/data';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import {
+  Badge,
+  Button,
+  EmptyState,
+  Input,
+  ProjectCard,
+  ProjectGrid,
+  PageHead,
+  Select,
+  Tabs,
+} from "@/components/ui";
 
-function StatusDot({ status }: { status?: string | null }) {
-  const active = String(status || "").toLowerCase() === "active";
-  return (
-    <span className="inline-flex items-center gap-1.5 text-sm text-ink-muted">
-      <span className={`w-1.5 h-1.5 rounded-full ${active ? "bg-[#4BA972]" : "bg-[#C6C8D1]"}`} />
-      {status ? String(status)[0].toUpperCase() + String(status).slice(1) : "Draft"}
-    </span>
-  );
+/** Lencana status aktiviti ikut status sebenar (Active/Draft/Archived). */
+function LencanaStatus({ status }: { status?: string | null }) {
+  const s = String(status || "draft").toLowerCase();
+  if (s === "active") return <Badge variant="dot" warna="green">Active</Badge>;
+  if (s === "archived") return <Badge variant="dim" warna="gray">Archived</Badge>;
+  return <Badge variant="dim" warna="yellow">Draft</Badge>;
+}
+
+/** Sisa hari sehingga end_at; null bila tiada tarikh (tiada lencana masa). */
+function sisaHari(endAt?: string | null): number | undefined {
+  if (!endAt) return undefined;
+  const ms = new Date(endAt).getTime() - Date.now();
+  return Math.ceil(ms / 86400000);
 }
 
 function PageInner() {
@@ -79,11 +93,31 @@ function PageInner() {
 
   const menuFor = (h: Hunt) => [
     { label: "Manage activity", icon: <FileText className="w-4 h-4" />, onSelect: () => { window.location.href = `/educator/activities/${h.id}`; } },
+    { label: "View submissions", icon: <ClipboardList className="w-4 h-4" />, onSelect: () => { window.location.href = `/educator/activities/${h.id}/submissions`; } },
     ...(h.submission_link
       ? [{ label: "Open submission link", icon: <LinkIcon className="w-4 h-4" />, onSelect: () => window.open(h.submission_link as string, "_blank", "noopener") }]
       : []),
     { label: "Delete activity", icon: <Trash2 className="w-4 h-4" />, danger: true, onSelect: () => onDelete(h.id) },
   ];
+
+  /** Kad projek satu aktiviti; lencana mata dan status data sebenar. */
+  const kad = (h: Hunt) => (
+    <ProjectCard
+      title={h.title}
+      subtitle={h.class_id && classMap[h.class_id] ? classMap[h.class_id] : undefined}
+      description={h.description || undefined}
+      badges={
+        <>
+          <Badge variant="dim" warna="purple">{h.points ?? 0} pts</Badge>
+          <LencanaStatus status={h.status} />
+        </>
+      }
+      daysLeft={sisaHari(h.end_at)}
+      menuItems={menuFor(h)}
+      menuLabel="Activity actions"
+      href={`/educator/activities/${h.id}`}
+    />
+  );
 
   /* ---------- Di dalam kelas ---------- */
   if (classFilter) {
@@ -97,54 +131,42 @@ function PageInner() {
                 {shown.length} {shown.length === 1 ? "activity" : "activities"}
               </p>
             </div>
-            <Link href="/educator/activities/new" className="btn-primary"><Plus className="w-4 h-4" /> Create activity</Link>
+            <Button href="/educator/activities/new"><Plus className="w-4 h-4" /> Create activity</Button>
           </div>
 
           {shown.length > 4 && (
-            <div className="relative mb-4 max-w-sm">
-              <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input className="input pl-9" placeholder="Search activities..." value={q} onChange={(e) => setQ(e.target.value)} />
+            <div className="mb-4 max-w-sm">
+              <Input
+                placeholder="Search activities..."
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                ikonKiri={<Search className="w-4 h-4" />}
+                aria-label="Search activities"
+              />
             </div>
           )}
 
           {busy && <p className="text-sm text-ink-muted">Loading…</p>}
 
           {!busy && shown.length === 0 ? (
-            <div className="surface py-16 text-center">
-              <div className="w-14 h-14 rounded-full bg-[#EAE6FC] flex items-center justify-center mx-auto mb-4">
-                <ListChecks className="w-6 h-6 text-brand-purple" />
-              </div>
-              <div className="section-title mb-1">Set the first task.</div>
-              <p className="text-sm text-ink-muted mb-5">Activities are the work your students hand in and you grade.</p>
-              <Link href="/educator/activities/new" className="btn-primary">Create activity</Link>
-            </div>
+            <EmptyState
+              icon={<ListChecks className="w-6 h-6" />}
+              title="Set the first task."
+              text="Activities are the work your students hand in and you grade."
+              actionLabel="Create activity"
+              href="/educator/activities/new"
+            />
           ) : (
-            <div className="surface">
-              {shown.map((h) => (
-                <div key={h.id} className="t-row flex items-center gap-4 px-5 py-4 first:border-0">
-                  <span className="w-10 h-10 rounded-xl bg-[#F4F4F6] flex items-center justify-center shrink-0">
-                    <FileText className="w-[18px] h-[18px] text-ink-faint" />
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <Link href={`/educator/activities/${h.id}`} className="text-[15px] font-medium text-ink hover:text-brand-purple transition truncate block">
-                      {h.title}
-                    </Link>
-                    {h.description && <div className="text-sm text-ink-muted truncate">{h.description}</div>}
-                  </div>
-                  <div className="hidden sm:block"><StatusDot status={h.status} /></div>
-                  <div className="hidden sm:block text-sm text-ink-muted tabular-nums w-20 text-right">{h.points ?? 0} points</div>
-                  {h.submission_link && (
-                    <a href={h.submission_link} target="_blank" rel="noopener noreferrer" className="hidden lg:inline-flex btn-quiet text-brand-purple">
-                      <LinkIcon className="w-3.5 h-3.5" /> Submission link
-                    </a>
-                  )}
-                  <Link href={`/educator/activities/${h.id}/submissions`} className="btn-quiet text-brand-purple whitespace-nowrap">
-                    View submissions
-                  </Link>
-                  <RowMenu items={menuFor(h)} />
-                </div>
-              ))}
-            </div>
+            <>
+              {!busy && (
+                <ProjectGrid>
+                  {shown.map((h) => kad(h))}
+                </ProjectGrid>
+              )}
+              {!busy && shown.length > 0 && (
+                <p className="text-xs text-ink-faint mt-4">Open an activity to manage submissions.</p>
+              )}
+            </>
           )}
         </ClassShell>
       </Shell>
@@ -154,80 +176,59 @@ function PageInner() {
   /* ---------- Library ---------- */
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
-        <div>
-          <h1 className="page-title">Your teaching library</h1>
-          <p className="page-subtitle">Create and manage your activities and quizzes all in one place.</p>
-        </div>
-        <Link href="/educator/activities/new" className="btn-primary"><Plus className="w-4 h-4" /> Create activity</Link>
-      </div>
+      <PageHead
+        title="Your teaching library"
+        description="Create and manage your activities and quizzes all in one place."
+        primaryAction={{ label: "Create activity", icon: <Plus className="w-4 h-4" />, href: "/educator/activities/new" }}
+      />
 
-      <div className="flex items-center gap-6 border-b border-hairline mb-5">
-        <span className="relative pb-2.5 text-[15px] font-semibold text-ink">
-          Activities
-          <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink rounded-full" />
-        </span>
-        <Link href="/educator/live" className="pb-2.5 text-[15px] font-medium text-ink-muted hover:text-ink transition">
-          Quizzes
-        </Link>
-      </div>
+      <Tabs
+        items={[
+          { label: "Activities", href: "/educator/activities" },
+          { label: "Quizzes", href: "/educator/live" },
+        ]}
+        className="mb-5"
+      />
 
       <div className="flex items-center gap-3 flex-wrap mb-5">
-        <div className="relative flex-1 min-w-[220px] max-w-sm">
-          <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input className="input pl-9" placeholder="Search activities" value={q} onChange={(e) => setQ(e.target.value)} />
+        <div className="flex-1 min-w-[220px] max-w-sm">
+          <Input
+            placeholder="Search activities"
+            value={q}
+            onChange={(e) => setQ(e.target.value)}
+            ikonKiri={<Search className="w-4 h-4" />}
+            aria-label="Search activities"
+          />
         </div>
-        <select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} className="input w-auto">
+        <Select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} aria-label="Filter by class" className="w-auto">
           <option value="">All classes</option>
           {Object.entries(classMap).map(([id, name]) => (<option key={id} value={id}>{name}</option>))}
-        </select>
-        <select value={onlyActive ? "active" : "all"} onChange={(e) => setOnlyActive(e.target.value === "active")} className="input w-auto">
+        </Select>
+        <Select value={onlyActive ? "active" : "all"} onChange={(e) => setOnlyActive(e.target.value === "active")} aria-label="Filter by status" className="w-auto">
           <option value="all">All statuses</option>
           <option value="active">Active</option>
-        </select>
+        </Select>
       </div>
 
       {busy && <p className="text-sm text-ink-muted">Loading…</p>}
 
       {!busy && shown.length === 0 ? (
-        <div className="surface py-20 text-center">
-          <div className="w-14 h-14 rounded-full bg-[#EAE6FC] flex items-center justify-center mx-auto mb-4">
-            <ListChecks className="w-6 h-6 text-brand-purple" />
-          </div>
-          <div className="section-title mb-1">Nothing here yet.</div>
-          <p className="text-sm text-ink-muted mb-5">Activities you create in any class appear here.</p>
-          <Link href="/educator/activities/new" className="btn-primary">Create activity</Link>
-        </div>
+        <EmptyState
+          icon={<ListChecks className="w-6 h-6" />}
+          title="Nothing here yet."
+          text="Activities you create in any class appear here."
+          actionLabel="Create activity"
+          href="/educator/activities/new"
+        />
       ) : !busy && (
-        <div className="surface">
-          <div className="grid grid-cols-[1fr,150px,90px] sm:grid-cols-[1fr,200px,90px,120px,40px] gap-4 px-5 py-3 bg-[#FAFAFB]">
-            <div className="t-head">Activity</div>
-            <div className="t-head hidden sm:block">Class</div>
-            <div className="t-head text-right">Points</div>
-            <div className="t-head hidden sm:block">Status</div>
-            <div />
-          </div>
-          {shown.map((h) => (
-            <div key={h.id} className="t-row grid grid-cols-[1fr,150px,90px] sm:grid-cols-[1fr,200px,90px,120px,40px] gap-4 px-5 py-3.5 items-center">
-              <div className="flex items-center gap-3 min-w-0">
-                <FileText className="w-[18px] h-[18px] text-ink-faint shrink-0" />
-                <Link href={`/educator/activities/${h.id}`} className="text-[15px] text-brand-purple font-medium truncate hover:underline">
-                  {h.title}
-                </Link>
-              </div>
-              <div className="text-sm text-ink-muted truncate hidden sm:block">
-                {h.class_id && classMap[h.class_id] ? classMap[h.class_id] : ","}
-              </div>
-              <div className="text-sm text-ink tabular-nums text-right">{h.points ?? 0}</div>
-              <div className="hidden sm:block"><StatusDot status={h.status} /></div>
-              <div className="flex justify-end"><RowMenu items={menuFor(h)} /></div>
-            </div>
-          ))}
-          <div className="px-5 py-3 border-t border-hairline flex items-center justify-between">
-            <span className="text-xs text-ink-faint">Open an activity to manage submissions.</span>
-            <span className="text-xs text-ink-faint">{shown.length} of {hunts.length}</span>
-          </div>
-        </div>
+        <>
+          <ProjectGrid>
+            {shown.map((h) => kad(h))}
+          </ProjectGrid>
+          <p className="text-xs text-ink-faint mt-4">
+            {shown.length} of {hunts.length} {hunts.length === 1 ? "activity" : "activities"} shown. Open an activity to manage submissions.
+          </p>
+        </>
       )}
     </Shell>
   );
