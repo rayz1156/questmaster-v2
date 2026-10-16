@@ -136,8 +136,6 @@ function Inner() {
         }
         daysLeft={sisaHari(h.end_at)}
         done={siapSaya || undefined}
-        tasksDone={dipilih && kemajuanDimuat ? (siapSaya ? 1 : 0) : undefined}
-        tasksTotal={dipilih && kemajuanDimuat ? 1 : undefined}
         menuItems={[
           { label: "Open activity", icon: <Eye className="w-4 h-4" />, onSelect: () => { router.push(`/participant/activities?hunt=${h.id}`); } },
           { label: "Open submission board", icon: <ClipboardList className="w-4 h-4" />, onSelect: () => { router.push(`/participant/activities/${h.id}/submissions`); } },

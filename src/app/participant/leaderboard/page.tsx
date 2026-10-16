@@ -48,7 +48,8 @@ import {
 type AggScore = { team_id: string; team_name: string; total_score: number; quest_count: number };
 
 /** Baris pasukan siap dipapar dalam DataTable. */
-type BarisPasukan = { team_id: string; team_name: string; total_score: number; quest_count?: number };
+type BarisPasukan = { team_id: string; team_name: string; total_score: number; quest_count?: number; kedudukan: number };
+type BarisIndividu = ClassIndividualScore & { kedudukan: number };
 
 /** Ahli pasukan seperti yang dikembalikan listTeamMembers. */
 type Ahli = { user_id: string; profile?: { display_name?: string | null; email?: string | null } | null };
@@ -186,7 +187,8 @@ function LeaderboardInner() {
   const teamRest = leaderboard.length >= 2 ? 3 : 0;
 
   // Baris pasukan ternormalizasi untuk DataTable (quest_count hanya bila ada).
-  const barisPasukan: BarisPasukan[] = leaderboard.map(s => ({
+  const barisPasukan: BarisPasukan[] = leaderboard.map((s, idx) => ({
+    kedudukan: idx + 1,
     team_id: s.team_id,
     team_name: s.team_name,
     total_score: s.total_score,
@@ -197,10 +199,10 @@ function LeaderboardInner() {
     {
       key: "rank",
       header: "Rank",
-      render: (r, i) => (
+      render: (r) => (
         <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink tabular-nums">
-          {i + 1}
-          {i === 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#E3B341]" aria-hidden="true" />}
+          {r.kedudukan}
+          {r.kedudukan === 1 && <span className="w-1.5 h-1.5 rounded-full bg-[#E3B341]" aria-hidden="true" />}
         </span>
       ),
     },
@@ -233,14 +235,17 @@ function LeaderboardInner() {
     },
   ];
 
-  const lajurIndividu: DataColumn<ClassIndividualScore>[] = [
+  // Kedudukan sebenar dikira sebelum podium dipisahkan daripada jadual.
+  const barisIndividu: BarisIndividu[] = indivScores.map((s, idx) => ({ ...s, kedudukan: idx + 1 }));
+
+  const lajurIndividu: DataColumn<BarisIndividu>[] = [
     {
       key: "rank",
       header: "Rank",
-      render: (r, i) => (
+      render: (r) => (
         <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink tabular-nums">
-          {i + 1}
-          {i === 0 && <span className="w-1.5 h-1.5 rounded-full bg-[#E3B341]" aria-hidden="true" />}
+          {r.kedudukan}
+          {r.kedudukan === 1 && <span className="w-1.5 h-1.5 rounded-full bg-[#E3B341]" aria-hidden="true" />}
         </span>
       ),
     },
@@ -337,7 +342,7 @@ function LeaderboardInner() {
           <DataTable
             label="Individual leaderboard"
             columns={lajurIndividu}
-            rows={indivScores}
+            rows={barisIndividu.slice(indivRest)}
             rowKey={(s) => s.user_id}
             halaman={halaman}
             saizHalaman={10}
@@ -358,7 +363,7 @@ function LeaderboardInner() {
           <DataTable
             label="Team leaderboard"
             columns={lajurPasukan}
-            rows={barisPasukan}
+            rows={barisPasukan.slice(teamRest)}
             rowKey={(r) => r.team_id}
             onRowClick={(r) => toggleTeam(r.team_id)}
             renderRowExtra={(r) =>
