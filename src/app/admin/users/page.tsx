@@ -1,8 +1,10 @@
 "use client";
 
-// Users ruang kerja admin (V2-011b). Jadual carian: tab, carian dan
+// Users ruang kerja admin, rupa v3 (KZ-024). Jadual carian: tab, carian dan
 // penapis status dibaca daripada ?tab= ?q= ?status= supaya kad "Needs
 // attention" di Overview boleh mendarat terus ke konteks yang betul.
+// Jadual guna DataTable kit (avatar, lencana peranan, status titik, menu
+// "..."); data, penapis, penomboran dan tindakan tidak berubah.
 //
 // Ciri tindakan pukal kekal: kotak semak pada baris belum sah emel
 // memanggil /api/admin/users/verify (kerja sebenar di pelayan dengan
@@ -11,9 +13,20 @@
 
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Search, Download, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, Download, Eye, User as UserIcon } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, Tabs, EmptyState, relTime, initials } from "@/components/admin/ui";
+import { Tabs, relTime } from "@/components/admin/ui";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  DataTable,
+  EmptyState,
+  Input,
+  PageHead,
+  Select,
+  type DataColumn,
+} from "@/components/ui";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { petikCsv, lindungFormula } from "@/lib/csvPeserta";
 import { supabase } from "@/lib/supabaseClient";
@@ -98,7 +111,6 @@ function SenaraiPengguna({
   const jumlah = ditapis.length;
   const mula = jumlah === 0 ? 0 : (muka - 1) * SEBARIS + 1;
   const akhir = Math.min(muka * SEBARIS, jumlah);
-  const barisMuka = ditapis.slice((muka - 1) * SEBARIS, muka * SEBARIS);
 
   const tukarTab = (k: string) => {
     setTab(k as TabPengguna);
@@ -165,46 +177,123 @@ function SenaraiPengguna({
     }
   };
 
+  // Lajur jadual kit; data dan tindakan sama seperti jadual lama.
+  const lajur: DataColumn<Profile>[] = [
+    {
+      key: "pilih",
+      header: "",
+      className: "w-10",
+      render: (u) =>
+        emelBelumSah(u.id, meta) ? (
+          <input
+            type="checkbox"
+            aria-label={`Select ${u.display_name || "user"}`}
+            className="h-4 w-4 accent-brand-purple"
+            checked={selected.has(u.id)}
+            onChange={() => toggleSelected(u.id)}
+            onClick={(e) => e.stopPropagation()}
+          />
+        ) : null,
+    },
+    {
+      key: "user",
+      header: "User",
+      render: (u, i) => {
+        const m = meta[u.id];
+        return (
+          <span className="flex items-center gap-3 py-3">
+            <Avatar name={u.display_name || "Unnamed user"} size="sm" index={i} />
+            <span className="min-w-0">
+              <span className="block text-[13px] font-bold text-ink truncate">{u.display_name || "Unnamed user"}</span>
+              <span className="block text-[12px] text-ink-faint truncate">{m?.email || "No email"}</span>
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "role",
+      header: "Role",
+      render: (u) => (
+        <Badge variant="dim" warna="purple">
+          {labelPeranan(u.role)}
+        </Badge>
+      ),
+    },
+    {
+      key: "email",
+      header: "Email",
+      hideOnMobile: true,
+      render: (u) => {
+        const m = meta[u.id];
+        if (!m?.email) {
+          return (
+            <Badge variant="dim" warna="gray">
+              No email
+            </Badge>
+          );
+        }
+        return m.email_confirmed_at ? (
+          <Badge variant="dim" warna="green">
+            Verified
+          </Badge>
+        ) : (
+          <Badge variant="dim" warna="yellow">
+            Unverified
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "account",
+      header: "Account",
+      render: (u) =>
+        u.suspended ? (
+          <Badge variant="dim" warna="red">
+            Suspended
+          </Badge>
+        ) : !u.approved ? (
+          <Badge variant="dim" warna="yellow">
+            Pending
+          </Badge>
+        ) : (
+          <Badge variant="dot" warna="green">
+            Active
+          </Badge>
+        ),
+    },
+    {
+      key: "plan",
+      header: "Plan",
+      hideOnMobile: true,
+      render: (u) => {
+        const adaPelan = u.role === "educator" || u.role === "admin" || u.role === "superadmin";
+        return <span className="text-[13px] text-ink-faint">{adaPelan ? LABEL_PELAN_PENDEK[pelanProfil(u)] : "-"}</span>;
+      },
+    },
+    {
+      key: "last",
+      header: "Last active",
+      hideOnMobile: true,
+      render: (u) => {
+        const m = meta[u.id];
+        return <span className="text-[13px] text-ink-faint whitespace-nowrap">{relTime(m?.last_sign_in_at)}</span>;
+      },
+    },
+  ];
+
   return (
     <div>
-      <p className="text-ink-muted text-sm mb-6">Find anyone on Kuizen and manage their account.</p>
-
       <Tabs items={TAB_PENGGUNA.map((t) => ({ ...t, count: kiraan[t.key] }))} value={tab} onChange={tukarTab} />
-
-      <div className="flex flex-wrap items-center gap-2 py-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-          <input
-            className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-hairline text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-            placeholder="Search name, username or email"
-            value={q}
-            onChange={(e) => {
-              setQ(e.target.value);
-              setMuka(1);
-            }}
-          />
-        </div>
-        <select
-          value={status}
-          onChange={(e) => tukarStatus(e.target.value)}
-          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-          aria-label="Filter by status"
-        >
-          <option value="all">All statuses</option>
-          <option value="verified">Verified</option>
-          <option value="unverified">Unverified</option>
-          <option value="expiring">Plan expiring (14 days)</option>
-        </select>
-      </div>
 
       {/* Bar tindakan pukal: hanya timbul bila ada emel belum sah dalam paparan */}
       {belumSahDalam.length > 0 && (
-        <div className="mb-4 flex flex-wrap items-center gap-2 rounded-xl bg-amber-50 border border-amber-200 px-3 py-2 text-sm">
-          <span className="font-medium text-amber-900">{belumSahDalam.length} unverified</span>
+        <div className="my-4 flex flex-wrap items-center gap-2 rounded-[4px] bg-amber-50 border border-amber-200 px-4 py-3 text-[14px]">
+          <span className="font-bold text-amber-900">{belumSahDalam.length} unverified</span>
           <button
             type="button"
             onClick={() => setSelected(new Set(belumSahDalam))}
-            className="px-2 py-1 rounded-lg bg-white border border-amber-200 text-xs text-amber-900 hover:bg-amber-100"
+            className="px-2 py-1 rounded-[4px] bg-white border border-amber-200 text-[12px] font-medium text-amber-900 hover:bg-amber-100"
           >
             Select all
           </button>
@@ -212,20 +301,20 @@ function SenaraiPengguna({
             <button
               type="button"
               onClick={() => setSelected(new Set())}
-              className="px-2 py-1 rounded-lg bg-white border border-amber-200 text-xs text-amber-900 hover:bg-amber-100"
+              className="px-2 py-1 rounded-[4px] bg-white border border-amber-200 text-[12px] font-medium text-amber-900 hover:bg-amber-100"
             >
               Clear
             </button>
           )}
-          <label className="flex items-center gap-1.5 text-xs text-amber-900 cursor-pointer">
-            <input type="checkbox" checked={alsoApprove} onChange={(e) => setAlsoApprove(e.target.checked)} />
+          <label className="flex items-center gap-1.5 text-[12px] text-amber-900 cursor-pointer">
+            <input type="checkbox" className="h-4 w-4 accent-brand-purple" checked={alsoApprove} onChange={(e) => setAlsoApprove(e.target.checked)} />
             Also approve
           </label>
           <button
             type="button"
             disabled={selected.size === 0 || verifying}
             onClick={() => verifyEmails(Array.from(selected))}
-            className="ml-auto px-3 py-1.5 rounded-xl bg-green-600 text-white text-sm font-semibold hover:bg-green-700 disabled:opacity-40"
+            className="ml-auto px-3 py-1.5 rounded-[4px] bg-green-600 text-white text-[13px] font-bold hover:bg-green-700 disabled:opacity-40"
           >
             {verifying ? "Verifying..." : `Verify selected (${selected.size})`}
           </button>
@@ -233,122 +322,64 @@ function SenaraiPengguna({
       )}
 
       {mesej && (
-        <div
-          className={`mb-4 text-sm rounded-lg px-3 py-2 inline-block ${
-            mesej.baik ? "bg-green-50 text-green-700 border border-green-200" : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
+        <Alert tone={mesej.baik ? "success" : "danger"} className="mb-4">
           {mesej.teks}
-        </div>
+        </Alert>
       )}
 
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                <th className="w-10 px-4 py-3"></th>
-                <th className="px-4 py-3 font-medium">User</th>
-                <th className="px-4 py-3 font-medium">Role</th>
-                <th className="px-4 py-3 font-medium">Email</th>
-                <th className="px-4 py-3 font-medium">Account</th>
-                <th className="px-4 py-3 font-medium">Plan</th>
-                <th className="px-4 py-3 font-medium">Last active</th>
-              </tr>
-            </thead>
-            <tbody>
-              {barisMuka.map((u) => {
-                const m = meta[u.id];
-                const belum = emelBelumSah(u.id, meta);
-                const adaPelan = u.role === "educator" || u.role === "admin" || u.role === "superadmin";
-                return (
-                  <tr
-                    key={u.id}
-                    onClick={() => router.push(`/admin/users/${u.id}`)}
-                    className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9] cursor-pointer transition"
-                  >
-                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
-                      {belum && (
-                        <input
-                          type="checkbox"
-                          aria-label={`Select ${u.display_name || "user"}`}
-                          checked={selected.has(u.id)}
-                          onChange={() => toggleSelected(u.id)}
-                        />
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="w-9 h-9 rounded-full bg-[#EAE6FC] text-brand-purple text-[12px] font-semibold flex items-center justify-center shrink-0">
-                          {initials(u.display_name)}
-                        </span>
-                        <span className="min-w-0">
-                          <span className="block font-medium text-ink truncate">{u.display_name || "Unnamed user"}</span>
-                          <span className="block text-xs text-ink-faint truncate">{m?.email || "No email"}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Pill tone="violet">{labelPeranan(u.role)}</Pill>
-                    </td>
-                    <td className="px-4 py-3">
-                      {!m?.email ? (
-                        <Pill>No email</Pill>
-                      ) : m.email_confirmed_at ? (
-                        <Pill tone="green">Verified</Pill>
-                      ) : (
-                        <Pill tone="yellow">Unverified</Pill>
-                      )}
-                    </td>
-                    <td className="px-4 py-3">
-                      {u.suspended ? (
-                        <Pill tone="red">Suspended</Pill>
-                      ) : !u.approved ? (
-                        <Pill tone="yellow">Pending</Pill>
-                      ) : (
-                        <Pill tone="green">Active</Pill>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">
-                      {adaPelan ? LABEL_PELAN_PENDEK[pelanProfil(u)] : "-"}
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{relTime(m?.last_sign_in_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {jumlah === 0 && <EmptyState title="No users match." body="Try a different search or filter." />}
+      <DataTable
+        className="mt-4"
+        label="Users"
+        columns={lajur}
+        rows={ditapis}
+        rowKey={(u) => u.id}
+        menuItems={(u) => [
+          {
+            label: "View details",
+            icon: <Eye className="w-4 h-4" />,
+            onSelect: () => router.push(`/admin/users/${u.id}`),
+          },
+        ]}
+        menuLabel="User actions"
+        onRowClick={(u) => router.push(`/admin/users/${u.id}`)}
+        halaman={muka}
+        saizHalaman={SEBARIS}
+        onHalaman={setMuka}
+        head={
+          <>
+            <span className="w-full sm:w-64">
+              <Input
+                ikonKiri={<Search className="w-4 h-4" />}
+                placeholder="Search name, username or email"
+                aria-label="Search users"
+                value={q}
+                onChange={(e) => {
+                  setQ(e.target.value);
+                  setMuka(1);
+                }}
+              />
+            </span>
+            <Select value={status} onChange={(e) => tukarStatus(e.target.value)} aria-label="Filter by status" className="w-auto">
+              <option value="all">All statuses</option>
+              <option value="verified">Verified</option>
+              <option value="unverified">Unverified</option>
+              <option value="expiring">Plan expiring (14 days)</option>
+            </Select>
+            <span className="ml-auto text-[13px] text-ink-faint whitespace-nowrap">
+              Showing {mula}-{akhir} of {jumlah}
+            </span>
+          </>
+        }
+        empty={
+          <EmptyState
+            icon={<UserIcon className="w-6 h-6" />}
+            title="No users match"
+            text="Try a different search or filter."
+          />
+        }
+      />
 
-        <div className="flex items-center justify-between px-4 py-3 border-t border-hairline">
-          <span className="text-xs text-ink-faint">
-            Showing {mula}-{akhir} of {jumlah}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={muka <= 1}
-              onClick={() => setMuka((v) => Math.max(1, v - 1))}
-              className="p-2 rounded-xl border border-hairline text-ink-muted hover:text-ink disabled:opacity-40"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              disabled={muka * SEBARIS >= jumlah}
-              onClick={() => setMuka((v) => v + 1)}
-              className="p-2 rounded-xl border border-hairline text-ink-muted hover:text-ink disabled:opacity-40"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </Card>
-
-      <p className="text-xs text-ink-faint mt-3">Account changes are recorded in Audit.</p>
+      <p className="text-[12px] text-ink-faint mt-3">Account changes are recorded in Audit.</p>
     </div>
   );
 }
@@ -419,20 +450,16 @@ export default function Page() {
   };
 
   return (
-    <AdminShell
-      title="Users"
-      actions={
-        <button
-          type="button"
-          onClick={exportCsv}
-          className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-        >
-          <Download className="w-4 h-4 text-ink-faint" /> Export CSV
-        </button>
-      }
-    >
+    <AdminShell>
+      <PageHead
+        title="Users"
+        description="Find anyone on Kuizen and manage their account."
+        secondaryActions={[
+          { label: "Export CSV", icon: <Download className="w-4 h-4" />, onSelect: exportCsv },
+        ]}
+      />
       {muat ? (
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       ) : (
         <Suspense fallback={<div className="text-sm text-ink-faint py-8">Loading...</div>}>
           <SenaraiPengguna users={users} meta={meta} onReload={reload} />
