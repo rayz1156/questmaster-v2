@@ -136,7 +136,8 @@ function sama(a: unknown, b: unknown): boolean {
 {
   semak("masa: siap = Done hijau", sama(labelMasa(0, true), { label: "Done", warna: "green" }));
   semak("masa: 1 hari = Due Tomorrow merah", sama(labelMasa(1, false), { label: "Due Tomorrow", warna: "red" }));
-  semak("masa: 0 hari = Due Tomorrow merah", sama(labelMasa(0, false), { label: "Due Tomorrow", warna: "red" }));
+  semak("masa: 0 hari = Due Today merah", sama(labelMasa(0, false), { label: "Due Today", warna: "red" }));
+  semak("masa: lepas tarikh = Overdue merah", sama(labelMasa(-3, false), { label: "Overdue", warna: "red" }));
   semak("masa: 5 hari = 5 Days Left kuning", sama(labelMasa(5, false), { label: "5 Days Left", warna: "yellow" }));
   semak("masa: 12 hari = kelabu", sama(labelMasa(12, false), { label: "12 Days Left", warna: "gray" }));
 }

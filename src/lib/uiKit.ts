@@ -155,7 +155,9 @@ export type WarnaMasa = "green" | "yellow" | "red" | "gray";
  */
 export function labelMasa(hariSisa: number, siap: boolean): { label: string; warna: WarnaMasa } {
   if (siap) return { label: "Done", warna: "green" };
-  if (hariSisa <= 1) return { label: "Due Tomorrow", warna: "red" };
+  if (hariSisa < 0) return { label: "Overdue", warna: "red" };
+  if (hariSisa === 0) return { label: "Due Today", warna: "red" };
+  if (hariSisa === 1) return { label: "Due Tomorrow", warna: "red" };
   if (hariSisa <= 7) return { label: `${hariSisa} Days Left`, warna: "yellow" };
   return { label: `${hariSisa} Days Left`, warna: "gray" };
 }

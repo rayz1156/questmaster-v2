@@ -38,10 +38,13 @@ const SAIZ: Record<ButtonSize, string> = {
   lg: "h-11 px-6 text-[14px]",
 };
 
+// Butang ikon segi empat: lg 44px untuk aksi utama telefon (sasaran sentuh).
+const SAIZ_IKON: Record<ButtonSize, string> = { sm: "h-8 w-8", md: "h-9 w-9", lg: "h-11 w-11" };
+
 function kelasAsas(variant: ButtonVariant, size: ButtonSize, warna: WarnaKit): string {
   const asas =
     "inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none";
-  const saiz = variant === "icon" ? "h-9 w-9" : SAIZ[size];
+  const saiz = variant === "icon" ? SAIZ_IKON[size] : SAIZ[size];
   const fokus = "focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-brand-purple";
   if (variant === "primary") {
     const pejal = warna === "purple" ? "bg-brand-purple hover:bg-[#6b30ff]" : "";

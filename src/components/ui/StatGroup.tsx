@@ -27,7 +27,7 @@ export default function StatGroup({
         <div key={i}>
           <div className="text-[14px] text-ink-muted">{s.label}</div>
           <div className="text-[28px] font-normal leading-tight text-ink mt-0.5">{s.value}</div>
-          {typeof s.change === "number" && (
+          {typeof s.change === "number" && s.change !== 0 && (
             <div
               className={`text-[14px] flex items-center gap-0.5 mt-0.5 ${
                 s.change >= 0 ? "text-kz-up" : "text-kz-down"
