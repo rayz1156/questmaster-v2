@@ -1,21 +1,57 @@
 "use client";
 
-// Butiran pengguna ruang kerja admin (V2-011b). Semua tindakan satu
-// pengguna yang dahulu berada dalam kad halaman Users dipindahkan ke
-// sini: peranan, pelan, had kelas, kebenaran muat naik, gantung dengan
-// alasan, lulus, buang, hantar semula pengesahan dan sahkan emel.
+// Butiran pengguna ruang kerja admin (V2-011b), rupa v3 (KZ-024b): ProfileLayout
+// gaya "Students Details". Kiri: avatar inisial, nama, lencana peranan dan
+// status, blok "LAST LOGIN" serta menu laluan admin sedia ada. Kanan: Tabs
+// keadaan (Profile, Classes, Activity history) dan kandungan sedia ada.
 //
-// Gantung memanggil RPC qm_admin_set_suspended: audit dengan alasan
-// ditulis oleh fungsi itu sendiri di pelayan. Buang meminta pentadbir
-// menaip nama paparan pengguna dengan tepat sebelum butang hidup.
-// Suspend dan Delete disembunyikan untuk akaun sendiri dan superadmin.
+// Semua tindakan satu pengguna yang dahulu berada dalam kad halaman Users
+// dipindahkan ke sini: peranan, pelan, had kelas, kebenaran muat naik, gantung
+// dengan alasan, lulus, buang, hantar semula pengesahan dan sahkan emel.
+// Logik, data, panggilan API dan pengesahan TIDAK berubah (KZ-DS-v3 bahagian 5).
+//
+// Gantung memanggil RPC qm_admin_set_suspended: audit dengan alasan ditulis
+// oleh fungsi itu sendiri di pelayan. Buang meminta pentadbir menaip nama
+// paparan pengguna dengan tepat sebelum butang hidup. Suspend dan Delete
+// disembunyikan untuk akaun sendiri dan superadmin.
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { KeyRound, MailCheck, Mail, UserCheck, ScrollText, Ban, RotateCcw, Trash2, Save } from "lucide-react";
+import {
+  KeyRound,
+  MailCheck,
+  Mail,
+  UserCheck,
+  ScrollText,
+  Ban,
+  RotateCcw,
+  Trash2,
+  Save,
+  Users as UsersIcon,
+  GraduationCap,
+  Map as MapIcon,
+  User as UserIcon,
+} from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, Tabs, EmptyState, ReasonDialog, relTime, initials } from "@/components/admin/ui";
+import { ReasonDialog, relTime } from "@/components/admin/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  CheckRadio,
+  DataSection,
+  DataRow,
+  DataTable,
+  EmptyState,
+  Input,
+  ProfileLayout,
+  Select,
+  Tabs,
+  type DataColumn,
+} from "@/components/ui";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { supabase } from "@/lib/supabaseClient";
 import { getSession } from "@/lib/session";
@@ -62,6 +98,15 @@ type KelasMentah = {
   joined_at?: string | null;
 };
 
+/** Baris kelas yang dipaparkan dalam DataTable tab Classes. */
+type BarisKelas = {
+  id: string;
+  nama: string;
+  peranan: string;
+  status: string;
+  tarikh: string;
+};
+
 function fmt(d: string | null | undefined) {
   if (!d) return "Never";
   try {
@@ -78,17 +123,7 @@ function labelPeranan(role: string) {
   return "Participant";
 }
 
-/** Baris medan dalam kad butiran: label kiri, kandungan kanan. */
-function Baris({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex items-center justify-between gap-4 py-2.5 border-b border-hairline last:border-b-0">
-      <span className="text-sm text-ink-muted shrink-0">{label}</span>
-      <span className="text-sm text-ink text-right min-w-0 flex items-center gap-2 justify-end flex-wrap">{children}</span>
-    </div>
-  );
-}
-
-/** Butang tindakan menegak dalam kad "Account actions". */
+/** Butang tindakan menegak dalam kad "Account actions", nilai v3 (KZ-DS-v3). */
 function ButangTindakan({
   onClick,
   ikon,
@@ -106,12 +141,12 @@ function ButangTindakan({
       onClick={onClick}
       className={
         bahaya
-          ? "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-red-200 text-sm font-medium text-red-600 hover:bg-red-50 transition"
-          : "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-xl border border-hairline text-sm font-medium text-ink hover:bg-[#F7F7F9] transition"
+          ? "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[4px] border border-red-200 bg-white text-[13px] font-bold text-red-600 hover:bg-[#fce4e2] transition"
+          : "w-full flex items-center gap-2.5 px-3 py-2.5 rounded-[4px] border border-hairline bg-white text-[13px] font-bold text-ink-muted hover:bg-canvas transition"
       }
     >
-      <span className="text-ink-faint">{ikon}</span>
-      <span className="text-left">{label}</span>
+      <span className="text-ink-faint shrink-0">{ikon}</span>
+      <span className="text-left min-w-0 truncate">{label}</span>
     </button>
   );
 }
@@ -130,9 +165,7 @@ export default function Page({ params }: { params: { id: string } }) {
   const [dialogGantung, setDialogGantung] = useState<null | "suspend" | "restore">(null);
   const [pengesahanHapus, setPengesahanHapus] = useState("");
   const [hadDraf, setHadDraf] = useState<{ owned: string; coed: string } | null>(null);
-  const [kelas, setKelas] = useState<
-    { id: string; nama: string; peranan: string; status: string; tarikh: string }[] | null
-  >(null);
+  const [kelas, setKelas] = useState<BarisKelas[] | null>(null);
   const [audit, setAudit] = useState<AuditLogRow[] | null>(null);
 
   const reload = async () => {
@@ -409,22 +442,23 @@ export default function Page({ params }: { params: { id: string } }) {
 
   if (muat) {
     return (
-      <AdminShell crumbs={[{ label: "Users", href: "/admin/users" }, { label: "Loading..." }]}>
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+      <AdminShell>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       </AdminShell>
     );
   }
 
   if (!u) {
     return (
-      <AdminShell crumbs={[{ label: "Users", href: "/admin/users" }, { label: "Not found" }]} title="User not found">
+      <AdminShell title="User not found">
         <Card>
-          <EmptyState title="User not found." body="This account may have been deleted." />
-          <div className="px-4 pb-4">
-            <Link href="/admin/users" className="text-sm font-medium text-brand-purple hover:opacity-80">
-              Back to Users
-            </Link>
-          </div>
+          <EmptyState
+            icon={<UserIcon className="w-6 h-6" />}
+            title="User not found."
+            text="This account may have been deleted."
+            actionLabel="Back to Users"
+            href="/admin/users"
+          />
         </Card>
       </AdminShell>
     );
@@ -437,313 +471,355 @@ export default function Page({ params }: { params: { id: string } }) {
   const adaPelan = u.role === "educator" || u.role === "admin" || u.role === "superadmin";
   const bolehHad = u.role === "educator" || u.role === "admin";
 
-  return (
-    <AdminShell crumbs={[{ label: "Users", href: "/admin/users" }, { label: namaPaparan }]}>
-      {/* Kepala */}
-      <div className="flex items-center gap-4 mb-6">
-        <span className="w-16 h-16 rounded-full bg-[#EAE6FC] text-brand-purple text-xl font-semibold flex items-center justify-center shrink-0">
-          {initials(u.display_name)}
-        </span>
-        <div className="min-w-0">
-          <div className="text-xl font-semibold text-ink truncate">{namaPaparan}</div>
-          <div className="text-sm text-ink-faint truncate">{emel || "No email"}</div>
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <Pill tone="violet">{labelPeranan(u.role)}</Pill>
-            {u.suspended ? (
-              <Pill tone="red">Suspended</Pill>
-            ) : !u.approved ? (
-              <Pill tone="yellow">Pending</Pill>
-            ) : (
-              <Pill tone="green">Active</Pill>
-            )}
-          </div>
-        </div>
-      </div>
+  // Lencana status akaun (sama seperti lajur Account senarai Users, KZ-024).
+  const lencanaStatus = u.suspended ? (
+    <Badge variant="dim" warna="red">
+      Suspended
+    </Badge>
+  ) : !u.approved ? (
+    <Badge variant="dim" warna="yellow">
+      Pending
+    </Badge>
+  ) : (
+    <Badge variant="dot" warna="green">
+      Active
+    </Badge>
+  );
 
-      <Tabs
-        items={[
-          { key: "profile", label: "Profile" },
-          { key: "classes", label: "Classes" },
-          { key: "activity", label: "Activity history" },
-        ]}
-        value={tab}
-        onChange={(k) => setTab(k as MukaTab)}
-      />
-
-      {mesej && (
-        <div
-          className={`mt-4 text-sm rounded-lg px-3 py-2 inline-block ${
-            mesej.baik
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
+  // Lajur DataTable tab Classes; data dan pautan sama seperti jadual lama.
+  const lajurKelas: DataColumn<BarisKelas>[] = [
+    {
+      key: "kelas",
+      header: "Class",
+      render: (k) => (
+        <Link
+          href={`/admin/classes/${k.id}`}
+          className="text-[13px] font-bold text-ink hover:text-brand-purple transition"
         >
-          {mesej.teks}
-        </div>
-      )}
+          {k.nama}
+        </Link>
+      ),
+    },
+    {
+      key: "peranan",
+      header: "Role",
+      render: (k) => <span className="text-[13px] text-ink-faint">{k.peranan}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (k) =>
+        k.status === "Archived" ? (
+          <Badge variant="dim" warna="gray">
+            Archived
+          </Badge>
+        ) : k.status === "Ended" ? (
+          <Badge variant="dim" warna="yellow">
+            Ended
+          </Badge>
+        ) : (
+          <Badge variant="dot" warna="green">
+            Active
+          </Badge>
+        ),
+    },
+    {
+      key: "tarikh",
+      header: "Date",
+      hideOnMobile: true,
+      render: (k) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{fmt(k.tarikh)}</span>,
+    },
+  ];
+
+  return (
+    <AdminShell>
+      <ProfileLayout
+        name={namaPaparan}
+        subtitle={
+          <span className="inline-flex flex-wrap items-center gap-1.5">
+            <Badge variant="dim" warna="purple">
+              {labelPeranan(u.role)}
+            </Badge>
+            {lencanaStatus}
+          </span>
+        }
+        menu={[
+          { label: "All users", href: "/admin/users", icon: <UsersIcon className="w-[18px] h-[18px]" /> },
+          { label: "Classes", href: "/admin/classes", icon: <GraduationCap className="w-[18px] h-[18px]" /> },
+          { label: "Activities", href: "/admin/hunts", icon: <MapIcon className="w-[18px] h-[18px]" /> },
+        ]}
+        lastLogin={fmt(m?.last_sign_in_at)}
+        menuMoreItems={[{ label: "View audit history", onSelect: () => setTab("activity") }]}
+      >
+        <h1 className="text-[24px] font-bold text-ink leading-tight">User details</h1>
+        <p className="text-[14px] text-ink-faint mt-1">Profile, classes and activity history of this account.</p>
+
+        <Tabs
+          className="mt-6"
+          items={[
+            { label: "Profile", onSelect: () => setTab("profile"), aktif: tab === "profile" },
+            { label: "Classes", onSelect: () => setTab("classes"), aktif: tab === "classes" },
+            { label: "Activity history", onSelect: () => setTab("activity"), aktif: tab === "activity" },
+          ]}
+        />
+
+        {mesej && (
+          <Alert tone={mesej.baik ? "success" : "danger"} className="mt-4">
+            {mesej.teks}
+          </Alert>
+        )}
 
       {/* ===== Tab Profile ===== */}
       {tab === "profile" && (
-        <>
-          <div className="grid lg:grid-cols-3 gap-4 mt-4">
-            <Card className="lg:col-span-2 p-4">
-              <div className="text-sm font-semibold text-ink mb-2">Account details</div>
-              <Baris label="Name">{u.display_name || "Unnamed user"}</Baris>
-              <Baris label="Username">{u.username || "-"}</Baris>
-              <Baris label="Email">{emel || "No email"}</Baris>
-              <Baris label="Email status">
-                {!emel ? (
-                  <Pill>No email</Pill>
-                ) : m?.email_confirmed_at ? (
-                  <Pill tone="green">Verified</Pill>
-                ) : (
-                  <Pill tone="yellow">Unverified</Pill>
-                )}
-              </Baris>
-              <Baris label="Role">
-                {u.role === "superadmin" ? (
-                  <Pill tone="violet">Owner</Pill>
-                ) : (
-                  <select
-                    value={u.role}
-                    onChange={(e) => tukarPeranan(e.target.value as "participant" | "educator" | "admin")}
-                    className="h-9 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-                    aria-label="Role"
-                  >
-                    <option value="participant">Participant</option>
-                    <option value="educator">Educator</option>
-                    <option value="admin">Admin</option>
-                  </select>
-                )}
-              </Baris>
-              <Baris label="Registered">{fmt(m?.created_at || u.created_at)}</Baris>
-              <Baris label="Last sign in">{fmt(m?.last_sign_in_at)}</Baris>
-              {adaPelan && (
-                <Baris label="Plan">
-                  <select
-                    value={pelanProfil(u)}
-                    onChange={(e) => tukarPelan(e.target.value as PelanAdmin)}
-                    className="h-9 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-                    aria-label="Plan"
-                  >
-                    {PELAN_ADMIN.map((p) => (
-                      <option key={p} value={p}>
-                        {LABEL_PELAN[p]}
-                      </option>
-                    ))}
-                  </select>
-                </Baris>
-              )}
-              {adaPelan && <Baris label="Plan expires">{u.plan_expires_at ? fmt(u.plan_expires_at) : "-"}</Baris>}
-              {bolehHad && (
-                <div className="py-3 border-t border-hairline mt-2">
-                  <div className="text-sm font-medium text-ink mb-2">Class limits</div>
-                  <div className="flex items-end gap-3 flex-wrap">
-                    <label className="flex flex-col text-xs text-ink-muted">
-                      Max classes (own)
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 w-28 h-9 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-                        value={drafHad.owned}
-                        onChange={(e) => setHadDraf({ owned: e.target.value, coed: drafHad.coed })}
-                      />
-                    </label>
-                    <label className="flex flex-col text-xs text-ink-muted">
-                      Max as co-educator
-                      <input
-                        type="number"
-                        min={0}
-                        className="mt-1 w-28 h-9 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-                        value={drafHad.coed}
-                        onChange={(e) => setHadDraf({ owned: drafHad.owned, coed: e.target.value })}
-                      />
-                    </label>
-                    <button
-                      type="button"
-                      onClick={simpanHad}
-                      className="inline-flex items-center gap-1.5 bg-brand-purple text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90"
+        <div className="mt-6 grid lg:grid-cols-3 gap-6 items-start">
+          {/* Maklumat akaun: DataSection/DataRow terus dalam kandungan kanan. */}
+          <div className="lg:col-span-2 space-y-8 min-w-0">
+            <DataSection title="Basics">
+              <DataRow label="Name" value={u.display_name || "Unnamed user"} />
+              <DataRow label="Username" value={u.username || "-"} />
+              <DataRow label="Email" value={emel || "No email"} />
+              <DataRow
+                label="Email status"
+                value={
+                  !emel ? (
+                    <Badge variant="dim" warna="gray">
+                      No email
+                    </Badge>
+                  ) : m?.email_confirmed_at ? (
+                    <Badge variant="dim" warna="green">
+                      Verified
+                    </Badge>
+                  ) : (
+                    <Badge variant="dim" warna="yellow">
+                      Unverified
+                    </Badge>
+                  )
+                }
+              />
+              <DataRow
+                label="Role"
+                value={
+                  u.role === "superadmin" ? (
+                    <Badge variant="dim" warna="purple">
+                      Owner
+                    </Badge>
+                  ) : (
+                    <Select
+                      value={u.role}
+                      onChange={(e) => tukarPeranan(e.target.value as "participant" | "educator" | "admin")}
+                      aria-label="Role"
+                      className="w-40"
                     >
-                      <Save className="w-4 h-4" /> Save
-                    </button>
-                  </div>
-                  <p className="text-xs text-ink-faint mt-2">Empty means the plan default applies.</p>
+                      <option value="participant">Participant</option>
+                      <option value="educator">Educator</option>
+                      <option value="admin">Admin</option>
+                    </Select>
+                  )
+                }
+              />
+              <DataRow label="Registered" value={fmt(m?.created_at || u.created_at)} />
+              <DataRow label="Last sign in" value={fmt(m?.last_sign_in_at)} />
+            </DataSection>
+
+            {adaPelan && (
+              <DataSection title="Plan">
+                <DataRow
+                  label="Plan"
+                  value={
+                    <Select
+                      value={pelanProfil(u)}
+                      onChange={(e) => tukarPelan(e.target.value as PelanAdmin)}
+                      aria-label="Plan"
+                      className="w-40"
+                    >
+                      {PELAN_ADMIN.map((p) => (
+                        <option key={p} value={p}>
+                          {LABEL_PELAN[p]}
+                        </option>
+                      ))}
+                    </Select>
+                  }
+                />
+                <DataRow label="Plan expires" value={u.plan_expires_at ? fmt(u.plan_expires_at) : "-"} />
+              </DataSection>
+            )}
+
+            {bolehHad && (
+              <DataSection title="Class limits">
+                <DataRow
+                  label="Max classes (own)"
+                  value={
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-28"
+                      value={drafHad.owned}
+                      onChange={(e) => setHadDraf({ owned: e.target.value, coed: drafHad.coed })}
+                      aria-label="Max classes (own)"
+                    />
+                  }
+                />
+                <DataRow
+                  label="Max as co-educator"
+                  value={
+                    <Input
+                      type="number"
+                      min={0}
+                      className="w-28"
+                      value={drafHad.coed}
+                      onChange={(e) => setHadDraf({ owned: drafHad.owned, coed: e.target.value })}
+                      aria-label="Max as co-educator"
+                    />
+                  }
+                />
+                <div className="flex flex-wrap items-center gap-3 py-5 px-5">
+                  <Button onClick={simpanHad}>
+                    <Save className="w-4 h-4" /> Save
+                  </Button>
+                  <span className="text-[12px] text-ink-faint">Empty means the plan default applies.</span>
                 </div>
-              )}
-              {adaPelan && (
-                <div className="py-3 border-t border-hairline mt-2">
-                  <div className="text-sm font-medium text-ink mb-2">Upload permissions</div>
-                  <div className="flex items-center gap-4 flex-wrap text-sm">
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
+              </DataSection>
+            )}
+
+            {adaPelan && (
+              <DataSection title="Upload permissions">
+                <DataRow
+                  label="Allowed uploads"
+                  value={
+                    <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                      <CheckRadio
                         type="checkbox"
-                        className="accent-brand-purple w-4 h-4"
+                        label="Files (FileLu)"
                         checked={!!u.can_upload_files}
                         onChange={() => toggleKebenaran("can_upload_files")}
                       />
-                      Files (FileLu)
-                    </label>
-                    <label className="flex items-center gap-2 cursor-pointer">
-                      <input
+                      <CheckRadio
                         type="checkbox"
-                        className="accent-brand-purple w-4 h-4"
+                        label="Videos (Bunny Stream)"
                         checked={!!u.can_upload_videos}
                         onChange={() => toggleKebenaran("can_upload_videos")}
                       />
-                      Videos (Bunny Stream)
-                    </label>
-                    {(u.role === "admin" || u.role === "superadmin") && (
-                      <span className="text-xs text-ink-faint">Admins always allowed</span>
-                    )}
-                  </div>
-                </div>
-              )}
-            </Card>
-
-            <Card className="p-4">
-              <div className="text-sm font-semibold text-ink mb-3">Account actions</div>
-              <div className="space-y-2">
-                <ButangTindakan onClick={hantarReset} ikon={<KeyRound className="w-4 h-4" />} label="Send password reset" />
-                {belumSah && (
-                  <ButangTindakan onClick={sahkanEmel} ikon={<MailCheck className="w-4 h-4" />} label="Verify email" />
-                )}
-                {belumSah && (
-                  <ButangTindakan onClick={hantarSemula} ikon={<Mail className="w-4 h-4" />} label="Resend verification" />
-                )}
-                {menungguLulus && (
-                  <ButangTindakan onClick={luluskan} ikon={<UserCheck className="w-4 h-4" />} label="Approve educator" />
-                )}
-                <ButangTindakan
-                  onClick={() => setTab("activity")}
-                  ikon={<ScrollText className="w-4 h-4" />}
-                  label="View audit history"
+                      {(u.role === "admin" || u.role === "superadmin") && (
+                        <span className="text-[12px] text-ink-faint">Admins always allowed</span>
+                      )}
+                    </span>
+                  }
                 />
-                {bolehBahaya &&
-                  (u.suspended ? (
-                    <ButangTindakan
-                      onClick={() => setDialogGantung("restore")}
-                      ikon={<RotateCcw className="w-4 h-4" />}
-                      label="Restore account"
-                    />
-                  ) : (
-                    <ButangTindakan
-                      bahaya
-                      onClick={() => setDialogGantung("suspend")}
-                      ikon={<Ban className="w-4 h-4" />}
-                      label="Suspend account"
-                    />
-                  ))}
-              </div>
-              <p className="text-xs text-ink-faint mt-4">Account changes are recorded in Audit.</p>
-            </Card>
+              </DataSection>
+            )}
           </div>
 
-          {/* Zon bahaya */}
-          {bolehBahaya && (
-            <Card className="mt-4 p-4 border-red-200">
-              <div className="text-sm font-semibold text-red-600 mb-1">Danger zone</div>
-              <p className="text-sm text-ink-muted mb-3">
-                Deleting this user removes their account permanently. Type the display name exactly to enable the button.
-              </p>
-              <div className="flex items-center gap-3 flex-wrap">
-                <input
-                  className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink w-64"
-                  placeholder={namaPaparan}
-                  value={pengesahanHapus}
-                  onChange={(e) => setPengesahanHapus(e.target.value)}
-                  aria-label="Type the display name to confirm deletion"
-                />
-                <button
-                  type="button"
-                  disabled={pengesahanHapus !== namaPaparan}
-                  onClick={hapus}
-                  className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40"
-                >
-                  <Trash2 className="w-4 h-4" /> Delete user
-                </button>
-              </div>
-            </Card>
-          )}
-
-          <ReasonDialog
-            open={dialogGantung !== null}
-            title={dialogGantung === "restore" ? `Restore "${namaPaparan}"?` : `Suspend "${namaPaparan}"?`}
-            confirmLabel={dialogGantung === "restore" ? "Restore account" : "Suspend account"}
-            tone={dialogGantung === "restore" ? "default" : "danger"}
-            onConfirm={sahkanGantung}
-            onClose={() => setDialogGantung(null)}
-          />
-        </>
+          {/* Kad tindakan akaun; tindakan dan pengesahan sama seperti sebelum ini. */}
+          <Card>
+            <CardHead title="Account actions" subtitle={emel || "No email"} />
+            <div className="mt-4 space-y-2">
+              <ButangTindakan onClick={hantarReset} ikon={<KeyRound className="w-4 h-4" />} label="Send password reset" />
+              {belumSah && (
+                <ButangTindakan onClick={sahkanEmel} ikon={<MailCheck className="w-4 h-4" />} label="Verify email" />
+              )}
+              {belumSah && (
+                <ButangTindakan onClick={hantarSemula} ikon={<Mail className="w-4 h-4" />} label="Resend verification" />
+              )}
+              {menungguLulus && (
+                <ButangTindakan onClick={luluskan} ikon={<UserCheck className="w-4 h-4" />} label="Approve educator" />
+              )}
+              <ButangTindakan
+                onClick={() => setTab("activity")}
+                ikon={<ScrollText className="w-4 h-4" />}
+                label="View audit history"
+              />
+              {bolehBahaya &&
+                (u.suspended ? (
+                  <ButangTindakan
+                    onClick={() => setDialogGantung("restore")}
+                    ikon={<RotateCcw className="w-4 h-4" />}
+                    label="Restore account"
+                  />
+                ) : (
+                  <ButangTindakan
+                    bahaya
+                    onClick={() => setDialogGantung("suspend")}
+                    ikon={<Ban className="w-4 h-4" />}
+                    label="Suspend account"
+                  />
+                ))}
+            </div>
+            <p className="text-[12px] text-ink-faint mt-4">Account changes are recorded in Audit.</p>
+          </Card>
+        </div>
       )}
 
-      {/* ===== Tab Classes ===== */}
-      {tab === "classes" && (
-        <Card className="mt-4 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                  <th className="px-4 py-3 font-medium">Class</th>
-                  <th className="px-4 py-3 font-medium">Role</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Date</th>
-                </tr>
-              </thead>
-              <tbody>
-                {(kelas || []).map((k) => (
-                  <tr key={k.id} className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9]">
-                    <td className="px-4 py-3">
-                      <Link href={`/admin/classes/${k.id}`} className="font-medium text-brand-purple hover:opacity-80">
-                        {k.nama}
-                      </Link>
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">{k.peranan}</td>
-                    <td className="px-4 py-3">
-                      {k.status === "Archived" ? (
-                        <Pill>Archived</Pill>
-                      ) : k.status === "Ended" ? (
-                        <Pill tone="yellow">Ended</Pill>
-                      ) : (
-                        <Pill tone="green">Active</Pill>
-                      )}
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">{fmt(k.tarikh)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+      {/* Zon bahaya: pengesahan menaip nama paparan tetap sama. */}
+      {tab === "profile" && bolehBahaya && (
+        <Card className="mt-6">
+          <div className="text-[13px] font-bold text-red-600 mb-1">Danger zone</div>
+          <p className="text-[14px] text-ink-muted mb-4">
+            Deleting this user removes their account permanently. Type the display name exactly to enable the button.
+          </p>
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              className="w-64"
+              placeholder={namaPaparan}
+              value={pengesahanHapus}
+              onChange={(e) => setPengesahanHapus(e.target.value)}
+              aria-label="Type the display name to confirm deletion"
+            />
+            <button
+              type="button"
+              disabled={pengesahanHapus !== namaPaparan}
+              onClick={hapus}
+              className="inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none h-9 px-[18px] py-[7px] text-[13px] bg-red-600 text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              <Trash2 className="w-4 h-4" /> Delete user
+            </button>
           </div>
-          {kelas === null ? (
-            <div className="px-4 py-8 text-sm text-ink-faint">Loading...</div>
-          ) : (
-            kelas.length === 0 && <EmptyState title="No classes." body="This user has no classes yet." />
-          )}
         </Card>
       )}
 
+      {/* ===== Tab Classes ===== */}
+      {tab === "classes" &&
+        (kelas === null ? (
+          <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        ) : (
+          <DataTable
+            className="mt-6"
+            label="Classes of this user"
+            columns={lajurKelas}
+            rows={kelas}
+            rowKey={(k) => k.id}
+            empty={
+              <EmptyState
+                icon={<GraduationCap className="w-6 h-6" />}
+                title="No classes."
+                text="This user has no classes yet."
+              />
+            }
+          />
+        ))}
+
       {/* ===== Tab Activity history ===== */}
-      {tab === "activity" && (
-        <Card className="mt-4 overflow-hidden">
-          {audit === null ? (
-            <div className="px-4 py-8 text-sm text-ink-faint">Loading...</div>
-          ) : audit.length === 0 ? (
-            <EmptyState title="No activity yet." />
-          ) : (
-            audit.map((r) => {
+      {tab === "activity" &&
+        (audit === null ? (
+          <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        ) : audit.length === 0 ? (
+          <EmptyState icon={<ScrollText className="w-6 h-6" />} title="No activity yet." className="mt-6" />
+        ) : (
+          <Card padat className="mt-6">
+            {audit.map((r) => {
               const beza = bezaAudit(r.meta);
               const alasan = alasanAudit(r.meta);
               return (
-                <div key={r.id} className="px-4 py-3 border-b border-hairline last:border-b-0">
+                <div key={r.id} className="px-6 py-4 border-t border-kz-line first:border-t-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-sm font-medium text-ink">{labelTindakan(r.action).label}</span>
-                    <span className="text-xs text-ink-faint">by {namaProfil(r.actor_id)}</span>
-                    <span className="ml-auto text-xs text-ink-faint">{relTime(r.created_at)}</span>
+                    <span className="text-[13px] font-bold text-ink">{labelTindakan(r.action).label}</span>
+                    <span className="text-[12px] text-ink-faint">by {namaProfil(r.actor_id)}</span>
+                    <span className="ml-auto text-[12px] text-ink-faint whitespace-nowrap">{relTime(r.created_at)}</span>
                   </div>
-                  {alasan && <p className="text-sm text-ink-muted mt-1">Reason: {alasan}</p>}
+                  {alasan && <p className="text-[13px] text-ink-muted mt-1">Reason: {alasan}</p>}
                   {beza.length > 0 && (
                     <div className="mt-1 space-y-0.5">
                       {beza.map((b) => (
-                        <div key={b.key} className="text-xs text-ink-muted font-mono">
+                        <div key={b.key} className="text-[12px] text-ink-muted font-mono">
                           {b.key}: {b.before} -&gt; {b.after}
                         </div>
                       ))}
@@ -751,10 +827,19 @@ export default function Page({ params }: { params: { id: string } }) {
                   )}
                 </div>
               );
-            })
-          )}
-        </Card>
-      )}
+            })}
+          </Card>
+        ))}
+
+      <ReasonDialog
+        open={dialogGantung !== null}
+        title={dialogGantung === "restore" ? `Restore "${namaPaparan}"?` : `Suspend "${namaPaparan}"?`}
+        confirmLabel={dialogGantung === "restore" ? "Restore account" : "Suspend account"}
+        tone={dialogGantung === "restore" ? "default" : "danger"}
+        onConfirm={sahkanGantung}
+        onClose={() => setDialogGantung(null)}
+      />
+      </ProfileLayout>
     </AdminShell>
   );
 }
