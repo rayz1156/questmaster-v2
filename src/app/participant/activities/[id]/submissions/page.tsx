@@ -1,14 +1,18 @@
 'use client';
+/**
+ * Papan penghantaran aktiviti (peserta), pembungkus rupa v3 KZ-023:
+ * PageHead + Card di sekeliling SubmissionBoardView sedia ada.
+ * Komponen papan tidak ditulis semula.
+ */
 import ParticipantShell from "@/components/ParticipantShell";
 
 import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import Shell from '@/components/Shell';
 import SubmissionBoardView from '@/components/submission-board/SubmissionBoardView';
 import { supabase } from '@/lib/supabase';
 import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem } from '@/lib/submission-boards';
+import { Alert, Card, PageHead } from '@/components/ui';
 
 
 /** Wrap fetch() to attach the Supabase access token. */
@@ -39,26 +43,32 @@ export default function ParticipantSubmissionsPage() {
         if (!r.ok) throw new Error((await r.json()).error || 'Failed to load');
         const j = await r.json();
         setData({ board: j.board, items: j.items || [], columns: j.columns || [], myRole: j.myRole || 'student', myId: j.myId });
-      } catch (e: any) { setErr(e.message); }
+      } catch (e) { setErr((e as { message?: string })?.message || String(e)); }
     })();
   }, [huntId]);
 
   return (
     <ParticipantShell>
-      <div className="mb-3"><Link href={`/participant/home`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1"><ArrowLeft className="w-4 h-4" /> Back</Link></div>
-      <h1 className="text-xl font-bold mb-3">My Submissions</h1>
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      {!data && !err && <p className="text-sm text-gray-500">Loading...</p>}
+      <PageHead
+        title="My Submissions"
+        secondaryActions={[
+          { label: 'Back', icon: <ArrowLeft className="w-4 h-4" />, href: '/participant/home' },
+        ]}
+      />
+      {err && <Alert tone="danger" className="mb-4">{err}</Alert>}
+      {!data && !err && <p className="text-[14px] text-ink-muted">Loading...</p>}
       {data && classId && (
-        <SubmissionBoardView
-          huntId={huntId}
-          classId={classId}
-          initialBoard={data.board}
-          initialItems={data.items}
+        <Card padat>
+          <SubmissionBoardView
+            huntId={huntId}
+            classId={classId}
+            initialBoard={data.board}
+            initialItems={data.items}
             initialColumns={data.columns}
-          myRole={data.myRole}
-          myId={data.myId}
-        />
+            myRole={data.myRole}
+            myId={data.myId}
+          />
+        </Card>
       )}
     </ParticipantShell>
   );

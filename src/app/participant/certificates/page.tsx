@@ -1,20 +1,35 @@
 "use client";
 
 /**
- * My certificates (peserta): senarai sijil sendiri, muat turun, pautan
- * pengesahan awam dan pengesahan nama sijil.
+ * My certificates (peserta): senarai sijil sendiri, rupa v3 KZ-023.
  *
- * Pengesahan nama: jika certificate_name_confirmed_at masih NULL dan peserta
- * ada kelas dengan templat sijil (RPC qm_certificate_classes_needing_name),
- * kad ini meminta nama yang dicetak. Kemas kini dibuat terus ke qm_profiles
- * melalui RLS (polisi self update; penjaga pelan 0027 tidak memin lajur ini).
+ * Kad sijil dalam grid guna Card kit dengan butang muat turun dan
+ * pautan pengesahan awam yang sama seperti sebelum ini.
+ *
+ * Pengesahan nama: jika certificate_name_confirmed_at masih NULL dan
+ * peserta ada kelas dengan templat sijil (RPC
+ * qm_certificate_classes_needing_name), kad ini meminta nama yang
+ * dicetak. Kemas kini dibuat terus ke qm_profiles melalui RLS (polisi
+ * self update; penjaga pelan 0027 tidak memin lajur ini).
  * Tiada em dash dalam mana-mana rentetan UI.
  */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Download, ShieldCheck } from "lucide-react";
+import { Award, Download, ShieldCheck } from "lucide-react";
 import ParticipantShell from "@/components/ParticipantShell";
 import { supabase } from "@/lib/supabase";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  CardSection,
+  EmptyState,
+  Field,
+  Input,
+  PageHead,
+} from "@/components/ui";
 import { authHeader } from "@/lib/peer-client";
 import { statusSijil } from "@/lib/sijil/ui";
 
@@ -118,77 +133,107 @@ export default function CertificatesPage() {
   if (loading) {
     return (
       <ParticipantShell>
-        <div className="max-w-shell mx-auto px-6 py-10 text-slate-500">Loading...</div>
+        <p className="text-[14px] text-ink-faint">Loading...</p>
       </ParticipantShell>
     );
   }
 
   return (
     <ParticipantShell>
-      <div className="max-w-shell mx-auto px-6 py-10">
-        <div className="eyebrow mb-1">Certificates</div>
-        <h1 className="page-title mb-1">My certificates</h1>
-        <p className="page-subtitle mb-8">
-          Certificates issued to you by your educators.
-        </p>
+      <PageHead
+        title="My certificates"
+        description="Certificates issued to you by your educators."
+      />
 
-        {msg && <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm">{msg}</div>}
+      {msg && <Alert tone="info" className="mb-4">{msg}</Alert>}
 
-        {/* Kad pengesahan nama */}
-        {!namaDisahkan && perluNama.length > 0 && (
-          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-8">
-            <h2 className="font-semibold mb-1">Confirm the name to print on your certificates</h2>
-            <p className="text-sm text-slate-600 mb-3">
-              Your educator will issue certificates for{" "}
-              {perluNama.map((k) => k.class_name).join(", ")}. Confirm how your name
-              should appear before it is printed.
-            </p>
-            <div className="flex gap-2 flex-wrap">
-              <input
-                className="input"
-                value={namaPaparan}
-                onChange={(e) => setNamaPaparan(e.target.value)}
-                placeholder="Name on certificate"
-              />
-              <button className="btn-primary" onClick={sahkanNama}>
-                <ShieldCheck className="w-4 h-4" /> Confirm
-              </button>
+      {/* Kad pengesahan nama */}
+      {!namaDisahkan && perluNama.length > 0 && (
+        <Card className="mb-7">
+          <CardHead
+            title="Confirm the name to print on your certificates"
+            subtitle={
+              <>
+                Your educator will issue certificates for{" "}
+                {perluNama.map((k) => k.class_name).join(", ")}. Confirm how your name
+                should appear before it is printed.
+              </>
+            }
+          />
+          <div className="mt-4 flex gap-2 flex-wrap">
+            <div className="min-w-[220px] flex-1 max-w-sm">
+              <Field label="Name on certificate" htmlFor="nama-sijil">
+                <Input
+                  id="nama-sijil"
+                  value={namaPaparan}
+                  onChange={(e) => setNamaPaparan(e.target.value)}
+                  placeholder="Name on certificate"
+                />
+              </Field>
             </div>
+            <Button onClick={sahkanNama} className="mt-[30px]">
+              <ShieldCheck className="w-4 h-4" /> Confirm
+            </Button>
           </div>
-        )}
+        </Card>
+      )}
 
-        {sijil.length === 0 ? (
-          <div className="rounded-xl border border-hairline p-8 text-center text-slate-500">
-            No certificates yet. Your educator will issue them when you qualify.
-          </div>
-        ) : (
-          <div className="space-y-3">
-            {sijil.map((s) => {
-              const st = statusSijil(s.revoked_at);
-              return (
-                <div key={s.id} className="rounded-xl border border-hairline bg-white p-4 flex items-center justify-between gap-4 flex-wrap">
-                  <div className="min-w-0">
-                    <div className="font-semibold truncate">{s.program_snapshot}</div>
-                    <div className="text-sm text-slate-500">
-                      {s.name_snapshot} · {new Date(s.issued_at).toLocaleDateString()} ·{" "}
-                      <span className="font-mono">{s.code}</span>
-                    </div>
-                  </div>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <span className={`text-sm font-medium ${st.kelas}`}>{st.label}</span>
-                    <button className="btn-quiet" onClick={() => muatTurun(s)} disabled={!!s.revoked_at}>
-                      <Download className="w-4 h-4" /> Download
-                    </button>
-                    <Link href={`/sijil/${s.code}`} className="btn-quiet" target="_blank">
+      {sijil.length === 0 ? (
+        <div className="bg-white rounded-[4px] shadow-card">
+          <EmptyState
+            icon={<Award className="w-6 h-6" />}
+            title="No certificates yet."
+            text="Your educator will issue them when you qualify."
+          />
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-7">
+          {sijil.map((s) => {
+            const st = statusSijil(s.revoked_at);
+            return (
+              <Card key={s.id} padat className="flex flex-col">
+                <div className="p-6">
+                  <CardHead
+                    title={s.program_snapshot}
+                    subtitle={
+                      <>
+                        {s.name_snapshot} · {new Date(s.issued_at).toLocaleDateString()} ·{" "}
+                        <span className="font-mono">{s.code}</span>
+                      </>
+                    }
+                    right={
+                      s.revoked_at ? (
+                        <Badge variant="dim" warna="red">{st.label}</Badge>
+                      ) : (
+                        <Badge variant="dot" warna="green">{st.label}</Badge>
+                      )
+                    }
+                  />
+                </div>
+                <CardSection baris className="mt-auto">
+                  <div className="flex items-center justify-end gap-2 flex-wrap">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => muatTurun(s)}
+                      disabled={!!s.revoked_at}
+                    >
+                      <Download className="w-3.5 h-3.5" /> Download
+                    </Button>
+                    <Link
+                      href={`/sijil/${s.code}`}
+                      target="_blank"
+                      className="inline-flex items-center justify-center gap-2 rounded-[4px] border border-hairline bg-white h-8 px-3 text-[12px] font-bold tracking-[0.26px] text-ink-muted hover:bg-canvas transition"
+                    >
                       Verify
                     </Link>
                   </div>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
+                </CardSection>
+              </Card>
+            );
+          })}
+        </div>
+      )}
     </ParticipantShell>
   );
 }

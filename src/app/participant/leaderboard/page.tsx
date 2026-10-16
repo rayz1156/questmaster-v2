@@ -1,14 +1,58 @@
 "use client";
-import ParticipantShell from "@/components/ParticipantShell";
-import Link from 'next/link';
-import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
-import { Users, RefreshCw, Trophy, User as UserIcon, ChevronDown, ChevronRight, Activity, ClipboardList, Crown, Medal, Home, Compass, BookOpen } from "lucide-react";
-import { LeaderboardPodium, LB_TILE, LB_TILE_REST, LB_MEDAL, LB_MEDAL_REST, LB_PTS, LB_PTS_REST } from "@/components/LiveLeaderboard";
-import { listMyHunts, listMyHuntsByClass, listTeamScores, listClassTeamScores, listClassIndividualScores, addScoreAdjustment, listScoreAdjustments, deleteScoreAdjustment, listEnrolledClasses, listTeamMembers, type Hunt, type TeamScore, type ScoreAdjustment, type ClassIndividualScore, type Klass } from "@/lib/data";
 
+/**
+ * Leaderboard peserta, rupa v3 KZ-023.
+ *
+ * Jadual guna DataTable kit (avatar inisial, kedudukan, penomboran
+ * pelanggan, baris kembang ahli pasukan). Podium LeaderboardPodium,
+ * fungsi kira markah, kitaran segar 8 saat, togol Teams/Individuals,
+ * penapisan kelas yang disembunyikan educatornya (leaderboard_visible)
+ * dan pemilih aktiviti kekal seperti sebelum KZ-023.
+ *
+ * Pautan "Back to class dashboard" dahulu menuju /participant/classes/<id>
+ * yang tiada halaman indeksnya; kini ia memaut ke Intro Board kelas
+ * (laluan /participant/classes/<id>/board yang benar-benar wujud).
+ */
+import { Suspense, useEffect, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { ArrowLeft, RefreshCw, User as UserIcon, Users } from "lucide-react";
+import ParticipantShell from "@/components/ParticipantShell";
+import { LeaderboardPodium } from "@/components/LiveLeaderboard";
+import {
+  listMyHuntsByClass,
+  listTeamScores,
+  listClassTeamScores,
+  listClassIndividualScores,
+  listScoreAdjustments,
+  listEnrolledClasses,
+  listTeamMembers,
+  type Hunt,
+  type TeamScore,
+  type ScoreAdjustment,
+  type ClassIndividualScore,
+  type Klass,
+} from "@/lib/data";
+import {
+  Alert,
+  Avatar,
+  Button,
+  DataTable,
+  EmptyState,
+  InitialTile,
+  PageHead,
+  Select,
+  Tabs,
+  type DataColumn,
+} from "@/components/ui";
 
 type AggScore = { team_id: string; team_name: string; total_score: number; quest_count: number };
+
+/** Baris pasukan siap dipapar dalam DataTable. */
+type BarisPasukan = { team_id: string; team_name: string; total_score: number; quest_count?: number; kedudukan: number };
+type BarisIndividu = ClassIndividualScore & { kedudukan: number };
+
+/** Ahli pasukan seperti yang dikembalikan listTeamMembers. */
+type Ahli = { user_id: string; profile?: { display_name?: string | null; email?: string | null } | null };
 
 function LeaderboardInner() {
   const [classes, setClasses] = useState<Klass[]>([]);
@@ -20,20 +64,21 @@ function LeaderboardInner() {
   const [aggScores, setAggScores] = useState<AggScore[]>([]);
   const [indivScores, setIndivScores] = useState<ClassIndividualScore[]>([]);
   const [viewMode, setViewMode] = useState<'team' | 'individual'>('team');
+  // Penyesuaian markah terus dimuat (panggilan data tidak berubah) walaupun
+  // halaman ini belum memaparnya; tiada UI memanggilnya lagi.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [adj, setAdj] = useState<ScoreAdjustment[]>([]);
   const [err, setErr] = useState<string | null>(null);
-  const [delta, setDelta] = useState<Record<string, number>>({});
-  const [reason, setReason] = useState<Record<string, string>>({});
-  const [busy, setBusy] = useState(false);
   const [expandedTeam, setExpandedTeam] = useState<string | null>(null);
-  const [teamMembers, setTeamMembers] = useState<Record<string, any[]>>({});
+  const [teamMembers, setTeamMembers] = useState<Record<string, Ahli[]>>({});
+  const [halaman, setHalaman] = useState(1);
 
   const toggleTeam = async (teamId: string) => {
     if (expandedTeam === teamId) { setExpandedTeam(null); return; }
     setExpandedTeam(teamId);
     if (!teamMembers[teamId]) {
       try {
-        const members = await listTeamMembers(teamId);
+        const members = (await listTeamMembers(teamId)) as Ahli[];
         setTeamMembers(prev => ({ ...prev, [teamId]: members }));
       } catch (e) { console.error(e); }
     }
@@ -67,6 +112,7 @@ function LeaderboardInner() {
     loadScores();
     const t = setInterval(loadScores, 8000);
     return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, hunts, classId, viewMode]);
 
   async function loadScores() {
@@ -79,7 +125,7 @@ function LeaderboardInner() {
           setIndivScores(is);
           setScores([]); setAggScores([]); setAdj([]);
           return;
-        } catch (e:any) { setErr(e.message); return; }
+        } catch (e) { setErr((e as Error).message); return; }
       } else {
         setIndivScores([]);
       }
@@ -102,7 +148,7 @@ function LeaderboardInner() {
           setAdj([]);
           return;
         }
-      } catch (e) { /* fall through to legacy per-hunt aggregation */ }
+      } catch { /* fall through to legacy per-hunt aggregation */ }
         // All quests in class - aggregate
         const allScores: TeamScore[] = [];
         const allAdj: ScoreAdjustment[] = [];
@@ -112,7 +158,7 @@ function LeaderboardInner() {
             allScores.push(...s);
             const a = await listScoreAdjustments(h.id);
             allAdj.push(...a);
-          } catch(e) {}
+          } catch {}
         }
         // Aggregate by team
         const map = new Map<string, AggScore>();
@@ -130,9 +176,8 @@ function LeaderboardInner() {
         setScores([]);
         setAdj(allAdj.sort((a, b) => b.created_at.localeCompare(a.created_at)));
       }
-    } catch (e: any) { setErr(e.message); }
+    } catch (e) { setErr((e as Error).message); }
   }
-
 
   const isIndividual = viewMode === 'individual';
   const leaderboard = activeId ? scores.sort((a, b) => b.total_score - a.total_score) : aggScores;
@@ -141,159 +186,217 @@ function LeaderboardInner() {
   const indivRest = indivScores.length >= 2 ? 3 : 0;
   const teamRest = leaderboard.length >= 2 ? 3 : 0;
 
+  // Baris pasukan ternormalizasi untuk DataTable (quest_count hanya bila ada).
+  const barisPasukan: BarisPasukan[] = leaderboard.map((s, idx) => ({
+    kedudukan: idx + 1,
+    team_id: s.team_id,
+    team_name: s.team_name,
+    total_score: s.total_score,
+    ...('quest_count' in s ? { quest_count: (s as AggScore).quest_count } : {}),
+  }));
+
+  const lajurPasukan: DataColumn<BarisPasukan>[] = [
+    {
+      key: "rank",
+      header: "Rank",
+      render: (r) => (
+        <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink tabular-nums">
+          {r.kedudukan}
+          {r.kedudukan === 1 && <span className="w-1.5 h-1.5 rounded-full bg-[#E3B341]" aria-hidden="true" />}
+        </span>
+      ),
+    },
+    {
+      key: "team",
+      header: "Team",
+      render: (r, i) => (
+        <span className="flex items-center gap-3 py-3">
+          <InitialTile name={r.team_name} index={i} />
+          <span className="text-[14px] font-medium text-ink truncate">{r.team_name}</span>
+        </span>
+      ),
+    },
+    {
+      key: "activities",
+      header: "Activities",
+      hideOnMobile: true,
+      className: "text-right",
+      render: (r) => (
+        r.quest_count != null
+          ? <span className="text-[13px] text-ink-faint tabular-nums">{r.quest_count}</span>
+          : null
+      ),
+    },
+    {
+      key: "points",
+      header: "Points",
+      className: "text-right",
+      render: (r) => <span className="text-[13px] font-medium text-ink tabular-nums">{r.total_score}</span>,
+    },
+  ];
+
+  // Kedudukan sebenar dikira sebelum podium dipisahkan daripada jadual.
+  const barisIndividu: BarisIndividu[] = indivScores.map((s, idx) => ({ ...s, kedudukan: idx + 1 }));
+
+  const lajurIndividu: DataColumn<BarisIndividu>[] = [
+    {
+      key: "rank",
+      header: "Rank",
+      render: (r) => (
+        <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink tabular-nums">
+          {r.kedudukan}
+          {r.kedudukan === 1 && <span className="w-1.5 h-1.5 rounded-full bg-[#E3B341]" aria-hidden="true" />}
+        </span>
+      ),
+    },
+    {
+      key: "student",
+      header: "Student",
+      render: (r, i) => (
+        <span className="flex items-center gap-3 py-3">
+          <Avatar name={r.display_name || "Student"} size="md" index={i} />
+          <span className="min-w-0">
+            <span className="block text-[13px] font-bold text-ink truncate">{r.display_name || "Student"}</span>
+            {/* Pecahan markah individu daripada view qm_class_individual_scores. */}
+            <span className="block text-[12px] text-ink-faint truncate">
+              Activities {r.task_score ?? 0} · Live Quiz {r.live_score ?? 0} · Adjustments {r.adjustment_score ?? 0}
+            </span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "points",
+      header: "Points",
+      className: "text-right",
+      render: (r) => <span className="text-[13px] font-medium text-ink tabular-nums">{r.total_score}</span>,
+    },
+  ];
+
   return (
     <ParticipantShell>
       {classId && (
-        <Link href={`/participant/classes/${classId}`} className="btn-quiet mb-6">← Back to class dashboard</Link>
+        <Button variant="ghost" href={`/participant/classes/${classId}/board`} className="mb-2">
+          <ArrowLeft className="w-4 h-4" /> Back to class dashboard
+        </Button>
       )}
-      <div className="flex flex-wrap items-end justify-between gap-4 mb-8">
-        <div className="min-w-0">
-          <div className="eyebrow mb-1">Rankings</div>
-          <h1 className="page-title">Who is ahead right now.</h1>
-          <p className="page-subtitle">Scores update as groups complete activities.</p>
-        </div>
-        <button onClick={loadScores} className="btn-secondary shrink-0"><RefreshCw className="w-4 h-4"/>Refresh</button>
-      </div>
+      <PageHead
+        title="Who is ahead right now."
+        description="Scores update as groups complete activities."
+        secondaryActions={[{ label: "Refresh", icon: <RefreshCw className="w-4 h-4" />, onSelect: loadScores }]}
+      />
 
       {/* Class & Activity selectors */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-8 max-w-3xl">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6 max-w-3xl">
         <div>
           <div className="text-sm font-medium text-ink mb-1.5">Class</div>
           {classes.length === 0 ? <p className="text-sm text-ink-muted">No leaderboard is available yet.</p> : (
-            <select className="input" value={classId} onChange={e => setClassId(e.target.value)}>
+            <Select className="w-auto" value={classId} onChange={e => setClassId(e.target.value)} aria-label="Select class">
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
+            </Select>
           )}
         </div>
         <div>
           <div className="text-sm font-medium text-ink mb-1.5">Activity</div>
           {classId && hunts.length > 0 ? (
-            <select className="input" value={activeId} onChange={e => setActiveId(e.target.value)}>
+            <Select className="w-auto" value={activeId} onChange={e => setActiveId(e.target.value)} aria-label="Filter by activity">
               <option value="">All activities</option>
               {hunts.map(h => <option key={h.id} value={h.id}>{h.title}</option>)}
-            </select>
+            </Select>
           ) : (
             <p className="text-sm text-ink-faint py-2.5">Select a class with activities.</p>
           )}
         </div>
       </div>
 
-      {err && <div className="text-sm text-[#C0392B] mb-4">{err}</div>}
+      {err && <Alert tone="danger" className="mb-4">{err}</Alert>}
 
       {/* Leaderboard */}
-      <div className="relative overflow-hidden rounded-2xl bg-white border border-hairline p-5 mb-3">
-        <Crown className="absolute -top-2 -right-2 w-16 h-16 text-[#EFEBFB] pointer-events-none"/>
-        <div className="mb-4">
-          <div className="section-title">{isIndividual && !activeId ? `Individuals` : activeId ? `Activity leaderboard` : `Class leaderboard`}</div>
-          <div className="text-sm text-ink-muted mt-0.5">{isIndividual && !activeId ? "Students ranked by their own approved work." : "Rankings update automatically as groups complete activities."}</div>
-        </div>
-        {!activeId && (
-          <div className="inline-flex rounded-xl border border-hairline overflow-hidden mb-4 text-sm">
-            <button onClick={() => setViewMode('team')} className={`px-3.5 py-1.5 font-medium transition ${viewMode === 'team' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}>Teams</button>
-            <button onClick={() => setViewMode('individual')} className={`px-3.5 py-1.5 font-medium transition border-l border-hairline ${viewMode === 'individual' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}>Individuals</button>
-          </div>
-        )}
-        {isIndividual && !activeId ? (
-          indivScores.length === 0 ? <p className="text-sm text-ink-muted">No students ranked yet.</p> : (
-          <>
+      <div className="mb-4">
+        <h2 className="section-title">
+          {isIndividual && !activeId ? "Individuals" : activeId ? "Activity leaderboard" : "Class leaderboard"}
+        </h2>
+        <p className="text-sm text-ink-muted mt-0.5">
+          {isIndividual && !activeId ? "Students ranked by their own approved work." : "Rankings update automatically as groups complete activities."}
+        </p>
+      </div>
+
+      {!activeId && (
+        <Tabs
+          className="mb-5"
+          items={[
+            { label: "Teams", onSelect: () => setViewMode('team'), aktif: viewMode === 'team' },
+            { label: "Individuals", onSelect: () => setViewMode('individual'), aktif: viewMode === 'individual' },
+          ]}
+        />
+      )}
+
+      {isIndividual && !activeId ? (
+        <>
           {indivRest > 0 && (
             <LeaderboardPodium
-              className="mb-5"
+              className="mb-6"
               rows={indivScores.slice(0, 3).map((s, i) => ({ rank: i + 1, name: s.display_name || 'Student', score: s.total_score }))}
             />
           )}
-          <div className="space-y-2">
-          {indivScores.slice(indivRest).map((s, j) => {
-            const i = j + indivRest;
-            const tileBg = i < 3 ? LB_TILE[i] : LB_TILE_REST;
-            const medalBg = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
-            const ptsBg = i < 3 ? LB_PTS[i] : LB_PTS_REST;
-            return (
-              <div key={s.user_id} className={`relative flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition ${tileBg}`}>
-                <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medalBg}`}>{i + 1}</div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center gap-2">
-                    <UserIcon className="w-4 h-4 text-ink-faint shrink-0"/>
-                    <div className="text-[15px] font-medium text-ink truncate">{s.display_name || 'Student'}</div>
-                  </div>
-                  {/* V2-012: pecahan markah individu daripada view
-                      qm_class_individual_scores (migrasi 0049). Total kekal
-                      dipapar di kanan; baris ini menunjukkan dari mana ia
-                      datang: Activities, Live Quiz, Adjustments. */}
-                  <div className="text-xs text-ink-faint mt-0.5 truncate">
-                    Activities {s.task_score ?? 0} · Live Quiz {s.live_score ?? 0} · Adjustments {s.adjustment_score ?? 0}
-                  </div>
-                </div>
-                <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${ptsBg}`}>
-                  <div className="text-center">
-                    <div className="text-lg font-semibold leading-none tabular-nums">{s.total_score}</div>
-                    <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
-                  </div>
-                </div>
-              </div>
-            );
-          })}
-          </div>
-          </>
-          )
-        ) : leaderboard.length === 0 ? <p className="text-sm text-ink-muted">No teams yet.</p> : (
-          <>
+          <DataTable
+            label="Individual leaderboard"
+            columns={lajurIndividu}
+            rows={barisIndividu.slice(indivRest)}
+            rowKey={(s) => s.user_id}
+            halaman={halaman}
+            saizHalaman={10}
+            onHalaman={setHalaman}
+            empty={
+              <EmptyState icon={<UserIcon className="w-6 h-6" />} title="No students ranked yet." />
+            }
+          />
+        </>
+      ) : (
+        <>
           {teamRest > 0 && (
             <LeaderboardPodium
-              className="mb-5"
+              className="mb-6"
               rows={leaderboard.slice(0, 3).map((s, i) => ({ rank: i + 1, name: s.team_name, score: s.total_score }))}
             />
           )}
-          <div className="space-y-2">
-          {leaderboard.slice(teamRest).map((s, j) => {
-            const i = j + teamRest;
-            const isExpanded = expandedTeam === s.team_id;
-            const tileBg = i < 3 ? LB_TILE[i] : LB_TILE_REST;
-            const medalBg = i < 3 ? LB_MEDAL[i] : LB_MEDAL_REST;
-            const ptsBg = i < 3 ? LB_PTS[i] : LB_PTS_REST;
-            return (
-              <div key={s.team_id}>
-                <div
-                  className={`relative flex items-center gap-3 p-3 sm:p-4 rounded-2xl border transition cursor-pointer ${tileBg}`}
-                  onClick={() => toggleTeam(s.team_id)}
-                >
-                  {isExpanded ? <ChevronDown className="w-4 h-4 text-gray-500 shrink-0"/> : <ChevronRight className="w-4 h-4 text-gray-500 shrink-0"/>}
-                  <div className={`w-12 h-12 rounded-full flex items-center justify-center text-lg font-semibold tabular-nums shrink-0 ${medalBg}`}>
-                    {i < 3 ? (i + 1) : (i + 1)}
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <div className="text-[15px] font-medium text-ink truncate">{s.team_name}</div>
-                    {'quest_count' in s && <div className="text-xs text-gray-500">{(s as AggScore).quest_count} activity(s)</div>}
-                  </div>
-                  <div className={`shrink-0 flex items-center justify-center min-w-[64px] px-3 py-1.5 rounded-xl ${ptsBg}`}>
-                    <div className="text-center">
-                      <div className="text-lg font-semibold leading-none tabular-nums">{s.total_score}</div>
-                      <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
-                    </div>
-                  </div>
-                </div>
-                {isExpanded && (
-                  <div className="ml-14 mt-1 mb-1 pl-3 border-l-2 border-hairline space-y-1">
-                    {!teamMembers[s.team_id] ? <p className="text-xs text-gray-400 py-1">Loading members...</p> :
-                     teamMembers[s.team_id].length === 0 ? <p className="text-xs text-gray-400 py-1">No members</p> :
-                     teamMembers[s.team_id].map((m: any) => (
-                      <div key={m.user_id} className="text-xs text-gray-600 flex items-center gap-2 py-0.5">
-                        <UserIcon className="w-3 h-3 text-ink-faint"/>
-                        <span>{m.profile?.display_name || m.profile?.email || m.user_id.slice(0,8)}</span>
+          <DataTable
+            label="Team leaderboard"
+            columns={lajurPasukan}
+            rows={barisPasukan.slice(teamRest)}
+            rowKey={(r) => r.team_id}
+            onRowClick={(r) => toggleTeam(r.team_id)}
+            renderRowExtra={(r) =>
+              expandedTeam === r.team_id ? (
+                <div className="py-2">
+                  <div className="pl-4 sm:pl-[68px] border-l-2 border-[#ebe2ff] space-y-1">
+                    {!teamMembers[r.team_id] ? <p className="text-xs text-ink-faint py-1">Loading members...</p> :
+                     teamMembers[r.team_id].length === 0 ? <p className="text-xs text-ink-faint py-1">No members</p> :
+                     teamMembers[r.team_id].map((m: Ahli) => (
+                      <div key={m.user_id} className="text-xs text-ink-muted flex items-center gap-2 py-0.5">
+                        <UserIcon className="w-3 h-3 text-ink-faint" />
+                        <span>{m.profile?.display_name || m.profile?.email || m.user_id.slice(0, 8)}</span>
                       </div>
                     ))}
                   </div>
-                )}
-              </div>
-            );
-          })}
-          </div>
-          </>
-        )}
-      </div>
-      </ParticipantShell>
+                </div>
+              ) : null
+            }
+            halaman={halaman}
+            saizHalaman={10}
+            onHalaman={setHalaman}
+            empty={
+              <EmptyState icon={<Users className="w-6 h-6" />} title="No teams yet." />
+            }
+          />
+        </>
+      )}
+
+      {barisPasukan.length > 0 && (
+        <p className="text-xs text-ink-faint mt-3">Click a team to see its members</p>
+      )}
+    </ParticipantShell>
   );
 }
-
 
 export default function ParticipantLeaderboard() { return <Suspense fallback={<p>Loading...</p>}><LeaderboardInner /></Suspense>; }
