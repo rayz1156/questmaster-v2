@@ -18,7 +18,8 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
-import { LogOut, HelpCircle, ChevronDown, Menu, X, User as UserIcon, CircleDot } from "lucide-react";
+import { LogOut, HelpCircle, ChevronDown, Menu, X, User as UserIcon, CircleDot, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { useBarSisiKecil } from "@/lib/barSisi";
 import { getSession, clearSession } from "@/lib/session";
 import { LogoMark } from "@/components/Logo";
 import type { User, Profile } from "@/lib/types";
@@ -99,6 +100,8 @@ export default function Shell({
   // Sub-item bar sisi yang dibuka secara manual (KZ-021).
   const [subTerbuka, setSubTerbuka] = useState<string[]>([]);
   const menuRef = useRef<HTMLDivElement | null>(null);
+  // Bar sisi desktop boleh dikecilkan kepada lajur ikon (seperti ChatGPT/Claude).
+  const [kecil, togolKecil] = useBarSisiKecil();
 
   useEffect(() => {
     let cancelled = false;
@@ -211,8 +214,24 @@ export default function Shell({
     !!t.sub && (t.sub.some((s) => here(s.href) || (s.match || []).some(here)));
   const subTerbukaFn = (t: Tab) => subAktif(t) || subTerbuka.includes(t.href);
 
-  const ItemMenu = ({ t }: { t: Tab }) => {
+  const ItemMenu = ({ t, padat = false }: { t: Tab; padat?: boolean }) => {
     const aktif = activeTab(t);
+    // Mod lajur ikon: ikon sahaja, nama dalam tooltip dan aria-label.
+    if (padat) {
+      return (
+        <Link
+          href={t.href}
+          aria-current={aktif ? "page" : undefined}
+          aria-label={t.label}
+          title={t.label}
+          className={`mx-auto flex h-11 w-11 items-center justify-center rounded-md transition ${
+            aktif ? "bg-kz-menu-active text-brand-purple" : "text-ink-faint hover:bg-canvas hover:text-ink"
+          }`}
+        >
+          {t.icon ?? <CircleDot className="h-5 w-5" />}
+        </Link>
+      );
+    }
     return (
       <div>
         <div className="flex items-center">
@@ -275,11 +294,11 @@ export default function Shell({
     );
   };
 
-  const senaraiMenu = (
-    <nav aria-label="Main" className="flex flex-col gap-0.5 px-3 pb-6">
+  const binaMenu = (padat: boolean) => (
+    <nav aria-label="Main" className={`flex flex-col gap-0.5 ${padat ? "px-2 pt-2" : "px-3"} pb-6`}>
       {/* Tajuk "Menu" lama hanya dipaparkan bila tiada kumpulan, supaya
           pemanggil lama mendapat rupa yang sama seperti sebelum ini. */}
-      {!adaKumpulan && (
+      {!adaKumpulan && !padat && (
         <div className="px-3 pb-2 pt-4 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
           Menu
         </div>
@@ -287,13 +306,14 @@ export default function Shell({
       {blokMenu.map((k, i) => (
         <div key={k.label ?? `blok-${i}`}>
           {/* Tajuk kumpulan: overline 11px 700 uppercase ls 2.2px, padding 24px. */}
-          {k.label && (
+          {k.label && padat && i > 0 && <div className="mx-3 my-2 h-px bg-hairline" />}
+          {k.label && !padat && (
             <div className="px-6 pt-6 pb-2 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
               {k.label}
             </div>
           )}
           {k.tabs.map((t) => (
-            <ItemMenu key={t.href} t={t} />
+            <ItemMenu key={t.href} t={t} padat={padat} />
           ))}
         </div>
       ))}
@@ -302,14 +322,28 @@ export default function Shell({
 
   return (
     <div className="min-h-screen bg-canvas flex">
-      {/* ===== Bar sisi desktop (>= 1200px) ===== */}
-      <aside className="hidden xl:flex w-[290px] shrink-0 flex-col bg-white shadow-bar sticky top-0 h-screen">
-        <div className="flex h-[65px] shrink-0 items-center gap-2.5 px-6">
-          <Link href="/educator/classes" className="inline-flex items-center gap-2.5" aria-label="Kuizen">
-            {logoBarSisi}
-          </Link>
+      {/* ===== Bar sisi desktop (>= 1200px): penuh 290px atau lajur ikon 72px ===== */}
+      <aside
+        className={`hidden xl:flex ${kecil ? "w-[72px]" : "w-[290px]"} shrink-0 flex-col bg-white shadow-bar sticky top-0 h-screen transition-[width] duration-200`}
+      >
+        <div className={`flex h-[65px] shrink-0 items-center gap-2.5 ${kecil ? "justify-center px-2" : "px-6"}`}>
+          {!kecil && (
+            <Link href="/educator/classes" className="inline-flex min-w-0 items-center gap-2.5" aria-label="Kuizen">
+              {logoBarSisi}
+            </Link>
+          )}
+          <button
+            type="button"
+            onClick={togolKecil}
+            aria-label={kecil ? "Expand sidebar" : "Collapse sidebar"}
+            aria-expanded={!kecil}
+            title={kecil ? "Expand sidebar" : "Collapse sidebar"}
+            className={`${kecil ? "" : "ml-auto"} flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-faint transition hover:bg-canvas hover:text-ink`}
+          >
+            {kecil ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </button>
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto">{senaraiMenu}</div>
+        <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden">{binaMenu(kecil)}</div>
       </aside>
 
       {/* ===== Laci telefon/tablet: lapisan gelap lutsinar + panel ===== */}
@@ -334,7 +368,7 @@ export default function Shell({
                 <X className="h-5 w-5" />
               </button>
             </div>
-            <div className="min-h-0 flex-1 overflow-y-auto">{senaraiMenu}</div>
+            <div className="min-h-0 flex-1 overflow-y-auto">{binaMenu(false)}</div>
           </div>
         </div>
       )}
@@ -351,7 +385,7 @@ export default function Shell({
             >
               <Menu className="h-5 w-5" />
             </button>
-            <Link href="/educator/classes" className="xl:hidden inline-flex items-center gap-2" aria-label="Kuizen">
+            <Link href="/educator/classes" className={`${kecil ? "" : "xl:hidden"} inline-flex items-center gap-2`} aria-label="Kuizen">
               <LogoMark size={26} />
               <span className="text-[17px] font-bold tracking-tight text-ink">Kuizen</span>
             </Link>

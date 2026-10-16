@@ -23,7 +23,10 @@ import {
   Search,
   LogOut,
   User as UserIcon,
+  PanelLeftClose,
+  PanelLeftOpen,
 } from 'lucide-react';
+import { useBarSisiKecil } from '@/lib/barSisi';
 import { getSession, clearSession } from '@/lib/session';
 import { LogoMark } from '@/components/Logo';
 import { initials } from '@/components/admin/ui';
@@ -62,6 +65,8 @@ export default function AdminShell({
   const [profile, setProfile] = useState<Profile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [laciOpen, setLaciOpen] = useState(false);
+  // Bar sisi desktop boleh dikecilkan kepada lajur ikon (seperti ChatGPT/Claude).
+  const [kecil, togolKecil] = useBarSisiKecil();
   const [lencana, setLencana] = useState<{ moderasi: number | null; maklumbalas: number | null }>({
     moderasi: null,
     maklumbalas: null,
@@ -219,50 +224,64 @@ export default function AdminShell({
     else blok.push({ label, items: [t] });
   }
 
-  const isiSisi = (
-    <nav className="px-3 pb-4 space-y-1">
+  const binaIsi = (padat: boolean) => (
+    <nav aria-label="Admin" className={`${padat ? 'px-2 pt-2' : 'px-3'} pb-4 space-y-1`}>
       {blok.map((k, i) => (
         <div key={k.label ?? `blok-${i}`}>
-          {k.label && (
+          {k.label && !padat && (
             <div className="px-6 pt-6 pb-2 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
               {k.label}
             </div>
           )}
+          {k.label && padat && i > 0 && <div className="mx-2 my-2 h-px bg-hairline" />}
           {k.items.map((t) => {
-          const n = t.lencana ? lencana[t.lencana] : null;
-          return (
-          <Link
-            key={t.href}
-            href={t.href}
-            className={`flex items-center gap-2.5 px-3 py-2 text-sm rounded-xl transition ${
-              aktif(t.href)
-                ? 'bg-[#F1EEFC] text-brand-purple font-semibold'
-                : 'text-ink-muted hover:text-ink hover:bg-[#F7F7F9] font-medium'
-            }`}
-          >
-            {t.icon}
-            <span className="truncate">{t.label}</span>
-            {typeof n === 'number' && n > 0 && (
-              <span className="ml-auto shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-purple text-white text-[10px] font-semibold flex items-center justify-center">
-                {n > 99 ? '99+' : n}
-              </span>
-            )}
-          </Link>
-          );
+            const n = t.lencana ? lencana[t.lencana] : null;
+            const ada = typeof n === 'number' && n > 0;
+            return (
+              <Link
+                key={t.href}
+                href={t.href}
+                aria-current={aktif(t.href) ? 'page' : undefined}
+                aria-label={padat ? t.label : undefined}
+                title={padat ? t.label : undefined}
+                className={`relative flex items-center text-sm rounded-xl transition ${
+                  padat ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-3 py-2'
+                } ${
+                  aktif(t.href)
+                    ? 'bg-[#F1EEFC] text-brand-purple font-semibold'
+                    : 'text-ink-muted hover:text-ink hover:bg-[#F7F7F9] font-medium'
+                }`}
+              >
+                {t.icon}
+                {!padat && <span className="truncate">{t.label}</span>}
+                {ada && !padat && (
+                  <span className="ml-auto shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-purple text-white text-[10px] font-semibold flex items-center justify-center">
+                    {(n as number) > 99 ? '99+' : n}
+                  </span>
+                )}
+                {ada && padat && (
+                  <span className="absolute right-1 top-1 h-2 w-2 rounded-full bg-brand-purple" aria-hidden="true" />
+                )}
+              </Link>
+            );
           })}
         </div>
       ))}
       <div className="h-px bg-hairline my-3" />
       <Link
         href="/help"
-        className={`flex items-center gap-2.5 px-3 py-2 text-sm rounded-xl transition ${
+        aria-label={padat ? 'Help' : undefined}
+        title={padat ? 'Help' : undefined}
+        className={`flex items-center text-sm rounded-xl transition ${
+          padat ? 'mx-auto h-10 w-10 justify-center' : 'gap-2.5 px-3 py-2'
+        } ${
           aktif('/help')
             ? 'bg-[#F1EEFC] text-brand-purple font-semibold'
             : 'text-ink-muted hover:text-ink hover:bg-[#F7F7F9] font-medium'
         }`}
       >
         <HelpCircle className="w-4 h-4 shrink-0" />
-        <span>Help</span>
+        {!padat && <span>Help</span>}
       </Link>
     </nav>
   );
@@ -294,20 +313,36 @@ export default function AdminShell({
 
   return (
     <div className="min-h-screen bg-canvas flex">
-      {/* ===== Bar sisi desktop ===== */}
-      <aside className="hidden md:flex flex-col w-[240px] shrink-0 bg-white border-r border-hairline sticky top-0 h-screen">
-        <div className="px-5 h-16 flex items-center border-b border-hairline shrink-0">
-          <span className="inline-flex items-center gap-2.5">
-            <LogoMark size={28} />
-            <span className="text-[19px] font-semibold tracking-tight text-ink">Kuizen</span>
-          </span>
+      {/* ===== Bar sisi desktop: penuh 240px atau lajur ikon 72px ===== */}
+      <aside
+        className={`hidden md:flex flex-col ${kecil ? 'w-[72px]' : 'w-[240px]'} shrink-0 bg-white border-r border-hairline sticky top-0 h-screen transition-[width] duration-200`}
+      >
+        <div className={`h-16 flex items-center gap-2 border-b border-hairline shrink-0 ${kecil ? 'justify-center px-2' : 'px-5'}`}>
+          {!kecil && (
+            <span className="inline-flex items-center gap-2.5">
+              <LogoMark size={28} />
+              <span className="text-[19px] font-semibold tracking-tight text-ink">Kuizen</span>
+            </span>
+          )}
+          <button
+            type="button"
+            onClick={togolKecil}
+            aria-label={kecil ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-expanded={!kecil}
+            title={kecil ? 'Expand sidebar' : 'Collapse sidebar'}
+            className={`${kecil ? '' : 'ml-auto'} flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-faint transition hover:bg-canvas hover:text-ink`}
+          >
+            {kecil ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
+          </button>
         </div>
-        <div className="px-5 pt-5 pb-2">
-          <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
-            Admin workspace
-          </span>
-        </div>
-        <div className="flex-1 overflow-y-auto">{isiSisi}</div>
+        {!kecil && (
+          <div className="px-5 pt-5 pb-2">
+            <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
+              Admin workspace
+            </span>
+          </div>
+        )}
+        <div className="flex-1 overflow-y-auto overflow-x-hidden">{binaIsi(kecil)}</div>
       </aside>
 
       {/* ===== Laci bar sisi pada skrin kecil ===== */}
@@ -329,7 +364,7 @@ export default function AdminShell({
                 Admin workspace
               </span>
             </div>
-            <div className="flex-1 overflow-y-auto">{isiSisi}</div>
+            <div className="flex-1 overflow-y-auto">{binaIsi(false)}</div>
           </aside>
         </div>
       )}
