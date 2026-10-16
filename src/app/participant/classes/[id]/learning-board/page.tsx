@@ -1,10 +1,14 @@
 'use client';
+/**
+ * Learning Board kelas (peserta), pembungkus rupa v3 KZ-023:
+ * PageHead + Card di sekeliling LearningBoardView sedia ada.
+ * Komponen papan tidak ditulis semula.
+ */
 import ParticipantShell from "@/components/ParticipantShell";
 import { useParams } from 'next/navigation';
-import Link from 'next/link';
-import { ArrowLeft, GraduationCap, ListChecks, BarChart3, BookOpen, User as UserIcon } from 'lucide-react';
-import Shell from '@/components/Shell';
+import { ArrowLeft } from 'lucide-react';
 import LearningBoardView from '@/components/learning-board/LearningBoardView';
+import { Card, PageHead } from '@/components/ui';
 
 
 export default function ParticipantLearningBoardPage() {
@@ -12,15 +16,15 @@ export default function ParticipantLearningBoardPage() {
   const classId = params.id;
   return (
     <ParticipantShell>
-      <div className="min-h-screen bg-gray-50 text-gray-900">
-<div className="px-4 md:px-6 py-4 flex items-center gap-3 border-b border-gray-200 bg-white">
-          <Link href={`/participant/home`} className="text-gray-600 hover:text-gray-900 inline-flex items-center gap-1 text-sm">
-            <ArrowLeft className="w-4 h-4" /> Back
-          </Link>
-          <h1 className="text-xl font-semibold ml-2">Learning Board</h1>
-        </div>
+      <PageHead
+        title="Learning board"
+        secondaryActions={[
+          { label: 'Back', icon: <ArrowLeft className="w-4 h-4" />, href: '/participant/home' },
+        ]}
+      />
+      <Card padat>
         <LearningBoardView classId={classId} isEditor={false} />
-      </div>
+      </Card>
     </ParticipantShell>
   );
 }

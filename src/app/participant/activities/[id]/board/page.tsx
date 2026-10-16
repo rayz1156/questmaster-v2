@@ -1,12 +1,17 @@
 "use client";
+/**
+ * Papan penghantaran aktiviti (peserta), pembungkus rupa v3 KZ-023:
+ * PageHead + Card di sekeliling QuestBoardView sedia ada.
+ * Komponen papan tidak ditulis semula.
+ */
 import ParticipantShell from "@/components/ParticipantShell";
 import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
-import { Home, Compass, Users, Trophy, User as UserIcon, ArrowLeft, BookOpen } from "lucide-react";
+import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { Board, getBoardForHunt } from "@/lib/boards";
 import QuestBoardView from "@/components/boards/QuestBoardView";
+import { Alert, Card, PageHead } from "@/components/ui";
 
 
 export default function PartActivityBoardPage() {
@@ -24,22 +29,27 @@ export default function PartActivityBoardPage() {
         setUserId(u.user?.id || null);
         const b = await getBoardForHunt(huntId);
         setBoard(b);
-      } catch (e: any) { setErr(e.message || String(e)); }
+      } catch (e) { setErr((e as { message?: string })?.message || String(e)); }
       finally { setLoading(false); }
     })();
   }, [huntId]);
 
   return (
     <ParticipantShell>
-      <div className="mb-3">
-        <Link href={`/participant/activities`} className="text-sm text-gray-600 hover:text-gray-900 inline-flex items-center gap-1">
-          <ArrowLeft className="w-4 h-4" /> Back to Activities
-        </Link>
-      </div>
-      {loading && <p className="text-sm text-gray-500">Memuatkan…</p>}
-      {err && <p className="text-sm text-red-600">{err}</p>}
-      {!loading && !board && <p className="text-sm text-gray-600">Board hantaran belum dicipta untuk aktiviti ini.</p>}
-      {board && <QuestBoardView board={board} canManage={false} currentUserId={userId} />}
+      <PageHead
+        title="Activity board"
+        secondaryActions={[
+          { label: "Back to Activities", icon: <ArrowLeft className="w-4 h-4" />, href: "/participant/activities" },
+        ]}
+      />
+      {loading && <p className="text-[14px] text-ink-muted">Memuatkan…</p>}
+      {err && <Alert tone="danger">{err}</Alert>}
+      {!loading && !board && <p className="text-[14px] text-ink-muted">Board hantaran belum dicipta untuk aktiviti ini.</p>}
+      {board && (
+        <Card padat>
+          <QuestBoardView board={board} canManage={false} currentUserId={userId} />
+        </Card>
+      )}
     </ParticipantShell>
   );
 }
