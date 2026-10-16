@@ -1,6 +1,6 @@
 "use client";
 
-import type { ReactNode } from "react";
+import { Fragment, type ReactNode } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { jumlahMukaSurat, potongHalaman } from "@/lib/uiKit";
 import Dropdown, { type DropdownItem } from "./Dropdown";
@@ -51,6 +51,10 @@ export type DataTableProps<T> = {
   className?: string;
   /** `aria-label` jadual untuk pembaca skrin. */
   label: string;
+  /** Klik baris penuh (KZ-022, untuk baris boleh kembang dsb.). */
+  onRowClick?: (row: T) => void;
+  /** Baris tambahan selepas baris utama (KZ-022, kandungan kembang). */
+  renderRowExtra?: (row: T, index: number) => ReactNode;
 };
 
 export default function DataTable<T>({
@@ -70,6 +74,8 @@ export default function DataTable<T>({
   empty,
   className = "",
   label,
+  onRowClick,
+  renderRowExtra,
 }: DataTableProps<T>) {
   const jumlah = jumlahMukaSurat(rows.length, saizHalaman);
   const hal = Math.min(Math.max(1, halaman), jumlah);
@@ -132,10 +138,15 @@ export default function DataTable<T>({
             {barisHalaman.map((r, i) => {
               const id = rowKey(r, i);
               const dipilih = selectedIds?.has(id);
+              const indeksAsal = (hal - 1) * saizHalaman + i;
+              const extra = renderRowExtra ? renderRowExtra(r, indeksAsal) : null;
               return (
+                <Fragment key={id}>
                 <tr
-                  key={id}
-                  className={`border-t border-kz-line hover:bg-[#f8f9fc] transition ${dipilih ? "bg-[#f8f9fc]" : ""}`}
+                  onClick={onRowClick ? () => onRowClick(r) : undefined}
+                  className={`border-t border-kz-line hover:bg-[#f8f9fc] transition ${
+                    onRowClick ? "cursor-pointer" : ""
+                  } ${dipilih ? "bg-[#f8f9fc]" : ""}`}
                 >
                   {selectable && (
                     <td className="px-3 py-2 align-middle">
@@ -166,7 +177,10 @@ export default function DataTable<T>({
                         trigger={({ open, toggle }) => (
                           <button
                             type="button"
-                            onClick={toggle}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              toggle();
+                            }}
                             aria-haspopup="menu"
                             aria-expanded={open}
                             aria-label={menuLabel}
@@ -179,6 +193,17 @@ export default function DataTable<T>({
                     </td>
                   )}
                 </tr>
+                {extra != null && (
+                  <tr className="border-t border-kz-line">
+                    <td
+                      colSpan={columns.length + (selectable ? 1 : 0) + (menuItems ? 1 : 0)}
+                      className="px-2 py-2"
+                    >
+                      {extra}
+                    </td>
+                  </tr>
+                )}
+                </Fragment>
               );
             })}
           </tbody>

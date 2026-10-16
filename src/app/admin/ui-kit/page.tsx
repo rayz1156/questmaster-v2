@@ -375,6 +375,12 @@ export default function UiKitPage() {
           halaman={halaman}
           saizHalaman={6}
           onHalaman={setHalaman}
+          onRowClick={() => {}}
+          renderRowExtra={(r) =>
+            r.status === "Suspend" ? (
+              <p className="text-[12px] text-ink-faint py-2">Sample expanded row for {r.nama}.</p>
+            ) : null
+          }
           empty={<EmptyState icon={<Inbox className="w-6 h-6" />} title="No students found" text="Try a different search or filter." />}
         />
       </Seksyen>
@@ -407,6 +413,12 @@ export default function UiKitPage() {
             tasksTotal={8}
             members={["Aiman Solehah", "Sofia Amina"]}
             daysLeft={1}
+            badges={
+              <>
+                <Badge variant="dim" warna="purple">100 pts</Badge>
+                <Badge variant="dot" warna="green">Active</Badge>
+              </>
+            }
           />
           <ProjectCard
             title="History Trail"

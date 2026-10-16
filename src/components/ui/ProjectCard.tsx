@@ -30,6 +30,7 @@ export default function ProjectCard({
   members,
   daysLeft,
   done,
+  badges,
   menuItems,
   menuLabel = "Project actions",
   href,
@@ -47,6 +48,8 @@ export default function ProjectCard({
   daysLeft?: number;
   /** Siap: lencana "Done" hijau dim. */
   done?: boolean;
+  /** Lencana tambahan baris bawah, kanan, sebelum lencana masa (KZ-022). */
+  badges?: ReactNode;
   menuItems?: DropdownItem[];
   menuLabel?: string;
   href?: string;
@@ -118,18 +121,21 @@ export default function ProjectCard({
         </>
       )}
 
-      {(members && members.length > 0) || masa ? (
+      {(members && members.length > 0) || masa || badges ? (
         <div className="flex items-center justify-between gap-2 mt-auto pt-2">
           {members && members.length > 0 ? (
             <AvatarGroup names={members} max={4} />
           ) : (
             <span />
           )}
-          {masa && (
-            <Badge variant="dim" warna={masa.warna}>
-              {masa.label}
-            </Badge>
-          )}
+          <span className="flex items-center gap-1.5">
+            {badges}
+            {masa && (
+              <Badge variant="dim" warna={masa.warna}>
+                {masa.label}
+              </Badge>
+            )}
+          </span>
         </div>
       ) : null}
     </div>
