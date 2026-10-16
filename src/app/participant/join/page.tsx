@@ -1,8 +1,25 @@
 "use client";
+/**
+ * Sertai kelas melalui kod, rupa v3 KZ-023.
+ *
+ * Kad tengah gaya AuthSplit: borang Field/Input kit dalam Card kit.
+ * Aliran tidak berubah: semak sesi dahulu (belum log masuk -> halaman
+ * log masuk dengan next), kod dalam URL -> alih ke /j/<kod
+ * dinormalisasi>, dan borang tetap memanggil joinClassByCode dengan
+ * normalizeClassCode.
+ */
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { ArrowLeft } from "lucide-react";
 import { joinClassByCode, normalizeClassCode } from "@/lib/data";
-import { supabase } from "@/lib/supabase";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHead,
+  Field,
+  Input,
+} from "@/components/ui";
 
 function Inner() {
   const router = useRouter();
@@ -11,7 +28,6 @@ function Inner() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [ok, setOk] = useState<string | null>(null);
-  const [authChecked, setAuthChecked] = useState(false);
   useEffect(() => {
     let cancelled = false;
     (async () => {
@@ -22,7 +38,6 @@ function Inner() {
       if (!data.user) {
         router.replace(`/login?next=${encodeURIComponent('/participant/join' + (code ? `?code=${code}` : ''))}`);
       } else {
-        setAuthChecked(true);
         // Satu aliran sahaja: jika kod ada di URL, alih ke /j/<kod
         // dinormalisasi> (tiket V2-004). Tiada penyertaan automatik di sini.
         if (code && code.trim()) {
@@ -32,6 +47,8 @@ function Inner() {
       }
     })();
     return () => { cancelled = true; };
+    // Dijalankan sekali semasa muat, seperti versi asal.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const onSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -39,16 +56,39 @@ function Inner() {
     // Kod dinormalisasi sebelum dihantar supaya jarak, sengkang dan
     // huruf O/I/L tidak menghalang penyertaan.
     try { await joinClassByCode(normalizeClassCode(code)); setOk("Joined! Redirecting…"); setTimeout(() => router.replace('/participant/home'), 800); }
-    catch (e: any) { const m=String(e?.message||'Failed'); setErr(/Invalid class code/i.test(m) ? "Code not found. Please check the code with your educator." : m); } finally { setBusy(false); }
+    catch (e: unknown) { const m = String((e as { message?: string })?.message || 'Failed'); setErr(/Invalid class code/i.test(m) ? "Code not found. Please check the code with your educator." : m); } finally { setBusy(false); }
   };
   return (
-    <form onSubmit={onSubmit} className="card w-full max-w-sm space-y-3">
-      <a href="/participant/home" className="btn-quiet mb-4"><svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7"/></svg>Back to Home</a><h1 className="section-title">Join a class</h1>
-      <p className="text-sm text-ink-muted">Enter the class code given by your educator.</p>
-      <input className="input text-center font-mono text-lg uppercase tracking-[0.2em]" placeholder="ABCD1234" value={code} onChange={e=>{setCode(e.target.value.toUpperCase());setErr(null);}} required maxLength={16}/>
-      <button disabled={busy} className="btn-primary w-full py-2">{busy ? 'Joining…' : 'Join class'}</button>
-      {err && <div className="text-sm text-[#C0392B]">{err}</div>}
-      {ok && <div className="text-sm text-[#2E7D4F]">{ok}</div>}
+    <form onSubmit={onSubmit} className="w-full max-w-sm">
+      <Card>
+        <div className="mb-5">
+          <Button variant="ghost" href="/participant/home" ariaLabel="Back to Home">
+            <ArrowLeft className="w-4 h-4" /> Back to Home
+          </Button>
+        </div>
+        <CardHead
+          title="Join a class"
+          subtitle="Enter the class code given by your educator."
+        />
+        <div className="mt-5">
+          <Field label="Class code" htmlFor="kod-kelas">
+            <Input
+              id="kod-kelas"
+              className="text-center font-mono text-lg uppercase tracking-[0.2em]"
+              placeholder="ABCD1234"
+              value={code}
+              onChange={e => { setCode(e.target.value.toUpperCase()); setErr(null); }}
+              required
+              maxLength={16}
+            />
+          </Field>
+        </div>
+        <Button type="submit" disabled={busy} className="mt-5 w-full py-2">
+          {busy ? 'Joining…' : 'Join class'}
+        </Button>
+        {err && <Alert tone="danger" className="mt-3">{err}</Alert>}
+        {ok && <Alert tone="success" className="mt-3">{ok}</Alert>}
+      </Card>
     </form>
   );
 }
