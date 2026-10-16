@@ -1,9 +1,12 @@
 "use client";
 
-// Butiran kelas ruang kerja admin (V2-011c). Semua tindakan kelas
-// berpindah ke sini daripada senarai: edit nama/join_code, arkib dan
-// buang dengan pengesahan menaip nama. Tab: Overview, Members,
-// Activities, Teams dan Ranking.
+// Butiran kelas ruang kerja admin (V2-011c), rupa v3 (KZ-024b): PageHead
+// varian breadcrumb ("Classes / <nama kelas>") dengan tindakan Edit, Archive
+// atau Restore, dan Delete; StatGroup nombor sebenar; Tabs keadaan untuk
+// bahagian sedia ada; DataTable untuk ahli dan aktiviti. Logik, data dan
+// pengesahan TIDAK berubah (KZ-DS-v3 bahagian 5). Semua tindakan kelas
+// berpindah ke sini daripada senarai: edit nama/join_code, arkib dan buang
+// dengan pengesahan menaip nama.
 //
 // Ranking individu datang daripada view qm_class_individual_scores
 // (V2-012, migrasi 0049): Activities + Live Quiz + Adjustments; skor
@@ -13,11 +16,14 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
-  Pencil, Archive, RotateCcw, Trash2, X, Download, Users as UsersIcon,
-  Map as MapIcon, ClipboardList, Search,
+  Pencil, Archive, RotateCcw, Trash2, Download, Users as UsersIcon,
+  Map as MapIcon, Search,
 } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, Tabs, EmptyState, StatCard } from "@/components/admin/ui";
+import {
+  Alert, Avatar, Badge, Button, Card, CardHead, DataTable, EmptyState,
+  Field, Input, Modal, PageHead, StatGroup, Tabs, type DataColumn,
+} from "@/components/ui";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { mesejHad } from "@/lib/pelan";
 import {
@@ -352,25 +358,23 @@ export default function Page({ params }: { params: { id: string } }) {
 
   if (muat) {
     return (
-      <AdminShell crumbs={[{ label: "Classes", href: "/admin/classes" }, { label: "Loading..." }]}>
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+      <AdminShell>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       </AdminShell>
     );
   }
 
   if (!kelas) {
     return (
-      <AdminShell
-        crumbs={[{ label: "Classes", href: "/admin/classes" }, { label: "Not found" }]}
-        title="Class not found"
-      >
+      <AdminShell title="Class not found">
         <Card>
-          <EmptyState title="Class not found." body="This class may have been deleted." />
-          <div className="px-4 pb-4">
-            <Link href="/admin/classes" className="text-sm font-medium text-brand-purple hover:opacity-80">
-              Back to Classes
-            </Link>
-          </div>
+          <EmptyState
+            icon={<MapIcon className="w-6 h-6" />}
+            title="Class not found."
+            text="This class may have been deleted."
+            actionLabel="Back to Classes"
+            href="/admin/classes"
+          />
         </Card>
       </AdminShell>
     );
@@ -388,79 +392,163 @@ export default function Page({ params }: { params: { id: string } }) {
     );
   });
 
+  // Lajur DataTable tab Members; carian dan data sama seperti jadual lama.
+  const lajurAhli: DataColumn<AhliKelasAdmin>[] = [
+    {
+      key: "nama",
+      header: "Member",
+      render: (a, i) => (
+        <span className="flex items-center gap-3 py-3">
+          <Avatar name={a.nama || "Unnamed user"} size="sm" index={i} />
+          <span className="min-w-0">
+            <Link
+              href={`/admin/users/${a.user_id}`}
+              className="block text-[13px] font-bold text-ink hover:text-brand-purple transition truncate"
+            >
+              {a.nama || "Unnamed user"}
+            </Link>
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "emel",
+      header: "Email",
+      hideOnMobile: true,
+      render: (a) => <span className="text-[13px] text-ink-faint">{a.emel || "No email"}</span>,
+    },
+    {
+      key: "joined",
+      header: "Joined",
+      render: (a) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{fmt(a.joined_at)}</span>,
+    },
+  ];
+
+  // Lajur DataTable tab Activities; kiraan cabaran/penghantaran sama seperti lama.
+  const lajurAktiviti: DataColumn<Hunt>[] = [
+    {
+      key: "tajuk",
+      header: "Title",
+      render: (h) => (
+        <Link
+          href={`/admin/hunts/${h.id}`}
+          className="text-[13px] font-bold text-ink hover:text-brand-purple transition"
+        >
+          {h.title}
+        </Link>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (h) =>
+        h.status === "active" ? (
+          <Badge variant="dot" warna="green">
+            {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+          </Badge>
+        ) : h.status === "draft" ? (
+          <Badge variant="dim" warna="yellow">
+            {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+          </Badge>
+        ) : (
+          <Badge variant="dim" warna="gray">
+            {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+          </Badge>
+        ),
+    },
+    {
+      key: "cabaran",
+      header: "Challenges",
+      render: (h) => (
+        <span className="text-[13px] text-ink-faint">
+          {challengesKelas.filter((c) => c.hunt_id === h.id).length}
+        </span>
+      ),
+    },
+    {
+      key: "hantaran",
+      header: "Submissions",
+      render: (h) => (
+        <span className="text-[13px] text-ink-faint">
+          {subsKelas.filter((s) =>
+            challengesKelas.some((c) => c.id === s.challenge_id && c.hunt_id === h.id),
+          ).length}
+        </span>
+      ),
+    },
+    {
+      key: "mula",
+      header: "Start",
+      hideOnMobile: true,
+      render: (h) => (
+        <span className="text-[13px] text-ink-faint whitespace-nowrap">{h.start_at ? fmt(h.start_at) : "-"}</span>
+      ),
+    },
+    {
+      key: "tamat",
+      header: "End",
+      hideOnMobile: true,
+      render: (h) => (
+        <span className="text-[13px] text-ink-faint whitespace-nowrap">{h.end_at ? fmt(h.end_at) : "-"}</span>
+      ),
+    },
+  ];
+
   return (
-    <AdminShell
-      crumbs={[{ label: "Classes", href: "/admin/classes" }, { label: namaKelas }]}
-      actions={
-        <>
-          <button
-            type="button"
-            onClick={() => setEdit({ name: kelas.name, join_code: kelas.join_code || "" })}
-            className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-          >
-            <Pencil className="w-4 h-4 text-ink-faint" /> Edit
-          </button>
-          {kelas.is_archived ? (
-            <button
-              type="button"
-              onClick={tukarArkib}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-            >
-              <RotateCcw className="w-4 h-4 text-ink-faint" /> Restore
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={tukarArkib}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-            >
-              <Archive className="w-4 h-4 text-ink-faint" /> Archive
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setZonBahaya((v) => !v)}
-            className="inline-flex items-center gap-1.5 bg-white border border-red-200 rounded-xl px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            <Trash2 className="w-4 h-4" /> Delete
-          </button>
-        </>
-      }
-    >
-      {/* Kepala */}
-      <div className="flex items-center gap-4 mb-6 flex-wrap">
-        <span
-          className="w-12 h-12 rounded-2xl shrink-0"
-          style={{ background: kelas.color || "#6366f1" }}
-          aria-hidden
-        />
-        <div className="min-w-0">
-          <div className="text-xl font-semibold text-ink truncate">{namaKelas}</div>
-          <div className="text-sm text-ink-faint truncate flex items-center gap-2 flex-wrap">
+    <AdminShell>
+      <PageHead
+        crumb="Classes"
+        name={namaKelas}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
             <span>
               by{" "}
-              <Link href={`/admin/users/${kelas.owner_id}`} className="text-brand-purple font-medium hover:opacity-80">
+              <Link
+                href={`/admin/users/${kelas.owner_id}`}
+                className="text-brand-purple font-medium hover:underline"
+              >
                 {namaProfil(kelas.owner_id)}
               </Link>
             </span>
             <span className="font-mono">{kelas.join_code || "-"}</span>
-            <Pill tone={status === "active" ? "green" : status === "ended" ? "yellow" : "gray"}>
-              {labelStatusKelas(kelas)}
-            </Pill>
-          </div>
-        </div>
-      </div>
+            {status === "active" ? (
+              <Badge variant="dot" warna="green">
+                {labelStatusKelas(kelas)}
+              </Badge>
+            ) : status === "ended" ? (
+              <Badge variant="dim" warna="yellow">
+                {labelStatusKelas(kelas)}
+              </Badge>
+            ) : (
+              <Badge variant="dim" warna="gray">
+                {labelStatusKelas(kelas)}
+              </Badge>
+            )}
+          </span>
+        }
+        secondaryActions={[
+          {
+            label: "Edit",
+            icon: <Pencil className="w-4 h-4" />,
+            onSelect: () => setEdit({ name: kelas.name, join_code: kelas.join_code || "" }),
+          },
+          kelas.is_archived
+            ? { label: "Restore", icon: <RotateCcw className="w-4 h-4" />, onSelect: tukarArkib }
+            : { label: "Archive", icon: <Archive className="w-4 h-4" />, onSelect: tukarArkib },
+          { label: "Delete", icon: <Trash2 className="w-4 h-4" />, onSelect: () => setZonBahaya((v) => !v) },
+        ]}
+      />
 
       {/* Zon bahaya buang kelas: pengesahan menaip nama kelas tepat */}
       {zonBahaya && (
-        <Card className="mb-6 p-4 border-red-200">
-          <div className="text-sm font-semibold text-red-600 mb-1">Danger zone</div>
-          <p className="text-sm text-ink-muted mb-3">
+        <Card className="mb-6">
+          <div className="text-[13px] font-bold text-red-600 mb-1">Danger zone</div>
+          <p className="text-[14px] text-ink-muted mb-4">
             Deleting this class removes its activities, submissions and teams permanently. Type the class name exactly to enable the button.
           </p>
-          <div className="flex items-center gap-3 flex-wrap">
-            <input
-              className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink w-64"
+          <div className="flex flex-wrap items-center gap-3">
+            <Input
+              className="w-64"
               placeholder={namaKelas}
               value={pengesahanHapus}
               onChange={(e) => setPengesahanHapus(e.target.value)}
@@ -470,261 +558,235 @@ export default function Page({ params }: { params: { id: string } }) {
               type="button"
               disabled={pengesahanHapus !== namaKelas}
               onClick={hapus}
-              className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40"
+              className="inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none h-9 px-[18px] py-[7px] text-[13px] bg-red-600 text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
               <Trash2 className="w-4 h-4" /> Delete class
             </button>
-            <button
-              type="button"
-              onClick={() => {
-                setZonBahaya(false);
-                setPengesahanHapus("");
-              }}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink"
-            >
+            <Button variant="outline" onClick={() => { setZonBahaya(false); setPengesahanHapus(""); }}>
               Cancel
-            </button>
+            </Button>
           </div>
         </Card>
       )}
 
       <Tabs
         items={[
-          { key: "overview", label: "Overview" },
-          { key: "members", label: "Members" },
-          { key: "activities", label: "Activities" },
-          { key: "teams", label: "Teams" },
-          { key: "ranking", label: "Ranking" },
+          { label: "Overview", onSelect: () => setTab("overview"), aktif: tab === "overview" },
+          { label: "Members", onSelect: () => setTab("members"), aktif: tab === "members" },
+          { label: "Activities", onSelect: () => setTab("activities"), aktif: tab === "activities" },
+          { label: "Teams", onSelect: () => setTab("teams"), aktif: tab === "teams" },
+          { label: "Ranking", onSelect: () => setTab("ranking"), aktif: tab === "ranking" },
         ]}
-        value={tab}
-        onChange={(k) => setTab(k as MukaTab)}
       />
 
       {mesej && (
-        <div
-          className={`mt-4 text-sm rounded-lg px-3 py-2 inline-block ${
-            mesej.baik
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
+        <Alert tone={mesej.baik ? "success" : "danger"} className="mt-4">
           {mesej.teks}
-        </div>
+        </Alert>
       )}
 
       {/* ===== Tab Overview ===== */}
       {tab === "overview" && (
-        <div className="mt-4">
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-4">
-            <StatCard label="Members" value={ahli.length} icon={<UsersIcon className="w-4 h-4" />} />
-            <StatCard label="Activities" value={hunts.length} icon={<MapIcon className="w-4 h-4" />} />
-            <StatCard label="Teams" value={teams.length} icon={<UsersIcon className="w-4 h-4" />} />
-            <StatCard
-              label="Submissions"
-              value={kiraanSubs.jumlah}
-              hint={`${kiraanSubs.approved} approved, ${kiraanSubs.rejected} rejected, ${kiraanSubs.pending} pending`}
-              icon={<ClipboardList className="w-4 h-4" />}
+        <>
+          <Card>
+            <StatGroup
+              stats={[
+                { label: "Members", value: ahli.length },
+                { label: "Activities", value: hunts.length },
+                { label: "Teams", value: teams.length },
+                { label: "Submissions", value: kiraanSubs.jumlah },
+              ]}
             />
-          </div>
-          <Card className="p-4">
-            <div className="text-sm font-semibold text-ink mb-2">Class details</div>
-            <div className="flex items-center justify-between gap-4 py-2.5 border-b border-hairline last:border-b-0">
-              <span className="text-sm text-ink-muted shrink-0">Description</span>
-              <span className="text-sm text-ink text-right min-w-0">{kelas.description || "-"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 py-2.5 border-b border-hairline last:border-b-0">
-              <span className="text-sm text-ink-muted shrink-0">Created</span>
-              <span className="text-sm text-ink text-right">{fmt(kelas.created_at)}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 py-2.5 border-b border-hairline last:border-b-0">
-              <span className="text-sm text-ink-muted shrink-0">Scoring mode</span>
-              <span className="text-sm text-ink text-right">{kelas.scoring_mode === "individual" ? "Individual" : "Team"}</span>
-            </div>
-            <div className="flex items-center justify-between gap-4 py-2.5 border-b border-hairline last:border-b-0">
-              <span className="text-sm text-ink-muted shrink-0">Leaderboard visible to students</span>
-              <span className="text-sm text-ink text-right">{kelas.leaderboard_visible === false ? "No" : "Yes"}</span>
+          </Card>
+          <Card className="mt-4">
+            <CardHead title="Class details" />
+            <div className="mt-4">
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Description</div>
+                <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted text-right sm:text-left">
+                  {kelas.description || "-"}
+                </div>
+              </div>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Created</div>
+                <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">{fmt(kelas.created_at)}</div>
+              </div>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Scoring mode</div>
+                <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">
+                  {kelas.scoring_mode === "individual" ? "Individual" : "Team"}
+                </div>
+              </div>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Leaderboard visible to students</div>
+                <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">
+                  {kelas.leaderboard_visible === false ? "No" : "Yes"}
+                </div>
+              </div>
+              <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3">
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Submissions</div>
+                <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">
+                  {kiraanSubs.approved} approved, {kiraanSubs.rejected} rejected, {kiraanSubs.pending} pending
+                </div>
+              </div>
             </div>
           </Card>
-        </div>
+        </>
       )}
 
       {/* ===== Tab Members ===== */}
       {tab === "members" && (
-        <div className="mt-4">
-          <div className="flex flex-wrap items-center gap-2 mb-4">
-            <div className="relative flex-1 min-w-[200px]">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-              <input
-                className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-hairline text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-                placeholder="Search name or email"
-                value={carianAhli}
-                onChange={(e) => setCarianAhli(e.target.value)}
-              />
-            </div>
-            <button
-              type="button"
-              onClick={exportAhli}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-            >
-              <Download className="w-4 h-4 text-ink-faint" /> Export CSV
-            </button>
-          </div>
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                    <th className="px-4 py-3 font-medium">Name</th>
-                    <th className="px-4 py-3 font-medium">Email</th>
-                    <th className="px-4 py-3 font-medium">Joined</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {ahliDitapis.map((a) => (
-                    <tr key={a.user_id} className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9]">
-                      <td className="px-4 py-3">
-                        <Link
-                          href={`/admin/users/${a.user_id}`}
-                          className="font-medium text-brand-purple hover:opacity-80"
-                        >
-                          {a.nama || "Unnamed user"}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3 text-ink-muted">{a.emel || "No email"}</td>
-                      <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{fmt(a.joined_at)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-            {ahli.length === 0 && <EmptyState title="No members." body="Nobody has joined this class yet." />}
-          </Card>
-        </div>
+        <DataTable
+          className="mt-4"
+          label="Class members"
+          columns={lajurAhli}
+          rows={ahliDitapis}
+          rowKey={(a) => a.user_id}
+          head={
+            <>
+              <span className="w-full sm:w-64">
+                <Input
+                  ikonKiri={<Search className="w-4 h-4" />}
+                  placeholder="Search name or email"
+                  aria-label="Search members"
+                  value={carianAhli}
+                  onChange={(e) => setCarianAhli(e.target.value)}
+                />
+              </span>
+              <Button variant="outline" onClick={exportAhli}>
+                <Download className="w-4 h-4" /> Export CSV
+              </Button>
+            </>
+          }
+          empty={
+            <EmptyState
+              icon={<UsersIcon className="w-6 h-6" />}
+              title="No members."
+              text="Nobody has joined this class yet."
+            />
+          }
+        />
       )}
 
       {/* ===== Tab Activities ===== */}
       {tab === "activities" && (
-        <Card className="mt-4 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                  <th className="px-4 py-3 font-medium">Title</th>
-                  <th className="px-4 py-3 font-medium">Status</th>
-                  <th className="px-4 py-3 font-medium">Challenges</th>
-                  <th className="px-4 py-3 font-medium">Submissions</th>
-                  <th className="px-4 py-3 font-medium">Start</th>
-                  <th className="px-4 py-3 font-medium">End</th>
-                </tr>
-              </thead>
-              <tbody>
-                {hunts.map((h) => {
-                  const kiraCh = challengesKelas.filter((c) => c.hunt_id === h.id).length;
-                  const kiraSub = subsKelas.filter((s) =>
-                    challengesKelas.some((c) => c.id === s.challenge_id && c.hunt_id === h.id),
-                  ).length;
-                  return (
-                    <tr key={h.id} className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9]">
-                      <td className="px-4 py-3">
-                        <Link href={`/admin/hunts/${h.id}`} className="font-medium text-brand-purple hover:opacity-80">
-                          {h.title}
-                        </Link>
-                      </td>
-                      <td className="px-4 py-3">
-                        <Pill tone={h.status === "active" ? "green" : h.status === "draft" ? "yellow" : "gray"}>
-                          {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
-                        </Pill>
-                      </td>
-                      <td className="px-4 py-3 text-ink-muted">{kiraCh}</td>
-                      <td className="px-4 py-3 text-ink-muted">{kiraSub}</td>
-                      <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{h.start_at ? fmt(h.start_at) : "-"}</td>
-                      <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{h.end_at ? fmt(h.end_at) : "-"}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-          {hunts.length === 0 && <EmptyState title="No activities." body="This class has no activities yet." />}
-        </Card>
+        <DataTable
+          className="mt-4"
+          label="Class activities"
+          columns={lajurAktiviti}
+          rows={hunts}
+          rowKey={(h) => h.id}
+          empty={
+            <EmptyState
+              icon={<MapIcon className="w-6 h-6" />}
+              title="No activities."
+              text="This class has no activities yet."
+            />
+          }
+        />
       )}
 
       {/* ===== Tab Teams ===== */}
       {tab === "teams" && (
-        <div className="mt-4 grid lg:grid-cols-2 gap-4">
+        <div className="mt-4 grid lg:grid-cols-2 gap-4 items-start">
           {/* Senarai kiri */}
-          <Card className="overflow-hidden">
-            <div className="px-4 py-3 border-b border-hairline text-sm font-semibold text-ink">Teams</div>
+          <Card padat>
+            <div className="px-6 py-4 border-b border-kz-line text-[16.8px] font-bold tracking-[-0.17px] text-ink">
+              Teams
+            </div>
             {teams.length === 0 ? (
-              <EmptyState title="No teams." body="Teams appear here once an educator creates them." />
+              <EmptyState
+                icon={<UsersIcon className="w-6 h-6" />}
+                title="No teams."
+                text="Teams appear here once an educator creates them."
+              />
             ) : (
               teamsSusun.map((t) => (
                 <button
                   key={t.id}
                   type="button"
                   onClick={() => setPasukanDipilih(t.id)}
-                  className={`w-full flex items-center gap-3 px-4 py-3 border-t border-hairline first:border-t-0 text-left transition ${
-                    pasukanDipilih === t.id ? "bg-[#F1EEFC]" : "hover:bg-[#F7F7F9]"
+                  className={`w-full flex items-center gap-3 px-6 py-4 border-t border-kz-line text-left transition ${
+                    pasukanDipilih === t.id ? "bg-[#F1EEFC]" : "hover:bg-[#f8f9fc]"
                   }`}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium text-ink truncate">{t.name}</span>
-                    <span className="block text-xs text-ink-faint">{ahliPasukan[t.id]?.length ?? 0} members</span>
+                    <span className="block text-[14px] font-bold text-ink truncate">{t.name}</span>
+                    <span className="block text-[12px] text-ink-faint">{ahliPasukan[t.id]?.length ?? 0} members</span>
                   </span>
-                  <span className="text-sm font-semibold text-brand-purple shrink-0">{Number(t.score) || 0}</span>
+                  <span className="text-[14px] font-semibold text-brand-purple shrink-0">{Number(t.score) || 0}</span>
                 </button>
               ))
             )}
           </Card>
 
           {/* Panel kanan: butiran pasukan dipilih */}
-          <Card className="p-4">
+          <Card>
             {pasukanDipilih === null ? (
-              <EmptyState title="Select a team." body="Pick a team on the left to see its members." />
+              <EmptyState
+                icon={<UsersIcon className="w-6 h-6" />}
+                title="Select a team."
+                text="Pick a team on the left to see its members."
+              />
             ) : (
               (() => {
                 const t = teams.find((x) => x.id === pasukanDipilih);
-                if (!t) return <EmptyState title="Team not found." />;
+                if (!t)
+                  return (
+                    <EmptyState
+                      icon={<UsersIcon className="w-6 h-6" />}
+                      title="Team not found."
+                      text="It may have been deleted."
+                    />
+                  );
                 const senarai = butiranAhli[t.id];
                 return (
                   <>
-                    <div className="flex items-center justify-between gap-3 mb-3 flex-wrap">
+                    <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-sm font-semibold text-ink truncate">{t.name}</div>
-                        <div className="text-xs text-ink-faint">Score {Number(t.score) || 0}</div>
+                        <div className="text-[16.8px] font-bold tracking-[-0.17px] text-ink truncate">{t.name}</div>
+                        <div className="text-[12px] text-ink-faint">Score {Number(t.score) || 0}</div>
                       </div>
                       <div className="flex items-center gap-2">
-                        <button
-                          type="button"
+                        <Button
+                          variant="outline"
+                          size="sm"
                           onClick={() => setEditPasukan({ id: t.id, nama: t.name, lama: t.name })}
-                          className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-3 py-1.5 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
                         >
-                          <Pencil className="w-4 h-4 text-ink-faint" /> Rename
-                        </button>
+                          <Pencil className="w-4 h-4" /> Rename
+                        </Button>
                         <button
                           type="button"
                           onClick={() => buangPasukan(t)}
-                          className="inline-flex items-center gap-1.5 bg-white border border-red-200 rounded-xl px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50"
+                          className="inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none h-8 px-3 text-[12px] bg-white border border-red-200 text-red-600 hover:bg-[#fce4e2]"
                         >
                           <Trash2 className="w-4 h-4" /> Delete
                         </button>
                       </div>
                     </div>
                     {senarai === undefined ? (
-                      <div className="text-sm text-ink-faint py-4">Loading members...</div>
+                      <div className="text-[14px] text-ink-faint py-4">Loading members...</div>
                     ) : senarai.length === 0 ? (
-                      <EmptyState title="No members." />
+                      <EmptyState
+                        icon={<UsersIcon className="w-6 h-6" />}
+                        title="No members."
+                        text="Nobody is in this team yet."
+                      />
                     ) : (
-                      <div className="space-y-1">
+                      <div className="mt-2 space-y-1">
                         {senarai.map((m) => (
-                          <div key={m.user_id} className="flex items-center gap-2 text-sm py-1">
+                          <div key={m.user_id} className="flex items-center gap-2 text-[14px] py-1">
                             <span className="text-ink truncate">{m.nama || "Unnamed user"}</span>
-                            {m.role === "leader" && <Pill tone="violet">Leader</Pill>}
+                            {m.role === "leader" && (
+                              <Badge variant="dim" warna="purple">
+                                Leader
+                              </Badge>
+                            )}
                           </div>
                         ))}
                       </div>
                     )}
-                    <p className="text-xs text-ink-faint mt-4">Team changes are recorded in Audit.</p>
+                    <p className="text-[12px] text-ink-faint mt-4">Team changes are recorded in Audit.</p>
                   </>
                 );
               })()
@@ -736,12 +798,12 @@ export default function Page({ params }: { params: { id: string } }) {
       {/* ===== Tab Ranking ===== */}
       {tab === "ranking" && (
         <div className="mt-4">
-          <div className="flex items-center gap-3 mb-4 flex-wrap">
-            <div className="flex items-center gap-1 p-1 bg-[#F4F4F6] rounded-xl w-fit">
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <div className="flex items-center gap-1 p-1 bg-[#eff1f5] rounded-[4px] w-fit">
               <button
                 type="button"
                 onClick={() => setModRanking("teams")}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                className={`px-4 py-1.5 rounded-[4px] text-[13px] font-bold transition ${
                   modRanking === "teams" ? "bg-white shadow text-brand-purple" : "text-ink-muted hover:text-ink"
                 }`}
               >
@@ -750,47 +812,51 @@ export default function Page({ params }: { params: { id: string } }) {
               <button
                 type="button"
                 onClick={() => setModRanking("individuals")}
-                className={`px-4 py-1.5 rounded-lg text-sm font-medium transition ${
+                className={`px-4 py-1.5 rounded-[4px] text-[13px] font-bold transition ${
                   modRanking === "individuals" ? "bg-white shadow text-brand-purple" : "text-ink-muted hover:text-ink"
                 }`}
               >
                 Individuals
               </button>
             </div>
-            <button
-              type="button"
-              onClick={exportRanking}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-            >
-              <Download className="w-4 h-4 text-ink-faint" /> Export CSV
-            </button>
+            <Button variant="outline" onClick={exportRanking}>
+              <Download className="w-4 h-4" /> Export CSV
+            </Button>
           </div>
 
-          <Card className="overflow-hidden">
+          <Card padat>
             {modRanking === "teams" ? (
               teamsSusun.length === 0 ? (
-                <EmptyState title="No team scores yet." />
+                <EmptyState
+                  icon={<UsersIcon className="w-6 h-6" />}
+                  title="No team scores yet."
+                  text="Teams appear here once an educator creates them."
+                />
               ) : (
                 teamsSusun.map((t, i) => (
                   <div
                     key={t.id}
-                    className="flex items-center gap-3 px-4 py-3 border-t border-hairline first:border-t-0"
+                    className="flex items-center gap-3 px-6 py-4 border-t border-kz-line first:border-t-0"
                   >
                     <span className="w-8 h-8 rounded-full bg-[#EAE6FC] text-brand-purple text-[13px] font-semibold flex items-center justify-center shrink-0">
                       {i + 1}
                     </span>
-                    <span className="text-sm font-medium text-ink truncate flex-1">{t.name}</span>
-                    <span className="text-sm font-semibold text-brand-purple shrink-0">{Number(t.score) || 0}</span>
+                    <span className="text-[14px] font-bold text-ink truncate flex-1">{t.name}</span>
+                    <span className="text-[14px] font-semibold text-brand-purple shrink-0">{Number(t.score) || 0}</span>
                   </div>
                 ))
               )
             ) : markahIndividu.length === 0 ? (
-              <EmptyState title="No students ranked yet." />
+              <EmptyState
+                icon={<UsersIcon className="w-6 h-6" />}
+                title="No students ranked yet."
+                text="Scores appear here once students join activities."
+              />
             ) : (
               markahIndividu.map((r, i) => (
                 <div
                   key={r.user_id}
-                  className="flex items-center gap-3 px-4 py-3 border-t border-hairline first:border-t-0"
+                  className="flex items-center gap-3 px-6 py-4 border-t border-kz-line first:border-t-0"
                 >
                   <span className="w-8 h-8 rounded-full bg-[#EAE6FC] text-brand-purple text-[13px] font-semibold flex items-center justify-center shrink-0">
                     {i + 1}
@@ -798,108 +864,90 @@ export default function Page({ params }: { params: { id: string } }) {
                   <span className="min-w-0 flex-1">
                     <Link
                       href={`/admin/users/${r.user_id}`}
-                      className="text-sm font-medium text-ink hover:text-brand-purple truncate"
+                      className="text-[14px] font-bold text-ink hover:text-brand-purple transition truncate"
                     >
                       {r.display_name || namaById[r.user_id] || "Unnamed user"}
                     </Link>
                     {/* V2-012: pecahan markah individu daripada view
                         qm_class_individual_scores (migrasi 0049). */}
-                    <span className="block text-xs text-ink-faint truncate">
+                    <span className="block text-[12px] text-ink-faint truncate">
                       Activities {r.task_score ?? 0} · Live Quiz {r.live_score ?? 0} · Adjustments {r.adjustment_score ?? 0}
                     </span>
                   </span>
-                  <span className="text-sm font-semibold text-brand-purple shrink-0">{Number(r.total_score) || 0}</span>
+                  <span className="text-[14px] font-semibold text-brand-purple shrink-0">{Number(r.total_score) || 0}</span>
                 </div>
               ))
             )}
           </Card>
-          <p className="text-xs text-ink-faint mt-3">
+          <p className="text-[12px] text-ink-faint mt-3">
             Team scores come from the live scoring engine. Individual totals combine activities, live quizzes and adjustments.
           </p>
         </div>
       )}
 
       {/* Dialog edit kelas */}
-      {edit && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-2xl border border-hairline shadow-raised w-full max-w-md p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-ink">Edit class</h3>
-              <button type="button" onClick={() => setEdit(null)} aria-label="Close">
-                <X className="w-5 h-5 text-ink-muted" />
-              </button>
-            </div>
-            <label className="text-xs text-ink-faint">Name</label>
-            <input
-              className="w-full mt-1 mb-3 h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-              value={edit.name}
-              onChange={(e) => setEdit({ ...edit, name: e.target.value })}
+      <Modal
+        open={edit !== null}
+        onClose={() => setEdit(null)}
+        title="Edit class"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEdit(null)}>
+              Cancel
+            </Button>
+            <Button onClick={simpanEdit} disabled={!edit || edit.name.trim().length === 0}>
+              Save changes
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="Name" htmlFor="edit-nama-kelas">
+            <Input
+              id="edit-nama-kelas"
+              value={edit?.name ?? ""}
+              onChange={(e) => setEdit(edit ? { ...edit, name: e.target.value } : null)}
             />
-            <label className="text-xs text-ink-faint">Join code</label>
-            <input
-              className="w-full mt-1 mb-3 h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink font-mono focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-              value={edit.join_code}
-              onChange={(e) => setEdit({ ...edit, join_code: e.target.value })}
+          </Field>
+          <Field label="Join code" htmlFor="edit-kod-kelas">
+            <Input
+              id="edit-kod-kelas"
+              className="font-mono"
+              value={edit?.join_code ?? ""}
+              onChange={(e) => setEdit(edit ? { ...edit, join_code: e.target.value } : null)}
             />
-            <p className="text-xs text-ink-faint mb-3">Class changes are recorded in Audit.</p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEdit(null)}
-                className="bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={simpanEdit}
-                disabled={edit.name.trim().length === 0}
-                className="bg-brand-purple text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40"
-              >
-                Save changes
-              </button>
-            </div>
-          </div>
+          </Field>
+          <p className="text-[12px] text-ink-faint">Class changes are recorded in Audit.</p>
         </div>
-      )}
+      </Modal>
 
       {/* Dialog tukar nama pasukan */}
-      {editPasukan && (
-        <div className="fixed inset-0 z-50 bg-black/40 flex items-center justify-center p-4" role="dialog" aria-modal="true">
-          <div className="bg-white rounded-2xl border border-hairline shadow-raised w-full max-w-md p-5">
-            <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold text-ink">Rename team</h3>
-              <button type="button" onClick={() => setEditPasukan(null)} aria-label="Close">
-                <X className="w-5 h-5 text-ink-muted" />
-              </button>
-            </div>
-            <input
-              className="w-full mb-3 h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-              value={editPasukan.nama}
-              onChange={(e) => setEditPasukan({ ...editPasukan, nama: e.target.value })}
-              aria-label="New team name"
+      <Modal
+        open={editPasukan !== null}
+        onClose={() => setEditPasukan(null)}
+        title="Rename team"
+        footer={
+          <>
+            <Button variant="outline" onClick={() => setEditPasukan(null)}>
+              Cancel
+            </Button>
+            <Button onClick={simpanNamaPasukan} disabled={!editPasukan || editPasukan.nama.trim().length === 0}>
+              Save changes
+            </Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          <Field label="New team name" htmlFor="edit-nama-pasukan">
+            <Input
+              id="edit-nama-pasukan"
+              value={editPasukan?.nama ?? ""}
+              onChange={(e) => setEditPasukan(editPasukan ? { ...editPasukan, nama: e.target.value } : null)}
             />
-            <p className="text-xs text-ink-faint mb-3">Team changes are recorded in Audit.</p>
-            <div className="flex justify-end gap-2">
-              <button
-                type="button"
-                onClick={() => setEditPasukan(null)}
-                className="bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink"
-              >
-                Cancel
-              </button>
-              <button
-                type="button"
-                onClick={simpanNamaPasukan}
-                disabled={editPasukan.nama.trim().length === 0}
-                className="bg-brand-purple text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40"
-              >
-                Save changes
-              </button>
-            </div>
-          </div>
+          </Field>
+          <p className="text-[12px] text-ink-faint">Team changes are recorded in Audit.</p>
         </div>
-      )}
+      </Modal>
     </AdminShell>
   );
 }
