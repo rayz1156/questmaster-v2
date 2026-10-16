@@ -104,6 +104,9 @@ function Inner() {
         setKemajuanDimuat(true);
       } catch { setCompletedTeamIds([]); setKemajuanDimuat(false); }
     })();
+    // Bergantung pada id aktiviti sahaja supaya tukar pilihan tidak memuat
+    // semula data yang sama (corak sama seperti sebelum KZ-023).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [active?.id]);
 
   const filteredHunts = useMemo(() => filterClass ? hunts.filter((h) => h.class_id === filterClass) : hunts, [hunts, filterClass]);
