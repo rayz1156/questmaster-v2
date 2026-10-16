@@ -156,6 +156,7 @@ export default function DataTable<T>({
                         className="h-4 w-4 accent-brand-purple"
                         checked={!!dipilih}
                         onChange={() => onToggleSelect?.(id)}
+                        onClick={(e) => e.stopPropagation()}
                       />
                     </td>
                   )}

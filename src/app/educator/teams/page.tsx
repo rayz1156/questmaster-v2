@@ -216,14 +216,16 @@ function TeamsInner() {
         <PageHead
           title="Teams"
           description={teams.length > 0 ? `${teams.length} ${teams.length === 1 ? "team" : "teams"}` : undefined}
-          actions={
-            <Select className="w-auto" value={activeClassId} onChange={e=>{setActiveClassId(e.target.value);setSelectedTeamId(null);}} aria-label="Filter by class">
-              <option value="">All classes</option>
-              {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          }
           primaryAction={teams.length > 0 ? { label: "Create team", icon: <Plus className="w-4 h-4" />, onSelect: () => setShowCreate(true) } : undefined}
         />
+      )}
+      {!activeClassId && (
+        <div className="flex items-center gap-3 flex-wrap mb-5">
+          <Select className="w-auto" value={activeClassId} onChange={e=>{setActiveClassId(e.target.value);setSelectedTeamId(null);}} aria-label="Filter by class">
+            <option value="">All classes</option>
+            {classes.map(c=><option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </div>
       )}
 
       {loading ? <p className="text-sm text-ink-muted">Loading teams…</p> : (

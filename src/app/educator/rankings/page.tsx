@@ -306,15 +306,15 @@ function RankingsInner() {
       <PageHead
         title="Rankings"
         description="Choose a class to see how its teams are doing."
-        actions={
-          classes.length > 0 ? (
-            <Select className="w-auto" value={classId} onChange={e => setClassId(e.target.value)} aria-label="Select a class">
-              <option value="">Select a class</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </Select>
-          ) : null
-        }
       />
+      {classes.length > 0 && (
+        <div className="flex items-center gap-3 flex-wrap mb-5">
+          <Select className="w-auto" value={classId} onChange={e => setClassId(e.target.value)} aria-label="Select a class">
+            <option value="">Select a class</option>
+            {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </Select>
+        </div>
+      )}
       <div className="bg-white rounded-[4px] shadow-card">
         <EmptyState
           icon={<BarChart3 className="w-6 h-6" />}
