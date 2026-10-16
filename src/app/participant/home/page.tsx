@@ -38,6 +38,7 @@ import {
 } from "@/lib/data";
 import { useSession } from "@/lib/session";
 import { statusKelas, susunKelas, type AktivitiKelas, type KelasUntukStatus } from "@/lib/kelasStatus";
+import { KUNCI_KELAS_AKTIF } from "@/lib/kelasNav";
 import {
   atas5DenganSaya,
   ayatKedudukan,
@@ -147,6 +148,16 @@ export default function Page() {
     if (lalai) setActiveClassId(lalai.id);
     setDataReady(true);
   })(); }, [user]);
+
+  // KZ-022c: ingat kelas yang dipilih supaya Intro Board dan Learning Board
+  // di menu sisi memaut ke kelas yang sama. Storan disekat: abaikan.
+  useEffect(() => {
+    if (!activeClassId) return;
+    try {
+      window.localStorage.setItem(KUNCI_KELAS_AKTIF, activeClassId);
+      window.dispatchEvent(new Event(KUNCI_KELAS_AKTIF));
+    } catch { /* abaikan */ }
+  }, [activeClassId]);
 
   // Pasukan saya merentas semua kelas (satu pertanyaan sahaja).
   useEffect(() => {
