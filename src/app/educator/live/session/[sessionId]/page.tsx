@@ -1,15 +1,24 @@
 "use client";
 
+/**
+ * Skrin hos sesi kuiz langsung (dipaparkan pada projektor kelas). KZ-025:
+ * HANYA bingkai luar ditukar ke kit v3 (PageHead, kad Card, butang kit,
+ * Alert). Kandungan besar untuk projektor (teks soalan, pemasa, kod sertai,
+ * papan keputusan) dan saiz fonnya TIDAK diubah. Logik realtime/polling,
+ * peralihan status (lobby/asking/revealed/ended) dan token hos kekal sama.
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
-import { Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check, Maximize2, X } from "lucide-react";
+import { ArrowLeft, Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check, Maximize2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
 import RaceHostPanel, { type PemainLumba, type ReviewHos } from "@/components/RaceHostPanel";
 import BossHostPanel, { type PemainRaksasa, type SeranganFeed, type StatsRaksasa } from "@/components/BossHostPanel";
+import { Alert, Badge, Button, Card, CardHead, PageHead } from "@/components/ui";
 
 interface Pilihan { key: string; text: string }
 interface Soalan {
@@ -165,14 +174,14 @@ export default function PanelHosSesi() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-sm text-ink-muted">Loading…</p>
       </Shell>
     );
   }
   if (!state) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-gray-500">{err || "Session not found."} <Link href="/educator/live" className="text-brand-purple font-semibold">Back →</Link></p>
+        <p className="text-sm text-ink-muted">{err || "Session not found."} <Link href="/educator/live" className="text-brand-purple font-semibold">Back →</Link></p>
       </Shell>
     );
   }
@@ -194,29 +203,34 @@ export default function PanelHosSesi() {
     streak: session.status === "ended" ? p.best_streak : p.streak,
   }));
 
+  // Label status yang sama seperti sebelum ini (Racing/Battling/perbincangan).
+  const labelStatus =
+    (lumba || raksasa) && session.status === "asking"
+      ? raksasa
+        ? "Battling"
+        : "Racing"
+      : (lumba || raksasa) && session.status === "ended" && (session.review_index ?? -1) >= 0
+        ? "Class discussion"
+        : LABEL_STATUS[session.status] || session.status;
+
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <div>
-          <h2 className="page-title">{quiz?.title || "Live session"}</h2>
-          <Link href="/educator/live" className="text-xs text-gray-500 hover:text-gray-800">← All quizzes</Link>
-        </div>
-        <span className={`text-xs font-semibold px-2 py-1 rounded-full ${session.status === "ended" ? "bg-gray-100 text-gray-600" : "bg-green-100 text-green-700"}`}>
-          {(lumba || raksasa) && session.status === "asking"
-            ? raksasa
-              ? "Battling"
-              : "Racing"
-            : (lumba || raksasa) && session.status === "ended" && (session.review_index ?? -1) >= 0
-              ? "Class discussion"
-              : LABEL_STATUS[session.status] || session.status}
-        </span>
-      </div>
+      <PageHead
+        crumb="Live Quiz"
+        name={quiz?.title || "Live session"}
+        secondaryActions={[{ label: "All quizzes", icon: <ArrowLeft className="w-4 h-4" />, href: "/educator/live" }]}
+        actions={
+          <Badge variant="dot" warna={session.status === "ended" ? "gray" : "green"}>
+            {labelStatus}
+          </Badge>
+        }
+      />
 
       {/* Tiga cara masuk: imbas QR, buka pautan, atau taip kod di /live.
           Speed Race / Boss Battle: disorok selepas permainan tamat supaya
           keputusan dan perbincangan berada di atas. */}
       {(!(lumba || raksasa) || session.status !== "ended") && (
-      <div className="card mb-4">
+      <Card className="mb-4">
         <div className="flex items-start gap-5 flex-wrap">
           <div className="text-center shrink-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -254,12 +268,9 @@ export default function PanelHosSesi() {
             </button>
 
             <div className="flex items-center gap-3 mt-3 flex-wrap">
-              <button
-                onClick={() => setPaparPenuh(true)}
-                className="px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 text-sm flex items-center gap-1"
-              >
+              <Button variant="outline" size="sm" onClick={() => setPaparPenuh(true)}>
                 <Maximize2 className="w-4 h-4" /> Show on screen
-              </button>
+              </Button>
               <span className="flex items-center gap-2 text-sm text-gray-600">
                 <Users className="w-5 h-5 text-indigo-600" />
                 <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} participants
@@ -271,13 +282,13 @@ export default function PanelHosSesi() {
           Three ways in: scan the QR code, open the link, or go to{" "}
           <span className="font-mono">{pautanAsas}</span> and type the code.
         </p>
-      </div>
+      </Card>
       )}
 
       {sesiPenuh && (
-        <div className="mb-4 rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+        <Alert tone="warning" className="mb-4">
           This session has reached its limit of {hadPemain} players. New players are turned away for now.
-        </div>
+        </Alert>
       )}
 
       {lumba ? (
@@ -305,30 +316,31 @@ export default function PanelHosSesi() {
         />
       ) : (
       <>
+      {/* Panel kawalan hos (mod klasik): fungsi kawal yang sama, rupa kit. */}
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         {session.status === "lobby" && (
-          <button onClick={() => kawal("start")} disabled={busy} className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1">
+          <Button onClick={() => kawal("start")} disabled={busy}>
             <Play className="w-4 h-4" /> Start quiz
-          </button>
+          </Button>
         )}
         {session.status === "asking" && (
-          <button onClick={() => kawal("reveal")} disabled={busy} className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1">
+          <Button onClick={() => kawal("reveal")} disabled={busy}>
             <Eye className="w-4 h-4" /> Reveal answer
-          </button>
+          </Button>
         )}
         {(session.status === "asking" || session.status === "revealed") && (
-          <button onClick={() => kawal("next")} disabled={busy} className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1">
+          <Button onClick={() => kawal("next")} disabled={busy}>
             <SkipForward className="w-4 h-4" /> Next question
-          </button>
+          </Button>
         )}
         {session.status !== "ended" && (
           <>
-            <button onClick={() => kawal("end")} disabled={busy} className="px-3 py-1.5 rounded-lg border border-red-300 text-red-600 hover:bg-red-50 text-sm flex items-center gap-1">
+            <Button variant="dim" warna="red" onClick={() => kawal("end")} disabled={busy}>
               <Square className="w-4 h-4" /> End session
-            </button>
-            <button onClick={() => kawal("reset")} disabled={busy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm flex items-center gap-1">
+            </Button>
+            <Button variant="outline" onClick={() => kawal("reset")} disabled={busy}>
               <RotateCcw className="w-4 h-4" /> Reset
-            </button>
+            </Button>
           </>
         )}
       </div>
@@ -343,12 +355,12 @@ export default function PanelHosSesi() {
           />
         </div>
       ) : session.status === "lobby" ? (
-        <div className="card mb-4">
-          <div className="font-semibold mb-1">Waiting in the lobby…</div>
-          <p className="text-sm text-gray-500">Participants appear here as they join. Press &quot;Start quiz&quot; when you are ready.</p>
-        </div>
+        <Card className="mb-4">
+          <CardHead title="Waiting in the lobby…" />
+          <p className="text-sm text-gray-500 mt-2">Participants appear here as they join. Press &quot;Start quiz&quot; when you are ready.</p>
+        </Card>
       ) : currentQuestion && (
-        <div className="card mb-4">
+        <Card className="mb-4">
           <div className="text-xs text-gray-500 mb-1">Question {session.current_index + 1} / {totalSoalan}</div>
           <div className="font-semibold mb-1">{currentQuestion.prompt}</div>
           <div className="text-xs text-gray-400 mb-2">
@@ -377,16 +389,22 @@ export default function PanelHosSesi() {
           {session.status !== "revealed" && (
             <p className="text-xs text-gray-400 mt-2">The correct answer stays hidden until you reveal it.</p>
           )}
-        </div>
+        </Card>
       )}
 
       {session.status === "lobby" ? (
-        <div className="card">
-          <div className="font-semibold mb-2 flex items-center gap-2"><Users className="w-4 h-4 text-indigo-600" /> Participants ({playerCount})</div>
+        <Card>
+          <CardHead
+            title={
+              <span className="flex items-center gap-2">
+                <Users className="w-4 h-4 text-indigo-600" /> Participants ({playerCount})
+              </span>
+            }
+          />
           {players.length === 0 ? (
-            <p className="text-sm text-gray-500">No participants yet.</p>
+            <p className="text-sm text-gray-500 mt-2">No participants yet.</p>
           ) : (
-            <ol className="text-sm space-y-1">
+            <ol className="text-sm space-y-1 mt-2">
               {players.map((p, i) => (
                 <li key={p.id} className="flex items-center justify-between">
                   <span>{i + 1}. {p.nickname}</span>
@@ -395,7 +413,7 @@ export default function PanelHosSesi() {
               ))}
             </ol>
           )}
-        </div>
+        </Card>
       ) : session.status === "ended" ? null : (
         <LiveLeaderboard
           rows={barisPapan}
