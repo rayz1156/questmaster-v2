@@ -953,6 +953,218 @@ export default function CertificatesPage() {
 
   const bilanganTick = tickLayak(layak, tick).length;
 
+  // KZ-025b: lajur jadual kelayakan (DataTable kit, gaya "Students").
+  // Kotak semak kekal manual dalam lajur pertama (bukan prop `selectable`
+  // kit) kerana hanya baris layak yang belum dikeluarkan boleh dipilih dan
+  // kotak kepala berkeadaan indeterminate melalui kepalaTickRef seperti
+  // sebelum ini. Pengendali keadaan tidak berubah.
+  const lajurLayak: DataColumn<PratontonBaris>[] = [
+    {
+      key: "pilih",
+      header: (
+        <input
+          ref={kepalaTickRef}
+          type="checkbox"
+          className="h-4 w-4 accent-brand-purple"
+          title="Select all eligible participants"
+          disabled={barisBolehPilih.length === 0 || issueBusy}
+          checked={semuaBolehPilihTicked}
+          onChange={(e) => {
+            const pilih = e.target.checked;
+            setTick((p) => {
+              const baharu = { ...p };
+              for (const r of barisBolehPilih) {
+                baharu[r.participant_id] = pilih;
+              }
+              return baharu;
+            });
+          }}
+        />
+      ),
+      render: (r) => (
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-brand-purple"
+          disabled={!r.eligible || r.already_issued}
+          checked={!!tick[r.participant_id]}
+          onChange={(e) => setTick((p) => ({ ...p, [r.participant_id]: e.target.checked }))}
+        />
+      ),
+    },
+    {
+      key: "nama",
+      header: "Name",
+      render: (r, i) => (
+        <span className="flex items-center gap-3 min-w-0">
+          <Avatar name={r.display_name} size="sm" index={i} />
+          <span className="text-[13px] font-bold text-ink truncate">{r.display_name}</span>
+        </span>
+      ),
+    },
+    {
+      key: "nama_sijil",
+      header: "Certificate name",
+      render: (r) =>
+        /* KZ-007: nama sandaran (display name) dipapar dengan label kecil
+           kelabu bila nama sijil belum disahkan. */
+        r.name_confirmed ? (
+          r.certificate_name
+        ) : r.certificate_name ? (
+          <span>
+            {r.certificate_name}{" "}
+            <span className="text-[12px] text-ink-faint">(display name)</span>
+          </span>
+        ) : (
+          <span className="text-amber-600">Waiting for name confirmation</span>
+        ),
+    },
+    {
+      key: "layak",
+      header: "Eligible",
+      render: (r) =>
+        r.eligible ? <Badge warna="green">Yes</Badge> : <Badge warna="red">No</Badge>,
+    },
+    {
+      key: "sebab",
+      header: "Reason",
+      hideOnMobile: true,
+      render: (r) => <span className="text-ink-faint">{r.reason}</span>,
+    },
+    {
+      key: "dikeluarkan",
+      header: "Issued",
+      render: (r) =>
+        r.already_issued ? <Badge warna="green">Yes</Badge> : <Badge warna="gray">No</Badge>,
+    },
+  ];
+
+  // KZ-025b: lajur jadual sijil dikeluarkan (DataTable kit). Kotak semak
+  // emel kekal manual: hanya baris yang boleh diemel memaparkan kotak dan
+  // kotak kepala berkongsi keadaan semuaPilihEmel seperti sebelum ini.
+  const lajurSijil: DataColumn<Sijil>[] = [
+    {
+      key: "pilih",
+      /* KZ-007: pilih semua sijil yang boleh diemel. */
+      header: (
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-brand-purple"
+          title="Select all certificates that can be emailed"
+          disabled={!pro}
+          checked={semuaPilihEmel}
+          onChange={(e) => {
+            const pilih = e.target.checked;
+            setPilihEmel((p) => {
+              const baharu = { ...p };
+              for (const s of sijil) {
+                if (sijilBolehEmel(s)) baharu[s.id] = pilih;
+              }
+              return baharu;
+            });
+          }}
+        />
+      ),
+      render: (s) =>
+        sijilBolehEmel(s) ? (
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-brand-purple"
+            disabled={!pro}
+            checked={!!pilihEmel[s.id]}
+            onChange={(e) => setPilihEmel((p) => ({ ...p, [s.id]: e.target.checked }))}
+          />
+        ) : null,
+    },
+    {
+      key: "kod",
+      header: "Code",
+      render: (s) => <span className="font-mono text-[13px]">{s.code}</span>,
+    },
+    {
+      key: "nama",
+      header: "Name",
+      render: (s) => <span className="text-[13px] font-bold text-ink">{s.name_snapshot}</span>,
+    },
+    {
+      key: "tarikh",
+      header: "Date",
+      hideOnMobile: true,
+      render: (s) => (
+        <span className="text-ink-faint">{new Date(s.issued_at).toLocaleDateString()}</span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (s) =>
+        s.revoked_at ? <Badge warna="red">Revoked</Badge> : <Badge warna="green">Active</Badge>,
+    },
+    {
+      key: "emel",
+      header: "Email",
+      hideOnMobile: true,
+      render: (s) => (
+        /* KZ-007: tarikh penghantaran emel atau Not sent. */
+        <span className="text-ink-faint">
+          {s.emailed_at ? new Date(s.emailed_at).toLocaleString() : "Not sent"}
+        </span>
+      ),
+    },
+    {
+      key: "tindakan",
+      header: "",
+      className: "whitespace-nowrap",
+      render: (s) => (
+        <span className="inline-flex flex-wrap items-center gap-1">
+          {sijilBolehEmel(s) && (
+            <Button
+              size="sm"
+              variant="ghost"
+              disabled={!pro || emelBusy}
+              title={pro ? (s.emailed_at ? "Send the certificate email again" : "Send the certificate email") : "Available on Pro"}
+              onClick={() => emelSatu(s)}
+            >
+              <Mail className="w-4 h-4" /> {s.emailed_at ? "Resend" : "Send"}
+            </Button>
+          )}
+          <Button size="sm" variant="ghost" onClick={() => muatTurun(s)}>
+            <Download className="w-4 h-4" /> Download
+          </Button>
+          {!s.revoked_at && (
+            <Button
+              size="sm"
+              variant="ghost"
+              className="text-kz-down"
+              onClick={() => {
+                setRevokeSijil(s);
+                setSebabBatalkan("");
+              }}
+            >
+              Revoke
+            </Button>
+          )}
+          {revokeSijil?.id === s.id && (
+            <span className="inline-flex items-center gap-2">
+              <span className="block w-56">
+                <Input
+                  value={sebabBatalkan}
+                  onChange={(e) => setSebabBatalkan(e.target.value)}
+                  placeholder="Reason for revocation"
+                />
+              </span>
+              <Button size="sm" onClick={() => batalkan(s)}>
+                Confirm
+              </Button>
+              <Button size="sm" variant="outline" onClick={() => setRevokeSijil(null)}>
+                Cancel
+              </Button>
+            </span>
+          )}
+        </span>
+      ),
+    },
+  ];
+
   return (
     <Shell tabs={EDU_TABS}>
             <ClassShell classId={classId} current={"certificates" as ClassTabKey} klass={klass}>
@@ -1526,72 +1738,12 @@ export default function CertificatesPage() {
                   Clear
                 </Button>
               </div>
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-slate-500 border-b border-hairline">
-                      <th className="py-2 pr-3">
-                        {/* KZ-011: pilih semua baris yang boleh dipilih
-                            (layak dan belum dikeluarkan). */}
-                        <input
-                          ref={kepalaTickRef}
-                          type="checkbox"
-                          title="Select all eligible participants"
-                          disabled={barisBolehPilih.length === 0 || issueBusy}
-                          checked={semuaBolehPilihTicked}
-                          onChange={(e) => {
-                            const pilih = e.target.checked;
-                            setTick((p) => {
-                              const baharu = { ...p };
-                              for (const r of barisBolehPilih) {
-                                baharu[r.participant_id] = pilih;
-                              }
-                              return baharu;
-                            });
-                          }}
-                        />
-                      </th>
-                      <th className="py-2 pr-3">Name</th>
-                      <th className="py-2 pr-3">Certificate name</th>
-                      <th className="py-2 pr-3">Eligible</th>
-                      <th className="py-2 pr-3">Reason</th>
-                      <th className="py-2 pr-3">Issued</th>
-                    </tr>
-                  </thead>
-                <tbody>
-                  {layak.map((r) => (
-                    <tr key={r.participant_id} className="border-b border-hairline">
-                      <td className="py-2 pr-3">
-                        <input
-                          type="checkbox"
-                          disabled={!r.eligible || r.already_issued}
-                          checked={!!tick[r.participant_id]}
-                          onChange={(e) => setTick((p) => ({ ...p, [r.participant_id]: e.target.checked }))}
-                        />
-                      </td>
-                      <td className="py-2 pr-3">{r.display_name}</td>
-                      <td className="py-2 pr-3">
-                        {/* KZ-007: nama sandaran (display name) dipapar dengan
-                            label kecil kelabu bila nama sijil belum disahkan. */}
-                        {r.name_confirmed ? (
-                          r.certificate_name
-                        ) : r.certificate_name ? (
-                          <span>
-                            {r.certificate_name}{" "}
-                            <span className="text-xs text-slate-400">(display name)</span>
-                          </span>
-                        ) : (
-                          <span className="text-amber-600">Waiting for name confirmation</span>
-                        )}
-                      </td>
-                      <td className="py-2 pr-3">{r.eligible ? "Yes" : "No"}</td>
-                      <td className="py-2 pr-3 text-slate-500">{r.reason}</td>
-                      <td className="py-2 pr-3">{r.already_issued ? "Yes" : "No"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-              </div>
+              <DataTable
+                label="Certificate eligibility"
+                rows={layak}
+                rowKey={(r) => r.participant_id}
+                columns={lajurLayak}
+              />
               <Button
                 className="mt-4"
                 onClick={keluarkan}
@@ -1616,110 +1768,13 @@ export default function CertificatesPage() {
               title="No certificates issued yet"
             />
           ) : (
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-slate-500 border-b border-hairline">
-                    <th className="py-2 pr-3">
-                      {/* KZ-007: pilih semua sijil yang boleh diemel. */}
-                      <input
-                        type="checkbox"
-                        title="Select all certificates that can be emailed"
-                        disabled={!pro}
-                        checked={semuaPilihEmel}
-                        onChange={(e) => {
-                          const pilih = e.target.checked;
-                          setPilihEmel((p) => {
-                            const baharu = { ...p };
-                            for (const s of sijil) {
-                              if (sijilBolehEmel(s)) baharu[s.id] = pilih;
-                            }
-                            return baharu;
-                          });
-                        }}
-                      />
-                    </th>
-                    <th className="py-2 pr-3">Code</th>
-                    <th className="py-2 pr-3">Name</th>
-                    <th className="py-2 pr-3">Date</th>
-                    <th className="py-2 pr-3">Status</th>
-                    <th className="py-2 pr-3">Email</th>
-                    <th className="py-2 pr-3"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {sijil.map((s) => (
-                    <tr key={s.id} className="border-b border-hairline">
-                      <td className="py-2 pr-3">
-                        {sijilBolehEmel(s) && (
-                          <input
-                            type="checkbox"
-                            disabled={!pro}
-                            checked={!!pilihEmel[s.id]}
-                            onChange={(e) => setPilihEmel((p) => ({ ...p, [s.id]: e.target.checked }))}
-                          />
-                        )}
-                      </td>
-                      <td className="py-2 pr-3 font-mono">{s.code}</td>
-                      <td className="py-2 pr-3">{s.name_snapshot}</td>
-                      <td className="py-2 pr-3">{new Date(s.issued_at).toLocaleDateString()}</td>
-                      <td className="py-2 pr-3">
-                        {s.revoked_at ? (
-                          <span className="text-red-600">Revoked</span>
-                        ) : (
-                          <span className="text-emerald-600">Active</span>
-                        )}
-                      </td>
-                      {/* KZ-007: tarikh penghantaran emel atau Not sent. */}
-                      <td className="py-2 pr-3">
-                        {s.emailed_at ? new Date(s.emailed_at).toLocaleString() : "Not sent"}
-                      </td>
-                      <td className="py-2 pr-3 whitespace-nowrap">
-                        {sijilBolehEmel(s) && (
-                          <button
-                            className="btn-quiet"
-                            disabled={!pro || emelBusy}
-                            title={pro ? (s.emailed_at ? "Send the certificate email again" : "Send the certificate email") : "Available on Pro"}
-                            onClick={() => emelSatu(s)}
-                          >
-                            <Mail className="w-4 h-4" /> {s.emailed_at ? "Resend" : "Send"}
-                          </button>
-                        )}
-                        <button className="btn-quiet" onClick={() => muatTurun(s)}>
-                          <Download className="w-4 h-4" /> Download
-                        </button>
-                        {!s.revoked_at && (
-                          <button
-                            className="btn-quiet text-red-600"
-                            onClick={() => {
-                              setRevokeSijil(s);
-                              setSebabBatalkan("");
-                            }}
-                          >
-                            Revoke
-                          </button>
-                        )}
-                        {revokeSijil?.id === s.id && (
-                          <span className="inline-flex items-center gap-2">
-                            <input
-                              className="input"
-                              value={sebabBatalkan}
-                              onChange={(e) => setSebabBatalkan(e.target.value)}
-                              placeholder="Reason for revocation"
-                            />
-                            <button className="btn-primary" onClick={() => batalkan(s)}>
-                              Confirm
-                            </button>
-                            <button className="btn-quiet" onClick={() => setRevokeSijil(null)}>
-                              Cancel
-                            </button>
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
+            <div className="mt-6">
+              <DataTable
+                label="Issued certificates"
+                rows={sijil}
+                rowKey={(s) => s.id}
+                columns={lajurSijil}
+              />
             </div>
           )}
         </Card>
