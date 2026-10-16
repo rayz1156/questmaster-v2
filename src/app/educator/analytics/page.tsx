@@ -12,10 +12,20 @@ import { supabase } from "@/lib/supabaseClient";
 import { listMyEducatorClasses } from "@/lib/data";
 import type { EducatorClassRow } from "@/lib/types";
 import {
-  Users, BarChart3, BookOpen,
+  BarChart3, BookOpen,
   Activity, TrendingUp, AlertTriangle, Eye, LogIn, Target, CheckCircle2,
   Download,
 } from "lucide-react";
+import {
+  Alert,
+  BarChart,
+  Card,
+  CardHead,
+  LineChart,
+  PageHead,
+  Select,
+  StatGroup,
+} from "@/components/ui";
 
 type Summary = {
   class_id: string | null;
@@ -25,50 +35,10 @@ type Summary = {
   hourly: Array<{ hour: number; events: number }>;
 };
 
-function LineChart({ data }: { data: Array<{ day: string; dau: number }> }) {
-  const { points, max, width, height } = useMemo(() => {
-    const w = 720, h = 180, pad = 28;
-    if (data.length === 0) return { points: "", max: 0, width: w, height: h };
-    const max = Math.max(1, ...data.map(d => d.dau));
-    const step = (w - 2 * pad) / Math.max(1, data.length - 1);
-    const pts = data.map((d, i) => {
-      const x = pad + i * step;
-      const y = h - pad - ((d.dau / max) * (h - 2 * pad));
-      return `${x.toFixed(1)},${y.toFixed(1)}`;
-    }).join(" ");
-    return { points: pts, max, width: w, height: h };
-  }, [data]);
-  if (data.length === 0) return <div className="text-sm text-gray-500">No data yet, analytics start collecting now.</div>;
-  return (
-    <svg viewBox={`0 0 ${width} ${height}`} className="w-full h-56">
-      <polyline fill="none" stroke="#7057D9" strokeWidth="2.5" points={points} />
-      <polyline fill="url(#g)" stroke="none" points={`28,${height-28} ${points} ${width-28},${height-28}`} opacity="0.15" />
-      <defs>
-        <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
-          <stop offset="0%" stopColor="#7057D9" />
-          <stop offset="100%" stopColor="#7057D9" stopOpacity="0" />
-        </linearGradient>
-      </defs>
-      <text x="6" y="14" fontSize="10" fill="#6b7280">peak {max}</text>
-    </svg>
-  );
-}
-
-function HourBars({ data }: { data: Array<{ hour: number; events: number }> }) {
-  const buckets = Array.from({ length: 24 }, (_, h) => data.find(d => d.hour === h)?.events ?? 0);
-  const max = Math.max(1, ...buckets);
-  return (
-    <div className="flex items-end gap-1 h-32">
-      {buckets.map((v, h) => (
-        <div key={h} className="flex-1 flex flex-col items-center gap-1" title={`${h}:00, ${v} events`}>
-          <div className="w-full bg-[#B9ABF1] rounded-t" style={{ height: `${(v / max) * 100}%` }} />
-          {h % 3 === 0 && <span className="text-[10px] text-gray-500">{h}h</span>}
-        </div>
-      ))}
-    </div>
-  );
-}
-
+/**
+ * Instructor Overview (KZ-022): carta guna kit LineChart/BarChart; carta
+ * garis dan bar div tempatan yang lama dibuang kerana kit mengambil alih.
+ */
 export default function EducatorAnalyticsPage() {
   const [classes, setClasses] = useState<EducatorClassRow[]>([]);
   const [classId, setClassId] = useState<string | "all">("all");
@@ -110,42 +80,42 @@ export default function EducatorAnalyticsPage() {
   const active30 = inact?.active_30d ?? 0;
   const atRisk = inact?.at_risk_inactive_7d ?? 0;
 
+  // Data carta harian dan hourly: dipetakan sahaja kepada bentuk kit, tiada
+  // nilai baharu. Label hari dipendekkan kepada MM-DD untuk paksi.
+  const dataHarian = useMemo(
+    () => (summary?.daily ?? []).map((d) => ({ label: d.day.length > 5 ? d.day.slice(5) : d.day, nilai: d.dau })),
+    [summary],
+  );
+  const dataJam = useMemo(() => {
+    const baket = Array.from({ length: 24 }, (_, h) => summary?.hourly?.find((d) => d.hour === h)?.events ?? 0);
+    return baket.map((v, h) => ({ label: h % 3 === 0 ? `${h}h` : "", nilai: v }));
+  }, [summary]);
+
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
-        <div>
-          <div className="eyebrow mb-1">{classId === "all" ? "Global insights" : "Insights"}</div>
-          <h1 className="page-title">See how learning is going.</h1>
-          <p className="page-subtitle">
-            Track engagement across all your classes and spot opportunities to support your learners.
-          </p>
-        </div>
-        <div className="flex items-center gap-3">
-          <select
-            value={classId}
-            onChange={(e) => setClassId(e.target.value as string | "all")}
-            className="input w-auto"
-          >
-            <option value="all">All classes</option>
-            {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
-          </select>
-          {/* Butang eksport hanya bila satu kelas dipilih (tiket G). */}
-          {classId !== "all" && (
-            <button
-              type="button"
-              className="btn-primary inline-flex items-center gap-2"
-              onClick={() => setDialogEksport(true)}
-            >
-              <Download className="w-4 h-4" />
-              Export
-            </button>
-          )}
-          <span className="input w-auto flex items-center text-ink-muted cursor-default">Last 90 days</span>
-        </div>
+      <PageHead
+        title="See how learning is going."
+        description="Track engagement across all your classes and spot opportunities to support your learners."
+        {...(classId !== "all"
+          ? { primaryAction: { label: "Export", icon: <Download className="w-4 h-4" />, onSelect: () => setDialogEksport(true) } }
+          : {})}
+      />
+
+      <div className="flex items-center gap-3 flex-wrap mb-5">
+        <Select
+          value={classId}
+          onChange={(e) => setClassId(e.target.value as string | "all")}
+          aria-label="Choose class"
+          className="w-auto"
+        >
+          <option value="all">All classes</option>
+          {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
+        </Select>
+        <span className="text-[13px] text-ink-faint">Last 90 days</span>
       </div>
 
       {loading && <p className="text-sm text-ink-muted">Loading…</p>}
-      {error && <div className="text-sm text-red-600 mb-4">{error}</div>}
+      {error && <div className="text-sm text-kz-down mb-4">{error}</div>}
 
       {summary && (
         <>
@@ -154,37 +124,45 @@ export default function EducatorAnalyticsPage() {
 
           {/* Bila "All classes": jemputan ringkas ke arah pilih kelas. */}
           {classId === "all" && (
-            <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-5">
+            <Alert tone="info" icon={<BookOpen className="w-4 h-4" />} className="mb-5">
               Choose a class to see scores, who needs attention and team balance.
-            </div>
+            </Alert>
           )}
 
-          {/* Tiga nombor yang benar-benar menjawab soalan "bagaimana keadaannya". */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-5">
-            <Stat icon={<Users className="w-5 h-5" />} label="Learners" value={learners} />
-            <Stat icon={<TrendingUp className="w-5 h-5" />} label="Active in 30 days" value={active30} tone="green" />
-            <Stat icon={<Users className="w-5 h-5" />} label="Inactive over 7 days" value={atRisk} tone="rose" />
-          </div>
+          {/* Empat nombor sebenar; tiada data perubahan, jadi tiada anak panah. */}
+          <Card className="mb-5">
+            <StatGroup
+              stats={[
+                { label: "Learners", value: learners },
+                { label: "Active in 30 days", value: active30 },
+                { label: "Inactive over 7 days", value: atRisk },
+                { label: "Total events", value: t?.total_events ?? 0 },
+              ]}
+            />
+          </Card>
 
           {atRisk > 0 && (
-            <div className="flex items-center gap-3 rounded-2xl border border-[#F3E2C0] bg-[#FDF8EC] px-4 py-3.5 mb-5">
-              <span className="w-8 h-8 rounded-full bg-[#F6E3BC] flex items-center justify-center shrink-0">
-                <AlertTriangle className="w-4 h-4 text-[#9A6B14]" />
+            <Alert tone="warning" icon={<AlertTriangle className="w-4 h-4" />} className="mb-5">
+              <span>
+                {atRisk} {atRisk === 1 ? "learner has" : "learners have"} not visited in over a week.{" "}
+                <a href="#explore" className="text-brand-purple hover:underline">View learners →</a>
               </span>
-              <span className="text-sm text-[#7A5410] flex-1">
-                {atRisk} {atRisk === 1 ? "learner has" : "learners have"} not visited in over a week.
-              </span>
-              <a href="#explore" className="btn-quiet text-[#7A5410] whitespace-nowrap">View learners →</a>
-            </div>
+            </Alert>
           )}
 
-          <div className="surface p-5 mb-5">
-            <div className="flex items-center justify-between gap-2 flex-wrap mb-1">
-              <h2 className="font-semibold text-ink">Daily active learners</h2>
-              <span className="text-xs text-ink-faint">Last 90 days</span>
+          <Card className="mb-5">
+            <CardHead
+              title="Daily active learners"
+              subtitle="Last 90 days"
+            />
+            <div className="mt-4">
+              {dataHarian.length === 0 ? (
+                <p className="text-[14px] text-ink-faint">No data yet, analytics start collecting now.</p>
+              ) : (
+                <LineChart labelAks="Daily active learners, last 90 days" data={dataHarian} tinggi={180} />
+              )}
             </div>
-            <LineChart data={summary.daily} />
-            <details className="mt-3 border-t border-hairline pt-3">
+            <details className="mt-3 border-t border-kz-line pt-3">
               <summary className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink">
                 <BarChart3 className="w-4 h-4 text-ink-faint" />
                 More usage metrics
@@ -202,10 +180,10 @@ export default function EducatorAnalyticsPage() {
                 <p className="text-sm text-ink-muted mb-2 flex items-center gap-1.5">
                   <BookOpen className="w-4 h-4 text-ink-faint" /> When students actually work
                 </p>
-                <HourBars data={summary.hourly} />
+                <BarChart labelAks="Events by hour of day" data={dataJam} />
               </div>
             </details>
-          </div>
+          </Card>
 
           {/* Analitik kelas lanjutan (V2-014b): ditutup secara lalai kerana
               bahagian markah baharu di atas sudah menjawab soalan utama;
