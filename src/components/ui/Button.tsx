@@ -78,6 +78,8 @@ export type ButtonProps = {
   className?: string;
   ariaLabel?: string;
   target?: string;
+  /** Tooltip pelayar (KZ-024): dipaparkan oleh butang dan pautan. */
+  title?: string;
 };
 
 export default function Button({
@@ -92,6 +94,7 @@ export default function Button({
   className = "",
   ariaLabel,
   target,
+  title,
 }: ButtonProps) {
   // Dim memerlukan gaya dinamik kerana pasangan warna datang daripada peta.
   const gayaDim: React.CSSProperties =
@@ -115,6 +118,7 @@ export default function Button({
         style={gaya}
         aria-label={ariaLabel}
         target={target}
+        title={title}
         onClick={onClick}
       >
         {children}
@@ -129,6 +133,7 @@ export default function Button({
       className={kelas}
       style={gaya}
       aria-label={ariaLabel}
+      title={title}
       aria-hidden={ikonSaja && !ariaLabel ? undefined : undefined}
     >
       {children}

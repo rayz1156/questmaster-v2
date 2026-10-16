@@ -215,6 +215,8 @@ export default function UiKitPage() {
             <Button size="sm">Small</Button>
             <Button size="lg">Large 44px</Button>
             <Button href="/admin/overview">Link as button</Button>
+            {/* Prop `title` (KZ-024): tooltip pelayar, serasi ke belakang. */}
+            <Button variant="outline" title="Tooltip sample from the title prop">With title</Button>
             <Button disabled>Disabled</Button>
           </div>
         </Card>

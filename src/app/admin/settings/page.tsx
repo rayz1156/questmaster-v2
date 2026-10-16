@@ -1,17 +1,26 @@
 "use client";
 
-// Settings ruang kerja admin (V2-011c). Dua bahagian: jadual pentadbir
-// (Owner dan Admin, dengan emel dan aktiviti terakhir daripada
+// Settings ruang kerja admin, rupa v3 (KZ-024). Dua bahagian: jadual
+// pentadbir (Owner dan Admin, dengan emel dan aktiviti terakhir daripada
 // adminListUsersMeta) dan matriks kebenaran peranan baca sahaja. Peranan
 // hanya boleh ditukar pada butiran pengguna, bukan di sini, jadi tiada
-// butang edit dalam jadual.
+// butang edit dalam jadual. Jadual guna DataTable kit; data tidak berubah.
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Check, X } from "lucide-react";
+import { Check, X, User as UserIcon } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, EmptyState, relTime, initials } from "@/components/admin/ui";
+import { relTime } from "@/components/admin/ui";
+import {
+  Avatar,
+  Badge,
+  CardHead,
+  DataTable,
+  EmptyState,
+  PageHead,
+  type DataColumn,
+} from "@/components/ui";
 import {
   adminListProfiles,
   adminListUsersMeta,
@@ -32,7 +41,7 @@ const KEENAN = [
 /** Sel matriks: tanda hijau bila dibenarkan, silang kelabu bila tidak. */
 function SelBenar({ ok }: { ok: boolean }) {
   return ok ? (
-    <Check className="w-4 h-4 text-green-600" aria-label="Allowed" />
+    <Check className="w-4 h-4 text-kz-up" aria-label="Allowed" />
   ) : (
     <X className="w-4 h-4 text-ink-faint" aria-label="Not allowed" />
   );
@@ -72,102 +81,124 @@ export default function Page() {
     [profiles],
   );
 
+  // Lajur jadual pentadbir; klik baris membuka butiran pengguna seperti sebelum ini.
+  const lajurPentadbir: DataColumn<Profile>[] = [
+    {
+      key: "nama",
+      header: "Name",
+      render: (u, i) => (
+        <span className="flex items-center gap-3 py-3">
+          <Avatar name={u.display_name || "Unnamed user"} size="sm" index={i} />
+          <Link
+            href={`/admin/users/${u.id}`}
+            onClick={(e) => e.stopPropagation()}
+            className="text-[13px] font-bold text-ink hover:text-brand-purple truncate"
+          >
+            {u.display_name || "Unnamed user"}
+          </Link>
+        </span>
+      ),
+    },
+    {
+      key: "emel",
+      header: "Email",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="text-[13px] text-ink-faint truncate block max-w-[220px]">
+          {meta[u.id]?.email || "No email"}
+        </span>
+      ),
+    },
+    {
+      key: "peranan",
+      header: "Role",
+      render: (u) => (
+        <Badge variant="dim" warna="purple">
+          {u.role === "superadmin" ? "Owner" : "Admin"}
+        </Badge>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (u) =>
+        u.suspended ? (
+          <Badge variant="dim" warna="red">
+            Suspended
+          </Badge>
+        ) : (
+          <Badge variant="dot" warna="green">
+            Active
+          </Badge>
+        ),
+    },
+    {
+      key: "aktif",
+      header: "Last active",
+      hideOnMobile: true,
+      render: (u) => (
+        <span className="text-[13px] text-ink-faint whitespace-nowrap">
+          {relTime(meta[u.id]?.last_sign_in_at)}
+        </span>
+      ),
+    },
+  ];
+
+  // Lajur matriks kebenaran: baca sahaja, tiada klik baris.
+  const lajurKeenan: DataColumn<(typeof KEENAN)[number]>[] = [
+    {
+      key: "kebenaran",
+      header: "Permission",
+      render: (k) => <span className="text-[13px] text-ink">{k.label}</span>,
+    },
+    {
+      key: "owner",
+      header: "Owner",
+      className: "w-24",
+      render: (k) => <SelBenar ok={k.owner} />,
+    },
+    {
+      key: "admin",
+      header: "Admin",
+      className: "w-24",
+      render: (k) => <SelBenar ok={k.admin} />,
+    },
+  ];
+
   return (
-    <AdminShell title="Settings">
+    <AdminShell>
+      <PageHead title="Settings" />
+
       {muat ? (
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       ) : (
-        <div className="space-y-6">
+        <div className="space-y-8">
           {/* ===== Admin access ===== */}
           <section>
-            <h2 className="text-sm font-semibold text-ink mb-3">Admin access</h2>
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                      <th className="px-4 py-3 font-medium">Name</th>
-                      <th className="px-4 py-3 font-medium">Email</th>
-                      <th className="px-4 py-3 font-medium">Role</th>
-                      <th className="px-4 py-3 font-medium">Status</th>
-                      <th className="px-4 py-3 font-medium">Last active</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {pentadbir.map((u) => {
-                      const m = meta[u.id];
-                      return (
-                        <tr
-                          key={u.id}
-                          onClick={() => router.push(`/admin/users/${u.id}`)}
-                          className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9] cursor-pointer transition"
-                        >
-                          <td className="px-4 py-3">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <span className="w-9 h-9 rounded-full bg-[#EAE6FC] text-brand-purple text-[12px] font-semibold flex items-center justify-center shrink-0">
-                                {initials(u.display_name)}
-                              </span>
-                              <Link
-                                href={`/admin/users/${u.id}`}
-                                onClick={(e) => e.stopPropagation()}
-                                className="font-medium text-ink hover:text-brand-purple truncate"
-                              >
-                                {u.display_name || "Unnamed user"}
-                              </Link>
-                            </div>
-                          </td>
-                          <td className="px-4 py-3 text-ink-muted truncate max-w-[220px]">{m?.email || "No email"}</td>
-                          <td className="px-4 py-3">
-                            <Pill tone="violet">{u.role === "superadmin" ? "Owner" : "Admin"}</Pill>
-                          </td>
-                          <td className="px-4 py-3">
-                            {u.suspended ? <Pill tone="red">Suspended</Pill> : <Pill tone="green">Active</Pill>}
-                          </td>
-                          <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{relTime(m?.last_sign_in_at)}</td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-              {pentadbir.length === 0 && (
-                <EmptyState title="No admins." body="Admins appear here once they exist." />
-              )}
-            </Card>
+            <CardHead title="Admin access" subtitle="Owners and admins who can reach this workspace." className="mb-3" />
+            <DataTable
+              label="Admins"
+              columns={lajurPentadbir}
+              rows={pentadbir}
+              rowKey={(u) => u.id}
+              onRowClick={(u) => router.push(`/admin/users/${u.id}`)}
+              empty={
+                <EmptyState
+                  icon={<UserIcon className="w-6 h-6" />}
+                  title="No admins"
+                  text="Admins appear here once they exist."
+                />
+              }
+            />
           </section>
 
           {/* ===== Role permissions ===== */}
           <section>
-            <h2 className="text-sm font-semibold text-ink mb-3">Role permissions</h2>
-            <Card className="overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                      <th className="px-4 py-3 font-medium">Permission</th>
-                      <th className="px-4 py-3 font-medium w-24">Owner</th>
-                      <th className="px-4 py-3 font-medium w-24">Admin</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {KEENAN.map((k) => (
-                      <tr key={k.label} className="border-b border-hairline last:border-b-0">
-                        <td className="px-4 py-3 text-ink">{k.label}</td>
-                        <td className="px-4 py-3">
-                          <SelBenar ok={k.owner} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <SelBenar ok={k.admin} />
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              </div>
-              <p className="text-xs text-ink-faint px-4 py-3 border-t border-hairline">
-                To make someone an admin, open their profile in Users and change the role.
-              </p>
-            </Card>
+            <CardHead title="Role permissions" subtitle="What each admin role can do. Read only." className="mb-3" />
+            <DataTable label="Role permissions" columns={lajurKeenan} rows={KEENAN} rowKey={(k) => k.label} />
+            <p className="text-[12px] text-ink-faint mt-3">
+              To make someone an admin, open their profile in Users and change the role.
+            </p>
           </section>
         </div>
       )}

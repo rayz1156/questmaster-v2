@@ -1,18 +1,38 @@
 "use client";
 
-// Galeri templat sijil Kuizen (V2-016a), dalam AdminShell. Pentadbir aktif
+// Galeri templat sijil Kuizen, rupa v3 (KZ-024). Pentadbir aktif
 // boleh: cipta item (layout lalai Grid Sijil Kuizen v1), muat naik PNG
 // latar/logo (tiket + finalize, corak V2-015), suis Published dan Free tier,
 // sunting susun atur (guna semula layout-editor), padam dengan alasan
 // (semuanya diaudit oleh laluan API). Tiada em dash dalam rentetan UI.
+// Komponen kit: PageHead, Card, Badge, Button, Input, Select, Alert;
+// panggilan API dan aliran muat naik tidak berubah.
 
 import { useCallback, useEffect, useState } from "react";
-import { Plus, Trash2 } from "lucide-react";
+import { Plus, Trash2, Award } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, EmptyState } from "@/components/admin/ui";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  EmptyState,
+  Field,
+  Input,
+  PageHead,
+  Select,
+} from "@/components/ui";
 import { authHeader } from "@/lib/peer-client";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
 import LayoutEditor from "@/app/educator/classes/[id]/certificates/layout-editor";
+
+/**
+ * Gaya label-butang fail (input sembunyi di dalam label; kit Button tidak
+ * boleh membungkus input fail, jadi kelas butang outline disalin di sini).
+ */
+const LABEL_BUTANG_FAIL =
+  "inline-flex items-center justify-center gap-2 h-9 px-[18px] py-[7px] text-[13px] font-bold tracking-[0.26px] rounded-[4px] bg-white border border-hairline text-ink-muted hover:bg-canvas transition cursor-pointer select-none disabled:opacity-40";
 
 /** Nisbah halaman A4 landskap untuk kad pratonton. */
 const A4_NISBAH = "841.89 / 595.28";
@@ -212,81 +232,88 @@ export default function Page() {
   };
 
   return (
-    <AdminShell title="Certificates">
+    <AdminShell>
+      <PageHead
+        title="Certificates"
+        description="Published templates are visible to every educator. Free tier items can be used by Free plan classes."
+        primaryAction={{
+          label: "New gallery template",
+          icon: <Plus className="w-4 h-4" />,
+          onSelect: () => setBorang((v) => !v),
+        }}
+      />
+
       {msg && (
-        <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm">{msg}</div>
+        <Alert tone="info" className="mb-4">
+          {msg}
+        </Alert>
       )}
 
-      <div className="flex items-center justify-between gap-2 mb-4">
-        <p className="text-sm text-ink-muted">
-          Published templates are visible to every educator. Free tier items can be
-          used by Free plan classes.
-        </p>
-        <button className="btn-primary shrink-0" onClick={() => setBorang((v) => !v)}>
-          <Plus className="w-4 h-4" /> New gallery template
-        </button>
-      </div>
-
       {borang && (
-        <Card className="p-4 mb-6 space-y-3">
-          <div>
-            <label className="block text-sm font-medium mb-1">Title</label>
-            <input
-              className="input w-full"
-              value={title}
-              maxLength={120}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Certificate of Participation"
-            />
+        <Card className="mb-5">
+          <CardHead
+            title="New gallery template"
+            subtitle="New items start unpublished with the Kuizen grid v1 layout. Upload a background PNG, adjust the layout, then publish."
+          />
+          <div className="mt-4 space-y-4">
+            <Field label="Title" htmlFor="tajuk-templat">
+              <Input
+                id="tajuk-templat"
+                value={title}
+                maxLength={120}
+                onChange={(e) => setTitle(e.target.value)}
+                placeholder="Certificate of Participation"
+              />
+            </Field>
+            <div className="flex items-end gap-3 flex-wrap">
+              <Field label="Kind" htmlFor="jenis-templat" className="w-44">
+                <Select
+                  id="jenis-templat"
+                  value={kind}
+                  onChange={(e) => setKind(e.target.value as "" | "participation" | "achievement")}
+                >
+                  <option value="">None</option>
+                  <option value="participation">Participation</option>
+                  <option value="achievement">Achievement</option>
+                </Select>
+              </Field>
+              <Field label="Text tone" htmlFor="nada-teks" className="w-44">
+                <Select
+                  id="nada-teks"
+                  value={tone}
+                  onChange={(e) => setTone(e.target.value as "dark" | "light")}
+                >
+                  <option value="dark">Dark text</option>
+                  <option value="light">Light text</option>
+                </Select>
+              </Field>
+              <div className="flex gap-2 ml-auto">
+                <Button variant="outline" onClick={() => setBorang(false)}>
+                  Cancel
+                </Button>
+                <Button disabled={!title.trim() || busy} onClick={cipta}>
+                  Create
+                </Button>
+              </div>
+            </div>
           </div>
-          <div className="flex items-end gap-3 flex-wrap">
-            <div>
-              <label className="block text-sm font-medium mb-1">Kind</label>
-              <select
-                className="input"
-                value={kind}
-                onChange={(e) => setKind(e.target.value as "" | "participation" | "achievement")}
-              >
-                <option value="">None</option>
-                <option value="participation">Participation</option>
-                <option value="achievement">Achievement</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Text tone</label>
-              <select
-                className="input"
-                value={tone}
-                onChange={(e) => setTone(e.target.value as "dark" | "light")}
-              >
-                <option value="dark">Dark text</option>
-                <option value="light">Light text</option>
-              </select>
-            </div>
-            <div className="flex gap-2 ml-auto">
-              <button className="btn-quiet" onClick={() => setBorang(false)}>
-                Cancel
-              </button>
-              <button className="btn-primary" disabled={!title.trim() || busy} onClick={cipta}>
-                Create
-              </button>
-            </div>
-          </div>
-          <p className="text-xs text-ink-faint">
-            New items start unpublished with the Kuizen grid v1 layout. Upload a
-            background PNG, adjust the layout, then publish.
-          </p>
         </Card>
       )}
 
       {loading ? (
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       ) : items.length === 0 ? (
-        <EmptyState title="No gallery templates." body="Create one to share a design with every educator." />
+        <Card>
+          <EmptyState
+            icon={<Award className="w-6 h-6" />}
+            title="No gallery templates"
+            text="Create one to share a design with every educator."
+          />
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-5">
           {items.map((item) => (
-            <Card key={item.id} className="overflow-hidden flex flex-col">
+            <Card key={item.id} padat className="overflow-hidden flex flex-col">
               <div className="relative bg-slate-100" style={{ aspectRatio: A4_NISBAH }}>
                 {item.preview_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
@@ -296,30 +323,36 @@ export default function Page() {
                     className="absolute inset-0 w-full h-full object-fill"
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-xs text-ink-faint">
+                  <div className="absolute inset-0 flex items-center justify-center text-[12px] text-ink-faint">
                     No background yet
                   </div>
                 )}
                 <span className="absolute top-2 left-2">
                   {item.published ? (
-                    <Pill tone="green">Published</Pill>
+                    <Badge variant="dim" warna="green">
+                      Published
+                    </Badge>
                   ) : (
-                    <Pill tone="violet">Draft</Pill>
+                    <Badge variant="dim" warna="purple">
+                      Draft
+                    </Badge>
                   )}
                 </span>
                 {item.free_tier && (
                   <span className="absolute top-2 right-2">
-                    <Pill tone="green">Free tier</Pill>
+                    <Badge variant="dim" warna="green">
+                      Free tier
+                    </Badge>
                   </span>
                 )}
               </div>
-              <div className="p-4 flex flex-col gap-2 flex-1">
+              <div className="p-6 flex flex-col gap-2 flex-1">
                 <div className="flex items-center gap-2 min-w-0">
-                  <div className="font-semibold truncate" title={item.title}>
+                  <div className="text-[15px] font-bold text-ink truncate" title={item.title}>
                     {item.title}
                   </div>
                 </div>
-                <div className="text-xs text-ink-muted">
+                <div className="text-[12px] text-ink-faint">
                   {item.kind === "participation"
                     ? "Participation"
                     : item.kind === "achievement"
@@ -330,7 +363,7 @@ export default function Page() {
                   {` · Order ${item.sort_order}`}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <label className="btn-quiet" title="Upload a background PNG or JPEG">
+                  <label className={LABEL_BUTANG_FAIL} title="Upload a background PNG or JPEG">
                     <input
                       type="file"
                       accept="image/png,image/jpeg"
@@ -340,7 +373,7 @@ export default function Page() {
                     />
                     Background
                   </label>
-                  <label className="btn-quiet" title="Upload a logo PNG or JPEG">
+                  <label className={LABEL_BUTANG_FAIL} title="Upload a logo PNG or JPEG">
                     <input
                       type="file"
                       accept="image/png,image/jpeg"
@@ -350,28 +383,30 @@ export default function Page() {
                     />
                     Logo
                   </label>
-                  <button
-                    className="btn-quiet"
+                  <Button
+                    variant="outline"
                     disabled={busy || !item.background_path}
                     title={item.background_path ? "Adjust name, QR and code positions" : "Upload a background first"}
                     onClick={() => bukaEditor(item)}
                   >
                     Edit layout
-                  </button>
+                  </Button>
                 </div>
-                <div className="flex items-center gap-3 flex-wrap text-sm">
-                  <label className="flex items-center gap-1.5" title="Visible to all educators">
+                <div className="flex items-center gap-3 flex-wrap text-[13px]">
+                  <label className="flex items-center gap-1.5 cursor-pointer" title="Visible to all educators">
                     <input
                       type="checkbox"
+                      className="h-4 w-4 accent-brand-purple"
                       checked={item.published}
                       disabled={busy}
                       onChange={(e) => kemas(item.id, { published: e.target.checked })}
                     />
                     Published
                   </label>
-                  <label className="flex items-center gap-1.5" title="Usable by Free plan classes">
+                  <label className="flex items-center gap-1.5 cursor-pointer" title="Usable by Free plan classes">
                     <input
                       type="checkbox"
+                      className="h-4 w-4 accent-brand-purple"
                       checked={item.free_tier}
                       disabled={busy}
                       onChange={(e) => kemas(item.id, { free_tier: e.target.checked })}
@@ -380,8 +415,8 @@ export default function Page() {
                   </label>
                   <label className="flex items-center gap-1.5" title="Order in the educator gallery">
                     Order
-                    <input
-                      className="input w-16"
+                    <Input
+                      className="w-16"
                       type="number"
                       defaultValue={item.sort_order}
                       disabled={busy}
@@ -393,8 +428,9 @@ export default function Page() {
                       }}
                     />
                   </label>
-                  <button
-                    className="btn-quiet text-red-600 ml-auto"
+                  <Button
+                    variant="outline"
+                    className="text-kz-down ml-auto"
                     disabled={busy}
                     title="Delete this gallery template (reason required)"
                     onClick={() => {
@@ -403,23 +439,25 @@ export default function Page() {
                     }}
                   >
                     <Trash2 className="w-4 h-4" /> Delete
-                  </button>
+                  </Button>
                 </div>
                 {padamId === item.id && (
                   <div className="flex items-center gap-2 flex-wrap">
-                    <input
-                      className="input flex-1"
+                    <Input
+                      className="flex-1 min-w-[200px]"
                       value={alasan}
                       onChange={(e) => setAlasan(e.target.value)}
                       placeholder="Reason (at least 5 characters)"
+                      aria-label="Reason for deleting this template"
                     />
-                    <button
-                      className="btn-primary"
+                    <Button
+                      variant="primary"
+                      warna="red"
                       disabled={alasan.trim().length < 5 || busy}
                       onClick={padam}
                     >
                       Confirm delete
-                    </button>
+                    </Button>
                   </div>
                 )}
               </div>
