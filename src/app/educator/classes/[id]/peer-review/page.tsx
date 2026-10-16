@@ -9,13 +9,15 @@
  *
  * Kerahsiaan dikekalkan di pelayan: identiti penilai tidak pernah dihantar
  * ke pelayar, jadi justifikasi dipaparkan tanpa nama penilai.
+ *
+ * KZ-022b: rupa v3 dengan kit (Card, CardHead, Field, Input, Alert, Badge,
+ * Button, DataTable, EmptyState; kepala halaman dibekalkan ClassShell).
+ * Logik, data, panggilan API dan pengendali klik tidak berubah.
  */
-import { useCallback, useEffect, useMemo, useState, Fragment } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { useParams } from "next/navigation";
-import Link from "next/link";
 import {
   AlertTriangle,
-  ClipboardList,
   Plus,
   RefreshCw,
   Trash2,
@@ -29,6 +31,18 @@ import { getClass, type Klass } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import { peerApi } from "@/lib/peer-client";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import {
+  Alert,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  EmptyState,
+  Field,
+  Input,
+  type DataColumn,
+} from "@/components/ui";
 
 type Pusingan = {
   id: string;
@@ -78,6 +92,13 @@ type Keputusan = {
 
 type Penapis = "semua" | "merah" | "semak" | "risiko" | "belum";
 
+/** Kumpulan seperti yang dipulangkan oleh pertanyaan qm_teams dengan ahli. */
+type PasukanRingkas = {
+  id: string;
+  name: string | null;
+  qm_team_members?: { user_id: string }[];
+};
+
 /** Cadangan templat Fasa 1: tiga pusingan formatif (sumatif datang kemudian). */
 const TEMPLAT_MINGGU = [4, 6, 9];
 
@@ -97,11 +118,9 @@ function formatTarikh(iso: string): string {
   }
 }
 
-/** Nilai untuk input datetime-local daripada ISO string. */
-function keInputMasa(iso: string): string {
-  const d = new Date(iso);
-  const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+/** Mesej ralat selamat daripada nilai balingan `unknown`. */
+function mesejRalat(e: unknown, zonkal: string): string {
+  return e instanceof Error && e.message ? e.message : zonkal;
 }
 
 export default function PeerReviewPage() {
@@ -141,8 +160,8 @@ export default function PeerReviewPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json.error || "Failed to load rounds");
       setRounds(json.rounds ?? []);
-    } catch (e: any) {
-      setMsg(e.message || "Failed to load rounds");
+    } catch (e: unknown) {
+      setMsg(mesejRalat(e, "Failed to load rounds"));
     }
   }, [classId]);
 
@@ -157,10 +176,12 @@ export default function PeerReviewPage() {
           .select("id, name, qm_team_members(user_id)")
           .eq("class_id", classId)
           .is("hunt_id", null);
+        const senarai = (teams ?? []) as unknown as PasukanRingkas[];
         setKumpulanDua(
-          (teams ?? [])
-            .filter((t: any) => (t.qm_team_members ?? []).length === 2)
-            .map((t: any) => t.name),
+          senarai
+            .filter((t) => (t.qm_team_members ?? []).length === 2)
+            .map((t) => t.name ?? "")
+            .filter((n) => n !== ""),
         );
       } catch {
         setKumpulanDua([]);
@@ -181,8 +202,8 @@ export default function PeerReviewPage() {
         const json = await res.json();
         if (!res.ok) throw new Error(json.error || "Failed to load results");
         setKeputusan(json);
-      } catch (e: any) {
-        setMsg(e.message || "Failed to load results");
+      } catch (e: unknown) {
+        setMsg(mesejRalat(e, "Failed to load results"));
         setKeputusan(null);
       }
     })();
@@ -235,8 +256,8 @@ export default function PeerReviewPage() {
       setBorangTerbuka(false);
       setNama(""); setMinggu(""); setDibuka(""); setDitutup("");
       setMsg("Round created.");
-    } catch (e: any) {
-      setMsg(e.message || "Failed to create round");
+    } catch (e: unknown) {
+      setMsg(mesejRalat(e, "Failed to create round"));
     }
   }
 
@@ -250,8 +271,8 @@ export default function PeerReviewPage() {
       // Tiga pusingan dicipta, jadi amaran satu pusingan tidak relevan.
       setAmaranSatuSudah(false);
       setMsg("Three formative rounds created. Edit the dates if needed. Marked (summative) rounds will come in a later phase.");
-    } catch (e: any) {
-      setMsg(e.message || "Failed to create template rounds");
+    } catch (e: unknown) {
+      setMsg(mesejRalat(e, "Failed to create template rounds"));
     }
   }
 
@@ -265,8 +286,8 @@ export default function PeerReviewPage() {
       await muatPusingan();
       setVersiKeputusan((v) => v + 1);
       setMsg(`Results computed: ${json.written ?? 0} students.`);
-    } catch (e: any) {
-      setMsg(e.message || "Failed to compute");
+    } catch (e: unknown) {
+      setMsg(mesejRalat(e, "Failed to compute"));
     } finally {
       setKiraBusy(false);
     }
@@ -288,8 +309,8 @@ export default function PeerReviewPage() {
       if (pusinganDipilih === p.id) setPusinganDipilih("");
       await muatPusingan();
       setMsg("Round deleted.");
-    } catch (e: any) {
-      setMsg(e.message || "Failed to delete");
+    } catch (e: unknown) {
+      setMsg(mesejRalat(e, "Failed to delete"));
     }
   }
 
@@ -331,299 +352,351 @@ export default function PeerReviewPage() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <div className="p-10 text-sm text-gray-500">Loading peer review...</div>
+        <div className="p-10 text-[14px] text-ink-muted">Loading peer review...</div>
       </Shell>
     );
   }
   if (!klass) {
     return (
       <Shell tabs={EDU_TABS}>
-        <div className="p-10 text-sm text-gray-500">Class not found.</div>
+        <div className="p-10 text-[14px] text-ink-muted">Class not found.</div>
       </Shell>
     );
   }
 
+  // Titik warna bendera pada lajur pelajar (palet pejal KZ-DS-v3).
+  const titikBendera: Record<string, string> = {
+    MERAH: "#e85347",
+    KUNING: "#f4bd0e",
+    HIJAU: "#1ee0ac",
+  };
+
+  // Lajur jadual keputusan (DataTable kit). Klik baris membuka justifikasi
+  // yang diterima (tindakan sedia ada).
+  const lajurKeputusan: DataColumn<BarisKeputusan>[] = [
+    {
+      key: "pelajar",
+      header: "Student",
+      render: (b) => (
+        <span className="flex items-center gap-2 min-w-0">
+          <span
+            aria-hidden="true"
+            className="h-2 w-2 shrink-0 rounded-full"
+            style={{ backgroundColor: b.flag ? (titikBendera[b.flag] ?? "#dbdfea") : "#dbdfea" }}
+          />
+          <span className="text-[13px] font-medium text-ink truncate">{b.name || "Student"}</span>
+          {b.team_at_risk && (
+            <Badge variant="dim" warna="red">AT RISK</Badge>
+          )}
+        </span>
+      ),
+    },
+    {
+      key: "kumpulan",
+      header: "Group",
+      render: (b) => <span className="text-[13px] text-ink-muted">{b.team_name}</span>,
+    },
+    {
+      key: "p",
+      header: "P",
+      className: "text-right",
+      hideOnMobile: true,
+      render: (b) => (
+        <span className="text-[13px] text-ink-muted tabular-nums">{b.p === null ? "-" : (Math.round(b.p * 10000) / 10000).toFixed(4)}</span>
+      ),
+    },
+    {
+      key: "f",
+      header: "F",
+      className: "text-right",
+      hideOnMobile: true,
+      render: (b) => (
+        <span className="text-[13px] text-ink-muted tabular-nums">{b.f === null ? "-" : (Math.round(b.f * 10000) / 10000).toFixed(4)}</span>
+      ),
+    },
+    {
+      key: "fmod",
+      header: "Fmod",
+      className: "text-right",
+      hideOnMobile: true,
+      render: (b) => (
+        <span className="text-[13px] text-ink-muted tabular-nums">{(Math.round(b.f_mod * 10000) / 10000).toFixed(4)}</span>
+      ),
+    },
+    {
+      key: "bendera",
+      header: "Flag",
+      render: (b) => (
+        <span className="text-[12px] font-medium" style={{ color: b.flag ? (titikBendera[b.flag] ?? "#8094ae") : "#8094ae" }}>
+          {b.flag ?? "-"}
+        </span>
+      ),
+    },
+    {
+      key: "semak",
+      header: "Review",
+      render: (b) => (
+        b.needs_review
+          ? <span className="text-[12px] font-bold text-kz-down">YES</span>
+          : <span className="text-[13px] text-ink-faint">-</span>
+      ),
+    },
+  ];
+
   return (
     <Shell tabs={EDU_TABS}>
-      <ClassShell classId={klass.id} current="overview" klass={klass}>
-        <div className="flex flex-wrap items-end justify-between gap-4 mb-4">
-          <div className="min-w-0">
-            <div className="eyebrow mb-1">Peer review</div>
-            <h1 className="page-title">Confidential teammate evaluations.</h1>
-            <p className="page-subtitle">Each member rates their teammates on five criteria. Scores stay private; only you see the raw data.</p>
-          </div>
-          <button
-            onClick={() => setBorangTerbuka(!borangTerbuka)}
-            className="inline-flex items-center gap-2 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-95"
-          >
-            <Plus className="h-4 w-4" /> Create round
-          </button>
-        </div>
-
+      <ClassShell classId={klass.id} current="peer-review" klass={klass}>
         {msg && (
-          <div className="mb-4 rounded-xl border border-indigo-100 bg-indigo-50 px-3 py-2 text-xs text-indigo-700">{msg}</div>
+          <Alert tone="info" className="mb-4">{msg}</Alert>
         )}
 
         {borangTerbuka && (
-          <div className="card mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <div className="font-semibold text-gray-900">Create evaluation round</div>
-              <button onClick={() => setBorangTerbuka(false)} className="btn-quiet"><X className="w-4 h-4" /></button>
-            </div>
+          <Card className="mb-4">
+            <CardHead
+              title="Create evaluation round"
+              right={
+                <Button variant="icon" ariaLabel="Close form" onClick={() => setBorangTerbuka(false)}>
+                  <X className="w-4 h-4" />
+                </Button>
+              }
+            />
             {rounds.length === 0 && (
-              <div className="mb-3 rounded-xl border border-violet-200 bg-violet-50 p-4">
-                <div className="text-sm font-semibold text-gray-900 mb-1">Suggested: three formative rounds</div>
-                <div className="text-xs text-gray-600 mb-3">
-                  Weeks 4, 6 and 9 catch group problems early. Marked (summative) rounds will come in a later phase.
-                </div>
-                <div className="text-xs font-medium text-gray-700 mb-1">Semester start date</div>
+              <Alert tone="info" className="my-4">
+                <div className="font-bold text-ink mb-1">Suggested: three formative rounds</div>
+                <p className="mb-3">Weeks 4, 6 and 9 catch group problems early. Marked (summative) rounds will come in a later phase.</p>
+                <p className="text-[14px] font-medium text-[#344357] mb-2">Semester start date</p>
                 <div className="flex flex-wrap items-center gap-2">
-                  <input
+                  <Input
                     type="date"
                     value={mulaSemester}
                     onChange={(e) => setMulaSemester(e.target.value)}
-                    className="input max-w-[200px]"
+                    className="max-w-[200px]"
+                    aria-label="Semester start date"
                   />
-                  <button
-                    onClick={ciptaTemplat}
-                    disabled={!mulaSemester}
-                    className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-medium text-white hover:opacity-95 disabled:opacity-50"
-                  >
+                  <Button size="sm" disabled={!mulaSemester} onClick={ciptaTemplat}>
                     Create all three rounds
-                  </button>
-                  <span className="text-xs text-gray-500">
+                  </Button>
+                  <span className="text-[12px] text-ink-faint">
                     Opens at start + (week - 1) weeks; closes seven days later. Not saved anywhere; you can edit each date.
                   </span>
                 </div>
-              </div>
+              </Alert>
             )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-              <div>
-                <div className="text-xs font-medium text-gray-700 mb-1">Round name</div>
-                <input value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Peer review week 4" className="input" />
-              </div>
-              <div>
-                <div className="text-xs font-medium text-gray-700 mb-1">Week label (optional)</div>
-                <input type="number" min={1} max={52} value={minggu} onChange={(e) => setMinggu(e.target.value)} className="input" />
-              </div>
-              <div>
-                <div className="text-xs font-medium text-gray-700 mb-1">Opens at</div>
-                <input type="datetime-local" value={dibuka} onChange={(e) => setDibuka(e.target.value)} className="input" />
-              </div>
-              <div>
-                <div className="text-xs font-medium text-gray-700 mb-1">Closes at</div>
-                <input type="datetime-local" value={ditutup} onChange={(e) => setDitutup(e.target.value)} className="input" />
-              </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
+              <Field label="Round name" htmlFor="pusingan-nama">
+                <Input id="pusingan-nama" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Peer review week 4" />
+              </Field>
+              <Field label="Week label (optional)" htmlFor="pusingan-minggu">
+                <Input id="pusingan-minggu" type="number" min={1} max={52} value={minggu} onChange={(e) => setMinggu(e.target.value)} />
+              </Field>
+              <Field label="Opens at" htmlFor="pusingan-dibuka">
+                <Input id="pusingan-dibuka" type="datetime-local" value={dibuka} onChange={(e) => setDibuka(e.target.value)} />
+              </Field>
+              <Field label="Closes at" htmlFor="pusingan-ditutup">
+                <Input id="pusingan-ditutup" type="datetime-local" value={ditutup} onChange={(e) => setDitutup(e.target.value)} />
+              </Field>
             </div>
-            <div className="mt-3 flex justify-end">
-              <button onClick={simpanBorang} className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-sm font-medium text-white hover:opacity-95">
-                Save round
-              </button>
+            <div className="mt-4 flex justify-end">
+              <Button onClick={simpanBorang}>Save round</Button>
             </div>
-          </div>
+          </Card>
         )}
 
         {amaranSatuSudah && (
-          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-3">
-            <AlertTriangle className="h-5 w-5 shrink-0 text-amber-600" />
-            <div className="flex-1 min-w-0">
-              <div className="font-semibold">A single round measures but does not detect.</div>
-              <div className="text-amber-700">Group problems will only become visible after everything is over. More rounds give earlier warning.</div>
+          <Alert tone="warning" icon={<AlertTriangle className="w-4 h-4" />} className="mb-4">
+            <div className="font-bold">A single round measures but does not detect.</div>
+            <p className="mb-3">Group problems will only become visible after everything is over. More rounds give earlier warning.</p>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" size="sm" onClick={() => setAmaranSatuSudah(false)}>Continue</Button>
+              <Button size="sm" onClick={() => { setAmaranSatuSudah(false); setBorangTerbuka(true); }}>Add round</Button>
             </div>
-            <div className="flex shrink-0 gap-2">
-              <button onClick={() => setAmaranSatuSudah(false)} className="rounded-xl border border-amber-300 bg-white px-3 py-1.5 text-xs font-medium text-amber-900">Continue</button>
-              <button onClick={() => { setAmaranSatuSudah(false); setBorangTerbuka(true); }} className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white">Add round</button>
-            </div>
-          </div>
+          </Alert>
         )}
 
         {kumpulanDua.length > 0 && (
-          <div className="mb-4 rounded-xl border border-amber-300 bg-amber-50 p-4 text-sm text-amber-900 flex items-start gap-3">
-            <Users className="h-5 w-5 shrink-0 text-amber-600" />
-            <div>
-              <div className="font-semibold">Some groups have only two members: {kumpulanDua.join(", ")}.</div>
-              <div className="text-amber-700">Each member receives a single evaluation, so no adjustment is made and both members are marked for review.</div>
-            </div>
-          </div>
+          <Alert tone="warning" icon={<Users className="w-4 h-4" />} className="mb-4">
+            <div className="font-bold">Some groups have only two members: {kumpulanDua.join(", ")}.</div>
+            <p>Each member receives a single evaluation, so no adjustment is made and both members are marked for review.</p>
+          </Alert>
         )}
 
         {/* Bahagian pusingan */}
-        <div className="card mb-4">
-          <div className="font-semibold text-gray-900 mb-2">Rounds</div>
+        <Card className="mb-4">
+          <CardHead
+            title="Rounds"
+            subtitle="Each member rates their teammates on five criteria. Scores stay private; only you see the raw data."
+            right={
+              <Button size="sm" onClick={() => setBorangTerbuka(!borangTerbuka)}>
+                <Plus className="w-4 h-4" /> Create round
+              </Button>
+            }
+          />
           {rounds.length === 0 ? (
-            <p className="text-sm text-gray-500">No rounds yet. Use the template above or create a round.</p>
+            <EmptyState
+              icon={<Users className="w-6 h-6" />}
+              title="No rounds yet"
+              text="Use the suggested template or create a round."
+              actionLabel="Create round"
+              onAction={() => setBorangTerbuka(true)}
+            />
           ) : (
-            <div className="divide-y divide-gray-100">
+            <div className="divide-y divide-kz-line">
               {rounds.map((r) => {
                 const st = statusPusingan(r);
                 const warna =
-                  st === "terbuka" ? "bg-emerald-50 text-emerald-700" :
-                  st === "akan" ? "bg-sky-50 text-sky-700" :
-                  st === "dikira" ? "bg-violet-50 text-violet-700" :
-                  "bg-gray-100 text-gray-600";
+                  st === "terbuka" ? "green" :
+                  st === "akan" ? "info" :
+                  st === "dikira" ? "purple" :
+                  "gray";
                 return (
-                  <div key={r.id} className="flex flex-wrap items-center gap-3 py-3">
+                  <div key={r.id} className="flex flex-wrap items-center gap-3 py-4">
                     <div className="min-w-0 flex-1">
-                      <div className="font-medium text-gray-900 truncate">
+                      <div className="text-[14px] font-medium text-ink truncate">
                         {r.name}
-                        {r.week ? <span className="ml-2 text-xs text-gray-500">week {r.week}</span> : null}
+                        {r.week ? <span className="ml-2 text-[12px] text-ink-faint font-normal">week {r.week}</span> : null}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-[12px] text-ink-faint">
                         {formatTarikh(r.opens_at)} to {formatTarikh(r.closes_at)}
                       </div>
                     </div>
-                    <span className={`rounded-full px-2.5 py-1 text-xs font-medium ${warna}`}>
+                    <Badge variant="dot" warna={warna}>
                       {st === "akan" ? "Upcoming" : st === "terbuka" ? "Open" : st === "dikira" ? "Computed" : "Closed"}
-                    </span>
+                    </Badge>
                     {(st === "tertutup" || st === "dikira") && (
-                      <button
+                      <Button
+                        variant="outline"
+                        size="sm"
                         onClick={() => kira(r.id)}
                         disabled={kiraBusy}
-                        className="inline-flex items-center gap-1.5 rounded-xl border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50 disabled:opacity-50"
                       >
-                        <RefreshCw className={`h-3.5 w-3.5 ${kiraBusy ? "animate-spin" : ""}`} />
+                        <RefreshCw className={`w-3.5 h-3.5 ${kiraBusy ? "animate-spin" : ""}`} />
                         {st === "dikira" ? "Recompute" : "Compute results"}
-                      </button>
+                      </Button>
                     )}
-                    <button
-                      onClick={() => setPusinganDipilih(r.id)}
-                      className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white hover:opacity-95"
-                    >
+                    <Button size="sm" onClick={() => setPusinganDipilih(r.id)}>
                       Results
-                    </button>
-                    <button
+                    </Button>
+                    <Button
+                      variant="icon"
+                      ariaLabel={`Delete round ${r.name}`}
                       onClick={() => padamPusingan(r)}
-                      title="Delete round"
-                      className="text-gray-400 hover:text-red-600"
                     >
-                      <Trash2 className="h-4 w-4" />
-                    </button>
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
                   </div>
                 );
               })}
             </div>
           )}
-        </div>
+        </Card>
 
-        {/* Bahagian keputusan */}
+        {/* Bahagian keputusan: penapis kecil pada kepala kad, klik baris
+            membuka justifikasi terima (penilai kekal tanpa nama). */}
         {keputusan && (
-          <div className="card">
-            <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-              <div className="font-semibold text-gray-900">
-                Results: {keputusan.round.name}
-                {keputusan.round.computed_at
-                  ? <span className="ml-2 text-xs text-gray-500">computed {formatTarikh(keputusan.round.computed_at)}</span>
-                  : <span className="ml-2 text-xs text-amber-700">not computed yet</span>}
-              </div>
-              <div className="flex flex-wrap gap-1.5">
-                {(["semua", "merah", "semak", "risiko", "belum"] as Penapis[]).map((k) => (
-                  <button
-                    key={k}
-                    onClick={() => setPenapis(k)}
-                    className={penapis === k
-                      ? "rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-3 py-1.5 text-xs font-medium text-white"
-                      : "rounded-xl border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 hover:bg-gray-50"}
-                  >
-                    {belumLabel[k]}
-                  </button>
-                ))}
+          penapis === "belum" ? (
+            <div className="bg-white rounded-[4px] shadow-card">
+              <CardHead
+                title={`Results: ${keputusan.round.name}`}
+                subtitle={
+                  keputusan.round.computed_at
+                    ? `Computed ${formatTarikh(keputusan.round.computed_at)}`
+                    : "Not computed yet"
+                }
+                right={
+                  <div className="flex flex-wrap gap-1.5">
+                    {(["semua", "merah", "semak", "risiko", "belum"] as Penapis[]).map((k) => (
+                      <Button
+                        key={k}
+                        size="sm"
+                        variant={penapis === k ? "primary" : "outline"}
+                        onClick={() => setPenapis(k)}
+                      >
+                        {belumLabel[k]}
+                      </Button>
+                    ))}
+                  </div>
+                }
+              />
+              <div className="px-6 pb-2">
+                {keputusan.not_submitted.length === 0 ? (
+                  <p className="text-[14px] text-ink-faint py-3">Everyone has submitted.</p>
+                ) : (
+                  <ul className="divide-y divide-kz-line">
+                    {keputusan.not_submitted.map((m) => (
+                      <li key={m.user_id + m.team_id} className="py-3 text-[13px]">
+                        <span className="font-medium text-ink">{m.name || "Student"}</span>
+                        <span className="text-ink-muted"> has not submitted their evaluation ({m.team_name}).</span>
+                      </li>
+                    ))}
+                  </ul>
+                )}
               </div>
             </div>
-
-            {penapis === "belum" ? (
-              <div className="divide-y divide-gray-100">
-                {keputusan.not_submitted.length === 0 ? (
-                  <p className="text-sm text-gray-500 py-3">Everyone has submitted.</p>
-                ) : (
-                  keputusan.not_submitted.map((m) => (
-                    <div key={m.user_id + m.team_id} className="py-2 text-sm">
-                      <span className="font-medium text-gray-900">{m.name || "Student"}</span>
-                      <span className="text-gray-500"> has not submitted their evaluation ({m.team_name}).</span>
+          ) : (
+            <DataTable
+              label={`Peer review results for ${keputusan.round.name}`}
+              columns={lajurKeputusan}
+              rows={barisDitapis}
+              rowKey={(b) => b.user_id}
+              onRowClick={(b) => setBarisTerbuka(barisTerbuka === b.user_id ? null : b.user_id)}
+              head={
+                <CardHead
+                  title={`Results: ${keputusan.round.name}`}
+                  subtitle={
+                    keputusan.round.computed_at
+                      ? `Computed ${formatTarikh(keputusan.round.computed_at)}`
+                      : "Not computed yet"
+                  }
+                  right={
+                    <div className="flex flex-wrap gap-1.5">
+                      {(["semua", "merah", "semak", "risiko", "belum"] as Penapis[]).map((k) => (
+                        <Button
+                          key={k}
+                          size="sm"
+                          variant={penapis === k ? "primary" : "outline"}
+                          onClick={() => setPenapis(k)}
+                        >
+                          {belumLabel[k]}
+                        </Button>
+                      ))}
                     </div>
-                  ))
-                )}
-              </div>
-            ) : (
-              <div className="overflow-x-auto">
-                <table className="w-full text-sm">
-                  <thead>
-                    <tr className="text-xs uppercase tracking-wide text-gray-500">
-                      <th className="text-left font-medium px-3 py-2">Student</th>
-                      <th className="text-left font-medium px-3 py-2">Group</th>
-                      <th className="text-right font-medium px-3 py-2">P</th>
-                      <th className="text-right font-medium px-3 py-2">F</th>
-                      <th className="text-right font-medium px-3 py-2">Fmod</th>
-                      <th className="text-left font-medium px-3 py-2">Flag</th>
-                      <th className="text-left font-medium px-3 py-2">Review</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-gray-100">
-                    {barisDitapis.map((b) => {
-                      const warnaBaris =
-                        b.flag === "MERAH" ? "bg-red-50" :
-                        b.flag === "KUNING" ? "bg-amber-50" :
-                        b.flag === "HIJAU" ? "bg-emerald-50" : "";
-                      const warnaTitik =
-                        b.flag === "MERAH" ? "bg-red-500" :
-                        b.flag === "KUNING" ? "bg-amber-500" :
-                        b.flag === "HIJAU" ? "bg-emerald-500" : "bg-gray-300";
-                      const just = justifikasiMengikut.get(b.user_id) ?? [];
-                      return (
-                        <Fragment key={b.user_id}>
-                          <tr
-                            className={`${warnaBaris} cursor-pointer hover:opacity-90`}
-                            onClick={() => setBarisTerbuka(barisTerbuka === b.user_id ? null : b.user_id)}
-                          >
-                            <td className="px-3 py-2 font-medium text-gray-900">
-                              <span className="inline-flex items-center gap-2">
-                                <span className={`h-2 w-2 rounded-full ${warnaTitik}`} />
-                                {b.name || "Student"}
-                                {b.team_at_risk && <span className="rounded-full bg-red-100 px-2 py-0.5 text-[10px] font-semibold text-red-700">AT RISK</span>}
-                              </span>
-                            </td>
-                            <td className="px-3 py-2 text-gray-700">{b.team_name}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{b.p === null ? "-" : (Math.round(b.p * 10000) / 10000).toFixed(4)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{b.f === null ? "-" : (Math.round(b.f * 10000) / 10000).toFixed(4)}</td>
-                            <td className="px-3 py-2 text-right tabular-nums">{(Math.round(b.f_mod * 10000) / 10000).toFixed(4)}</td>
-                            <td className="px-3 py-2">{b.flag ?? "-"}</td>
-                            <td className="px-3 py-2">{b.needs_review ? <span className="font-semibold text-red-700">YES</span> : "-"}</td>
-                          </tr>
-                          {barisTerbuka === b.user_id && (
-                            <tr key={b.user_id + "-just"}>
-                              <td colSpan={7} className="px-3 pb-3">
-                                <div className="rounded-xl border border-violet-200 bg-violet-50 p-4 text-xs">
-                                  <div className="font-semibold text-gray-900 mb-1">
-                                    Justifications received about {b.name || "this student"} (raters stay anonymous):
-                                  </div>
-                                  {just.length === 0 ? (
-                                    <div className="text-gray-500">None. The student received no written justification.</div>
-                                  ) : (
-                                    <ul className="list-disc pl-4 space-y-1 text-gray-700">
-                                      {just.map((j, i) => (
-                                        <li key={i}>
-                                          {j.justification}
-                                          <span className="ml-2 text-gray-500">
-                                            (K1 {j.k1}, K2 {j.k2}, K3 {j.k3}, K4 {j.k4}, K5 {j.k5})
-                                          </span>
-                                        </li>
-                                      ))}
-                                    </ul>
-                                  )}
-                                </div>
-                              </td>
-                            </tr>
-                          )}
-                        </Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {barisDitapis.length === 0 && (
-                  <p className="text-sm text-gray-500 py-3">No students match this filter.</p>
-                )}
-              </div>
-            )}
-          </div>
+                  }
+                />
+              }
+              empty={
+                <EmptyState
+                  icon={<Users className="w-6 h-6" />}
+                  title="No students match this filter."
+                  text="Try another filter."
+                />
+              }
+              renderRowExtra={(b) => {
+                if (barisTerbuka !== b.user_id) return null;
+                const just = justifikasiMengikut.get(b.user_id) ?? [];
+                return (
+                  <div className="rounded-[4px] border border-hairline bg-[#f8f9fc] p-4 text-[12px]">
+                    <div className="font-bold text-ink mb-1">
+                      Justifications received about {b.name || "this student"} (raters stay anonymous):
+                    </div>
+                    {just.length === 0 ? (
+                      <p className="text-ink-faint">None. The student received no written justification.</p>
+                    ) : (
+                      <ul className="list-disc pl-4 space-y-1 text-ink-muted">
+                        {just.map((j, i) => (
+                          <li key={i}>
+                            {j.justification}
+                            <span className="ml-2 text-ink-faint">
+                              (K1 {j.k1}, K2 {j.k2}, K3 {j.k3}, K4 {j.k4}, K5 {j.k5})
+                            </span>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                );
+              }}
+            />
+          )
         )}
       </ClassShell>
     </Shell>
