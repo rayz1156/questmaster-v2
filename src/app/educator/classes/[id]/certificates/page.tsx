@@ -28,7 +28,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { Download, Eye, Mail, Plus, RefreshCw } from "lucide-react";
+import { Award, Download, Eye, Mail, Plus, RefreshCw } from "lucide-react";
 import Shell from "@/components/Shell";
 import ClassShell, { type ClassTabKey } from "@/components/ClassShell";
 import { EDU_TABS } from "@/lib/eduTabs";
@@ -38,6 +38,23 @@ import { supabase } from "@/lib/supabase";
 import { authHeader } from "@/lib/peer-client";
 import { pelanSaya } from "@/lib/pelan";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import {
+  Alert,
+  Avatar,
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  CardSection,
+  CheckRadio,
+  DataTable,
+  EmptyState,
+  Field,
+  Input,
+  Select,
+  Tabs,
+  type DataColumn,
+} from "@/components/ui";
 import { idBolehPilih, pecahKelompok, tickLayak } from "@/lib/sijil/ui";
 import { normaliseSusunAtur } from "@/lib/sijil/susunAtur";
 import { normaliseMedan, type MedanSijil } from "@/lib/sijil/medan";
@@ -155,6 +172,12 @@ function LakaranLatar({
 const MAX_ASET = 8 * 1024 * 1024;
 // Imej tandatangan (V2-016b): PNG lutsinar atau JPEG sehingga 1 MB.
 const MAX_SIG = 1024 * 1024;
+
+// KZ-025b: kelas label muat naik fail (Background/Logo/Upload signature)
+// yang meniru butang ghost sm kit. Komponen Button kit memulangkan <button>
+// atau <a>, jadi ia tidak boleh membungkus <input type="file" tersembunyi>.
+const LABEL_FAIL =
+  "inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none h-8 px-3 text-[12px] text-ink-muted hover:bg-[#ebeef2] disabled:opacity-40";
 
 export default function CertificatesPage() {
   const params = useParams<{ id: string }>();
@@ -933,66 +956,75 @@ export default function CertificatesPage() {
   return (
     <Shell tabs={EDU_TABS}>
             <ClassShell classId={classId} current={"certificates" as ClassTabKey} klass={klass}>
-        {msg && <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm">{msg}</div>}
+        {msg && (
+          <Alert tone="info" className="mb-4">
+            {msg}
+          </Alert>
+        )}
 
-        {/* Templat */}
-        <div className="flex items-center justify-between mb-4 gap-2 flex-wrap">
-          <h2 className="text-lg font-semibold">Certificate templates</h2>
-          <div className="flex items-center gap-2">
-            <Link href="/educator/certificates" className="btn-quiet">
-              My templates
-            </Link>
-            <button
-              className="btn-primary"
-              onClick={() => {
-                setSunting(null);
-                setTajuk("");
-                setJenis("all_members");
-                bukaDialog("gallery");
-              }}
-            >
-              <Plus className="w-4 h-4" /> New certificate
-            </button>
-          </div>
-        </div>
+        {/* Templat: satu kad kit; dialog cipta, borang blank dan senarai
+            templat tinggal di dalamnya supaya aliran keadaan tidak berubah. */}
+        <Card className="mb-8">
+          <CardHead
+            title="Certificate templates"
+            right={
+              <>
+                <Button variant="outline" href="/educator/certificates">
+                  My templates
+                </Button>
+                <Button
+                  onClick={() => {
+                    setSunting(null);
+                    setTajuk("");
+                    setJenis("all_members");
+                    bukaDialog("gallery");
+                  }}
+                >
+                  <Plus className="w-4 h-4" /> New certificate
+                </Button>
+              </>
+            }
+          />
 
         {/* Dialog cipta (V2-016a): galeri Kuizen, Templat saya, Blank. */}
         {dialogTab !== null && (
-          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 space-y-4">
-            <div className="flex items-center gap-2 flex-wrap">
-              {(
-                [
-                  ["gallery", "Kuizen gallery"],
-                  ["mine", "My templates"],
-                  ["blank", "Blank"],
-                ] as const
-              ).map(([k, label]) => (
-                <button
-                  key={k}
-                  className={`px-3 py-1.5 rounded-lg text-sm font-medium border transition ${
-                    dialogTab === k
-                      ? "bg-violet-50 border border-violet-200 text-brand-purple"
-                      : "bg-white border-hairline text-ink-muted hover:text-ink"
-                  }`}
-                  onClick={() => {
-                    if (k === "blank") {
+          <CardSection className="mt-6 space-y-4">
+            <div className="flex items-center justify-between gap-4">
+              <Tabs
+                items={[
+                  {
+                    label: "Kuizen gallery",
+                    aktif: dialogTab === "gallery",
+                    onSelect: () => {
+                      setBorangTerbuka(false);
+                      setSunting(null);
+                      bukaDialog("gallery");
+                    },
+                  },
+                  {
+                    label: "My templates",
+                    aktif: dialogTab === "mine",
+                    onSelect: () => {
+                      setBorangTerbuka(false);
+                      setSunting(null);
+                      bukaDialog("mine");
+                    },
+                  },
+                  {
+                    label: "Blank",
+                    aktif: dialogTab === "blank",
+                    onSelect: () => {
                       setSunting(null);
                       setTajuk("");
                       setJenis("all_members");
                       setBorangTerbuka(true);
                       setDialogTab("blank");
-                    } else {
-                      setBorangTerbuka(false);
-                      setSunting(null);
-                      bukaDialog(k);
-                    }
-                  }}
-                >
-                  {label}
-                </button>
-              ))}
-              <button
-                className="btn-quiet ml-auto"
+                    },
+                  },
+                ]}
+              />
+              <Button
+                variant="ghost"
                 onClick={() => {
                   setDialogTab(null);
                   setBorangTerbuka(false);
@@ -1000,7 +1032,7 @@ export default function CertificatesPage() {
                 }}
               >
                 Close
-              </button>
+              </Button>
             </div>
 
             {dialogTab !== "blank" && (
@@ -1008,7 +1040,7 @@ export default function CertificatesPage() {
                 {(dialogTab === "gallery" ? pustaka.gallery : pustaka.mine).map((item) => (
                   <div
                     key={item.id}
-                    className={`rounded-xl border bg-white overflow-hidden flex flex-col ${
+                    className={`rounded-[4px] border bg-white overflow-hidden flex flex-col ${
                       item.locked ? "border-hairline" : "border-violet-200"
                     }`}
                   >
@@ -1049,75 +1081,75 @@ export default function CertificatesPage() {
                       </div>
                       <div className="mt-auto">
                         {item.locked ? (
-                          <Link
+                          <Button
+                            variant="outline"
                             href="/#harga"
-                            className="btn-quiet w-full text-center block"
                             title="Available on Pro"
+                            className="w-full"
                           >
                             Pro plan required
-                          </Link>
+                          </Button>
                         ) : (
-                          <button
-                            className="btn-primary w-full"
+                          <Button
+                            className="w-full"
                             disabled={pustakaBusy}
                             onClick={() => gunaItemPustaka(item)}
                           >
                             Use in class
-                          </button>
+                          </Button>
                         )}
                       </div>
                     </div>
                   </div>
                 ))}
                 {(dialogTab === "gallery" ? pustaka.gallery : pustaka.mine).length === 0 && (
-                  <div className="col-span-full rounded-xl border border-hairline p-8 text-center text-slate-500">
-                    No templates yet
+                  <div className="col-span-full">
+                    <EmptyState
+                      icon={<Award className="h-8 w-8" />}
+                      title="No templates yet"
+                    />
                   </div>
                 )}
               </div>
             )}
-          </div>
+          </CardSection>
         )}
 
         {borangTerbuka && (
-          <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 space-y-3">
-            <div>
-              <label className="block text-sm font-medium mb-1">Title</label>
-              <input
-                className="input w-full"
+          <CardSection className="mt-6 space-y-4">
+            <Field label="Title">
+              <Input
                 value={tajuk}
                 onChange={(e) => setTajuk(e.target.value)}
                 placeholder="Certificate of Completion"
               />
-            </div>
-            <div>
-              <label className="block text-sm font-medium mb-1">Criteria</label>
-              <select className="input w-full" value={jenis} onChange={(e) => setJenis(e.target.value)}>
+            </Field>
+            <Field label="Criteria">
+              <Select value={jenis} onChange={(e) => setJenis(e.target.value)}>
                 <option value="all_members">All members</option>
                 <option value="hunt_completed">Completed a specific activity</option>
                 <option value="min_score">Minimum score</option>
                 <option value="live_attended">Attended a live quiz</option>
-              </select>
-            </div>
+              </Select>
+            </Field>
             {jenis === "hunt_completed" && (
-              <select className="input w-full" value={huntId} onChange={(e) => setHuntId(e.target.value)}>
+              <Select value={huntId} onChange={(e) => setHuntId(e.target.value)}>
                 <option value="">Choose an activity...</option>
                 {hunts.map((h) => (
                   <option key={h.id} value={h.id}>{h.title}</option>
                 ))}
-              </select>
+              </Select>
             )}
             {jenis === "live_attended" && (
-              <select className="input w-full" value={quizId} onChange={(e) => setQuizId(e.target.value)}>
+              <Select value={quizId} onChange={(e) => setQuizId(e.target.value)}>
                 <option value="">Choose a live quiz...</option>
                 {kuiz.map((q) => (
                   <option key={q.id} value={q.id}>{q.title}</option>
                 ))}
-              </select>
+              </Select>
             )}
             {jenis === "min_score" && (
-              <input
-                className="input w-full"
+              <Input
                 type="number"
                 min={0}
                 value={minSkor}
@@ -1126,33 +1158,39 @@ export default function CertificatesPage() {
               />
             )}
             <div className="flex gap-2">
-              <button className="btn-primary" onClick={simpanTemplat}>Save template</button>
-              <button className="btn-quiet" onClick={() => { setBorangTerbuka(false); setSunting(null); }}>Cancel</button>
+              <Button onClick={simpanTemplat}>Save template</Button>
+              <Button
+                variant="outline"
+                onClick={() => { setBorangTerbuka(false); setSunting(null); }}
+              >
+                Cancel
+              </Button>
             </div>
-          </div>
+          </CardSection>
         )}
 
         {templat.length === 0 ? (
-          <div className="rounded-xl border border-hairline p-8 text-center text-slate-500 mb-8">
-            No certificate templates yet. Create one to start issuing certificates.
-          </div>
+          <EmptyState
+            className="mt-2"
+            icon={<Award className="h-8 w-8" />}
+            title="No certificate templates yet"
+            text="Create one to start issuing certificates."
+          />
         ) : (
-          <div className="space-y-3 mb-8">
+          <div className="mt-6">
             {templat.map((t) => (
-              <div key={t.id}>
-                <div className="rounded-xl border border-hairline bg-white p-4 flex items-start justify-between gap-4 flex-wrap">
+              <CardSection key={t.id} baris className="first:border-t-0">
+                <div className="flex items-start justify-between gap-4 flex-wrap">
                 <LakaranLatar classId={classId} t={t} onBuka={setEditor} />
                 <div className="min-w-0">
-                  <div className="font-semibold">
-                    {t.title}
-                    {/* KZ-009: lencana pil violet pada templat aktif kelas. */}
-                    {t.is_active && (
-                      <span className="ml-2 align-middle rounded-full bg-violet-600 px-2.5 py-0.5 text-[10px] font-bold text-white">
-                        Active
-                      </span>
-                    )}
+                  <div className="flex items-center gap-2">
+                    <span className="text-[14px] font-bold text-ink truncate" title={t.title}>
+                      {t.title}
+                    </span>
+                    {/* KZ-009: lencana kit pada templat aktif kelas. */}
+                    {t.is_active && <Badge variant="solid" warna="purple">Active</Badge>}
                   </div>
-                  <div className="text-sm text-slate-500">
+                  <div className="text-[13px] text-ink-faint">
                     {t.criteria?.type === "all_members" && "All members"}
                     {t.criteria?.type === "hunt_completed" && "Completed a specific activity"}
                     {t.criteria?.type === "min_score" && `Minimum score: ${t.criteria.min_score ?? 0}`}
@@ -1163,16 +1201,17 @@ export default function CertificatesPage() {
                   {/* KZ-009: tukar templat aktif melalui RPC; tiada pada
                       templat yang sudah aktif (ia memakai lencana). */}
                   {!t.is_active && (
-                    <button
-                      className="btn-quiet"
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       disabled={aktifBusy === t.id}
                       title="Use this template by default when opening this page"
                       onClick={() => tetapAktif(t)}
                     >
                       Set as active
-                    </button>
+                    </Button>
                   )}
-                  <label className={`btn-quiet ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? "Upload background image" : "Available on Pro"}>
+                  <label className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? "Upload background image" : "Available on Pro"}>
                     <input
                       type="file"
                       accept="image/*"
@@ -1182,7 +1221,7 @@ export default function CertificatesPage() {
                     />
                     Background {pro ? "" : "(Pro)"}
                   </label>
-                  <label className={`btn-quiet ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? "Upload logo" : "Available on Pro"}>
+                  <label className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? "Upload logo" : "Available on Pro"}>
                     <input
                       type="file"
                       accept="image/*"
@@ -1193,25 +1232,21 @@ export default function CertificatesPage() {
                     Logo {pro ? "" : "(Pro)"}
                   </label>
                   {t.background_path && (
-                    <label
-                      className="flex items-center gap-2 text-sm"
+                    <CheckRadio
+                      label="Complete design"
                       title="When on, the background is a complete design: only the name, QR and code are printed over it"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={(t.layout?.mode as string) === "full_background"}
-                        onChange={(e) => togolMod(t, e.target.checked)}
-                      />
-                      Complete design
-                    </label>
+                      checked={(t.layout?.mode as string) === "full_background"}
+                      onChange={(e) => togolMod(t, e.target.checked)}
+                    />
                   )}
                   {t.background_path && (
-                    <button className="btn-quiet" onClick={() => setEditor(t)}>
+                    <Button size="sm" variant="ghost" onClick={() => setEditor(t)}>
                       Edit layout
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    className="btn-quiet"
+                  <Button
+                    size="sm"
+                    variant="ghost"
                     onClick={() => {
                       setSunting(t.id);
                       setTajuk(t.title);
@@ -1223,122 +1258,118 @@ export default function CertificatesPage() {
                     }}
                   >
                     Edit
-                  </button>
-                  <button
-                    className={`btn-quiet ${pro ? "" : "opacity-50 cursor-not-allowed"}`}
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className={pro ? "" : "opacity-50 cursor-not-allowed"}
                     title={pro ? "Save this template to My templates" : "Available on Pro"}
                     disabled={!pro || pustakaBusy}
                     onClick={() => simpanKePustaka(t)}
                   >
                     Save to My templates
-                  </button>
+                  </Button>
                   {salinBuka === t.id ? (
-                    <select
-                      className="input"
-                      value=""
-                      disabled={pustakaBusy}
-                      onChange={(e) => {
-                        if (e.target.value) salinKeKelasLain(t, e.target.value);
-                      }}
-                    >
-                      <option value="">Choose a class...</option>
-                      {kelasPemanggil
-                        .filter((k) => k.id !== classId)
-                        .map((k) => (
-                          <option key={k.id} value={k.id}>
-                            {k.name}
-                          </option>
-                        ))}
-                    </select>
+                    <span className="block w-56">
+                      <Select
+                        value=""
+                        disabled={pustakaBusy}
+                        onChange={(e) => {
+                          if (e.target.value) salinKeKelasLain(t, e.target.value);
+                        }}
+                      >
+                        <option value="">Choose a class...</option>
+                        {kelasPemanggil
+                          .filter((k) => k.id !== classId)
+                          .map((k) => (
+                            <option key={k.id} value={k.id}>
+                              {k.name}
+                            </option>
+                          ))}
+                      </Select>
+                    </span>
                   ) : (
-                    <button
-                      className="btn-quiet"
+                    <Button
+                      size="sm"
+                      variant="ghost"
                       title="Copy this template to another class you teach"
                       disabled={kelasPemanggil.filter((k) => k.id !== classId).length === 0}
                       onClick={() => setSalinBuka(salinBuka === t.id ? null : t.id)}
                     >
                       Copy to another class
-                    </button>
+                    </Button>
                   )}
-                  <button className="btn-quiet" onClick={() => bukaMedan(t)}>
+                  <Button size="sm" variant="ghost" onClick={() => bukaMedan(t)}>
                     Certificate details
-                  </button>
+                  </Button>
                 </div>
                 </div>
 
                 {/* Panel medan isian (V2-016b) */}
                 {medanBuka === t.id && (
-                  <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mt-2 space-y-3">
-                    <h4 className="font-semibold">Certificate details</h4>
-                    <p className="text-sm text-slate-500">
-                      These values are printed on every certificate of this template. Empty
-                      fields are never printed.
-                    </p>
-                    <div className="grid gap-3 md:grid-cols-2">
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Course / programme</label>
-                        <input
-                          className="input w-full"
+                  <div className="mt-4 rounded-[4px] border border-kz-line bg-canvas p-6 space-y-4">
+                    <div>
+                      <h4 className="text-[16.8px] font-bold text-ink">Certificate details</h4>
+                      <p className="text-[13px] text-ink-faint mt-1">
+                        These values are printed on every certificate of this template. Empty
+                        fields are never printed.
+                      </p>
+                    </div>
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {/* KZ-010: medan kosong guna nama kelas pada sijil. */}
+                      <Field
+                        label="Course / programme"
+                        note="Leave empty to use the class name."
+                      >
+                        <Input
                           value={borangMedan.course ?? ""}
                           maxLength={160}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, course: e.target.value }))}
                           placeholder={klass?.name ?? "Bengkel Robotik 2026"}
                         />
-                        {/* KZ-010: medan kosong guna nama kelas pada sijil. */}
-                        <p className="text-xs text-slate-500 mt-1">Leave empty to use the class name.</p>
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Location</label>
-                        <input
-                          className="input w-full"
+                      </Field>
+                      <Field label="Location">
+                        <Input
                           value={borangMedan.location ?? ""}
                           maxLength={120}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, location: e.target.value }))}
                           placeholder="Dewan Kuliah FKMT, UPSI"
                         />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Start date</label>
-                        <input
-                          className="input w-full"
+                      </Field>
+                      <Field label="Start date">
+                        <Input
                           type="date"
                           value={borangMedan.date_start ?? ""}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, date_start: e.target.value || undefined }))}
                         />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">End date (optional)</label>
-                        <input
-                          className="input w-full"
+                      </Field>
+                      <Field label="End date (optional)">
+                        <Input
                           type="date"
                           value={borangMedan.date_end ?? ""}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, date_end: e.target.value || undefined }))}
                         />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Signer name</label>
-                        <input
-                          className="input w-full"
+                      </Field>
+                      <Field label="Signer name">
+                        <Input
                           value={borangMedan.signer_name ?? ""}
                           maxLength={100}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, signer_name: e.target.value }))}
                           placeholder="Dr Hariz"
                         />
-                      </div>
-                      <div>
-                        <label className="block text-sm font-medium mb-1">Signer title</label>
-                        <input
-                          className="input w-full"
+                      </Field>
+                      <Field label="Signer title">
+                        <Input
                           value={borangMedan.signer_title ?? ""}
                           maxLength={120}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, signer_title: e.target.value }))}
                           placeholder="Pensyarah"
                         />
-                      </div>
+                      </Field>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
                       <label
-                        className={`btn-quiet ${pro ? "" : "opacity-50 cursor-not-allowed"}`}
+                        className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`}
                         title={pro ? "Upload signature image (PNG or JPEG, max 1 MB)" : "Available on Pro"}
                       >
                         <input
@@ -1358,42 +1389,48 @@ export default function CertificatesPage() {
                           className="h-10 rounded border border-hairline bg-white px-1"
                         />
                       ) : (
-                        <span className="text-xs text-slate-500">
+                        <span className="text-[12px] text-ink-faint">
                           {t.signature_path ? "Loading signature..." : "No signature image yet"}
                         </span>
                       )}
                       {t.signature_path && (
-                        <button
-                          className="btn-quiet text-red-600"
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          className="text-kz-down"
                           disabled={medanBusy}
                           onClick={() => buangTandatangan(t)}
                         >
                           Remove signature
-                        </button>
+                        </Button>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <button className="btn-primary" onClick={() => simpanMedan(t)} disabled={medanBusy}>
+                      <Button onClick={() => simpanMedan(t)} disabled={medanBusy}>
                         Save
-                      </button>
-                      <button className="btn-quiet" onClick={() => setMedanBuka(null)}>
+                      </Button>
+                      <Button variant="outline" onClick={() => setMedanBuka(null)}>
                         Cancel
-                      </button>
+                      </Button>
                     </div>
                   </div>
                 )}
-              </div>
+              </CardSection>
             ))}
           </div>
         )}
+        </Card>
 
         {editor && (() => {
           // Templat segar daripada senarai supaya mode terkini digunakan
           // walaupun suis di baris templat diketik semasa editor terbuka.
           const t = templat.find((x) => x.id === editor.id) ?? editor;
           return (
-            <div ref={editorRef}>
-              <LayoutEditor
+            // KZ-025b: editor susun atur hanya dibingkai kad; kanvas,
+            // koordinat dan fon sijil di dalam LayoutEditor tidak diubah.
+            <Card padat className="mb-8 overflow-hidden">
+              <div ref={editorRef}>
+                <LayoutEditor
                 // key: mulakan semula keadaan dalaman (susun, latar)
                 // bila templat bertukar.
                 key={t.id}
@@ -1414,60 +1451,61 @@ export default function CertificatesPage() {
                   await muatSemula();
                 }}
               />
-            </div>
+              </div>
+            </Card>
           );
         })()}
 
         {/* Pengeluaran */}
-        <div className="rounded-xl border border-hairline bg-white p-4 mb-8">
-          <h3 className="font-semibold mb-3">Issue certificates</h3>
-          <div className="flex items-end gap-2 mb-4 flex-wrap">
-            <div>
-              <label className="block text-sm font-medium mb-1">Template</label>
-              <select className="input" value={pilihTemplat} onChange={(e) => setPilihTemplat(e.target.value)}>
-                {templat.map((t) => (
-                  // KZ-009: label templat aktif berakhir " (active)".
-                  <option key={t.id} value={t.id}>{t.title}{t.is_active ? " (active)" : ""}</option>
-                ))}
-              </select>
+        <Card className="mb-8">
+          <CardHead title="Issue certificates" />
+          <div className="mt-6 flex items-end gap-2 flex-wrap">
+            <div className="w-64">
               {/* KZ-009: jelaskan beza pilihan semasa dengan templat aktif. */}
-              <p className="mt-1 text-xs text-slate-500">
-                Issuing uses the selected template. The active template is selected by default.
-              </p>
+              <Field
+                label="Template"
+                note="Issuing uses the selected template. The active template is selected by default."
+              >
+                <Select value={pilihTemplat} onChange={(e) => setPilihTemplat(e.target.value)}>
+                  {templat.map((t) => (
+                    // KZ-009: label templat aktif berakhir " (active)".
+                    <option key={t.id} value={t.id}>{t.title}{t.is_active ? " (active)" : ""}</option>
+                  ))}
+                </Select>
+              </Field>
             </div>
-            <button className="btn-primary" onClick={bacaKelayakan} disabled={sedangHantar || !pilihTemplat}>
+            <Button onClick={bacaKelayakan} disabled={sedangHantar || !pilihTemplat}>
               <RefreshCw className="w-4 h-4" /> Check eligibility
-            </button>
-            <button className="btn-quiet" onClick={pratontonPdf} disabled={!pilihTemplat}>
+            </Button>
+            <Button variant="outline" onClick={pratontonPdf} disabled={!pilihTemplat}>
               <Eye className="w-4 h-4" /> Preview PDF
-            </button>
-            <button
-              className="btn-primary"
+            </Button>
+            <Button
               onClick={pro ? emelPukal : undefined}
               disabled={!pro}
               title={pro ? "Send certificate emails to everyone who has not received one yet" : "Available on Pro"}
             >
               <Mail className="w-4 h-4" /> Email all unsent{pro ? "" : " (Pro)"}
-            </button>
-            <button
-              className="btn-primary"
+            </Button>
+            <Button
               onClick={pro ? emelTerpilih : undefined}
               disabled={!pro || bilanganPilihEmel === 0}
               title={pro ? "Send certificate emails to the selected certificates" : "Available on Pro"}
             >
               <Mail className="w-4 h-4" /> Email selected ({bilanganPilihEmel}){pro ? "" : " (Pro)"}
-            </button>
+            </Button>
           </div>
 
           {layak.length > 0 && (
             <div>
               {/* KZ-011: ringkasan kecil dan butang pilih semua di atas jadual. */}
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <span className="text-sm text-slate-500">
+              <div className="flex flex-wrap items-center gap-2 mt-6 mb-3">
+                <span className="text-[13px] text-ink-faint">
                   {bilanganLayak} eligible, {bilanganSudahDikeluarkan} already issued, {bilanganTidakLayak} not eligible.
                 </span>
-                <button
-                  className="btn-quiet"
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => {
                     setTick((p) => {
                       const baharu = { ...p };
@@ -1478,14 +1516,15 @@ export default function CertificatesPage() {
                   disabled={barisBolehPilih.length === 0 || issueBusy}
                 >
                   Select all eligible ({barisBolehPilih.length})
-                </button>
-                <button
-                  className="btn-quiet"
+                </Button>
+                <Button
+                  size="sm"
+                  variant="ghost"
                   onClick={() => setTick({})}
                   disabled={bilanganTick === 0 || issueBusy}
                 >
                   Clear
-                </button>
+                </Button>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
@@ -1553,25 +1592,29 @@ export default function CertificatesPage() {
                 </tbody>
               </table>
               </div>
-              <button
-                className="btn-primary mt-3"
+              <Button
+                className="mt-4"
                 onClick={keluarkan}
                 disabled={bilanganTick === 0 || issueBusy}
               >
-                <Plus className="w-4 h-4" />{" "}
+                <Plus className="w-4 h-4" />
                 {kemajuan
                   ? `Issuing ${kemajuan.semasa} of ${kemajuan.jumlah}...`
                   : `Issue to ${bilanganTick} participant${bilanganTick === 1 ? "" : "s"}`}
-              </button>
+              </Button>
             </div>
           )}
-        </div>
+        </Card>
 
         {/* Sijil dikeluarkan */}
-        <div className="rounded-xl border border-hairline bg-white p-4">
-          <h3 className="font-semibold mb-3">Issued certificates</h3>
+        <Card>
+          <CardHead title="Issued certificates" />
           {sijil.length === 0 ? (
-            <p className="text-sm text-slate-500">No certificates issued yet.</p>
+            <EmptyState
+              className="mt-2"
+              icon={<Award className="h-8 w-8" />}
+              title="No certificates issued yet"
+            />
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
@@ -1679,7 +1722,7 @@ export default function CertificatesPage() {
               </table>
             </div>
           )}
-        </div>
+        </Card>
       </ClassShell>
       </Shell>
     );
