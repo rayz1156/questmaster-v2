@@ -9,14 +9,18 @@ export const LEADERBOARD_HREF = "/participant/leaderboard";
 // Single source of truth for the participant (student) sidebar navigation.
 // Prefer <ParticipantShell> over importing this directly: it menapis tab
 // Ranking apabila educator menyembunyikan leaderboard.
+//
+// KZ-021: setiap tab membawa medan `group` supaya Shell memaparkan
+// navigasi berkumpulan (KZ-DS-v3 bahagian 3) tanpa memecahkan pemanggil
+// lama. Penapisan Ranking dalam useParticipantTabs TIDAK berubah.
 export const PARTICIPANT_TABS = [
-  { href: "/participant/home",        label: "Home",       icon: <Home className="w-5 h-5" /> },
-  { href: "/participant/learning",    label: "Learning",   icon: <BookOpen className="w-5 h-5" /> },
-  { href: "/participant/activities",  label: "Activities", icon: <Compass className="w-5 h-5" /> },
-  { href: "/participant/teams",       label: "Teams",      icon: <Users className="w-5 h-5" /> },
-  { href: LEADERBOARD_HREF,           label: "Ranking",    icon: <Trophy className="w-5 h-5" /> },
-  { href: "/participant/certificates", label: "Certificates", icon: <Award className="w-5 h-5" /> },
-  { href: "/participant/profile",     label: "Profile",    icon: <UserIcon className="w-5 h-5" /> },
+  { href: "/participant/home",        label: "Home",       group: "Main",    icon: <Home className="w-5 h-5" /> },
+  { href: "/participant/learning",    label: "Learning",   group: "Main",    icon: <BookOpen className="w-5 h-5" /> },
+  { href: "/participant/activities",  label: "Activities", group: "Main",    icon: <Compass className="w-5 h-5" /> },
+  { href: "/participant/teams",       label: "Teams",      group: "Classes", icon: <Users className="w-5 h-5" /> },
+  { href: LEADERBOARD_HREF,           label: "Ranking",    group: "Classes", icon: <Trophy className="w-5 h-5" /> },
+  { href: "/participant/certificates", label: "Certificates", group: "Classes", icon: <Award className="w-5 h-5" /> },
+  { href: "/participant/profile",     label: "Profile",    group: "Account", icon: <UserIcon className="w-5 h-5" /> },
 ];
 
 const TABS_WITHOUT_LEADERBOARD = PARTICIPANT_TABS.filter((t) => t.href !== LEADERBOARD_HREF);

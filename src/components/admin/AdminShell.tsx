@@ -14,14 +14,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
-  LayoutDashboard,
-  Users,
   GraduationCap,
-  Map,
-  ShieldCheck,
-  ScrollText,
-  MessageSquare,
-  Settings,
   HelpCircle,
   ChevronRight,
   ChevronDown,
@@ -30,11 +23,11 @@ import {
   Search,
   LogOut,
   User as UserIcon,
-  Award,
 } from 'lucide-react';
 import { getSession, clearSession } from '@/lib/session';
 import { LogoMark } from '@/components/Logo';
 import { initials } from '@/components/admin/ui';
+import { adminTabs } from '@/lib/adminTabs';
 import type { Profile, User } from '@/lib/types';
 import { getMyProfile, adminListAllSubmissions } from '@/lib/data';
 import { supabase } from '@/lib/supabaseClient';
@@ -44,19 +37,13 @@ export interface CrumbAdmin {
   href?: string;
 }
 
-/** Item bar sisi; `lencana` merujuk kiraan yang dimuat sekali. */
-const NAV = [
-  { href: '/admin/overview', label: 'Overview', icon: LayoutDashboard },
-  { href: '/admin/users', label: 'Users', icon: Users },
-  { href: '/admin/classes', label: 'Classes', icon: GraduationCap },
-  { href: '/admin/hunts', label: 'Activities', icon: Map },
-  { href: '/admin/moderation', label: 'Moderation', icon: ShieldCheck, lencana: 'moderasi' as const },
-  { href: '/admin/audit', label: 'Audit', icon: ScrollText },
-  { href: '/admin/feedback', label: 'Feedback', icon: MessageSquare, lencana: 'maklumbalas' as const },
-  // V2-016a: galeri templat sijil Kuizen untuk semua educator.
-  { href: '/admin/certificates', label: 'Certificates', icon: Award },
-  { href: '/admin/settings', label: 'Settings', icon: Settings },
-];
+/**
+ * Bar sisi admin (KZ-021): item daripada `adminTabs` (@/lib/adminTabs),
+ * dikumpulkan mengikut medan `group` mengikut KZ-DS-v3 bahagian 3
+ * (Overview / Management / Security / System). `lencana` merujuk kiraan
+ * yang dimuat sekali dan dipaparkan sebagai gelembung ungu.
+ */
+const NAV = adminTabs;
 
 export default function AdminShell({
   title,
@@ -222,12 +209,28 @@ export default function AdminShell({
   const aktif = (href: string) => pathname === href || !!pathname?.startsWith(href + '/');
 
   // ===== Kandungan bar sisi, dikongsi desktop dan laci =====
+  // Kumpulan mengikut medan `group` adminTabs (KZ-021): tajuk overline
+  // 11px 700 uppercase ls 2.2px, padding 24px.
+  const blok: { label?: string; items: typeof NAV }[] = [];
+  for (const t of NAV) {
+    const label = (t as { group?: string }).group;
+    const last = blok[blok.length - 1];
+    if (last && last.label === label) last.items.push(t);
+    else blok.push({ label, items: [t] });
+  }
+
   const isiSisi = (
     <nav className="px-3 pb-4 space-y-1">
-      {NAV.map((t) => {
-        const Ikon = t.icon;
-        const n = t.lencana ? lencana[t.lencana] : null;
-        return (
+      {blok.map((k, i) => (
+        <div key={k.label ?? `blok-${i}`}>
+          {k.label && (
+            <div className="px-6 pt-6 pb-2 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
+              {k.label}
+            </div>
+          )}
+          {k.items.map((t) => {
+          const n = t.lencana ? lencana[t.lencana] : null;
+          return (
           <Link
             key={t.href}
             href={t.href}
@@ -237,7 +240,7 @@ export default function AdminShell({
                 : 'text-ink-muted hover:text-ink hover:bg-[#F7F7F9] font-medium'
             }`}
           >
-            <Ikon className="w-4 h-4 shrink-0" />
+            {t.icon}
             <span className="truncate">{t.label}</span>
             {typeof n === 'number' && n > 0 && (
               <span className="ml-auto shrink-0 min-w-[18px] h-[18px] px-1 rounded-full bg-brand-purple text-white text-[10px] font-semibold flex items-center justify-center">
@@ -245,8 +248,10 @@ export default function AdminShell({
               </span>
             )}
           </Link>
-        );
-      })}
+          );
+          })}
+        </div>
+      ))}
       <div className="h-px bg-hairline my-3" />
       <Link
         href="/help"

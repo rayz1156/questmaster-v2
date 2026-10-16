@@ -30,7 +30,39 @@ type Tab = {
   icon?: React.ReactNode;
   /** Awalan laluan tambahan yang masih dikira destinasi yang sama. */
   match?: string[];
+  /**
+   * Nama kumpulan bar sisi (KZ-021, KZ-DS-v3 bahagian 3). Tab tanpa
+   * `group` berada di atas tanpa tajuk kumpulan, jadi pemanggil lama
+   * yang tidak menghantar kumpulan terus mendapat menu rata seperti
+   * sebelum ini.
+   */
+  group?: string;
+  /** Sub-item (pilihan): 14px 400 tanpa ikon, aktif ungu. */
+  sub?: Tab[];
 };
+
+/** Satu blok bar sisi: tajuk kumpulan pilihan + senarai itemnya. */
+type Kumpulan = { label?: string; tabs: Tab[] };
+
+/**
+ * Kumpulkan tab mengikut medan `group` mengikut susunan kemunculan.
+ * Tab tanpa kumpulan terkumpul di blok pertama tanpa tajuk.
+ */
+function kumpulkanTabs(tabs: Tab[]): Kumpulan[] {
+  const keluar: Kumpulan[] = [];
+  const indeks = new Map<string, Kumpulan>();
+  for (const t of tabs) {
+    const kunci = t.group ?? "";
+    let k = indeks.get(kunci);
+    if (!k) {
+      k = { label: t.group, tabs: [] };
+      indeks.set(kunci, k);
+      keluar.push(k);
+    }
+    k.tabs.push(t);
+  }
+  return keluar;
+}
 
 /** Huruf awal untuk avatar. Tiada gambar rekaan. */
 function initials(name?: string | null): string {
@@ -44,13 +76,28 @@ function initials(name?: string | null): string {
   return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
 }
 
-export default function Shell({ tabs, children }: { tabs: Tab[]; children: React.ReactNode }) {
+export default function Shell({
+  tabs,
+  /**
+   * Kumpulan eksplisit (KZ-021, pilihan). Jika diberikan, ia mengatasi
+   * medan `group` pada tab. Pemanggil lama yang hanya menghantar `tabs`
+   * tidak berubah tingkah lakunya.
+   */
+  groups,
+  children,
+}: {
+  tabs: Tab[];
+  groups?: { label?: string; tabs: Tab[] }[];
+  children: React.ReactNode;
+}) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
   const [drawerOpen, setDrawerOpen] = useState(false);
+  // Sub-item bar sisi yang dibuka secara manual (KZ-021).
+  const [subTerbuka, setSubTerbuka] = useState<string[]>([]);
   const menuRef = useRef<HTMLDivElement | null>(null);
 
   useEffect(() => {
@@ -129,7 +176,13 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
   const mark = initials(profile?.display_name || user.display_name);
   const here = (href: string) => pathname === href || pathname?.startsWith(href + "/");
   const active = (href: string) => here(href);
-  const activeTab = (t: Tab) => here(t.href) || (t.match || []).some(here);
+  const activeTab = (t: Tab) => here(t.href) || (t.match || []).some(here) || (t.sub || []).some((s) => here(s.href) || (s.match || []).some(here));
+
+  // Kumpulan menu: eksplisit melalui `groups`, atau dibina daripada medan
+  // `group` setiap tab. Bila tiada tab mempunyai kumpulan, hasilnya satu
+  // blok tanpa tajuk dan menu kelihatan sama seperti sebelum KZ-021.
+  const blokMenu: Kumpulan[] = groups ?? kumpulkanTabs(tabs);
+  const adaKumpulan = blokMenu.some((k) => !!k.label);
 
   const tahun = new Date().getFullYear();
 
@@ -151,19 +204,22 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
     </>
   );
 
-  const senaraiMenu = (
-    <nav aria-label="Main" className="flex flex-col gap-0.5 px-3 pb-6">
-      <div className="px-3 pb-2 pt-4 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
-        Menu
-      </div>
-      {tabs.map((t) => {
-        const aktif = activeTab(t);
-        return (
+  // ===== Blok menu =====
+  // Item dengan sub-item mempunyai anak panah yang boleh dibuka/tutup;
+  // sub-item yang aktif menyebabkan induknya terbuka secara automatik.
+  const subAktif = (t: Tab) =>
+    !!t.sub && (t.sub.some((s) => here(s.href) || (s.match || []).some(here)));
+  const subTerbukaFn = (t: Tab) => subAktif(t) || subTerbuka.includes(t.href);
+
+  const ItemMenu = ({ t }: { t: Tab }) => {
+    const aktif = activeTab(t);
+    return (
+      <div>
+        <div className="flex items-center">
           <Link
-            key={t.href}
             href={t.href}
             aria-current={aktif ? "page" : undefined}
-            className={`flex h-11 items-center gap-2 rounded-md px-3 text-[15px] font-bold tracking-[0.15px] transition ${
+            className={`flex h-11 flex-1 items-center gap-2 rounded-md px-3 text-[15px] font-bold tracking-[0.15px] transition ${
               aktif ? "bg-kz-menu-active text-brand-purple" : "text-ink hover:bg-canvas"
             }`}
           >
@@ -177,8 +233,70 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
             </span>
             <span className="truncate">{t.label}</span>
           </Link>
-        );
-      })}
+          {t.sub && t.sub.length > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                setSubTerbuka((s) =>
+                  s.includes(t.href) ? s.filter((x) => x !== t.href) : [...s, t.href]
+                )
+              }
+              aria-expanded={subTerbukaFn(t)}
+              aria-label={`${t.label} submenu`}
+              className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-faint hover:text-ink"
+            >
+              <ChevronDown
+                className={`h-4 w-4 transition-transform ${subTerbukaFn(t) ? "rotate-180" : ""}`}
+              />
+            </button>
+          )}
+        </div>
+        {/* Sub-item: 14px 400 tanpa ikon, aktif ungu (KZ-DS-v3 bahagian 3). */}
+        {t.sub && t.sub.length > 0 && subTerbukaFn(t) && (
+          <div className="ml-[30px] flex flex-col">
+            {t.sub.map((s) => {
+              const subAkt = here(s.href) || (s.match || []).some(here);
+              return (
+                <Link
+                  key={s.href}
+                  href={s.href}
+                  aria-current={subAkt ? "page" : undefined}
+                  className={`flex h-9 items-center rounded-md px-3 text-[14px] font-normal transition ${
+                    subAkt ? "text-brand-purple font-medium" : "text-ink-muted hover:text-ink hover:bg-canvas"
+                  }`}
+                >
+                  <span className="truncate">{s.label}</span>
+                </Link>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  const senaraiMenu = (
+    <nav aria-label="Main" className="flex flex-col gap-0.5 px-3 pb-6">
+      {/* Tajuk "Menu" lama hanya dipaparkan bila tiada kumpulan, supaya
+          pemanggil lama mendapat rupa yang sama seperti sebelum ini. */}
+      {!adaKumpulan && (
+        <div className="px-3 pb-2 pt-4 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
+          Menu
+        </div>
+      )}
+      {blokMenu.map((k, i) => (
+        <div key={k.label ?? `blok-${i}`}>
+          {/* Tajuk kumpulan: overline 11px 700 uppercase ls 2.2px, padding 24px. */}
+          {k.label && (
+            <div className="px-6 pt-6 pb-2 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
+              {k.label}
+            </div>
+          )}
+          {k.tabs.map((t) => (
+            <ItemMenu key={t.href} t={t} />
+          ))}
+        </div>
+      ))}
     </nav>
   );
 

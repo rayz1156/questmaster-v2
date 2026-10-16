@@ -1,25 +1,44 @@
 /**
- * Destinasi utama pendidik, semakan September 2026.
+ * Destinasi utama pendidik, semakan Oktober 2026 (KZ-021).
  *
- * Tujuh pautan bar sisi dikurangkan kepada tiga. Sebabnya: Activities,
- * Quizzes, Teams dan Rankings semuanya bermakna "di dalam kelas mana", jadi
- * tempatnya ialah di dalam kelas, bukan di aras atas. Yang tinggal di aras
- * atas hanyalah tiga soalan sebenar yang seorang pendidik tanya:
+ * KZ-021 (KZ-DS-v3 bahagian 3): bar sisi pendidik kini berkumpulan.
+ * Setiap tab membawa medan `group` supaya Shell memaparkan tajuk
+ * kumpulan tanpa memecahkan pemanggil `<Shell tabs={EDU_TABS}>` lama.
  *
- *   Classes   siapa yang saya ajar
- *   Library   apa yang saya ada untuk diajar
- *   Insights  bagaimana keadaannya
+ * Kumpulan mengikut spesifikasi:
+ *   MAIN       rumah pendidik. Tiada halaman `/educator` berasingan,
+ *              jadi rumahnya ialah `/educator/classes` (laluan yang
+ *              wujud), seperti diminta KZ-DS-v3 bahagian 3.
+ *   TEACHING   Activities, Live Quiz, Library.
+ *   ASSESSMENT Rankings, Outcomes, Certificates, Analytics.
+ *   ACCOUNT    Teams, Invites, Profile.
  *
- * Profile dan Help berpindah ke bar atas sebelah kanan. Teams dan Rankings
- * peringkat global masih ada dan dicapai dari halaman Classes; tiada laluan
- * dibuang.
- *
- * `match` menyenaraikan laluan lain yang masih dikira destinasi yang sama,
- * supaya /educator/live turut menyalakan Library.
+ * Semua laluan di bawah disahkan wujud (git ls-files src/app | grep
+ * page.tsx). `match` menyenaraikan laluan lain yang masih dikira
+ * destinasi yang sama, contohnya halaman sesi kuiz langsung menyalakan
+ * Live Quiz.
  */
+import {
+  GraduationCap,
+  Compass,
+  Radio,
+  BookOpen,
+  Trophy,
+  Target,
+  Award,
+  BarChart3,
+  Users,
+  MailPlus,
+  User as UserIcon,
+} from "lucide-react";
+
 export type EduTab = {
   href: string;
   label: string;
+  /** Kumpulan bar sisi (KZ-021). */
+  group?: string;
+  /** Ikon lucide 20px. */
+  icon?: React.ReactNode;
   /** Awalan laluan tambahan yang dikira aktif untuk tab ini. */
   match?: string[];
 };
@@ -28,23 +47,67 @@ export const EDU_TABS: EduTab[] = [
   {
     href: "/educator/classes",
     label: "Classes",
-    // V2-016a: /educator/certificates (Templat sijil saya) turut menyalakan
-    // Classes; pautan masuknya ada pada halaman sijil setiap kelas.
-    match: [
-      "/educator/teams",
-      "/educator/rankings",
-      "/educator/invites",
-      "/educator/outcomes",
-      "/educator/certificates",
-    ],
+    group: "Main",
+    icon: <GraduationCap className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/activities",
+    label: "Activities",
+    group: "Teaching",
+    icon: <Compass className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/live",
+    label: "Live Quiz",
+    group: "Teaching",
+    icon: <Radio className="w-5 h-5" />,
   },
   {
     href: "/educator/library",
     label: "Library",
-    match: ["/educator/activities", "/educator/live"],
+    group: "Teaching",
+    icon: <BookOpen className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/rankings",
+    label: "Rankings",
+    group: "Assessment",
+    icon: <Trophy className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/outcomes",
+    label: "Outcomes",
+    group: "Assessment",
+    icon: <Target className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/certificates",
+    label: "Certificates",
+    group: "Assessment",
+    icon: <Award className="w-5 h-5" />,
   },
   {
     href: "/educator/analytics",
-    label: "Insights",
+    label: "Analytics",
+    group: "Assessment",
+    icon: <BarChart3 className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/teams",
+    label: "Teams",
+    group: "Account",
+    icon: <Users className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/invites",
+    label: "Invites",
+    group: "Account",
+    icon: <MailPlus className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/profile",
+    label: "Profile",
+    group: "Account",
+    icon: <UserIcon className="w-5 h-5" />,
   },
 ];
