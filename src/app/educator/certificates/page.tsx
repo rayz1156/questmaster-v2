@@ -6,13 +6,16 @@
  * pengesahan) dan "Use in class" (pilih kelas; templat kelas baharu
  * dicipta melalui laluan from-library).
  *
+ * KZ-022: rupa v3 (PageHead, Card/CardSection, Button, EmptyState); semua
+ * fungsi tidak berubah.
+ *
  * Semak pelan: penciptaan item peribadi memerlukan pelan berbayar
  * (dikuatkuasakan pangkalan data); halaman ini tetap boleh dibaca supaya
  * item lama kekal boleh diguna selepas pelan turun.
  */
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, Trash2 } from "lucide-react";
+import { Check, Trash2, Award } from "lucide-react";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
 import { authHeader } from "@/lib/peer-client";
@@ -20,6 +23,7 @@ import { listMyEducatorClasses } from "@/lib/data";
 import type { EducatorClassRow } from "@/lib/types";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
+import { Button, Card, CardSection, EmptyState, Input, PageHead } from "@/components/ui";
 
 /** Nisbah halaman A4 landskap untuk kad pratonton. */
 const A4_NISBAH = "841.89 / 595.28";
@@ -143,29 +147,28 @@ export default function MyCertificateTemplatesPage() {
 
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-end justify-between gap-4 flex-wrap mb-6">
-        <div>
-          <h1 className="page-title">My certificate templates</h1>
-          <p className="page-subtitle">
-            Reuse your own designs in every class you teach.
-          </p>
-        </div>
-      </div>
+      <PageHead
+        title="My certificate templates"
+        description="Reuse your own designs in every class you teach."
+      />
 
-      {msg && <div className="mb-4 rounded-xl border border-violet-200 bg-violet-50 p-4 text-sm">{msg}</div>}
+      {msg && <div className="mb-4 rounded-[4px] border border-violet-200 bg-violet-50 p-4 text-sm text-ink-muted">{msg}</div>}
 
       {loading ? (
         <p className="text-sm text-ink-muted">Loading...</p>
       ) : mine.length === 0 ? (
-        <div className="rounded-xl border border-hairline bg-white p-8 text-center text-slate-500">
-          No templates yet. Open a class, create a certificate template and use
-          the Save to My templates action.
-        </div>
+        <Card>
+          <EmptyState
+            icon={<Award className="w-6 h-6" />}
+            title="No templates yet."
+            text="Open a class, create a certificate template and use the Save to My templates action."
+          />
+        </Card>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-7">
           {mine.map((item) => (
-            <div key={item.id} className="rounded-xl border border-hairline bg-white overflow-hidden flex flex-col">
-              <div className="relative bg-slate-100" style={{ aspectRatio: A4_NISBAH }}>
+            <Card padat key={item.id} className="overflow-hidden flex flex-col">
+              <div className="relative bg-canvas" style={{ aspectRatio: A4_NISBAH }}>
                 {item.preview_url ? (
                   // eslint-disable-next-line @next/next/no-img-element
                   <img
@@ -174,33 +177,32 @@ export default function MyCertificateTemplatesPage() {
                     className="absolute inset-0 w-full h-full object-fill"
                   />
                 ) : (
-                  <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
+                  <div className="absolute inset-0 flex items-center justify-center text-xs text-ink-faint">
                     Text only
                   </div>
                 )}
               </div>
-              <div className="p-4 flex flex-col gap-2 flex-1">
+              <CardSection baris className="flex flex-col gap-2 flex-1">
                 {namaBaru?.id === item.id ? (
                   <div className="flex items-center gap-2">
-                    <input
-                      className="input"
+                    <Input
                       value={namaBaru.tajuk}
                       onChange={(e) => setNamaBaru({ id: item.id, tajuk: e.target.value })}
                       maxLength={120}
                     />
-                    <button className="btn-primary" disabled={busy || !namaBaru.tajuk.trim()} onClick={() => simpanNama(item.id)}>
+                    <Button size="sm" disabled={busy || !namaBaru.tajuk.trim()} onClick={() => simpanNama(item.id)}>
                       <Check className="w-4 h-4" /> Save
-                    </button>
+                    </Button>
                   </div>
                 ) : (
-                  <div className="font-semibold truncate" title={item.title}>
+                  <div className="text-[16.8px] font-bold text-ink truncate" title={item.title}>
                     {item.title}
                   </div>
                 )}
-                <div className="text-xs text-slate-500">
+                <div className="text-xs text-ink-faint">
                   {item.text_tone === "light" ? "Light text" : "Dark text"}
                 </div>
-                <div className="mt-auto flex items-center gap-2 flex-wrap">
+                <div className="mt-auto flex items-center gap-2 flex-wrap pt-2">
                   {gunaBuka === item.id ? (
                     <select
                       className="input"
@@ -218,32 +220,19 @@ export default function MyCertificateTemplatesPage() {
                       ))}
                     </select>
                   ) : (
-                    <button
-                      className="btn-primary"
-                      disabled={busy || kelas.length === 0}
-                      onClick={() => setGunaBuka(gunaBuka === item.id ? null : item.id)}
-                    >
+                    <Button size="sm" disabled={busy || kelas.length === 0} onClick={() => setGunaBuka(gunaBuka === item.id ? null : item.id)}>
                       Use in class
-                    </button>
+                    </Button>
                   )}
-                  <button
-                    className="btn-quiet"
-                    disabled={busy}
-                    onClick={() => setNamaBaru({ id: item.id, tajuk: item.title })}
-                  >
+                  <Button variant="outline" size="sm" disabled={busy} onClick={() => setNamaBaru({ id: item.id, tajuk: item.title })}>
                     Rename
-                  </button>
-                  <button
-                    className="btn-quiet text-red-600"
-                    disabled={busy}
-                    title="Delete this template from My templates"
-                    onClick={() => padam(item)}
-                  >
+                  </Button>
+                  <Button variant="outline" size="sm" disabled={busy} ariaLabel="Delete this template from My templates" onClick={() => padam(item)}>
                     <Trash2 className="w-4 h-4" /> Delete
-                  </button>
+                  </Button>
                 </div>
-              </div>
-            </div>
+              </CardSection>
+            </Card>
           ))}
         </div>
       )}
