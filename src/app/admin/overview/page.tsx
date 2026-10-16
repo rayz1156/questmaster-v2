@@ -1,18 +1,21 @@
 "use client";
 
-// Overview ruang kerja admin (V2-011b). Jawapan kepada satu soalan: apa
-// yang perlu perhatian hari ini. Empat kad statistik, kad "Needs
-// attention" yang menyembunyikan baris kosong, kesihatan akaun, kelas
-// terbaru dan aktiviti admin terbaru.
+// Overview ruang kerja admin, rupa v3 (KZ-024). Jawapan kepada satu soalan:
+// apa yang perlu perhatian hari ini. Papan gaya LMS: StatGroup nombor sebenar,
+// kad "Needs attention" yang menyembunyikan baris kosong, kesihatan akaun,
+// kelas terbaru (TileRow) dan aktiviti admin terbaru (PersonRow). Data,
+// panggilan Supabase dan kiraan tidak berubah berbanding versi V2-011b.
 //
 // Nama pemilik dan pelaku datang daripada adminListProfiles(): UUID
-// tidak pernah dipaparkan sebagai nama.
+// tidak pernah dipaparkan sebagai nama. Tiada data siri dimuat di sini,
+// jadi tiada kad carta.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Users as UsersIcon, GraduationCap, Map as MapIcon, ClipboardList, ChevronRight, UserCheck, Mail, MessageSquare, CalendarClock } from "lucide-react";
+import { GraduationCap, ClipboardList, ChevronRight, UserCheck, Mail, MessageSquare, CalendarClock, ShieldCheck, ScrollText } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { StatCard, Card, EmptyState, relTime, initials } from "@/components/admin/ui";
+import { relTime } from "@/components/admin/ui";
+import { Card, CardHead, CardLink, EmptyState, PageHead, PersonRow, StatGroup, TileRow } from "@/components/ui";
 import {
   adminListProfiles,
   adminListAllHunts,
@@ -146,146 +149,156 @@ export default function Page() {
   ].filter((r) => r.kiraan > 0);
 
   return (
-    <AdminShell title="Overview">
-      <p className="text-ink-muted text-sm mb-6">What needs your attention across Kuizen today.</p>
+    <AdminShell>
+      <PageHead title="Overview" description="What needs your attention across Kuizen today." />
 
-      {/* Empat kad statistik */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        <StatCard
-          label="Total users"
-          value={users.length}
-          hint={baharuMinggu > 0 ? `+${baharuMinggu} this week` : undefined}
-          icon={<UsersIcon className="w-4 h-4" />}
+      {/* Empat nombor sebenar; tiada data perubahan, jadi tiada anak panah. */}
+      <Card className="mb-5">
+        <StatGroup
+          stats={[
+            { label: "Total users", value: users.length },
+            { label: "Educators", value: pendidik },
+            {
+              label: (
+                <>
+                  Activities{" "}
+                  <span className="text-ink-faint font-normal">({aktif} active)</span>
+                </>
+              ),
+              value: jumlahAktiviti,
+            },
+            { label: "Pending reviews", value: pendingSemak },
+          ]}
         />
-        <StatCard
-          label="Educators"
-          value={pendidik}
-          hint={menunggu > 0 ? `${menunggu} pending approval` : undefined}
-          icon={<GraduationCap className="w-4 h-4" />}
-        />
-        <StatCard
-          label="Activities"
-          value={jumlahAktiviti}
-          hint={`${aktif} active`}
-          icon={<MapIcon className="w-4 h-4" />}
-        />
-        <StatCard
-          label="Pending reviews"
-          value={pendingSemak}
-          href="/admin/moderation"
-          icon={<ClipboardList className="w-4 h-4" />}
-        />
-      </div>
+      </Card>
 
-      <div className="grid lg:grid-cols-2 gap-4 mb-6">
+      <div className="grid lg:grid-cols-2 gap-5 mb-5">
         {/* Perlu perhatian */}
-        <Card className="overflow-hidden">
-          <div className="px-4 py-3 border-b border-hairline text-sm font-semibold text-ink">Needs attention</div>
+        <Card padat>
+          <div className="px-6 py-4 border-b border-kz-line">
+            <CardHead title="Needs attention" subtitle="Rows appear only when something needs you." />
+          </div>
           {muat ? (
-            <div className="px-4 py-8 text-sm text-ink-faint">Loading...</div>
+            <p className="px-6 py-8 text-[14px] text-ink-faint">Loading...</p>
           ) : perhatian.length === 0 ? (
-            <EmptyState title="All clear. Nothing needs you right now." />
+            <EmptyState
+              icon={<ShieldCheck className="w-6 h-6" />}
+              title="All clear"
+              text="Nothing needs you right now."
+            />
           ) : (
-            perhatian.map((r) => {
-              const Ikon = r.ikon;
-              return (
-                <Link
-                  key={r.href}
-                  href={r.href}
-                  className="flex items-center gap-3 px-4 py-3 hover:bg-[#F7F7F9] transition border-t border-hairline first:border-t-0"
-                >
-                  <Ikon className="w-4 h-4 text-brand-purple shrink-0" />
-                  <span className="text-sm text-ink flex-1 min-w-0 truncate">{r.label}</span>
-                  <span className="text-sm font-semibold text-ink-muted">{r.kiraan}</span>
-                  <ChevronRight className="w-4 h-4 text-ink-faint shrink-0" />
-                </Link>
-              );
-            })
+            <div className="divide-y divide-kz-line">
+              {perhatian.map((r) => {
+                const Ikon = r.ikon;
+                return (
+                  <Link
+                    key={r.href}
+                    href={r.href}
+                    className="flex items-center gap-3 px-6 py-4 hover:bg-[#f8f9fc] transition"
+                  >
+                    <Ikon className="w-4 h-4 text-brand-purple shrink-0" />
+                    <span className="text-[14px] text-ink flex-1 min-w-0 truncate">{r.label}</span>
+                    <span className="text-[14px] font-medium text-ink tabular-nums">{r.kiraan}</span>
+                    <ChevronRight className="w-4 h-4 text-ink-faint shrink-0" />
+                  </Link>
+                );
+              })}
+            </div>
           )}
         </Card>
 
-        {/* Kesihatan akaun */}
-        <Card className="p-4">
-          <div className="text-sm font-semibold text-ink mb-4">Account health</div>
-          <div className="flex h-2.5 rounded-full overflow-hidden bg-gray-100 mb-4">
-            <div className="bg-green-500" style={{ width: `${(verifikasi / jumlah) * 100}%` }} />
-            <div className="bg-yellow-500" style={{ width: `${(belumSah / jumlah) * 100}%` }} />
-            <div className="bg-red-500" style={{ width: `${(digantung / jumlah) * 100}%` }} />
+        {/* Kesihatan akaun: nisbah sebenar, tiada nombor rekaan. */}
+        <Card>
+          <CardHead title="Account health" subtitle="Email verification and suspensions." />
+          <div className="mt-4 flex h-1.5 rounded-full overflow-hidden bg-kz-line">
+            <div className="bg-kz-up" style={{ width: `${(verifikasi / jumlah) * 100}%` }} />
+            <div className="bg-kz-warn" style={{ width: `${(belumSah / jumlah) * 100}%` }} />
+            <div className="bg-kz-down" style={{ width: `${(digantung / jumlah) * 100}%` }} />
           </div>
-          <div className="space-y-2.5">
+          <div className="mt-4 space-y-2.5">
             {[
-              { label: "Verified", nilai: verifikasi, bulat: "bg-green-500", teks: "text-green-700" },
-              { label: "Unverified", nilai: belumSah, bulat: "bg-yellow-500", teks: "text-yellow-700" },
-              { label: "Suspended", nilai: digantung, bulat: "bg-red-500", teks: "text-red-700" },
+              { label: "Verified", nilai: verifikasi, warna: "green" as const },
+              { label: "Unverified", nilai: belumSah, warna: "yellow" as const },
+              { label: "Suspended", nilai: digantung, warna: "red" as const },
             ].map((r) => (
-              <div key={r.label} className="flex items-center gap-2 text-sm">
-                <span className={`w-2 h-2 rounded-full ${r.bulat}`} />
-                <span className={`font-medium ${r.teks}`}>{r.label}</span>
-                <span className="ml-auto text-ink-muted">
+              <div key={r.label} className="flex items-center gap-2 text-[14px]">
+                <span
+                  className={`inline-flex items-center gap-1.5 font-medium ${
+                    r.warna === "green" ? "text-kz-up" : r.warna === "yellow" ? "text-kz-warn" : "text-kz-down"
+                  }`}
+                >
+                  <span
+                    className="h-1.5 w-1.5 rounded-full"
+                    style={{ backgroundColor: "currentColor" }}
+                    aria-hidden="true"
+                  />
+                  {r.label}
+                </span>
+                <span className="ml-auto text-ink-muted tabular-nums">
                   {r.nilai}
                   {users.length > 0 ? ` · ${Math.round((r.nilai / jumlah) * 100)}%` : ""}
                 </span>
               </div>
             ))}
           </div>
-          <div className="text-xs text-ink-faint pt-3 mt-3 border-t border-hairline">Total users: {users.length}</div>
+          <div className="text-[12px] text-ink-faint border-t border-kz-line mt-3 pt-3">
+            Total users: {users.length}
+            {baharuMinggu > 0 ? ` (+${baharuMinggu} this week)` : ""}
+          </div>
         </Card>
       </div>
 
-      <div className="grid lg:grid-cols-2 gap-4">
+      <div className="grid lg:grid-cols-2 gap-5">
         {/* Kelas terbaru */}
-        <Card className="overflow-hidden">
-          <div className="px-4 py-3 border-b border-hairline text-sm font-semibold text-ink">Recent classes</div>
+        <Card padat>
+          <div className="px-6 py-4 border-b border-kz-line">
+            <CardHead title="Recent classes" right={<CardLink href="/admin/classes">View all</CardLink>} />
+          </div>
           {kelas.length === 0 ? (
-            <EmptyState title="No classes yet." />
+            <EmptyState
+              icon={<GraduationCap className="w-6 h-6" />}
+              title="No classes yet"
+              text="Classes created by educators appear here."
+            />
           ) : (
-            kelas.map((k) => (
-              <Link
-                key={k.id}
-                href={`/admin/classes/${k.id}`}
-                className="flex items-center gap-3 px-4 py-3 hover:bg-[#F7F7F9] transition border-t border-hairline first:border-t-0"
-              >
-                <span
-                  className="w-2.5 h-2.5 rounded-full shrink-0"
-                  style={{ background: k.color || "#6366f1" }}
+            <div className="px-6 divide-y divide-kz-line">
+              {kelas.map((k, i) => (
+                <TileRow
+                  key={k.id}
+                  index={i}
+                  title={k.name}
+                  subtitle={`${namaProfil(k.owner_id)} · ${ahliKelas[k.id] ?? 0} members`}
+                  value={relTime(k.created_at)}
+                  href={`/admin/classes/${k.id}`}
                 />
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm font-medium text-ink truncate">{k.name}</span>
-                  <span className="block text-xs text-ink-faint truncate">
-                    {namaProfil(k.owner_id)} · {ahliKelas[k.id] ?? 0} members
-                  </span>
-                </span>
-                <span className="text-xs text-ink-faint shrink-0">{relTime(k.created_at)}</span>
-                <ChevronRight className="w-4 h-4 text-ink-faint shrink-0" />
-              </Link>
-            ))
+              ))}
+            </div>
           )}
         </Card>
 
         {/* Aktiviti admin terbaru */}
-        <Card className="overflow-hidden">
-          <div className="px-4 py-3 border-b border-hairline flex items-center justify-between">
-            <span className="text-sm font-semibold text-ink">Recent admin activity</span>
-            <Link href="/admin/audit" className="text-xs font-medium text-brand-purple hover:opacity-80">
-              View all
-            </Link>
+        <Card padat>
+          <div className="px-6 py-4 border-b border-kz-line">
+            <CardHead title="Recent admin activity" right={<CardLink href="/admin/audit">View all</CardLink>} />
           </div>
           {audit.length === 0 ? (
-            <EmptyState title="No admin activity yet." />
+            <EmptyState
+              icon={<ScrollText className="w-6 h-6" />}
+              title="No admin activity yet"
+              text="Actions taken by admins appear here."
+            />
           ) : (
-            audit.map((r) => (
-              <div key={r.id} className="flex items-center gap-3 px-4 py-3 border-t border-hairline first:border-t-0">
-                <span className="w-7 h-7 rounded-full bg-[#EAE6FC] text-brand-purple text-[11px] font-semibold flex items-center justify-center shrink-0">
-                  {initials(namaProfil(r.actor_id))}
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block text-sm text-ink truncate">
-                    {namaProfil(r.actor_id)} · {labelTindakan(r.action).label}
-                  </span>
-                </span>
-                <span className="text-xs text-ink-faint shrink-0">{relTime(r.created_at)}</span>
-              </div>
-            ))
+            <div className="px-6 divide-y divide-kz-line">
+              {audit.map((r, i) => (
+                <PersonRow
+                  key={r.id}
+                  index={i}
+                  name={namaProfil(r.actor_id)}
+                  subtitle={labelTindakan(r.action).label}
+                  value={relTime(r.created_at)}
+                />
+              ))}
+            </div>
           )}
         </Card>
       </div>
