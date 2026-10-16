@@ -145,8 +145,8 @@ export function titikSvg(nisbah: number, panjang: number): number {
  * Label masa ProjectCard
  * ============================================================ */
 
-/** Warna lencana masa ProjectCard ikut sisa hari. */
-export type WarnaMasa = "hijau" | "kuning" | "merah" | "kelabu";
+/** Warna lencana masa ProjectCard ikut sisa hari (kunci WarnaKit). */
+export type WarnaMasa = "green" | "yellow" | "red" | "gray";
 
 /**
  * Label baki masa ProjectCard (KZ-DS-v3 bahagian ProjectCard):
@@ -154,10 +154,10 @@ export type WarnaMasa = "hijau" | "kuning" | "merah" | "kelabu";
  * kelabu. `segera` tidak dipakai di sini; warna diambil terus.
  */
 export function labelMasa(hariSisa: number, siap: boolean): { label: string; warna: WarnaMasa } {
-  if (siap) return { label: "Done", warna: "hijau" };
-  if (hariSisa <= 1) return { label: "Due Tomorrow", warna: "merah" };
-  if (hariSisa <= 7) return { label: `${hariSisa} Days Left`, warna: "kuning" };
-  return { label: `${hariSisa} Days Left`, warna: "kelabu" };
+  if (siap) return { label: "Done", warna: "green" };
+  if (hariSisa <= 1) return { label: "Due Tomorrow", warna: "red" };
+  if (hariSisa <= 7) return { label: `${hariSisa} Days Left`, warna: "yellow" };
+  return { label: `${hariSisa} Days Left`, warna: "gray" };
 }
 
 /** Pasangan latar/teks untuk InitialTile dan Avatar ikut indeks baris. */
