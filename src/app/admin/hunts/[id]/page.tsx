@@ -1,19 +1,29 @@
 "use client";
 
-// Butiran aktiviti ruang kerja admin (V2-011c). Tindakan lama halaman
-// senarai dipindahkan ke sini: tukar status (publish/arkib), ubah mata
-// challenge melalui RPC beralasan dan buang aktiviti dengan pengesahan
-// menaip tajuk. Togol "Team completions" lama turut dipindahkan ke tab
-// Submissions supaya tiada ciri hilang.
+// Butiran aktiviti ruang kerja admin (V2-011c), rupa v3 (KZ-024b): PageHead
+// varian breadcrumb ("Activities / <tajuk>") dengan tindakan Publish, Archive
+// dan Delete; Card butiran aktiviti; Tabs keadaan (Questions & points,
+// Submissions); DataTable cabaran dan penghantaran. Logik, data, panggilan RPC
+// dan pengesahan TIDAK berubah (KZ-DS-v3 bahagian 5).
+//
+// Tindakan lama halaman senarai dipindahkan ke sini: tukar status
+// (publish/arkib), ubah mata challenge melalui RPC beralasan dan buang
+// aktiviti dengan pengesahan menaip tajuk. Togol "Team completions" lama
+// turut dipindahkan ke tab Submissions supaya tiada ciri hilang.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import {
   Archive, Rocket, Trash2, CheckCircle, Circle, ChevronDown, ChevronRight,
+  ClipboardList, Inbox, Map as MapIcon,
 } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, Tabs, EmptyState, relTime } from "@/components/admin/ui";
+import { relTime } from "@/components/admin/ui";
+import {
+  Alert, Badge, Button, Card, CardHead, DataTable, EmptyState,
+  Input, PageHead, Tabs, Textarea, type DataColumn,
+} from "@/components/ui";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { mesejHad } from "@/lib/pelan";
 import {
@@ -303,25 +313,24 @@ export default function Page({ params }: { params: { id: string } }) {
 
   if (muat) {
     return (
-      <AdminShell crumbs={[{ label: "Activities", href: "/admin/hunts" }, { label: "Loading..." }]}>
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+      <AdminShell>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       </AdminShell>
     );
   }
 
   if (!hunt) {
     return (
-      <AdminShell
-        crumbs={[{ label: "Activities", href: "/admin/hunts" }, { label: "Not found" }]}
-        title="Activity not found"
-      >
+      <AdminShell>
+        <PageHead crumb="Activities" name="Not found" />
         <Card>
-          <EmptyState title="Activity not found." body="It may have been deleted." />
-          <div className="px-4 pb-4">
-            <Link href="/admin/hunts" className="text-sm font-medium text-brand-purple hover:opacity-80">
-              Back to Activities
-            </Link>
-          </div>
+          <EmptyState
+            icon={<MapIcon className="w-6 h-6" />}
+            title="Activity not found."
+            text="It may have been deleted."
+            actionLabel="Back to Activities"
+            href="/admin/hunts"
+          />
         </Card>
       </AdminShell>
     );
@@ -329,208 +338,294 @@ export default function Page({ params }: { params: { id: string } }) {
 
   const namaTajuk = hunt.title;
 
-  return (
-    <AdminShell
-      crumbs={[{ label: "Activities", href: "/admin/hunts" }, { label: namaTajuk }]}
-      actions={
-        <>
-          {hunt.status !== "active" && (
-            <button
-              type="button"
-              onClick={() => tukarStatus("active")}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-            >
-              <Rocket className="w-4 h-4 text-ink-faint" /> Publish
-            </button>
-          )}
-          {hunt.status !== "archived" && (
-            <button
-              type="button"
-              onClick={() => tukarStatus("archived")}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9]"
-            >
-              <Archive className="w-4 h-4 text-ink-faint" /> Archive
-            </button>
-          )}
-          <button
-            type="button"
-            onClick={() => setZonBahaya((v) => !v)}
-            className="inline-flex items-center gap-1.5 bg-white border border-red-200 rounded-xl px-4 py-2 text-sm font-medium text-red-600 hover:bg-red-50"
-          >
-            <Trash2 className="w-4 h-4" /> Delete
-          </button>
-        </>
-      }
-    >
-      {/* Kepala */}
-      <div className="mb-6">
-        <div className="text-xl font-semibold text-ink truncate">{namaTajuk}</div>
-        <div className="text-sm text-ink-faint flex items-center gap-2 flex-wrap mt-1">
-          {hunt.class_id && (
-            <Link href={`/admin/classes/${hunt.class_id}`} className="text-brand-purple font-medium hover:opacity-80">
-              {kelas?.name || "Unnamed class"}
-            </Link>
-          )}
-          <span>by {namaProfil(hunt.owner_id)}</span>
-          <Pill tone={hunt.status === "active" ? "green" : hunt.status === "draft" ? "yellow" : "gray"}>
-            {hunt.status.charAt(0).toUpperCase() + hunt.status.slice(1)}
-          </Pill>
-        </div>
-        <div className="text-xs text-ink-faint mt-1">
-          Start {fmt(hunt.start_at)} · End {fmt(hunt.end_at)}
-        </div>
-      </div>
+  // Lencana status aktiviti (sama seperti lajur Status senarai Activities, KZ-024).
+  const kapitalStatus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  const lencanaStatus =
+    hunt.status === "active" ? (
+      <Badge variant="dot" warna="green">
+        {kapitalStatus(hunt.status)}
+      </Badge>
+    ) : hunt.status === "draft" ? (
+      <Badge variant="dim" warna="yellow">
+        {kapitalStatus(hunt.status)}
+      </Badge>
+    ) : (
+      <Badge variant="dim" warna="gray">
+        {kapitalStatus(hunt.status)}
+      </Badge>
+    );
 
-      {/* Zon bahaya buang aktiviti */}
+  // Lajur DataTable cabaran: nombor, tajuk dan input mata draf
+  // (logik draf dan had sama seperti jadual lama).
+  const lajurCabaran: DataColumn<Challenge>[] = [
+    {
+      key: "no",
+      header: "#",
+      render: (_c, i) => <span className="text-[13px] text-ink-faint">{i + 1}</span>,
+    },
+    {
+      key: "tajuk",
+      header: "Title",
+      render: (c) => <span className="text-[13px] font-bold text-ink">{c.title}</span>,
+    },
+    {
+      key: "mata",
+      header: "Points",
+      render: (c) => (
+        <Input
+          type="number"
+          min={0}
+          max={MATA_MAX}
+          value={drafMata[c.id] ?? String(Number(c.points) || 0)}
+          onChange={(e) => setDrafMata({ ...drafMata, [c.id]: e.target.value })}
+          aria-label={`Points for ${c.title}`}
+          className="w-24"
+        />
+      ),
+    },
+  ];
+
+  // Lajur DataTable penghantaran; jawapan dipotong, URL sebagai pautan selamat.
+  const lajurSub: DataColumn<Submission>[] = [
+    {
+      key: "peserta",
+      header: "Participant",
+      render: (s) => (
+        <span className="block truncate max-w-[160px] text-[13px] font-bold text-ink">
+          {namaProfil(s.user_id)}
+        </span>
+      ),
+    },
+    {
+      key: "cabaran",
+      header: "Challenge",
+      hideOnMobile: true,
+      render: (s) => (
+        <span className="block truncate max-w-[160px] text-[13px] text-ink-faint">
+          {challenges.find((c) => c.id === s.challenge_id)?.title || "-"}
+        </span>
+      ),
+    },
+    {
+      key: "jawapan",
+      header: "Answer",
+      render: (s) => (
+        <span className="block max-w-[260px] text-[13px] text-ink-faint">
+          <JawapanRingkas answer={s.answer} />
+        </span>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (s) =>
+        s.status === "approved" ? (
+          <Badge variant="dot" warna="green">
+            {kapitalStatus(s.status)}
+          </Badge>
+        ) : s.status === "rejected" ? (
+          <Badge variant="dim" warna="red">
+            {kapitalStatus(s.status)}
+          </Badge>
+        ) : (
+          <Badge variant="dim" warna="yellow">
+            {kapitalStatus(s.status)}
+          </Badge>
+        ),
+    },
+    {
+      key: "hantar",
+      header: "Submitted",
+      hideOnMobile: true,
+      render: (s) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{relTime(s.created_at)}</span>,
+    },
+    {
+      key: "ulas",
+      header: "",
+      render: (s) => (
+        <Link
+          href={`/admin/moderation?id=${s.id}`}
+          className="text-[13px] font-bold text-brand-purple hover:opacity-80"
+        >
+          Review
+        </Link>
+      ),
+    },
+  ];
+
+  return (
+    <AdminShell>
+      <PageHead
+        crumb="Activities"
+        name={namaTajuk}
+        description={
+          <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
+            {hunt.class_id && (
+              <Link
+                href={`/admin/classes/${hunt.class_id}`}
+                className="font-bold text-brand-purple hover:opacity-80"
+              >
+                {kelas?.name || "Unnamed class"}
+              </Link>
+            )}
+            <span>by {namaProfil(hunt.owner_id)}</span>
+            {lencanaStatus}
+            <span>
+              Start {fmt(hunt.start_at)} · End {fmt(hunt.end_at)}
+            </span>
+          </span>
+        }
+        primaryAction={
+          hunt.status !== "active"
+            ? {
+                label: "Publish",
+                icon: <Rocket className="w-4 h-4" />,
+                onSelect: () => tukarStatus("active"),
+              }
+            : undefined
+        }
+        secondaryActions={[
+          ...(hunt.status !== "archived"
+            ? [
+                {
+                  label: "Archive",
+                  icon: <Archive className="w-4 h-4" />,
+                  onSelect: () => tukarStatus("archived"),
+                },
+              ]
+            : []),
+          {
+            label: "Delete",
+            icon: <Trash2 className="w-4 h-4" />,
+            onSelect: () => setZonBahaya(true),
+          },
+        ]}
+      />
+
+      {/* Zon bahaya buang aktiviti: pengesahan menaip tajuk, sama seperti lama. */}
       {zonBahaya && (
-        <Card className="mb-6 p-4 border-red-200">
-          <div className="text-sm font-semibold text-red-600 mb-1">Danger zone</div>
-          <p className="text-sm text-ink-muted mb-3">
+        <Card className="mb-6 border border-red-200">
+          <CardHead title="Danger zone" />
+          <p className="text-[14px] text-ink-muted mt-4 mb-4">
             Deleting this activity removes its challenges and submissions permanently. Type the activity title exactly to enable the button.
           </p>
           <div className="flex items-center gap-3 flex-wrap">
-            <input
-              className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink w-64"
-              placeholder={namaTajuk}
-              value={pengesahanHapus}
-              onChange={(e) => setPengesahanHapus(e.target.value)}
-              aria-label="Type the activity title to confirm deletion"
-            />
-            <button
-              type="button"
+            <span className="w-64">
+              <Input
+                placeholder={namaTajuk}
+                value={pengesahanHapus}
+                onChange={(e) => setPengesahanHapus(e.target.value)}
+                aria-label="Type the activity title to confirm deletion"
+                ralat={pengesahanHapus !== "" && pengesahanHapus !== namaTajuk}
+              />
+            </span>
+            <Button
+              warna="red"
               disabled={pengesahanHapus !== namaTajuk}
               onClick={hapus}
-              className="inline-flex items-center gap-1.5 bg-red-600 text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40"
             >
               <Trash2 className="w-4 h-4" /> Delete activity
-            </button>
-            <button
-              type="button"
+            </Button>
+            <Button
+              variant="outline"
               onClick={() => {
                 setZonBahaya(false);
                 setPengesahanHapus("");
               }}
-              className="inline-flex items-center gap-1.5 bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink"
             >
               Cancel
-            </button>
+            </Button>
           </div>
         </Card>
       )}
 
       <Tabs
         items={[
-          { key: "questions", label: "Questions & points" },
-          { key: "submissions", label: "Submissions" },
+          {
+            label: "Questions & points",
+            onSelect: () => setTab("questions"),
+            aktif: tab === "questions",
+          },
+          {
+            label: "Submissions",
+            onSelect: () => setTab("submissions"),
+            aktif: tab === "submissions",
+          },
         ]}
-        value={tab}
-        onChange={(k) => setTab(k as MukaTab)}
       />
 
       {mesej && (
-        <div
-          className={`mt-4 text-sm rounded-lg px-3 py-2 inline-block ${
-            mesej.baik
-              ? "bg-green-50 text-green-700 border border-green-200"
-              : "bg-red-50 text-red-700 border border-red-200"
-          }`}
-        >
-          {mesej.teks}
+        <div className="mt-4">
+          <Alert tone={mesej.baik ? "success" : "danger"}>{mesej.teks}</Alert>
         </div>
       )}
 
       {/* ===== Tab Questions & points ===== */}
       {tab === "questions" && (
         <div className="mt-4 grid lg:grid-cols-3 gap-4 items-start">
-          {/* Jadual challenge */}
-          <Card className="lg:col-span-2 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                    <th className="px-4 py-3 font-medium w-10">#</th>
-                    <th className="px-4 py-3 font-medium">Title</th>
-                    <th className="px-4 py-3 font-medium w-28">Points</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {challenges.map((c, i) => {
-                    const berubah = perubahanMata.some((p) => p.id === c.id);
-                    return (
-                      <tr
-                        key={c.id}
-                        className={`border-b border-hairline last:border-b-0 ${berubah ? "bg-[#F1EEFC]" : ""}`}
-                      >
-                        <td className="px-4 py-3 text-ink-faint">{i + 1}</td>
-                        <td className="px-4 py-3 font-medium text-ink">{c.title}</td>
-                        <td className="px-4 py-3">
-                          <input
-                            type="number"
-                            min={0}
-                            max={MATA_MAX}
-                            value={drafMata[c.id] ?? String(Number(c.points) || 0)}
-                            onChange={(e) => setDrafMata({ ...drafMata, [c.id]: e.target.value })}
-                            className="w-24 h-9 rounded-xl bg-white border border-hairline px-3 text-sm text-ink focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-                            aria-label={`Points for ${c.title}`}
-                          />
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {challenges.length === 0 && <EmptyState title="No questions." />}
-          </Card>
+          {/* Jadual cabaran; baris yang ada draf berubah disorot (rowClassName). */}
+          <DataTable
+            className="lg:col-span-2"
+            label="Activity questions"
+            columns={lajurCabaran}
+            rows={challenges}
+            rowKey={(c) => c.id}
+            rowClassName={(c) =>
+              perubahanMata.some((p) => p.id === c.id) ? "bg-[#F1EEFC]" : ""
+            }
+            empty={
+              <EmptyState
+                icon={<ClipboardList className="w-6 h-6" />}
+                title="No questions."
+                text="This activity has no challenges yet."
+              />
+            }
+          />
 
-          {/* Panel kanan melekat: semak perubahan */}
-          <Card className="lg:sticky lg:top-20 p-4">
-            <div className="text-sm font-semibold text-ink mb-3">Review changes</div>
+          {/* Panel kanan melekat: semak perubahan (logik dan had sama seperti lama) */}
+          <Card className="lg:sticky lg:top-20">
+            <CardHead title="Review changes" />
             {perubahanMata.length === 0 ? (
-              <p className="text-sm text-ink-faint">No changes yet. Edit points in the table to queue a change.</p>
+              <p className="text-[14px] text-ink-faint mt-4">
+                No changes yet. Edit points in the table to queue a change.
+              </p>
             ) : (
-              <div className="space-y-1 mb-3">
+              <div className="mt-4 space-y-1 mb-4">
                 {perubahanMata.map((p) => (
-                  <div key={p.id} className="text-sm text-ink">
-                    <span className="font-medium truncate">{p.title}:</span>{" "}
+                  <div key={p.id} className="text-[14px] text-ink">
+                    <span className="font-bold truncate">{p.title}:</span>{" "}
                     <span className="text-ink-muted">{p.sebelum} to {p.selepas}</span>
                   </div>
                 ))}
               </div>
             )}
-            <div className="flex items-center justify-between text-xs text-ink-muted border-t border-hairline pt-3 mb-3">
+            <div className="flex items-center justify-between text-[12px] text-ink-muted border-t border-hairline pt-3 mb-3">
               <span>Total before: <span className="font-semibold text-ink">{jumlahSebelum}</span></span>
               <span>Total after: <span className="font-semibold text-brand-purple">{jumlahSelepas}</span></span>
             </div>
             {mataTakSah.length > 0 && (
-              <p className="text-xs text-red-600 mb-3">
+              <p className="text-[12px] text-kz-down mb-3">
                 Points must be whole numbers from 0 to {MATA_MAX}. Check: {mataTakSah.join(", ")}
               </p>
             )}
-            <textarea
+            <Textarea
               rows={4}
               maxLength={500}
               value={alasanMata}
               onChange={(e) => setAlasanMata(e.target.value)}
               placeholder="Explain why these points change"
-              className="w-full border border-hairline rounded-xl p-3 text-sm text-ink resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
               aria-label="Reason for the points change"
             />
-            <div className="flex items-center justify-between mt-1 mb-3">
-              <span className="text-xs text-ink-faint">{alasanBersih.length}/500</span>
-              <span className="text-xs text-ink-faint">Changes are recorded in Audit.</span>
+            <div className="flex items-center justify-between mt-1.5 mb-3">
+              <span className="text-[12px] text-ink-faint">{alasanBersih.length}/500</span>
+              <span className="text-[12px] text-ink-faint">Changes are recorded in Audit.</span>
             </div>
             <div className="flex items-center gap-2">
-              <button
-                type="button"
-                disabled={!bolehSimpan}
-                onClick={simpanMataBtn}
-                className="flex-1 bg-brand-purple text-white rounded-xl px-4 py-2 text-sm font-medium hover:opacity-90 disabled:opacity-40"
-              >
+              <Button onClick={simpanMataBtn} disabled={!bolehSimpan} className="flex-1">
                 {simpanMata ? "Saving..." : "Save changes"}
-              </button>
-              <button
-                type="button"
+              </Button>
+              <Button
+                variant="outline"
                 disabled={perubahanMata.length === 0 && alasanMata.length === 0}
                 onClick={() => {
                   const draf: Record<string, string> = {};
@@ -539,15 +634,14 @@ export default function Page({ params }: { params: { id: string } }) {
                   setAlasanMata("");
                   setLaporanMata(null);
                 }}
-                className="bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink disabled:opacity-40"
               >
                 Discard
-              </button>
+              </Button>
             </div>
             {laporanMata && (
               <div className="mt-3 space-y-1 border-t border-hairline pt-3">
                 {laporanMata.map((l) => (
-                  <div key={l.title} className={`text-xs ${l.ok ? "text-green-700" : "text-red-700"}`}>
+                  <div key={l.title} className={`text-[12px] ${l.ok ? "text-green-700" : "text-kz-down"}`}>
                     {l.ok ? "Saved" : "Failed"}: {l.title}
                     {!l.ok && l.teks ? ` (${l.teks})` : ""}
                   </div>
@@ -561,58 +655,26 @@ export default function Page({ params }: { params: { id: string } }) {
       {/* ===== Tab Submissions ===== */}
       {tab === "submissions" && (
         <div className="mt-4 space-y-4">
-          <Card className="overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                    <th className="px-4 py-3 font-medium">Participant</th>
-                    <th className="px-4 py-3 font-medium">Challenge</th>
-                    <th className="px-4 py-3 font-medium">Answer</th>
-                    <th className="px-4 py-3 font-medium">Status</th>
-                    <th className="px-4 py-3 font-medium">Submitted</th>
-                    <th className="px-4 py-3 font-medium"></th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subs.map((s) => {
-                    const ch = challenges.find((c) => c.id === s.challenge_id);
-                    return (
-                      <tr key={s.id} className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9]">
-                        <td className="px-4 py-3 text-ink truncate max-w-[160px]">{namaProfil(s.user_id)}</td>
-                        <td className="px-4 py-3 text-ink-muted truncate max-w-[160px]">{ch?.title || "-"}</td>
-                        <td className="px-4 py-3 text-ink-muted max-w-[260px]">
-                          <JawapanRingkas answer={s.answer} />
-                        </td>
-                        <td className="px-4 py-3">
-                          <Pill tone={s.status === "approved" ? "green" : s.status === "rejected" ? "red" : "yellow"}>
-                            {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
-                          </Pill>
-                        </td>
-                        <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{relTime(s.created_at)}</td>
-                        <td className="px-4 py-3 text-right">
-                          <Link
-                            href={`/admin/moderation?id=${s.id}`}
-                            className="text-sm font-medium text-brand-purple hover:opacity-80"
-                          >
-                            Review
-                          </Link>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-            {subs.length === 0 && <EmptyState title="No submissions." body="Nobody has answered yet." />}
-          </Card>
+          <DataTable
+            label="Activity submissions"
+            columns={lajurSub}
+            rows={subs}
+            rowKey={(s) => s.id}
+            empty={
+              <EmptyState
+                icon={<Inbox className="w-6 h-6" />}
+                title="No submissions."
+                text="Nobody has answered yet."
+              />
+            }
+          />
 
           {/* Kad togol team completions, dipindahkan daripada halaman lama */}
-          <Card className="overflow-hidden">
+          <Card padat>
             <button
               type="button"
               onClick={bukaCompletions}
-              className="w-full flex items-center gap-2 px-4 py-3 text-sm font-semibold text-ink hover:bg-[#F7F7F9]"
+              className="w-full flex items-center gap-2 px-6 py-4 text-[14px] font-bold text-ink hover:bg-[#f8f9fc] transition"
             >
               {completions === null ? (
                 <ChevronRight className="w-4 h-4 text-ink-faint" />
@@ -622,9 +684,9 @@ export default function Page({ params }: { params: { id: string } }) {
               Team completions
             </button>
             {completions !== null && (
-              <div className="px-4 pb-4 pt-1 space-y-1 border-t border-hairline">
+              <div className="px-6 pb-4 pt-1 space-y-1 border-t border-kz-line">
                 {completions.length === 0 ? (
-                  <p className="text-xs text-ink-faint">No teams yet.</p>
+                  <p className="text-[12px] text-ink-faint">No teams yet.</p>
                 ) : (
                   completions.map((t) => {
                     const sudah = senaraiCompletions.includes(t.id);
@@ -634,8 +696,8 @@ export default function Page({ params }: { params: { id: string } }) {
                         type="button"
                         onClick={() => togolCompletion(t.id, sudah)}
                         disabled={toggling === t.id}
-                        className={`w-full flex items-center gap-2 p-2 rounded-lg text-left transition ${
-                          sudah ? "bg-green-50" : "bg-[#F7F7F9] hover:bg-[#EFEFF3]"
+                        className={`w-full flex items-center gap-2 p-2 rounded-[4px] text-left transition ${
+                          sudah ? "bg-green-50" : "bg-[#f8f9fc] hover:bg-[#eff1f5]"
                         }`}
                       >
                         {toggling === t.id ? (
@@ -645,10 +707,10 @@ export default function Page({ params }: { params: { id: string } }) {
                         ) : (
                           <Circle className="w-4 h-4 text-ink-faint" />
                         )}
-                        <span className={`text-sm truncate ${sudah ? "text-green-700 font-medium" : "text-ink-muted"}`}>
+                        <span className={`text-[13px] truncate ${sudah ? "text-green-700 font-bold" : "text-ink-muted"}`}>
                           {t.name}
                         </span>
-                        {sudah && <span className="text-xs text-green-600 ml-auto">Complete</span>}
+                        {sudah && <span className="text-[12px] text-green-600 ml-auto">Complete</span>}
                       </button>
                     );
                   })
