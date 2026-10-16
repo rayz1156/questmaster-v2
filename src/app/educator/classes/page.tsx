@@ -3,7 +3,7 @@ import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from '@/lib/eduTabs';
 import { useEffect, useMemo, useState } from "react";
-import {ListChecks, Users, BarChart3, Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus, Activity, Pin, PinOff} from "lucide-react";
+import {Plus, Trash2, GraduationCap, Copy, User as UserIcon, Mail, Check, CopyPlus, Pin, PinOff} from "lucide-react";
 import { listMyEducatorClasses, createClass, deleteClass, listMyClassEducatorInvites, acceptClassEducatorInviteByCode, duplicateClass, leaveClassAsEducator, listMyClassActivity, pinClass, unpinClass, type MyClassActivityRow } from "@/lib/data";
 import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 import { statusKelas, susunKelas, tapisKelas } from "@/lib/kelasStatus";
