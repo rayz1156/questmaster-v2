@@ -15,6 +15,8 @@ import Pagination, { PageOf } from "./Pagination";
  * hover #f8f9fc. Lajur pertama (lead) menyokong kotak semak pilihan dan
  * avatar/petak. Lajur akhir "..." membuka dropdown tindakan. Bawah:
  * penomboran pelanggan di kiri dan "PAGE N OF M" di kanan.
+ * `rowClassName` (KZ-024b) menambah kelas setiap baris, contohnya
+ * sorotan baris yang ada perubahan belum disimpan.
  *
  * Telefon: lajur `hideOnMobile` disembunyikan.
  */
@@ -42,6 +44,8 @@ export type DataTableProps<T> = {
   onToggleAll?: (semua: boolean) => void;
   /** Slot kepala kad: carian, penapis, ikon tetapan. */
   head?: ReactNode;
+  /** Kelas tambahan setiap baris (KZ-024b, contoh sorotan baris diubah). */
+  rowClassName?: (row: T, index: number) => string;
   /** Penomboran pelanggan: halaman semasa (1-based) dan saiz halaman. */
   halaman?: number;
   saizHalaman?: number;
@@ -68,6 +72,7 @@ export default function DataTable<T>({
   onToggleSelect,
   onToggleAll,
   head,
+  rowClassName,
   halaman = 1,
   saizHalaman = 10,
   onHalaman,
@@ -146,7 +151,7 @@ export default function DataTable<T>({
                   onClick={onRowClick ? () => onRowClick(r) : undefined}
                   className={`border-t border-kz-line hover:bg-[#f8f9fc] transition ${
                     onRowClick ? "cursor-pointer" : ""
-                  } ${dipilih ? "bg-[#f8f9fc]" : ""}`}
+                  } ${dipilih ? "bg-[#f8f9fc]" : ""} ${rowClassName ? rowClassName(r, indeksAsal) : ""}`.trim()}
                 >
                   {selectable && (
                     <td className="px-3 py-2 align-middle">

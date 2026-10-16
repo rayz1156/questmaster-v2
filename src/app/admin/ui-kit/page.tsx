@@ -344,12 +344,13 @@ export default function UiKitPage() {
       </Seksyen>
 
       {/* ===== DataTable ===== */}
-      <Seksyen title="DataTable" note="Head 13px soft on #ebeef2, rows with separators, status badges, actions menu, custom pagination; less important columns hidden on phone">
+      <Seksyen title="DataTable" note="Head 13px soft on #ebeef2, rows with separators, status badges, actions menu, custom pagination, optional rowClassName for changed-row highlight (KZ-024b); less important columns hidden on phone">
         <DataTable
           label="Sample students table"
           columns={lajur}
           rows={barisTapis}
           rowKey={(r) => r.id}
+          rowClassName={(r) => (r.status === "Suspend" ? "bg-[#F1EEFC]" : "")}
           selectable
           selectedIds={dipilih}
           onToggleSelect={(id) =>
