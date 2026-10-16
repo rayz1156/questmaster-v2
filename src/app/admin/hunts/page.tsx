@@ -1,14 +1,25 @@
 "use client";
 
-// Activities ruang kerja admin (V2-011c). Jadual carian semua aktiviti:
-// tab status dengan kiraan, carian tajuk dan penapis kelas. Klik baris
-// membuka butiran; tukar status, mata dan buang aktiviti berada di sana.
+// Activities ruang kerja admin, rupa v3 (KZ-024). Jadual carian semua
+// aktiviti guna DataTable kit: tab status dengan kiraan, carian tajuk dan
+// penapis kelas di kepala kad. Klik baris membuka butiran; tukar status,
+// mata dan buang aktiviti berada di sana. Data dan penapis tidak berubah.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search } from "lucide-react";
+import { Search, Map as MapIcon } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, Tabs, EmptyState } from "@/components/admin/ui";
+import { Tabs } from "@/components/admin/ui";
+import {
+  Badge,
+  DataTable,
+  EmptyState,
+  Input,
+  PageHead,
+  ProgressBar,
+  Select,
+  type DataColumn,
+} from "@/components/ui";
 import {
   adminListAllHunts,
   adminListAllClasses,
@@ -58,6 +69,69 @@ function SenaraiAktiviti({
   );
   const kiraan = useMemo(() => kiraTabAktiviti(hunts, { q, classId }), [hunts, q, classId]);
 
+  // Lajur jadual; kiraan dan kemajuan semakan datang daripada data dimuat.
+  const lajur: DataColumn<Hunt>[] = [
+    {
+      key: "aktiviti",
+      header: "Activity",
+      render: (h) => (
+        <span className="block text-[13px] font-bold text-ink truncate max-w-[220px]">{h.title}</span>
+      ),
+    },
+    {
+      key: "kelas",
+      header: "Class",
+      hideOnMobile: true,
+      render: (h) => (
+        <span className="text-[13px] text-ink-faint truncate block max-w-[180px]">{namaKelas(h.class_id)}</span>
+      ),
+    },
+    {
+      key: "pendidik",
+      header: "Educator",
+      hideOnMobile: true,
+      render: (h) => (
+        <span className="text-[13px] text-ink-faint truncate block max-w-[160px]">{namaProfil(h.owner_id)}</span>
+      ),
+    },
+    {
+      key: "cabaran",
+      header: "Challenges",
+      render: (h) => <span className="text-[13px] text-ink-faint tabular-nums">{kiraanCh[h.id] ?? 0}</span>,
+    },
+    {
+      key: "penghantaran",
+      header: "Submissions",
+      render: (h) => <span className="text-[13px] text-ink-faint tabular-nums">{kiraanSub[h.id] ?? 0}</span>,
+    },
+    {
+      key: "kemajuan",
+      header: "Review progress",
+      hideOnMobile: true,
+      render: (h) => {
+        const total = kiraanSub[h.id] ?? 0;
+        const disemak = disemakSub[h.id] ?? 0;
+        return (
+          <span className="flex items-center gap-2 min-w-[120px]">
+            <ProgressBar value={disemak} max={total} label={`Review progress for ${h.title}`} className="flex-1" />
+            <span className="text-[12px] text-ink-faint whitespace-nowrap">
+              {disemak} of {total}
+            </span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (h) => (
+        <Badge variant="dim" warna={h.status === "active" ? "green" : h.status === "draft" ? "yellow" : "gray"}>
+          {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+        </Badge>
+      ),
+    },
+  ];
+
   return (
     <div>
       <Tabs
@@ -66,89 +140,47 @@ function SenaraiAktiviti({
         onChange={(k) => setTab(k as TabAktiviti)}
       />
 
-      <div className="flex flex-wrap items-center gap-2 py-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-          <input
-            className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-hairline text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-            placeholder="Search title"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
+      <DataTable
+        className="mt-4"
+        label="Activities"
+        columns={lajur}
+        rows={ditapis}
+        rowKey={(h) => h.id}
+        onRowClick={(h) => router.push(`/admin/hunts/${h.id}`)}
+        head={
+          <>
+            <span className="w-full sm:w-64">
+              <Input
+                ikonKiri={<Search className="w-4 h-4" />}
+                placeholder="Search title"
+                aria-label="Search activities"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            </span>
+            <Select
+              value={classId}
+              onChange={(e) => setClassId(e.target.value)}
+              aria-label="Filter by class"
+              className="w-auto"
+            >
+              <option value="">All classes</option>
+              {kelas.map((k) => (
+                <option key={k.id} value={k.id}>
+                  {k.name}
+                </option>
+              ))}
+            </Select>
+          </>
+        }
+        empty={
+          <EmptyState
+            icon={<MapIcon className="w-6 h-6" />}
+            title="No activities match"
+            text="Try a different search or filter."
           />
-        </div>
-        <select
-          value={classId}
-          onChange={(e) => setClassId(e.target.value)}
-          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-          aria-label="Filter by class"
-        >
-          <option value="">All classes</option>
-          {kelas.map((k) => (
-            <option key={k.id} value={k.id}>
-              {k.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                <th className="px-4 py-3 font-medium">Activity</th>
-                <th className="px-4 py-3 font-medium">Class</th>
-                <th className="px-4 py-3 font-medium">Educator</th>
-                <th className="px-4 py-3 font-medium">Challenges</th>
-                <th className="px-4 py-3 font-medium">Submissions</th>
-                <th className="px-4 py-3 font-medium">Review progress</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-              </tr>
-            </thead>
-            <tbody>
-              {ditapis.map((h) => {
-                const total = kiraanSub[h.id] ?? 0;
-                const disemak = disemakSub[h.id] ?? 0;
-                const peratus = total === 0 ? 100 : Math.round((disemak / total) * 100);
-                return (
-                  <tr
-                    key={h.id}
-                    onClick={() => router.push(`/admin/hunts/${h.id}`)}
-                    className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9] cursor-pointer transition"
-                  >
-                    <td className="px-4 py-3 font-medium text-ink truncate max-w-[220px]">{h.title}</td>
-                    <td className="px-4 py-3 text-ink-muted truncate max-w-[180px]">{namaKelas(h.class_id)}</td>
-                    <td className="px-4 py-3 text-ink-muted truncate max-w-[160px]">{namaProfil(h.owner_id)}</td>
-                    <td className="px-4 py-3 text-ink-muted">{kiraanCh[h.id] ?? 0}</td>
-                    <td className="px-4 py-3 text-ink-muted">{total}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-2 min-w-[120px]">
-                        <div className="flex-1 h-1.5 rounded-full bg-gray-100 overflow-hidden">
-                          <div
-                            className="h-full bg-brand-purple rounded-full"
-                            style={{ width: `${peratus}%` }}
-                          />
-                        </div>
-                        <span className="text-xs text-ink-faint whitespace-nowrap">
-                          {disemak} of {total}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3">
-                      <Pill tone={h.status === "active" ? "green" : h.status === "draft" ? "yellow" : "gray"}>
-                        {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
-                      </Pill>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {ditapis.length === 0 && (
-          <EmptyState title="No activities match." body="Try a different search or filter." />
-        )}
-      </Card>
+        }
+      />
     </div>
   );
 }
@@ -201,9 +233,10 @@ export default function Page() {
   }, []);
 
   return (
-    <AdminShell title="Activities">
+    <AdminShell>
+      <PageHead title="Activities" />
       {hunts === null ? (
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       ) : (
         <SenaraiAktiviti
           hunts={hunts}

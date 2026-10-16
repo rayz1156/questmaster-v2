@@ -1,15 +1,25 @@
 "use client";
 
-// Classes ruang kerja admin (V2-011c). Jadual carian semua kelas: tab
-// status dengan kiraan, carian nama/join_code, penapis pendidik dan
-// susunan. Klik baris membuka halaman butiran kelas; semua tindakan
-// (edit, arkib, buang) berada di sana, bukan dalam senarai.
+// Classes ruang kerja admin, rupa v3 (KZ-024). Jadual carian semua kelas
+// gaya "Courses": tab status dengan kiraan, carian nama/join_code, penapis
+// pendidik dan susunan di kepala kad. Klik baris membuka halaman butiran
+// kelas; semua tindakan (edit, arkib, buang) berada di sana, bukan dalam
+// senarai. Data, penapis dan susunan tidak berubah.
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ChevronLeft, ChevronRight } from "lucide-react";
+import { Search, GraduationCap } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, Tabs, EmptyState, relTime } from "@/components/admin/ui";
+import { Tabs, relTime } from "@/components/admin/ui";
+import {
+  Badge,
+  DataTable,
+  EmptyState,
+  Input,
+  PageHead,
+  Select,
+  type DataColumn,
+} from "@/components/ui";
 import { supabase } from "@/lib/supabaseClient";
 import {
   adminListAllClasses,
@@ -81,141 +91,137 @@ function SenaraiKelas({
   const jumlah = ditapis.length;
   const mula = jumlah === 0 ? 0 : (muka - 1) * SEBARIS + 1;
   const akhir = Math.min(muka * SEBARIS, jumlah);
-  const barisMuka = ditapis.slice((muka - 1) * SEBARIS, muka * SEBARIS);
 
   const tukar = (fn: () => void) => {
     fn();
     setMuka(1);
   };
 
+  // Lajur jadual "Courses"; warna titik kelas ialah data sebenar jadual.
+  const lajur: DataColumn<KelasAdmin>[] = [
+    {
+      key: "kelas",
+      header: "Class",
+      render: (k) => (
+        <span className="flex items-center gap-3 py-3 min-w-0">
+          <span
+            aria-hidden="true"
+            className="h-2.5 w-2.5 rounded-full shrink-0"
+            style={{ background: k.color || "#6366f1" }}
+          />
+          <span className="min-w-0">
+            <span className="block text-[13px] font-bold text-ink truncate">{k.name}</span>
+            <span className="block text-[12px] text-ink-faint font-mono truncate">{k.join_code || "-"}</span>
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: "pendidik",
+      header: "Educator",
+      hideOnMobile: true,
+      render: (k) => (
+        <span className="text-[13px] text-ink-faint truncate block max-w-[180px]">{namaProfil(k.owner_id)}</span>
+      ),
+    },
+    {
+      key: "ahli",
+      header: "Members",
+      render: (k) => <span className="text-[13px] text-ink-faint tabular-nums">{kiraanAhli[k.id] ?? 0}</span>,
+    },
+    {
+      key: "aktiviti",
+      header: "Activities",
+      hideOnMobile: true,
+      render: (k) => <span className="text-[13px] text-ink-faint tabular-nums">{kiraanAktiviti[k.id] ?? 0}</span>,
+    },
+    {
+      key: "status",
+      header: "Status",
+      render: (k) => {
+        const status = statusKelas(k);
+        return (
+          <Badge variant="dim" warna={status === "active" ? "green" : status === "ended" ? "yellow" : "gray"}>
+            {labelStatusKelas(k)}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "dicipta",
+      header: "Created",
+      hideOnMobile: true,
+      render: (k) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{relTime(k.created_at)}</span>,
+    },
+  ];
+
   return (
     <div>
-      <p className="text-ink-muted text-sm mb-6">Every class on Kuizen, who runs it and how it&apos;s going.</p>
-
       <Tabs
         items={TAB_KELAS.map((t) => ({ ...t, count: kiraan[t.key] }))}
         value={tab}
         onChange={(k) => tukar(() => setTab(k as TabKelas))}
       />
 
-      <div className="flex flex-wrap items-center gap-2 py-4">
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-          <input
-            className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-hairline text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-            placeholder="Search name or join code"
-            value={q}
-            onChange={(e) => tukar(() => setQ(e.target.value))}
+      <DataTable
+        className="mt-4"
+        label="Classes"
+        columns={lajur}
+        rows={ditapis}
+        rowKey={(k) => k.id}
+        onRowClick={(k) => router.push(`/admin/classes/${k.id}`)}
+        halaman={muka}
+        saizHalaman={SEBARIS}
+        onHalaman={setMuka}
+        head={
+          <>
+            <span className="w-full sm:w-64">
+              <Input
+                ikonKiri={<Search className="w-4 h-4" />}
+                placeholder="Search name or join code"
+                aria-label="Search classes"
+                value={q}
+                onChange={(e) => tukar(() => setQ(e.target.value))}
+              />
+            </span>
+            <Select
+              value={educatorId}
+              onChange={(e) => tukar(() => setEducatorId(e.target.value))}
+              aria-label="Filter by educator"
+              className="w-auto"
+            >
+              <option value="">All educators</option>
+              {pendidik.map((p) => (
+                <option key={p.id} value={p.id}>
+                  {p.nama}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={susun}
+              onChange={(e) => tukar(() => setSusun(e.target.value as SusunKelas))}
+              aria-label="Sort classes"
+              className="w-auto"
+            >
+              {LABEL_SUSUN.map((s) => (
+                <option key={s.key} value={s.key}>
+                  {s.label}
+                </option>
+              ))}
+            </Select>
+            <span className="ml-auto text-[13px] text-ink-faint whitespace-nowrap">
+              Showing {mula}-{akhir} of {jumlah}
+            </span>
+          </>
+        }
+        empty={
+          <EmptyState
+            icon={<GraduationCap className="w-6 h-6" />}
+            title="No classes match"
+            text="Try a different search or filter."
           />
-        </div>
-        <select
-          value={educatorId}
-          onChange={(e) => tukar(() => setEducatorId(e.target.value))}
-          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-          aria-label="Filter by educator"
-        >
-          <option value="">All educators</option>
-          {pendidik.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.nama}
-            </option>
-          ))}
-        </select>
-        <select
-          value={susun}
-          onChange={(e) => tukar(() => setSusun(e.target.value as SusunKelas))}
-          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-          aria-label="Sort classes"
-        >
-          {LABEL_SUSUN.map((s) => (
-            <option key={s.key} value={s.key}>
-              {s.label}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      <Card className="overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead>
-              <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                <th className="px-4 py-3 font-medium">Class</th>
-                <th className="px-4 py-3 font-medium">Educator</th>
-                <th className="px-4 py-3 font-medium">Members</th>
-                <th className="px-4 py-3 font-medium">Activities</th>
-                <th className="px-4 py-3 font-medium">Status</th>
-                <th className="px-4 py-3 font-medium">Created</th>
-              </tr>
-            </thead>
-            <tbody>
-              {barisMuka.map((k) => {
-                const status = statusKelas(k);
-                return (
-                  <tr
-                    key={k.id}
-                    onClick={() => router.push(`/admin/classes/${k.id}`)}
-                    className="border-b border-hairline last:border-b-0 hover:bg-[#F7F7F9] cursor-pointer transition"
-                  >
-                    <td className="px-4 py-3">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span
-                          className="w-2.5 h-2.5 rounded-full shrink-0"
-                          style={{ background: k.color || "#6366f1" }}
-                        />
-                        <span className="min-w-0">
-                          <span className="block font-medium text-ink truncate">{k.name}</span>
-                          <span className="block text-xs text-ink-faint font-mono">{k.join_code || "-"}</span>
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted truncate max-w-[180px]">
-                      {namaProfil(k.owner_id)}
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted">{kiraanAhli[k.id] ?? 0}</td>
-                    <td className="px-4 py-3 text-ink-muted">{kiraanAktiviti[k.id] ?? 0}</td>
-                    <td className="px-4 py-3">
-                      <Pill tone={status === "active" ? "green" : status === "ended" ? "yellow" : "gray"}>
-                        {labelStatusKelas(k)}
-                      </Pill>
-                    </td>
-                    <td className="px-4 py-3 text-ink-muted whitespace-nowrap">{relTime(k.created_at)}</td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        {jumlah === 0 && (
-          <EmptyState title="No classes match." body="Try a different search or filter." />
-        )}
-
-        <div className="flex items-center justify-between px-4 py-3 border-t border-hairline">
-          <span className="text-xs text-ink-faint">
-            Showing {mula}-{akhir} of {jumlah}
-          </span>
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              disabled={muka <= 1}
-              onClick={() => setMuka((v) => Math.max(1, v - 1))}
-              className="p-2 rounded-xl border border-hairline text-ink-muted hover:text-ink disabled:opacity-40"
-              aria-label="Previous page"
-            >
-              <ChevronLeft className="w-4 h-4" />
-            </button>
-            <button
-              type="button"
-              disabled={muka * SEBARIS >= jumlah}
-              onClick={() => setMuka((v) => v + 1)}
-              className="p-2 rounded-xl border border-hairline text-ink-muted hover:text-ink disabled:opacity-40"
-              aria-label="Next page"
-            >
-              <ChevronRight className="w-4 h-4" />
-            </button>
-          </div>
-        </div>
-      </Card>
+        }
+      />
     </div>
   );
 }
@@ -261,9 +267,13 @@ export default function Page() {
   }, []);
 
   return (
-    <AdminShell title="Classes">
+    <AdminShell>
+      <PageHead
+        title="Classes"
+        description="Every class on Kuizen, who runs it and how it's going."
+      />
       {kelas === null ? (
-        <div className="text-sm text-ink-faint py-8">Loading...</div>
+        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
       ) : (
         <SenaraiKelas
           kelas={kelas}
