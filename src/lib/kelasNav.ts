@@ -39,13 +39,43 @@ export function pilihKelasNav(
   simpanan: string | null | undefined,
   idSah: string[],
   idLalai: string | null,
+  /** Pengekstrak id kelas daripada laluan; lalai: laluan pelajar. */
+  dariLaluanFn: (p: string | null | undefined) => string | null = kelasDariLaluan,
 ): string | null {
   const sah = new Set(idSah);
-  const dariLaluan = kelasDariLaluan(pathname);
+  const dariLaluan = dariLaluanFn(pathname);
   if (dariLaluan && sah.has(dariLaluan)) return dariLaluan;
   if (simpanan && sah.has(simpanan)) return simpanan;
   if (idLalai && sah.has(idLalai)) return idLalai;
   return null;
+}
+
+/* ===== Pendidik (KZ-022d) ===== */
+
+/** Kunci storan pelayar untuk kelas terakhir yang dibuka pendidik. */
+export const KUNCI_KELAS_PENDIDIK = "kz-kelas-aktif-pendidik";
+
+const CORAK_LALUAN_PENDIDIK = /^\/educator\/classes\/([^/?#]+)/;
+
+/** Id kelas daripada laluan halaman kelas pendidik, atau null. */
+export function kelasDariLaluanPendidik(pathname: string | null | undefined): string | null {
+  if (!pathname) return null;
+  const m = CORAK_LALUAN_PENDIDIK.exec(pathname);
+  if (!m) return null;
+  try {
+    return decodeURIComponent(m[1]);
+  } catch {
+    return m[1];
+  }
+}
+
+/** Pautan Intro Board dan Learning Board kelas untuk pendidik. */
+export function pautanPapanKelasPendidik(classId: string) {
+  const asas = `/educator/classes/${encodeURIComponent(classId)}`;
+  return {
+    intro: `${asas}/board`,
+    learning: `${asas}/learning-board`,
+  };
 }
 
 /** Pautan Intro Board dan Learning Board untuk satu kelas. */

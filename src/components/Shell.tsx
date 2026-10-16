@@ -20,6 +20,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { LogOut, HelpCircle, ChevronDown, Menu, X, User as UserIcon, CircleDot, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { useBarSisiKecil } from "@/lib/barSisi";
+import { useTabPapanPendidik } from "@/lib/papanPendidikNav";
 import { getSession, clearSession } from "@/lib/session";
 import { LogoMark } from "@/components/Logo";
 import type { User, Profile } from "@/lib/types";
@@ -102,6 +103,8 @@ export default function Shell({
   const menuRef = useRef<HTMLDivElement | null>(null);
   // Bar sisi desktop boleh dikecilkan kepada lajur ikon (seperti ChatGPT/Claude).
   const [kecil, togolKecil] = useBarSisiKecil();
+  // KZ-022d: Intro Board dan Learning Board kelas semasa untuk menu pendidik.
+  const tabsPenuh = useTabPapanPendidik(tabs);
 
   useEffect(() => {
     let cancelled = false;
@@ -184,7 +187,12 @@ export default function Shell({
   // Kumpulan menu: eksplisit melalui `groups`, atau dibina daripada medan
   // `group` setiap tab. Bila tiada tab mempunyai kumpulan, hasilnya satu
   // blok tanpa tajuk dan menu kelihatan sama seperti sebelum KZ-021.
-  const blokMenu: Kumpulan[] = groups ?? kumpulkanTabs(tabs);
+  const blokMenu: Kumpulan[] = groups ?? kumpulkanTabs(tabsPenuh);
+  // Bila dua item sepadan (contoh Classes dan Intro Board pada
+  // /educator/classes/<id>/board), hanya item paling tepat dinyalakan.
+  const hrefTerbaik = tabsPenuh
+    .filter((t) => here(t.href))
+    .sort((a, b) => b.href.length - a.href.length)[0]?.href;
   const adaKumpulan = blokMenu.some((k) => !!k.label);
 
   const tahun = new Date().getFullYear();
@@ -215,7 +223,7 @@ export default function Shell({
   const subTerbukaFn = (t: Tab) => subAktif(t) || subTerbuka.includes(t.href);
 
   const ItemMenu = ({ t, padat = false }: { t: Tab; padat?: boolean }) => {
-    const aktif = activeTab(t);
+    const aktif = activeTab(t) && !(hrefTerbaik && hrefTerbaik !== t.href && hrefTerbaik.startsWith(t.href + "/"));
     // Mod lajur ikon: ikon sahaja, nama dalam tooltip dan aria-label.
     if (padat) {
       return (
