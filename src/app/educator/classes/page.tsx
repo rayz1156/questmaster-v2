@@ -12,6 +12,7 @@ import RowMenu from "@/components/ui/RowMenu";
 import { pelanSaya, mesejHad, tanpaHad, HAD_PELAN, type RingkasanPelan } from "@/lib/pelan";
 import HadPelanNotis from "@/components/HadPelanNotis";
 import { HardDrive } from "lucide-react";
+import { inisial, warnaIndeks } from "@/lib/papanPemukaPeserta";
 
 function roleLabel(role: string): string {
   if (role === "owner") return "Owner";
@@ -179,6 +180,21 @@ const onPinToggle = async (k: EducatorClassRow) => {
   const senaraiTab = tab === "aktif" ? kelasAktif : kelasTamat;
   const senaraiPapar = carianAktif ? tapisKelas(senaraiTab, cari) : senaraiTab;
 
+  // Menu "..." setiap baris kelas (KZ-020): tindakan sedia ada daripada
+  // kad V2-005, ditambah "Copy class code" yang dahulunya butang Copy.
+  const menuTindakan = (k: EducatorClassRow, dipin: boolean) => [
+    ...(dipin
+      ? [{ label: "Unpin", icon: <PinOff className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]
+      : [{ label: "Pin to top", icon: <Pin className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]),
+    { label: "Copy class code", icon: <Copy className="w-4 h-4"/>, onSelect: () => navigator.clipboard.writeText(k.join_code) },
+    ...(k.role === "owner" ? [
+      { label: "Duplicate class", icon: <CopyPlus className="w-4 h-4"/>, onSelect: () => openDuplicate(k) },
+      { label: "Delete class", icon: <Trash2 className="w-4 h-4"/>, danger: true, onSelect: () => onDelete(k) },
+    ] : [
+      { label: "Leave class", icon: <UserIcon className="w-4 h-4"/>, danger: true, onSelect: () => onLeave(k) },
+    ]),
+  ];
+
   return (
     <Shell tabs={EDU_TABS}>
       <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
@@ -308,52 +324,135 @@ const onPinToggle = async (k: EducatorClassRow) => {
               No classes match &quot;{cari}&quot;.
             </div>
           ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
-          {senaraiPapar.map(k => {
-            const tamat = statusKelas(k) === "tamat";
-            const dipin = pinnedIds.has(k.id);
-            return (
-            <div key={k.id} className={`card hover:border-[#D8D9E0] transition ${tamat ? "opacity-75 bg-[#F7F7F9]" : ""}`}>
-              <div className="flex items-start gap-3">
-                <span className="w-9 h-9 rounded-xl shrink-0 mt-0.5" style={{ background: k.color || "#7057D9" }}/>
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <Link href={`/educator/classes/${k.id}`} className="font-semibold text-ink truncate hover:text-brand-purple transition">{k.name}</Link>
-                    {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label="Pinned"/>}
-                    {tamat && (
-                      <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-50 text-amber-700 border border-amber-200">
-                        Ended · {new Date(k.ended_at || k.created_at).toLocaleDateString()}
-                      </span>
-                    )}
+            <>
+              {/* Jadual gaya Students (desktop >= 768px). Logik tindakan
+                  kekal sama; hanya rupa yang ditukar. */}
+              <div className="surface hidden md:block">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="t-head">
+                      <th className="px-6 py-4 font-normal">Class</th>
+                      <th className="px-6 py-4 font-normal">Status</th>
+                      <th className="px-6 py-4 font-normal">Created</th>
+                      <th className="w-14" aria-label="Actions" />
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {senaraiPapar.map((k, i) => {
+                      const tamat = statusKelas(k) === "tamat";
+                      const dipin = pinnedIds.has(k.id);
+                      const warna = warnaIndeks(i);
+                      return (
+                        <tr key={k.id} className="t-row">
+                          <td className="px-6 py-4">
+                            <div className="flex items-center gap-3">
+                              <span
+                                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] text-[14px] font-bold"
+                                style={{
+                                  backgroundColor: k.color || warna.latar,
+                                  color: k.color ? "#fff" : warna.teks,
+                                }}
+                                aria-hidden="true"
+                              >
+                                {inisial(k.name)}
+                              </span>
+                              <div className="min-w-0">
+                                <Link
+                                  href={`/educator/classes/${k.id}`}
+                                  className="flex items-center gap-1.5 text-[14px] font-medium text-ink hover:text-brand-purple transition"
+                                >
+                                  <span className="truncate">{k.name}</span>
+                                  {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label="Pinned"/>}
+                                </Link>
+                                <div className="text-xs text-ink-faint truncate">
+                                  Code: {k.join_code} · {roleLabel(k.role)}
+                                </div>
+                              </div>
+                            </div>
+                          </td>
+                          <td className="px-6 py-4">
+                            <span className="inline-flex items-center gap-1.5 text-[13px] text-ink-muted">
+                              <span
+                                className={`h-1.5 w-1.5 rounded-full ${tamat ? "bg-kz-down" : "bg-kz-up"}`}
+                                aria-hidden="true"
+                              />
+                              {tamat ? "Ended" : "Active"}
+                            </span>
+                          </td>
+                          <td className="px-6 py-4 text-[13px] text-ink-muted">
+                            {new Date(k.created_at).toLocaleDateString()}
+                          </td>
+                          <td className="px-6 py-4 text-right align-middle">
+                            <RowMenu items={menuTindakan(k, dipin)} />
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+                {/* Bar bawah jadual: kiraan dan penombolan berkotak.
+                    Semua kelas muat satu halaman (tiada API penombolan),
+                    jadi Prev/Next dilumpuhkan jujur. */}
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-kz-line px-6 py-3">
+                  <span className="text-[13px] text-ink-faint">
+                    Showing {senaraiPapar.length} of {senaraiPapar.length} classes
+                  </span>
+                  <div className="flex items-center gap-1" aria-label="Pagination">
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border border-hairline text-[13px] text-ink-faint opacity-50">‹</span>
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] bg-brand-purple text-[13px] font-bold text-white">1</span>
+                    <span className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border border-hairline text-[13px] text-ink-faint opacity-50">›</span>
                   </div>
-                  {k.description
-                    ? <div className="text-sm text-ink-muted truncate mt-0.5">{k.description}</div>
-                    : <div className="text-sm text-ink-faint mt-0.5">{roleLabel(k.role)}</div>}
                 </div>
-                <RowMenu items={[
-                  ...(dipin
-                    ? [{ label: "Unpin", icon: <PinOff className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]
-                    : [{ label: "Pin to top", icon: <Pin className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]),
-                  ...(k.role === "owner" ? [
-                    { label: "Duplicate class", icon: <CopyPlus className="w-4 h-4"/>, onSelect: () => openDuplicate(k) },
-                    { label: "Delete class", icon: <Trash2 className="w-4 h-4"/>, danger: true, onSelect: () => onDelete(k) },
-                  ] : [
-                    { label: "Leave class", icon: <UserIcon className="w-4 h-4"/>, danger: true, onSelect: () => onLeave(k) },
-                  ]),
-                ]}/>
               </div>
 
-              <div className="flex items-center gap-2 mt-4 pt-3 border-t border-hairline">
-                <code className="code-chip text-xs">{k.join_code}</code>
-                {!tamat && (
-                  <button onClick={() => navigator.clipboard.writeText(k.join_code)} className="btn-quiet text-brand-purple"><Copy className="w-3.5 h-3.5"/>Copy</button>
-                )}
-                <Link href={`/educator/classes/${k.id}`} className="ml-auto btn-quiet text-brand-purple">Open →</Link>
+              {/* Telefon: senarai kad, bukan jadual. */}
+              <div className="flex flex-col gap-3 md:hidden">
+                {senaraiPapar.map((k, i) => {
+                  const tamat = statusKelas(k) === "tamat";
+                  const dipin = pinnedIds.has(k.id);
+                  const warna = warnaIndeks(i);
+                  return (
+                    <div key={k.id} className="card p-4">
+                      <div className="flex items-center gap-3">
+                        <span
+                          className="flex h-10 w-10 shrink-0 items-center justify-center rounded-[4px] text-[14px] font-bold"
+                          style={{
+                            backgroundColor: k.color || warna.latar,
+                            color: k.color ? "#fff" : warna.teks,
+                          }}
+                          aria-hidden="true"
+                        >
+                          {inisial(k.name)}
+                        </span>
+                        <div className="min-w-0 flex-1">
+                          <Link
+                            href={`/educator/classes/${k.id}`}
+                            className="flex items-center gap-1.5 text-[14px] font-medium text-ink hover:text-brand-purple transition"
+                          >
+                            <span className="truncate">{k.name}</span>
+                            {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label="Pinned"/>}
+                          </Link>
+                          <div className="text-xs text-ink-faint truncate">
+                            Code: {k.join_code} · {roleLabel(k.role)}
+                          </div>
+                        </div>
+                        <RowMenu items={menuTindakan(k, dipin)} />
+                      </div>
+                      <div className="mt-3 flex items-center justify-between text-[13px] text-ink-muted">
+                        <span className="inline-flex items-center gap-1.5">
+                          <span
+                            className={`h-1.5 w-1.5 rounded-full ${tamat ? "bg-kz-down" : "bg-kz-up"}`}
+                            aria-hidden="true"
+                          />
+                          {tamat ? "Ended" : "Active"}
+                        </span>
+                        <span>{new Date(k.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                  );
+                })}
               </div>
-            </div>
-            );
-          })}
-        </div>
+            </>
           )}
         </>
       )}
