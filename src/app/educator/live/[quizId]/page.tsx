@@ -1,14 +1,34 @@
 "use client";
 
+/**
+ * Penyunting kuiz langsung (pendidik). KZ-025: rupa v3 (PageHead dengan
+ * breadcrumb "Live Quiz / <tajuk>", setiap soalan dalam Card kit, borang
+ * guna Field/Input/Textarea/CheckRadio dan butang kit). Aliran simpan,
+ * sunting, padam soalan, import CSV/Aiken dan mula sesi TIDAK berubah;
+ * hanya pengendali `catch` ditaip semula supaya lint bersih.
+ */
+
 import { useEffect, useRef, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
-import { Plus, Trash2, Play, Upload, Pencil, Check, X, Download, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Play, Upload, Pencil, Check, X, Download, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import PanelMulaSesi from "@/components/PanelMulaSesi";
 import { RACE_DEFAULT_MINUTES, sahMinitLumba, type TahapRaksasa } from "@/lib/lumba-laju";
+import {
+  Alert,
+  Button,
+  Card,
+  CardHead,
+  CheckRadio,
+  EmptyState,
+  Field,
+  Input,
+  PageHead,
+  Textarea,
+} from "@/components/ui";
 
 interface Pilihan { key: string; text: string }
 interface Soalan {
@@ -39,6 +59,11 @@ async function authedFetch(url: string, init?: RequestInit) {
   const json = await res.json().catch(() => ({}));
   if (!res.ok) throw new Error(json.error || "Request failed.");
   return json;
+}
+
+/** Mesej ralat selamat daripada nilai balingan unknown. */
+function mesejRalat(e: unknown, zonkal: string): string {
+  return e instanceof Error && e.message ? e.message : zonkal;
 }
 
 const HURUF = ["A", "B", "C", "D", "E", "F"];
@@ -94,12 +119,13 @@ export default function EditorKuizLangsung() {
       const json = await authedFetch("/api/live/quizzes/" + quizId);
       setKuiz(json.data.quiz);
       setSoalan(json.data.questions || []);
-    } catch (e: any) {
-      setErr(e.message || "Could not load the quiz.");
+    } catch (e) {
+      setErr(mesejRalat(e, "Could not load the quiz."));
     } finally {
       setLoading(false);
     }
   };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (quizId) reload(); }, [quizId]);
 
   const onTambah = async () => {
@@ -126,8 +152,8 @@ export default function EditorKuizLangsung() {
       setKunci("A"); setPoints(1000); setTimeLimit(20); setKiraDetik(true);
       setMataBerganda(false); setShowNew(false);
       await reload();
-    } catch (e: any) {
-      setErr(e.message || "The question could not be saved.");
+    } catch (e) {
+      setErr(mesejRalat(e, "The question could not be saved."));
     } finally { setBusy(false); }
   };
 
@@ -166,8 +192,8 @@ export default function EditorKuizLangsung() {
       });
       setEditId(null);
       await reload();
-    } catch (e: any) {
-      setErr(e.message || "Update failed.");
+    } catch (e) {
+      setErr(mesejRalat(e, "Update failed."));
     } finally { setBusy(false); }
   };
 
@@ -176,8 +202,8 @@ export default function EditorKuizLangsung() {
     try {
       await authedFetch("/api/live/questions/" + s.id, { method: "DELETE" });
       await reload();
-    } catch (e: any) {
-      alert(e.message || "Could not delete the question.");
+    } catch (e) {
+      alert(mesejRalat(e, "Could not delete the question."));
     }
   };
 
@@ -193,8 +219,8 @@ export default function EditorKuizLangsung() {
       setAikenMsg({ ok: true, text: `${json.created} questions imported, ${json.skipped} blocks skipped.` });
       setAiken("");
       await reload();
-    } catch (e: any) {
-      setAikenMsg({ ok: false, text: e.message || "Import failed." });
+    } catch (e) {
+      setAikenMsg({ ok: false, text: mesejRalat(e, "Import failed.") });
     } finally { setAikenBusy(false); }
   };
 
@@ -247,8 +273,8 @@ export default function EditorKuizLangsung() {
         method: "PATCH",
         body: JSON.stringify({ streak_bonus: v }),
       });
-    } catch (e: any) {
-      setErr(e.message || "The setting could not be saved.");
+    } catch (e) {
+      setErr(mesejRalat(e, "The setting could not be saved."));
       setKuiz(sebelum);
     }
   };
@@ -273,8 +299,8 @@ export default function EditorKuizLangsung() {
         body: JSON.stringify(badan),
       });
       router.push(`/educator/live/session/${json.data.sessionId}`);
-    } catch (e: any) {
-      setErr(e.message || "The session could not be started.");
+    } catch (e) {
+      setErr(mesejRalat(e, "The session could not be started."));
       setBusy(false);
     }
   };
@@ -288,32 +314,77 @@ export default function EditorKuizLangsung() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-sm text-ink-muted">Loading…</p>
       </Shell>
     );
   }
   if (!kuiz) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-gray-500">Quiz not found. <Link href="/educator/live" className="text-brand-purple font-semibold">Back →</Link></p>
+        <p className="text-sm text-ink-muted">Quiz not found. <Link href="/educator/live" className="text-brand-purple font-semibold">Back →</Link></p>
       </Shell>
     );
   }
 
+  /** Baris pilihan dengan radio kunci: sama untuk borang baharu dan suntingan.
+   * `bolehBuang`: borang baharu sahaja yang mempunyai butang buang pilihan
+   * (borang suntingan asal tiada butang itu, jadi ia dikekalkan begitu). */
+  const barisPilihan = (
+    senarai: Pilihan[],
+    setSenarai: (x: Pilihan[]) => void,
+    kunciIni: string,
+    setKunciIni: (k: string) => void,
+    namaRadio: string,
+    bolehBuang: boolean,
+  ) => (
+    <div className="space-y-2">
+      {senarai.map((o, i) => (
+        <div key={o.key + i} className="flex items-center gap-2">
+          <CheckRadio
+            type="radio"
+            name={namaRadio}
+            checked={kunciIni === senarai[i].key}
+            onChange={() => setKunciIni(senarai[i].key)}
+            label={<span className="font-bold">{senarai[i].key}.</span>}
+          />
+          <div className="flex-1 min-w-0">
+            <Input
+              placeholder={`Option ${senarai[i].key} text`}
+              value={o.text}
+              onChange={(e) => setSenarai(senarai.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
+            />
+          </div>
+          {bolehBuang && senarai.length > 2 && (
+            <Button
+              variant="icon"
+              size="sm"
+              title="Remove option"
+              ariaLabel="Remove option"
+              className="text-[#e85347] hover:bg-[#fce4e2]"
+              onClick={() => setSenarai(senarai.filter((_, j) => j !== i).map((x, j) => ({ key: HURUF[j], text: x.text })))}
+            >
+              <X className="w-4 h-4" />
+            </Button>
+          )}
+        </div>
+      ))}
+    </div>
+  );
+
   return (
     <Shell tabs={EDU_TABS}>
-      <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <div>
-          <h2 className="page-title">{kuiz.title}</h2>
-          {kuiz.description && <p className="text-xs text-gray-500">{kuiz.description}</p>}
-        </div>
-        <div className="flex items-center gap-2">
-          <Link href="/educator/live" className="text-xs text-gray-500 hover:text-gray-800">← All quizzes</Link>
-          <button onClick={() => setPanelMula((v) => !v)} disabled={busy} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
-            <Play className="w-4 h-4" /> Start session
-          </button>
-        </div>
-      </div>
+      <PageHead
+        crumb="Live Quiz"
+        name={kuiz.title}
+        description={kuiz.description || undefined}
+        secondaryActions={[{ label: "All quizzes", icon: <ArrowLeft className="w-4 h-4" />, href: "/educator/live" }]}
+        primaryAction={{
+          label: "Start session",
+          icon: <Play className="w-4 h-4" />,
+          // Butang asal dilumpuhkan ketika sibuk; pagar yang sama dipakai di sini.
+          onSelect: () => { if (!busy) setPanelMula((v) => !v); },
+        }}
+      />
 
       {panelMula && (
         <PanelMulaSesi
@@ -330,164 +401,201 @@ export default function EditorKuizLangsung() {
         />
       )}
 
-      {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
+      {err && <Alert tone="danger" className="mb-4">{err}</Alert>}
 
-      <div className="card mb-4">
-        <label className="flex items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={kuiz.streak_bonus !== false}
-            onChange={(e) => onTukarStreak(e.target.checked)}
-            className="rounded"
-          />
-          Answer streak bonus
-        </label>
-        <p className="text-xs text-gray-500 mt-1">
+      <Card className="mb-4">
+        <CheckRadio
+          label="Answer streak bonus"
+          checked={kuiz.streak_bonus !== false}
+          onChange={(e) => onTukarStreak(e.target.checked)}
+        />
+        <p className="text-[12px] text-ink-faint mt-2">
           Extra points for correct answers back to back: +100 on the second in a row, +200 on the
           third, rising to +500. A wrong answer, a skipped question or running out of time resets
           the streak. The setting is fixed when a session starts, so changing it mid-game is safe.
         </p>
-      </div>
+      </Card>
 
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="font-semibold text-sm">Questions ({soalan.length})</h3>
-        <button onClick={() => setShowNew((s) => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
+      <div className="flex items-center justify-between mb-2 gap-2">
+        <h3 className="text-[14px] font-bold text-ink">Questions ({soalan.length})</h3>
+        <Button onClick={() => setShowNew((s) => !s)}>
           <Plus className="w-4 h-4" /> New Question
-        </button>
+        </Button>
       </div>
 
       {showNew && (
-        <div className="card mb-4">
-          <div className="font-semibold mb-2">Add a question</div>
-          <textarea className="input w-full mb-2" rows={2} placeholder="Question text" value={prompt} onChange={(e) => setPrompt(e.target.value)} />
-          <div className="space-y-2 mb-2">
-            {opts.map((o, i) => (
-              <div key={i} className="flex items-center gap-2">
-                <label className="flex items-center gap-1 text-xs shrink-0">
-                  <input type="radio" name="kunci-baharu" checked={kunci === HURUF[i]} onChange={() => setKunci(HURUF[i])} className="rounded" />
-                  <span className="font-semibold">{HURUF[i]}.</span>
-                </label>
-                <input
-                  className="input w-full"
-                  placeholder={`Option ${HURUF[i]} text`}
-                  value={o.text}
-                  onChange={(e) => setOpts(opts.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
+        <Card className="mb-4">
+          <CardHead title="Add a question" />
+          <div className="mt-4 space-y-4">
+            <Field label="Question" htmlFor="soalan-baharu">
+              <Textarea
+                id="soalan-baharu"
+                rows={2}
+                placeholder="Question text"
+                value={prompt}
+                onChange={(e) => setPrompt(e.target.value)}
+              />
+            </Field>
+            <Field label="Options" note="Pick the circle beside the correct answer.">
+              {barisPilihan(opts, setOpts, kunci, setKunci, "kunci-baharu", true)}
+            </Field>
+            {opts.length < 6 && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="text-brand-purple"
+                onClick={() => setOpts([...opts, { key: HURUF[opts.length], text: "" }])}
+              >
+                + Add option
+              </Button>
+            )}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Field label="Points" htmlFor="soalan-baharu-mata">
+                <Input
+                  id="soalan-baharu-mata"
+                  type="number"
+                  min={1}
+                  value={points}
+                  onChange={(e) => setPoints(Number(e.target.value) || 1000)}
                 />
-                {opts.length > 2 && (
-                  <button type="button" title="Remove option" onClick={() => setOpts(opts.filter((_, j) => j !== i).map((x, j) => ({ key: HURUF[j], text: x.text })))} className="text-red-600 hover:bg-red-50 rounded px-1">
-                    <X className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            ))}
+              </Field>
+              <Field label={kiraDetik ? "Time (seconds)" : "Pace (seconds)"} htmlFor="soalan-baharu-masa">
+                <Input
+                  id="soalan-baharu-masa"
+                  type="number"
+                  min={5}
+                  value={timeLimit}
+                  onChange={(e) => setTimeLimit(Number(e.target.value) || 20)}
+                />
+              </Field>
+            </div>
+            <div className="flex flex-wrap gap-6">
+              <CheckRadio label="Countdown" checked={kiraDetik} onChange={(e) => setKiraDetik(e.target.checked)} />
+              <CheckRadio label="Double points" checked={mataBerganda} onChange={(e) => setMataBerganda(e.target.checked)} />
+            </div>
+            <p className="text-[12px] text-ink-faint">
+              {kiraDetik
+                ? "Players see a clock. Answering at once earns the full points, answering on the last second earns half, and answers after time is up earn none."
+                : "No clock and no cut-off. Points still fall the longer a player takes, easing toward half, so faster answers always score higher."}
+            </p>
+            <div className="flex items-center justify-end gap-2">
+              <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
+              <Button disabled={busy} onClick={onTambah}>{busy ? "Saving…" : "Save question"}</Button>
+            </div>
           </div>
-          {opts.length < 6 && (
-            <button type="button" onClick={() => setOpts([...opts, { key: HURUF[opts.length], text: "" }])} className="text-xs text-blue-600 mb-3">
-              + Add option
-            </button>
-          )}
-          <div className="flex items-center gap-3 mb-1 text-xs text-gray-600 flex-wrap">
-            <label className="flex items-center gap-1">Points: <input type="number" min={1} className="input w-20" value={points} onChange={(e) => setPoints(Number(e.target.value) || 1000)} /></label>
-            <label className="flex items-center gap-1">{kiraDetik ? "Time (seconds):" : "Pace (seconds):"} <input type="number" min={5} className="input w-20" value={timeLimit} onChange={(e) => setTimeLimit(Number(e.target.value) || 20)} /></label>
-            <label className="flex items-center gap-1">
-              <input type="checkbox" checked={kiraDetik} onChange={(e) => setKiraDetik(e.target.checked)} className="rounded" />
-              Countdown
-            </label>
-            <label className="flex items-center gap-1">
-              <input type="checkbox" checked={mataBerganda} onChange={(e) => setMataBerganda(e.target.checked)} className="rounded" />
-              Double points
-            </label>
-          </div>
-          <p className="text-[11px] text-gray-500 mb-2">
-            {kiraDetik
-              ? "Players see a clock. Answering at once earns the full points, answering on the last second earns half, and answers after time is up earn none."
-              : "No clock and no cut-off. Points still fall the longer a player takes, easing toward half, so faster answers always score higher."}
-          </p>
-          <div className="flex items-center justify-end gap-2">
-            <button type="button" onClick={() => setShowNew(false)} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
-            <button type="button" disabled={busy} onClick={onTambah} className="btn-primary py-1.5 px-3 text-sm">{busy ? "Saving…" : "Save question"}</button>
-          </div>
-        </div>
+        </Card>
       )}
 
       {soalan.length === 0 ? (
-        <p className="text-sm text-gray-500 mb-4">No questions yet. Add one by hand, or upload a CSV file below.</p>
+        <div className="mb-4">
+          <EmptyState
+            icon={<Plus className="w-6 h-6" />}
+            title="No questions yet"
+            text="Add one by hand, or upload a CSV file below."
+          />
+        </div>
       ) : (
         <div className="space-y-3 mb-6">
           {soalan.map((s, idx) => (
-            <div key={s.id} className="card">
+            <Card key={s.id}>
               {editId === s.id ? (
-                <>
-                  <textarea className="input w-full mb-2" rows={2} value={editPrompt} onChange={(e) => setEditPrompt(e.target.value)} />
-                  <div className="space-y-2 mb-2">
-                    {editOpts.map((o, i) => (
-                      <div key={i} className="flex items-center gap-2">
-                        <label className="flex items-center gap-1 text-xs shrink-0">
-                          <input type="radio" name={`kunci-sunting-${s.id}`} checked={editKunci === o.key} onChange={() => setEditKunci(o.key)} className="rounded" />
-                          <span className="font-semibold">{o.key}.</span>
-                        </label>
-                        <input
-                          className="input w-full"
-                          value={o.text}
-                          onChange={(e) => setEditOpts(editOpts.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
-                        />
-                      </div>
-                    ))}
+                <div className="space-y-4">
+                  <Field label="Question" htmlFor={`sunting-${s.id}-prompt`}>
+                    <Textarea
+                      id={`sunting-${s.id}-prompt`}
+                      rows={2}
+                      value={editPrompt}
+                      onChange={(e) => setEditPrompt(e.target.value)}
+                    />
+                  </Field>
+                  <Field label="Options" note="Pick the circle beside the correct answer.">
+                    {barisPilihan(editOpts, setEditOpts, editKunci, setEditKunci, `kunci-sunting-${s.id}`, false)}
+                  </Field>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <Field label="Points" htmlFor={`sunting-${s.id}-mata`}>
+                      <Input
+                        id={`sunting-${s.id}-mata`}
+                        type="number"
+                        min={1}
+                        value={editPoints}
+                        onChange={(e) => setEditPoints(Number(e.target.value) || 1000)}
+                      />
+                    </Field>
+                    <Field label={editKira ? "Time (seconds)" : "Pace (seconds)"} htmlFor={`sunting-${s.id}-masa`}>
+                      <Input
+                        id={`sunting-${s.id}-masa`}
+                        type="number"
+                        min={5}
+                        value={editTime}
+                        onChange={(e) => setEditTime(Number(e.target.value) || 20)}
+                      />
+                    </Field>
                   </div>
-                  <div className="flex items-center gap-3 mb-2 text-xs text-gray-600 flex-wrap">
-                    <label className="flex items-center gap-1">Points: <input type="number" min={1} className="input w-20" value={editPoints} onChange={(e) => setEditPoints(Number(e.target.value) || 1000)} /></label>
-                    <label className="flex items-center gap-1">{editKira ? "Time (seconds):" : "Pace (seconds):"} <input type="number" min={5} className="input w-20" value={editTime} onChange={(e) => setEditTime(Number(e.target.value) || 20)} /></label>
-                    <label className="flex items-center gap-1">
-                      <input type="checkbox" checked={editKira} onChange={(e) => setEditKira(e.target.checked)} className="rounded" />
-                      Countdown
-                    </label>
-                    <label className="flex items-center gap-1">
-                      <input type="checkbox" checked={editBerganda} onChange={(e) => setEditBerganda(e.target.checked)} className="rounded" />
-                      Double points
-                    </label>
+                  <div className="flex flex-wrap gap-6">
+                    <CheckRadio label="Countdown" checked={editKira} onChange={(e) => setEditKira(e.target.checked)} />
+                    <CheckRadio label="Double points" checked={editBerganda} onChange={(e) => setEditBerganda(e.target.checked)} />
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    <button onClick={() => setEditId(null)} disabled={busy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
-                    <button onClick={onSimpanSunting} disabled={busy} className="btn-primary py-1.5 px-3 text-sm flex items-center gap-1"><Check className="w-4 h-4" /> Save</button>
+                    <Button variant="outline" onClick={() => setEditId(null)} disabled={busy}>Cancel</Button>
+                    <Button onClick={onSimpanSunting} disabled={busy}><Check className="w-4 h-4" /> Save</Button>
                   </div>
-                </>
+                </div>
               ) : (
-                <>
-                  <div className="flex items-start gap-2">
-                    <span className="text-xs font-semibold text-gray-400 mt-1">{idx + 1}.</span>
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium">{s.prompt}</div>
-                      <div className="text-xs text-gray-500 mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-                        {s.options.map((o) => (
-                          <span key={o.key} className={o.key === s.correct_key ? "font-semibold text-green-700" : ""}>
-                            {o.key}. {o.text}{o.key === s.correct_key ? " ✓" : ""}
-                          </span>
-                        ))}
-                      </div>
-                      <div className="text-xs text-gray-400 mt-1">
-                        {s.points} points{s.double_points ? " × 2" : ""} ·{" "}
-                        {s.use_countdown === false
-                          ? `no countdown, pace ${s.time_limit_sec}s`
-                          : `${s.time_limit_sec}s countdown`}
-                      </div>
+                <div className="flex items-start gap-2">
+                  <span className="text-[12px] font-bold text-ink-faint mt-1">{idx + 1}.</span>
+                  <div className="flex-1 min-w-0">
+                    <div className="text-[14px] font-medium text-ink">{s.prompt}</div>
+                    <div className="text-[12px] text-ink-faint mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                      {s.options.map((o) => (
+                        <span key={o.key} className={o.key === s.correct_key ? "font-semibold text-green-700" : ""}>
+                          {o.key}. {o.text}{o.key === s.correct_key ? " ✓" : ""}
+                        </span>
+                      ))}
                     </div>
-                    <div className="flex items-center gap-1 shrink-0">
-                      <button onClick={() => mulaSunting(s)} title="Edit question" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><Pencil className="w-4 h-4" /></button>
-                      <button onClick={() => onPadamSoalan(s)} title="Delete question" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4" /></button>
+                    <div className="text-[12px] text-ink-faint mt-1">
+                      {s.points} points{s.double_points ? " × 2" : ""} ·{" "}
+                      {s.use_countdown === false
+                        ? `no countdown, pace ${s.time_limit_sec}s`
+                        : `${s.time_limit_sec}s countdown`}
                     </div>
                   </div>
-                </>
+                  <div className="flex items-center gap-1 shrink-0">
+                    <Button
+                      variant="icon"
+                      size="sm"
+                      title="Edit question"
+                      ariaLabel="Edit question"
+                      onClick={() => mulaSunting(s)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      variant="icon"
+                      size="sm"
+                      title="Delete question"
+                      ariaLabel="Delete question"
+                      className="text-[#e85347] hover:bg-[#fce4e2]"
+                      onClick={() => onPadamSoalan(s)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </div>
               )}
-            </div>
+            </Card>
           ))}
         </div>
       )}
 
-      <div className="card mb-4">
-        <div className="font-semibold mb-1 flex items-center gap-2">
-          <FileSpreadsheet className="w-4 h-4 text-violet-600" /> Upload questions from a CSV file
-        </div>
-        <p className="text-xs text-gray-500 mb-3">
+      <Card className="mb-4">
+        <CardHead
+          title={
+            <span className="flex items-center gap-2">
+              <FileSpreadsheet className="w-4 h-4 text-violet-600" /> Upload questions from a CSV file
+            </span>
+          }
+        />
+        <p className="text-[12px] text-ink-faint mt-3 mb-3">
           Download the template, type one question per row, then upload the file here. Every
           question is added to the end of this quiz. If any row is wrong, nothing is imported and
           the problem rows are listed below.
@@ -507,6 +615,7 @@ export default function EditorKuizLangsung() {
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
+          {/* Pautan muat turun kekal <a> biasa: ini fail API, bukan laluan aplikasi. */}
           <a
             href="/api/live/quiz-template"
             className="px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 text-sm flex items-center gap-1"
@@ -521,12 +630,10 @@ export default function EditorKuizLangsung() {
             disabled={csvBusy}
             className="text-xs"
           />
-          {csvBusy && <span className="text-xs text-gray-500">Uploading…</span>}
+          {csvBusy && <span className="text-xs text-ink-faint">Uploading…</span>}
         </div>
         {csvMsg && (
-          <div className={`mt-3 text-sm rounded-lg px-3 py-2 ${csvMsg.ok ? "bg-green-50 text-green-700" : "bg-red-50 text-red-700"}`}>
-            {csvMsg.text}
-          </div>
+          <Alert tone={csvMsg.ok ? "success" : "danger"} className="mt-3">{csvMsg.text}</Alert>
         )}
         {csvErrors.length > 0 && (
           <ul className="mt-2 text-xs text-red-700 space-y-1 max-h-48 overflow-auto list-disc ml-4">
@@ -535,29 +642,35 @@ export default function EditorKuizLangsung() {
             ))}
           </ul>
         )}
-      </div>
-      <div className="card">
-        <div className="font-semibold mb-1 flex items-center gap-2"><Upload className="w-4 h-4 text-indigo-600" /> Import Aiken format</div>
-        <p className="text-xs text-gray-500 mb-2">
+      </Card>
+      <Card>
+        <CardHead
+          title={
+            <span className="flex items-center gap-2">
+              <Upload className="w-4 h-4 text-indigo-600" /> Import Aiken format
+            </span>
+          }
+        />
+        <p className="text-[12px] text-ink-faint mt-3 mb-2">
           Paste questions in Aiken format. Separate every question with a blank line.
           The <code className="font-mono bg-gray-100 px-1 rounded">ANSWER:</code> line sets the correct answer.
         </p>
-        <textarea
-          className="input w-full font-mono text-xs mb-2"
+        <Textarea
+          className="w-full font-mono text-xs mb-2"
           rows={6}
           placeholder={"What is the capital of Malaysia?\nA. Johor Bahru\nB. Kuala Lumpur\nC. Ipoh\nANSWER: B"}
           value={aiken}
           onChange={(e) => setAiken(e.target.value)}
         />
-        <div className="flex items-center gap-3">
-          <button onClick={onImportAiken} disabled={aikenBusy} className="btn-primary py-1 px-3 text-sm flex items-center gap-1">
+        <div className="flex items-center gap-3 flex-wrap">
+          <Button onClick={onImportAiken} disabled={aikenBusy}>
             <Upload className="w-4 h-4" /> {aikenBusy ? "Importing…" : "Import"}
-          </button>
+          </Button>
           {aikenMsg && (
             <span className={`text-xs ${aikenMsg.ok ? "text-green-600" : "text-red-600"}`}>{aikenMsg.text}</span>
           )}
         </div>
-      </div>
+      </Card>
     </Shell>
   );
 }
