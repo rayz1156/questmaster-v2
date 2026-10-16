@@ -1,8 +1,27 @@
 'use client';
 
+// Feedback ruang kerja admin, rupa v3 (KZ-024). Senarai maklum balas
+// pengguna guna DataTable kit: penapis status/jenis di kepala kad,
+// tindakan tukar status melalui menu "..." (fungsi updateStatus sama),
+// mesej penuh dipapar sebagai baris tambahan di bawah setiap baris.
+// Panggilan /api/admin/feedback, penapis dan kiraan tidak berubah.
+
 import { useEffect, useState, useCallback } from 'react';
+import { MessageSquare, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import AdminShell from '@/components/admin/AdminShell';
+import {
+  Alert,
+  Badge,
+  Card,
+  DataTable,
+  EmptyState,
+  PageHead,
+  Select,
+  StatGroup,
+  type DataColumn,
+  type WarnaKit,
+} from '@/components/ui';
 
 type FeedbackItem = {
   id: string;
@@ -17,11 +36,11 @@ type FeedbackItem = {
 
 const STATUS_OPTIONS = ['open', 'in_review', 'resolved', 'closed'] as const;
 const TYPE_LABELS: Record<string, string> = { bug: 'Bug', idea: 'Idea', question: 'Question', other: 'Other' };
-const STATUS_COLORS: Record<string, string> = {
-  open: 'bg-amber-100 text-amber-700',
-  in_review: 'bg-blue-100 text-blue-700',
-  resolved: 'bg-emerald-100 text-emerald-700',
-  closed: 'bg-gray-100 text-gray-600',
+const STATUS_WARNA: Record<string, WarnaKit> = {
+  open: 'yellow',
+  in_review: 'blue',
+  resolved: 'green',
+  closed: 'gray',
 };
 
 export default function AdminFeedbackPage() {
@@ -70,67 +89,134 @@ export default function AdminFeedbackPage() {
 
   const counts = items.reduce((acc, it) => { acc[it.status] = (acc[it.status] ?? 0) + 1; return acc; }, {} as Record<string, number>);
 
+  const lajur: DataColumn<FeedbackItem>[] = [
+    {
+      key: 'subjek',
+      header: 'Feedback',
+      render: (it) => (
+        <span className="min-w-0">
+          <span className="block text-[13px] font-bold text-ink truncate">{it.subject}</span>
+          <span className="block text-[12px] text-ink-faint truncate">
+            {it.user_email ?? 'anonymous'}{it.page_url ? ` · ${it.page_url}` : ''}
+          </span>
+        </span>
+      ),
+    },
+    {
+      key: 'jenis',
+      header: 'Type',
+      render: (it) => (
+        <Badge variant="dim" warna="purple">
+          {TYPE_LABELS[it.type] ?? it.type}
+        </Badge>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (it) => (
+        <Badge variant="dim" warna={STATUS_WARNA[it.status] ?? 'gray'}>
+          {it.status}
+        </Badge>
+      ),
+    },
+    {
+      key: 'masa',
+      header: 'Received',
+      hideOnMobile: true,
+      render: (it) => (
+        <span className="text-[13px] text-ink-faint whitespace-nowrap">
+          {new Date(it.created_at).toLocaleString()}
+        </span>
+      ),
+    },
+  ];
+
   return (
-    <AdminShell
-      title="Feedback"
-      actions={
-        <button
-          onClick={load}
-          className="px-4 py-2 text-sm font-medium rounded-xl border border-hairline bg-white text-ink hover:bg-[#F7F7F9]"
-        >
-          Refresh
-        </button>
-      }
-    >
-      <p className="text-sm text-gray-500 mb-6">Submissions from the /help page.</p>
+    <AdminShell>
+      <PageHead
+        title="Feedback"
+        description="Submissions from the /help page."
+        secondaryActions={[
+          { label: 'Refresh', icon: <RefreshCw className="w-4 h-4" />, onSelect: load },
+        ]}
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-6">
-        {STATUS_OPTIONS.map(s => (
-          <div key={s} className="rounded-lg border bg-white p-3">
-            <div className="text-xs uppercase tracking-wide text-gray-500">{s.replace('_', ' ')}</div>
-            <div className="text-2xl font-bold mt-1">{counts[s] ?? 0}</div>
-          </div>
-        ))}
-      </div>
+      {/* Kiraan status sebenar; tiada data perubahan, jadi tiada anak panah. */}
+      <Card className="mb-5">
+        <StatGroup
+          stats={STATUS_OPTIONS.map((s) => ({
+            label: s === 'in_review' ? 'In review' : s.charAt(0).toUpperCase() + s.slice(1),
+            value: counts[s] ?? 0,
+          }))}
+        />
+      </Card>
 
-      <div className="flex flex-wrap gap-3 mb-4">
-        <select value={filterStatus} onChange={e => setFilterStatus(e.target.value)} className="px-3 py-1.5 text-sm rounded-md border bg-white">
-          <option value="">All statuses</option>
-          {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-        </select>
-        <select value={filterType} onChange={e => setFilterType(e.target.value)} className="px-3 py-1.5 text-sm rounded-md border bg-white">
-          <option value="">All types</option>
-          {Object.entries(TYPE_LABELS).map(([k, v]) => <option key={k} value={k}>{v}</option>)}
-        </select>
-      </div>
+      {loading && <p className="text-[14px] text-ink-faint mb-4">Loading…</p>}
+      {error && (
+        <Alert tone="danger" className="mb-4">
+          {error}
+        </Alert>
+      )}
 
-      {loading && <div className="text-sm text-gray-500">Loading…</div>}
-      {error && <div className="text-sm text-red-600">{error}</div>}
-
-      <div className="space-y-3">
-        {items.map(item => (
-          <div key={item.id} className="rounded-lg border bg-white p-4">
-            <div className="flex items-start justify-between gap-3 flex-wrap">
-              <div className="flex-1 min-w-0">
-                <div className="flex items-center gap-2 flex-wrap mb-1">
-                  <span className="text-xs px-2 py-0.5 rounded-full bg-purple-100 text-purple-700">{TYPE_LABELS[item.type] ?? item.type}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full ${STATUS_COLORS[item.status] ?? 'bg-gray-100 text-gray-600'}`}>{item.status}</span>
-                  <span className="text-xs text-gray-500">{new Date(item.created_at).toLocaleString()}</span>
-                </div>
-                <div className="font-semibold">{item.subject}</div>
-                <div className="text-xs text-gray-500 mt-0.5">{item.user_email ?? 'anonymous'} {item.page_url ? `• ${item.page_url}` : ''}</div>
-                <p className="text-sm text-gray-700 mt-2 whitespace-pre-wrap">{item.message}</p>
-              </div>
-              <select value={item.status} onChange={e => updateStatus(item.id, e.target.value)} className="text-xs px-2 py-1 rounded border bg-white">
-                {STATUS_OPTIONS.map(s => <option key={s} value={s}>{s}</option>)}
-              </select>
-            </div>
-          </div>
-        ))}
-        {!loading && items.length === 0 && !error && (
-          <div className="text-center text-sm text-gray-500 py-12">No feedback yet.</div>
-        )}
-      </div>
+      {!loading && (
+        <DataTable
+          label="Feedback"
+          columns={lajur}
+          rows={items}
+          rowKey={(it) => it.id}
+          menuItems={(it) =>
+            STATUS_OPTIONS.map((s) => ({
+              label: `Mark ${s.replace('_', ' ')}`,
+              onSelect: () => updateStatus(it.id, s),
+              disabled: s === it.status,
+            }))
+          }
+          menuLabel="Feedback actions"
+          renderRowExtra={(it) => (
+            <p className="px-4 pb-3 text-[13px] text-ink-muted whitespace-pre-wrap">{it.message}</p>
+          )}
+          head={
+            <>
+              <Select
+                value={filterStatus}
+                onChange={(e) => setFilterStatus(e.target.value)}
+                aria-label="Filter by status"
+                className="w-auto"
+              >
+                <option value="">All statuses</option>
+                {STATUS_OPTIONS.map((s) => (
+                  <option key={s} value={s}>
+                    {s}
+                  </option>
+                ))}
+              </Select>
+              <Select
+                value={filterType}
+                onChange={(e) => setFilterType(e.target.value)}
+                aria-label="Filter by type"
+                className="w-auto"
+              >
+                <option value="">All types</option>
+                {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                  <option key={k} value={k}>
+                    {v}
+                  </option>
+                ))}
+              </Select>
+            </>
+          }
+          empty={
+            !error ? (
+              <EmptyState
+                icon={<MessageSquare className="w-6 h-6" />}
+                title="No feedback yet"
+                text="Submissions from the /help page appear here."
+              />
+            ) : null
+          }
+        />
+      )}
     </AdminShell>
   );
 }

@@ -1,16 +1,30 @@
 "use client";
 
-// Audit log ruang kerja admin (V2-011c). Jadual dengan penapis Action,
-// Actor, Period dan carian sasaran; klik baris membuka panel kanan
-// Event details dengan beza before/after dan raw data. Muat 50 baris
-// serentak dengan butang Load more (offset adminListAuditLogPaged).
-// Log ini tambah sahaja: tiada butang sunting atau padam di sini.
+// Audit log ruang kerja admin, rupa v3 (KZ-024). Jadual kit dengan penapis
+// Action, Actor, Period dan carian sasaran di kepala kad; klik baris
+// membuka panel kanan Event details dengan beza before/after dan raw data.
+// Muat 50 baris serentak dengan butang Load more (offset adminListAuditLogPaged).
+// Log ini tambah sahaja: tiada butang sunting atau padam di sini. Data,
+// penapis pelayan dan pemuatan tidak berubah.
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Search } from "lucide-react";
+import { Search, ScrollText, History } from "lucide-react";
 import AdminShell from "@/components/admin/AdminShell";
-import { Card, Pill, EmptyState, relTime } from "@/components/admin/ui";
+import { relTime } from "@/components/admin/ui";
+import {
+  Badge,
+  Button,
+  Card,
+  CardHead,
+  DataTable,
+  EmptyState,
+  Input,
+  PageHead,
+  Select,
+  type DataColumn,
+  type WarnaKit,
+} from "@/components/ui";
 import {
   adminListAuditLogPaged,
   adminListProfiles,
@@ -42,8 +56,8 @@ import type { KelasAdmin } from "@/lib/adminClasses";
 
 const SEBARIS = 50;
 
-/** Nada audit admin kepada nada Pill. */
-const TONE_PIL: Record<AuditTone, "green" | "yellow" | "red" | "gray"> = {
+/** Nada audit admin kepada warna Badge kit. */
+const TONE_PIL: Record<AuditTone, WarnaKit> = {
   good: "green",
   warn: "yellow",
   danger: "red",
@@ -196,152 +210,179 @@ export default function Page() {
     }
   }, [muatLagi, adaLagi, period, rows.length, tindakan, pelaku]);
 
+  // Lajur jadual audit; baris terpilih ditandakan pada lajur masa kerana
+  // DataTable kit tidak menyokong sorotan baris terpilih.
+  const lajur: DataColumn<AuditLogRow>[] = [
+    {
+      key: "masa",
+      header: "Time",
+      render: (r) => (
+        <span
+          title={fmt(r.created_at)}
+          className={`text-[13px] whitespace-nowrap ${dipilih === r.id ? "font-bold text-brand-purple" : "text-ink-faint"}`}
+        >
+          {relTime(r.created_at)}
+        </span>
+      ),
+    },
+    {
+      key: "pelaku",
+      header: "Actor",
+      render: (r) => (
+        <span className="text-[13px] text-ink truncate block max-w-[140px]">
+          {r.actor_id ? profById.get(r.actor_id)?.display_name || "Unnamed user" : "Unknown"}
+        </span>
+      ),
+    },
+    {
+      key: "tindakan",
+      header: "Action",
+      render: (r) => {
+        const label = labelTindakan(r.action);
+        return (
+          <Badge variant="dim" warna={TONE_PIL[label.tone]}>
+            {label.label}
+          </Badge>
+        );
+      },
+    },
+    {
+      key: "sasaran",
+      header: "Target",
+      render: (r) => {
+        const sasaran = sasaranAudit(r, petaSasaran);
+        if (sasaran.nama) {
+          return <span className="text-[13px] text-ink truncate block max-w-[180px]">{sasaran.nama}</span>;
+        }
+        return (
+          <span className="text-[13px] text-ink-muted">
+            {sasaran.jenis}
+            {sasaran.idPendek && (
+              <code className="ml-1.5 text-[11px] font-mono text-ink-faint">{sasaran.idPendek}</code>
+            )}
+          </span>
+        );
+      },
+    },
+    {
+      key: "alasan",
+      header: "Reason",
+      hideOnMobile: true,
+      render: (r) => (
+        <span className="block truncate text-[13px] text-ink-muted max-w-[200px]">{ringkasAlasan(r.meta)}</span>
+      ),
+    },
+  ];
+
   return (
-    <AdminShell title="Audit log">
-      <p className="text-ink-muted text-sm mb-6">
-        Every admin action, who did it and why. Entries can&apos;t be edited or deleted.
-      </p>
+    <AdminShell>
+      <PageHead
+        title="Audit log"
+        description="Every admin action, who did it and why. Entries can't be edited or deleted."
+      />
 
-      {/* ===== Penapis ===== */}
-      <div className="flex flex-wrap items-center gap-2 mb-4">
-        <select
-          value={tindakan}
-          onChange={(e) => setTindakan(e.target.value)}
-          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-          aria-label="Filter by action"
-        >
-          <option value="">All actions</option>
-          {tindakanWujud.map((a) => (
-            <option key={a} value={a}>
-              {labelTindakan(a).label}
-            </option>
-          ))}
-        </select>
-        <select
-          value={pelaku}
-          onChange={(e) => setPelaku(e.target.value)}
-          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-          aria-label="Filter by actor"
-        >
-          <option value="">All actors</option>
-          {pelakuWujud.map((id) => (
-            <option key={id} value={id}>
-              {profById.get(id)?.display_name || "Unnamed user"}
-            </option>
-          ))}
-        </select>
-        <select
-          value={period}
-          onChange={(e) => setPeriod(e.target.value as PeriodAudit)}
-          className="h-10 rounded-xl bg-white border border-hairline px-3 text-sm text-ink"
-          aria-label="Filter by period"
-        >
-          <option value="24h">24 hours</option>
-          <option value="7d">7 days</option>
-          <option value="30d">30 days</option>
-          <option value="all">All</option>
-        </select>
-        <div className="relative flex-1 min-w-[200px]">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-ink-faint" />
-          <input
-            className="w-full h-10 pl-9 pr-3 rounded-xl bg-white border border-hairline text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
-            placeholder="Search target, id or actor"
-            value={q}
-            onChange={(e) => setQ(e.target.value)}
-          />
-        </div>
-      </div>
-
-      <div className="grid lg:grid-cols-5 gap-4 items-start">
+      <div className="grid lg:grid-cols-5 gap-5 items-start">
         {/* ===== Jadual ===== */}
-        <Card className="lg:col-span-3 overflow-hidden">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead>
-                <tr className="text-left text-xs uppercase tracking-wide text-ink-faint border-b border-hairline">
-                  <th className="px-4 py-3 font-medium">Time</th>
-                  <th className="px-4 py-3 font-medium">Actor</th>
-                  <th className="px-4 py-3 font-medium">Action</th>
-                  <th className="px-4 py-3 font-medium">Target</th>
-                  <th className="px-4 py-3 font-medium">Reason</th>
-                </tr>
-              </thead>
-              <tbody>
-                {ditapis.map((r) => {
-                  const label = labelTindakan(r.action);
-                  const sasaran = sasaranAudit(r, petaSasaran);
-                  return (
-                    <tr
-                      key={r.id}
-                      onClick={() => setDipilih(r.id)}
-                      className={`border-b border-hairline last:border-b-0 cursor-pointer transition ${
-                        dipilih === r.id ? "bg-[#F1EEFC]" : "hover:bg-[#F7F7F9]"
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-ink-muted whitespace-nowrap" title={fmt(r.created_at)}>
-                        {relTime(r.created_at)}
-                      </td>
-                      <td className="px-4 py-3 text-ink truncate max-w-[140px]">
-                        {r.actor_id ? profById.get(r.actor_id)?.display_name || "Unnamed user" : "Unknown"}
-                      </td>
-                      <td className="px-4 py-3">
-                        <Pill tone={TONE_PIL[label.tone]}>{label.label}</Pill>
-                      </td>
-                      <td className="px-4 py-3 max-w-[180px]">
-                        {sasaran.nama ? (
-                          <span className="text-ink truncate block">{sasaran.nama}</span>
-                        ) : (
-                          <span className="text-ink-muted">
-                            {sasaran.jenis}
-                            {sasaran.idPendek && (
-                              <code className="ml-1.5 text-[11px] font-mono text-ink-faint">{sasaran.idPendek}</code>
-                            )}
-                          </span>
-                        )}
-                      </td>
-                      <td className="px-4 py-3 text-ink-muted max-w-[200px]">
-                        <span className="block truncate">{ringkasAlasan(r.meta)}</span>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
-
+        <div className="lg:col-span-3">
           {muat ? (
-            <div className="text-sm text-ink-faint py-8 text-center">Loading...</div>
+            <Card>
+              <p className="text-[14px] text-ink-faint py-8 text-center">Loading...</p>
+            </Card>
           ) : (
-            ditapis.length === 0 && <EmptyState title="No entries match." body="Try different filters." />
-          )}
+            <>
+              <DataTable
+                label="Audit log"
+                columns={lajur}
+                rows={ditapis}
+                rowKey={(r) => String(r.id)}
+                onRowClick={(r) => setDipilih(r.id)}
+                head={
+                  <>
+                    <Select
+                      value={tindakan}
+                      onChange={(e) => setTindakan(e.target.value)}
+                      aria-label="Filter by action"
+                      className="w-auto"
+                    >
+                      <option value="">All actions</option>
+                      {tindakanWujud.map((a) => (
+                        <option key={a} value={a}>
+                          {labelTindakan(a).label}
+                        </option>
+                      ))}
+                    </Select>
+                    <Select
+                      value={pelaku}
+                      onChange={(e) => setPelaku(e.target.value)}
+                      aria-label="Filter by actor"
+                      className="w-auto"
+                    >
+                      <option value="">All actors</option>
+                      {pelakuWujud.map((id) => (
+                        <option key={id} value={id}>
+                          {profById.get(id)?.display_name || "Unnamed user"}
+                        </option>
+                      ))}
+                    </Select>
+                    <Select
+                      value={period}
+                      onChange={(e) => setPeriod(e.target.value as PeriodAudit)}
+                      aria-label="Filter by period"
+                      className="w-auto"
+                    >
+                      <option value="24h">24 hours</option>
+                      <option value="7d">7 days</option>
+                      <option value="30d">30 days</option>
+                      <option value="all">All</option>
+                    </Select>
+                    <span className="w-full sm:w-56">
+                      <Input
+                        ikonKiri={<Search className="w-4 h-4" />}
+                        placeholder="Search target, id or actor"
+                        aria-label="Search audit entries"
+                        value={q}
+                        onChange={(e) => setQ(e.target.value)}
+                      />
+                    </span>
+                  </>
+                }
+                empty={
+                  <EmptyState
+                    icon={<ScrollText className="w-6 h-6" />}
+                    title="No entries match"
+                    text="Try different filters."
+                  />
+                }
+              />
 
-          {!muat && adaLagi && ditapis.length > 0 && (
-            <div className="px-4 py-3 border-t border-hairline text-center">
-              <button
-                type="button"
-                disabled={muatLagi}
-                onClick={muatLagiBtn}
-                className="bg-white border border-hairline rounded-xl px-4 py-2 text-sm font-medium text-ink hover:bg-[#F7F7F9] disabled:opacity-40"
-              >
-                {muatLagi ? "Loading..." : "Load more"}
-              </button>
-            </div>
+              {!muat && adaLagi && ditapis.length > 0 && (
+                <div className="mt-4 text-center">
+                  <Button variant="outline" disabled={muatLagi} onClick={muatLagiBtn}>
+                    {muatLagi ? "Loading..." : "Load more"}
+                  </Button>
+                </div>
+              )}
+            </>
           )}
-        </Card>
+        </div>
 
         {/* ===== Panel kanan butiran ===== */}
         <div className="lg:col-span-2">
           {!item ? (
             <Card>
-              <EmptyState title="Select an entry." body="Click a row to see the full event." />
+              <EmptyState
+                icon={<History className="w-6 h-6" />}
+                title="Select an entry"
+                text="Click a row to see the full event."
+              />
             </Card>
           ) : (
-            <Card className="lg:sticky lg:top-20 p-4">
-              <div className="text-sm font-semibold text-ink mb-3">Event details</div>
+            <Card className="lg:sticky lg:top-20">
+              <CardHead title="Event details" />
 
-              <div className="space-y-3 text-sm">
+              <div className="mt-4 space-y-4 text-[14px]">
                 <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">Actor</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Actor</div>
                   {item.actor_id ? (
                     <Link
                       href={`/admin/users/${item.actor_id}`}
@@ -356,20 +397,22 @@ export default function Page() {
                 </div>
 
                 <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">Time</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Time</div>
                   <div className="text-ink">{fmt(item.created_at)}</div>
                 </div>
 
                 <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">Action</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Action</div>
                   <div className="mt-1">
-                    <Pill tone={TONE_PIL[labelTindakan(item.action).tone]}>{labelTindakan(item.action).label}</Pill>
+                    <Badge variant="dim" warna={TONE_PIL[labelTindakan(item.action).tone]}>
+                      {labelTindakan(item.action).label}
+                    </Badge>
                   </div>
                 </div>
 
                 {sasaranItem && (
                   <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">Target</div>
+                    <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Target</div>
                     {sasaranItem.nama ? (
                       sasaranItem.href ? (
                         <Link
@@ -394,7 +437,7 @@ export default function Page() {
                 )}
 
                 <div>
-                  <div className="text-xs font-medium uppercase tracking-wide text-ink-faint">Reason</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Reason</div>
                   <div className="text-ink whitespace-pre-wrap break-words">
                     {alasanAudit(item.meta) || "(none)"}
                   </div>
@@ -402,11 +445,11 @@ export default function Page() {
 
                 {bezaAudit(item.meta).length > 0 && (
                   <div>
-                    <div className="text-xs font-medium uppercase tracking-wide text-ink-faint mb-1">Changes</div>
+                    <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint mb-1.5">Changes</div>
                     <div className="overflow-x-auto">
-                      <table className="w-full text-xs">
+                      <table className="w-full text-[12px]">
                         <thead>
-                          <tr className="text-left text-ink-faint border-b border-hairline">
+                          <tr className="text-left text-ink-faint border-b border-kz-line">
                             <th className="py-1.5 pr-3 font-medium">Field</th>
                             <th className="py-1.5 pr-3 font-medium">Before</th>
                             <th className="py-1.5 font-medium">After</th>
@@ -414,7 +457,7 @@ export default function Page() {
                         </thead>
                         <tbody>
                           {bezaAudit(item.meta).map((b) => (
-                            <tr key={b.key} className="border-b border-hairline last:border-b-0">
+                            <tr key={b.key} className="border-b border-kz-line last:border-b-0">
                               <td className="py-1.5 pr-3 text-ink-muted">{b.key}</td>
                               <td className="py-1.5 pr-3 text-ink-muted break-words">{b.before}</td>
                               <td className="py-1.5 text-ink font-medium break-words">{b.after}</td>
@@ -426,9 +469,9 @@ export default function Page() {
                   </div>
                 )}
 
-                <details className="border-t border-hairline pt-3">
-                  <summary className="text-xs font-medium text-ink-muted cursor-pointer">Raw data</summary>
-                  <pre className="mt-2 text-[11px] font-mono text-ink-muted whitespace-pre-wrap break-words bg-[#F7F7F9] rounded-xl p-3 overflow-x-auto">
+                <details className="border-t border-kz-line pt-3">
+                  <summary className="text-[12px] font-medium text-ink-muted cursor-pointer">Raw data</summary>
+                  <pre className="mt-2 text-[11px] font-mono text-ink-muted whitespace-pre-wrap break-words bg-canvas rounded-[4px] p-3 overflow-x-auto">
                     {jsonRawat(item.meta)}
                   </pre>
                 </details>
