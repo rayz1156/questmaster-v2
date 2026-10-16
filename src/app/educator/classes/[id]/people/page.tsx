@@ -6,6 +6,13 @@
  * Sebelum ini ketiga-tiganya berselerak: ahli pada halaman kelas, kumpulan
  * pada skrin global berasingan, pendidik dalam kad di bawah. Orang ialah
  * satu idea, jadi ia satu skrin dengan tiga sub-tab.
+ *
+ * KZ-022b: rupa v3. Sub-tab guna Tabs kit (tab keadaan); senarai pelajar
+ * dan kumpulan guna DataTable kit gaya "Students" (avatar inisial, lencana
+ * status, menu "..." tindakan, lajur kurang penting disembunyi di telefon);
+ * keadaan kosong guna EmptyState kit. Klik kepala lajur markah untuk
+ * menyusun kekal sebagai butang dalam `header` lajur. Logik, data, panggilan
+ * Supabase/API, import CSV dan laci markah tidak berubah.
  */
 
 import { useEffect, useMemo, useRef, useState } from "react";
@@ -22,6 +29,17 @@ import { namaAhli } from "@/lib/namaAhli";
 import { formatMata, kiraKedudukan } from "@/lib/markahPeserta";
 import LaciMarkahPeserta from "@/components/people/LaciMarkahPeserta";
 import { supabase } from "@/lib/supabase";
+import {
+  Avatar,
+  Button,
+  Card,
+  DataTable,
+  EmptyState,
+  InitialTile,
+  Select,
+  Tabs,
+  type DataColumn,
+} from "@/components/ui";
 
 type Sub = "students" | "teams" | "educators";
 
@@ -49,21 +67,15 @@ type TeamImportPreview = {
   errors?: { row: number; message: string }[];
 };
 
-const PALETTE = [
-  "bg-[#EAE6FC] text-[#5B42C4]",
-  "bg-[#E4EEFD] text-[#2B5FBF]",
-  "bg-[#FDE9E4] text-[#B4552F]",
-  "bg-[#E3F5EA] text-[#2E7D4F]",
-  "bg-[#FCE8F1] text-[#A83E6E]",
-  "bg-[#FBF0DC] text-[#96661A]",
-];
-
-function initials(name: string): string {
-  const parts = String(name || "").trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "?";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+/** Baris kumpulan seperti yang dikembalikan listTeamsByClass. */
+type Kumpulan = {
+  id: string;
+  name: string | null;
+  max_members?: number | null;
+  score?: number | null;
+  member_count?: number | null;
+  members_count?: number | null;
+};
 
 /**
  * Bilangan ahli bagi setiap kumpulan. qm_teams TIADA lajur member_count,
@@ -308,11 +320,8 @@ export default function ClassPeoplePage() {
         : { kunci, arah: arahPertama },
     );
 
-  // aria-sort untuk kepala lajur aktif sahaja.
-  const arahSort = (kunci: KunciUrut) =>
-    urut.kunci === kunci ? (urut.arah === 1 ? "ascending" : "descending") : undefined;
-
-  // Ikon arah susunan pada kepala lajur aktif.
+  // Ikon arah susunan pada kepala lajur aktif; kepala lajur markah ialah
+  // butang susunan dalam `header` lajur DataTable kit.
   const IkonUrut = ({ kunci }: { kunci: KunciUrut }) =>
     urut.kunci === kunci ? (
       urut.arah === 1 ? (
@@ -328,226 +337,278 @@ export default function ClassPeoplePage() {
     return teams.filter((t) => String(t.name || "").toLowerCase().includes(needle));
   }, [teams, q]);
 
-  const SubTab = ({ k, label, count }: { k: Sub; label: string; count?: number }) => (
-    <button
-      onClick={() => setSub(k)}
-      className={`relative pb-2.5 px-1 text-[15px] transition ${
-        sub === k ? "text-ink font-semibold" : "text-ink-muted hover:text-ink font-medium"
-      }`}
-    >
-      {label}
-      {typeof count === "number" && (
-        <span className="ml-1.5 text-xs text-ink-faint font-medium">{count}</span>
-      )}
-      {sub === k && <span className="absolute left-0 right-0 -bottom-px h-[2px] bg-ink rounded-full" />}
-    </button>
-  );
+  // Lajur jadual pelajar (DataTable kit, gaya "Students"). Medan yang
+  // dipapar sama seperti sebelum ini; e-mel tidak ditambah baharu.
+  const lajurAhli: DataColumn<{ m: Record<string, unknown>; mk: BarisMarkah | undefined }>[] = [
+    {
+      key: "nama",
+      header: (
+        <button
+          type="button"
+          onClick={() => klikUrut("nama", 1)}
+          className="inline-flex items-center gap-1 hover:text-ink"
+        >
+          Name <IkonUrut kunci="nama" />
+        </button>
+      ),
+      render: ({ m }, i) => (
+        <button
+          type="button"
+          onClick={() => setLaciUser({ id: String(m.user_id || ""), nama: name(m) })}
+          aria-label={`Open scores for ${name(m)}`}
+          className="flex items-center gap-3 min-w-0 text-left group"
+        >
+          <Avatar name={name(m)} size="sm" index={i} />
+          <span className="text-[13px] font-bold text-ink truncate group-hover:text-brand-purple group-hover:underline underline-offset-2">
+            {name(m)}
+          </span>
+        </button>
+      ),
+    },
+    {
+      key: "status",
+      header: "Status",
+      hideOnMobile: true,
+      render: () => (
+        <span className="inline-flex items-center gap-2 text-[13px] text-ink-muted">
+          <span className="w-1.5 h-1.5 rounded-full bg-[#4BA972]" aria-hidden="true" /> Active
+        </span>
+      ),
+    },
+    {
+      key: "serta",
+      header: "Joined",
+      render: ({ m }) => (
+        <span className="text-[13px] text-ink-muted">
+          {m.joined_at
+            ? new Date(String(m.joined_at)).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+            : ","}
+        </span>
+      ),
+    },
+    {
+      key: "aktiviti",
+      header: (
+        <button
+          type="button"
+          onClick={() => klikUrut("aktiviti", -1)}
+          className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
+        >
+          Activities <IkonUrut kunci="aktiviti" />
+        </button>
+      ),
+      hideOnMobile: true,
+      className: "text-right",
+      render: ({ mk }) => (
+        <span className={`text-[13px] tabular-nums ${mk && mk.task > 0 ? "text-ink" : "text-ink-faint"}`}>
+          {formatMata(mk?.task ?? 0)}
+        </span>
+      ),
+    },
+    {
+      key: "langsung",
+      header: (
+        <button
+          type="button"
+          onClick={() => klikUrut("langsung", -1)}
+          className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
+        >
+          Live Quiz <IkonUrut kunci="langsung" />
+        </button>
+      ),
+      hideOnMobile: true,
+      className: "text-right",
+      render: ({ mk }) => (
+        <span className={`text-[13px] tabular-nums ${mk && mk.live > 0 ? "text-ink" : "text-ink-faint"}`}>
+          {formatMata(mk?.live ?? 0)}
+        </span>
+      ),
+    },
+    {
+      key: "jumlah",
+      header: (
+        <button
+          type="button"
+          onClick={() => klikUrut("jumlah", -1)}
+          className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
+        >
+          Total <IkonUrut kunci="jumlah" />
+        </button>
+      ),
+      className: "text-right",
+      render: ({ mk }) => (
+        <span className={`text-[14px] font-medium tabular-nums ${mk && mk.jumlah > 0 ? "text-ink" : "text-ink-faint"}`}>
+          {formatMata(mk?.jumlah ?? 0)}
+        </span>
+      ),
+    },
+    {
+      key: "kedudukan",
+      header: (
+        <button
+          type="button"
+          onClick={() => klikUrut("kedudukan", 1)}
+          className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
+        >
+          Rank <IkonUrut kunci="kedudukan" />
+        </button>
+      ),
+      hideOnMobile: true,
+      className: "text-right",
+      render: ({ mk }) => (
+        <span className="text-[13px] tabular-nums text-ink-faint">{mk?.kedudukan ?? ""}</span>
+      ),
+    },
+  ];
+
+  // Lajur jadual kumpulan (DataTable kit). Baris tunggu (pending) kekal
+  // dipapar sebagai baris tambahan di bawah setiap kumpulan.
+  const lajurKumpulan: DataColumn<Kumpulan>[] = [
+    {
+      key: "kumpulan",
+      header: "Team",
+      render: (t, i) => (
+        <span className="flex items-center gap-3 py-3 min-w-0">
+          <InitialTile name={String(t.name || "Team")} index={i} />
+          <span className="text-[14px] font-medium text-ink truncate">{t.name || "Team"}</span>
+        </span>
+      ),
+    },
+    {
+      key: "ahli",
+      header: "Members",
+      hideOnMobile: true,
+      className: "text-right",
+      render: (t) => {
+        const max = Number(t.max_members) || 6;
+        const filled = bilAhli[String(t.id)] ?? Number(t.member_count ?? t.members_count ?? 0);
+        return (
+          <span className="inline-flex items-center gap-2 whitespace-nowrap">
+            <span className="flex gap-0.5" aria-hidden="true">
+              {Array.from({ length: Math.min(max, 8) }).map((_, k) => (
+                <span key={k} className={`w-2.5 h-1.5 rounded-full ${k < filled ? "bg-brand-purple" : "bg-[#e5e9f2]"}`} />
+              ))}
+            </span>
+            <span className="text-[12px] text-ink-muted tabular-nums">{filled} of {max}</span>
+          </span>
+        );
+      },
+    },
+    {
+      key: "mata",
+      header: "Points",
+      className: "text-right",
+      render: (t) => (
+        <span className="text-[14px] text-ink tabular-nums">
+          {scores[String(t.id)] ?? Number(t.score ?? 0)}
+        </span>
+      ),
+    },
+  ];
 
   return (
     <Shell tabs={EDU_TABS}>
       <ClassShell classId={id} current="people">
-        <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
-          <div className="flex items-center gap-6 border-b border-hairline w-full sm:w-auto">
-            <SubTab k="students" label="Students" count={members.length} />
-            <SubTab k="teams" label="Teams" count={teams.length} />
-            <SubTab k="educators" label="Educators" />
-          </div>
+        <Tabs
+          className="mb-5"
+          items={[
+            { label: `Students${members.length > 0 ? ` (${members.length})` : ""}`, onSelect: () => setSub("students"), aktif: sub === "students" },
+            { label: `Teams${teams.length > 0 ? ` (${teams.length})` : ""}`, onSelect: () => setSub("teams"), aktif: sub === "teams" },
+            { label: "Educators", onSelect: () => setSub("educators"), aktif: sub === "educators" },
+          ]}
+        />
 
-          <div className="flex items-center gap-3">
-            {sub !== "educators" && (
-              <div className="relative w-full sm:w-72">
-                <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-                <input
-                  className="input pl-9"
-                  placeholder={sub === "students" ? "Search people..." : "Search teams..."}
-                  value={q}
-                  onChange={(e) => setQ(e.target.value)}
-                />
-              </div>
-            )}
-            {sub === "students" && (
-              <button
-                type="button"
-                onClick={eksportCsv}
-                disabled={exportBusy}
-                className="btn-quiet text-brand-purple inline-flex items-center gap-1.5 disabled:opacity-50"
-              >
-                <Download className="w-4 h-4" /> {exportBusy ? "Exporting..." : "Export CSV"}
-              </button>
-            )}
-            <EmailExportButton classId={id} />
-          </div>
+        <div className="flex items-center gap-3 flex-wrap mb-5">
+          {sub !== "educators" && (
+            <div className="relative w-full sm:w-72">
+              <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+              <input
+                className="input pl-9"
+                placeholder={sub === "students" ? "Search people..." : "Search teams..."}
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+                aria-label={sub === "students" ? "Search people" : "Search teams"}
+              />
+            </div>
+          )}
+          {sub === "students" && (
+            <Button variant="outline" size="sm" onClick={eksportCsv} disabled={exportBusy}>
+              <Download className="w-4 h-4" /> {exportBusy ? "Exporting..." : "Export CSV"}
+            </Button>
+          )}
+          <EmailExportButton classId={id} />
         </div>
 
-        {err && <div className="text-sm text-red-600 mb-4">{err}</div>}
-        {exportErr && <div className="text-sm text-red-600 mb-4">{exportErr}</div>}
+        {err && <div className="text-sm text-kz-down mb-4">{err}</div>}
+        {exportErr && <div className="text-sm text-kz-down mb-4">{exportErr}</div>}
         {loading && <p className="text-sm text-ink-muted">Loading…</p>}
 
         {!loading && sub === "students" && (
-          barisAhli.length === 0 ? (
-            <div className="surface py-16 text-center">
-              <div className="w-14 h-14 rounded-full bg-[#EAE6FC] flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 text-brand-purple" />
-              </div>
-              <div className="section-title mb-1">Your class starts with people.</div>
-              <p className="text-sm text-ink-muted">
-                Share your class code to welcome your first students.
-              </p>
-            </div>
-          ) : (
-            <>
-              {/* Susunan pantas untuk skrin kecil: sesetengah lajur markah
-                  tersembunyi di telefon, jadi satu-satunya cara menyusun ialah
-                  select ini. Tidak kelihatan pada sm ke atas. */}
-              <div className="sm:hidden mb-3">
-                <label htmlFor="urut-mudah-alihs" className="sr-only">Sort by</label>
-                <select
-                  id="urut-mudah-alihs"
-                  className="input text-sm"
-                  value={urut.kunci === "kedudukan" ? "nama" : urut.kunci}
-                  onChange={(e) => {
-                    const kunci = e.target.value as KunciUrut;
-                    klikUrut(kunci, kunci === "nama" ? 1 : -1);
-                  }}
-                >
-                  <option value="nama">Name</option>
-                  <option value="jumlah">Total</option>
-                  <option value="aktiviti">Activities</option>
-                  <option value="langsung">Live Quiz</option>
-                </select>
-              </div>
-              <div className="surface" role="table" aria-label="Student scores">
-                <div className="grid grid-cols-[1fr,96px,84px] sm:grid-cols-[1fr,120px,96px,88px,88px,88px,52px] gap-3 sm:gap-4 px-5 py-3 bg-[#FAFAFB] items-center" role="row">
-                  {/* Kepala boleh diklik untuk menyusun: Name (A-Z lalai),
-                      Activities, Live Quiz, Total dan Rank. Klik pertama lajur
-                      markah papar markah tertinggi dahulu. */}
-                  <button
-                    type="button"
-                    onClick={() => klikUrut("nama", 1)}
-                    role="columnheader"
-                    aria-sort={arahSort("nama")}
-                    className="t-head inline-flex items-center gap-1 hover:text-ink"
+          <DataTable
+            label="Student scores"
+            columns={lajurAhli}
+            rows={barisAhli}
+            rowKey={({ m }, i) => String(m.user_id || i)}
+            head={
+              <>
+                {/* Susunan pantas untuk skrin kecil: sesetengah lajur markah
+                    tersembunyi di telefon, jadi satu-satunya cara menyusun
+                    ialah select ini. Tidak kelihatan pada sm ke atas. */}
+                <div className="sm:hidden contents">
+                  <label htmlFor="urut-mudah-alihs" className="sr-only">Sort by</label>
+                  <Select
+                    id="urut-mudah-alihs"
+                    className="w-44"
+                    value={urut.kunci === "kedudukan" ? "nama" : urut.kunci}
+                    onChange={(e) => {
+                      const kunci = e.target.value as KunciUrut;
+                      klikUrut(kunci, kunci === "nama" ? 1 : -1);
+                    }}
                   >
-                    Name
-                    <IkonUrut kunci="nama" />
-                  </button>
-                  <div className="t-head hidden sm:block" role="columnheader">Status</div>
-                  <div className="t-head" role="columnheader">Joined</div>
-                  <button
-                    type="button"
-                    onClick={() => klikUrut("aktiviti", -1)}
-                    role="columnheader"
-                    aria-sort={arahSort("aktiviti")}
-                    className="t-head hidden sm:inline-flex items-center gap-1 justify-end hover:text-ink"
-                  >
-                    Activities
-                    <IkonUrut kunci="aktiviti" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => klikUrut("langsung", -1)}
-                    role="columnheader"
-                    aria-sort={arahSort("langsung")}
-                    className="t-head hidden sm:inline-flex items-center gap-1 justify-end hover:text-ink"
-                  >
-                    Live Quiz
-                    <IkonUrut kunci="langsung" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => klikUrut("jumlah", -1)}
-                    role="columnheader"
-                    aria-sort={arahSort("jumlah")}
-                    className="t-head inline-flex items-center gap-1 justify-end hover:text-ink"
-                  >
-                    Total
-                    <IkonUrut kunci="jumlah" />
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => klikUrut("kedudukan", 1)}
-                    role="columnheader"
-                    aria-sort={arahSort("kedudukan")}
-                    className="t-head hidden sm:inline-flex items-center gap-1 justify-end hover:text-ink"
-                  >
-                    Rank
-                    <IkonUrut kunci="kedudukan" />
-                  </button>
+                    <option value="nama">Name</option>
+                    <option value="jumlah">Total</option>
+                    <option value="aktiviti">Activities</option>
+                    <option value="langsung">Live Quiz</option>
+                  </Select>
                 </div>
-              {barisAhli.map(({ m, mk }, i) => {
-                const jumlah = mk?.jumlah ?? 0;
-                const uid = String(m.user_id || "");
-                // Peserta tanpa markah papar 0 dengan warna pudar.
-                const pudar = "text-ink-faint";
-                return (
-                  <div
-                    key={uid || i}
-                    role="row"
-                    className="t-row grid grid-cols-[1fr,96px,84px] sm:grid-cols-[1fr,120px,96px,88px,88px,88px,52px] gap-3 sm:gap-4 px-5 py-3.5 items-center"
-                  >
-                    <div className="min-w-0" role="cell">
-                      <button
-                        type="button"
-                        onClick={() => setLaciUser({ id: uid, nama: name(m) })}
-                        aria-label={`Open scores for ${name(m)}`}
-                        className="flex items-center gap-3 min-w-0 text-left group"
-                      >
-                        <span className={`w-9 h-9 rounded-full text-[12px] font-semibold flex items-center justify-center shrink-0 ${PALETTE[i % PALETTE.length]}`}>
-                          {initials(name(m))}
-                        </span>
-                        <span className="text-[15px] text-ink truncate group-hover:text-brand-purple group-hover:underline underline-offset-2">
-                          {name(m)}
-                        </span>
-                      </button>
-                    </div>
-                    <div className="hidden sm:flex items-center gap-2 text-sm text-ink-muted" role="cell">
-                      <span className="w-1.5 h-1.5 rounded-full bg-[#4BA972]" /> Active
-                    </div>
-                    <div className="text-sm text-ink-muted" role="cell">
-                      {m.joined_at
-                        ? new Date(String(m.joined_at)).toLocaleDateString(undefined, { day: "numeric", month: "short" })
-                        : ","}
-                    </div>
-                    <div className={`hidden sm:block text-right text-sm tabular-nums ${mk && mk.task > 0 ? "text-ink" : pudar}`} role="cell">
-                      {formatMata(mk?.task ?? 0)}
-                    </div>
-                    <div className={`hidden sm:block text-right text-sm tabular-nums ${mk && mk.live > 0 ? "text-ink" : pudar}`} role="cell">
-                      {formatMata(mk?.live ?? 0)}
-                    </div>
-                    <div className={`text-right text-[15px] font-medium tabular-nums ${jumlah > 0 ? "text-ink" : pudar}`} role="cell">
-                      {formatMata(jumlah)}
-                    </div>
-                    <div className="hidden sm:block text-right text-sm tabular-nums text-ink-faint" role="cell">
-                      {mk?.kedudukan ?? ""}
-                    </div>
-                  </div>
-                );
-              })}
-              <div className="px-5 py-3 border-t border-hairline text-xs text-ink-faint" role="presentation">
-                {barisAhli.length} of {members.length}
-              </div>
-            </div>
-            </>
-          )
+              </>
+            }
+            menuItems={({ m }) => [
+              {
+                label: "Open scores",
+                icon: <Users className="w-4 h-4" />,
+                onSelect: () => setLaciUser({ id: String(m.user_id || ""), nama: name(m) }),
+              },
+            ]}
+            menuLabel="Student actions"
+            empty={
+              <EmptyState
+                icon={<Users className="w-6 h-6" />}
+                title="Your class starts with people."
+                text="Share your class code to welcome your first students."
+              />
+            }
+          />
         )}
 
         {!loading && sub === "teams" && (
           <>
             <div className="flex items-center gap-2 flex-wrap mb-4">
-              <a
+              <Button
+                variant="outline"
+                size="sm"
                 href={`/api/classes/${id}/teams/template`}
-                className="btn-quiet text-brand-purple inline-flex items-center gap-1.5"
               >
                 <Download className="w-4 h-4" /> Download template
-              </a>
-              <button
-                type="button"
-                className="btn-quiet text-brand-purple inline-flex items-center gap-1.5 disabled:opacity-50"
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
                 disabled={importBusy}
                 onClick={() => fileRef.current?.click()}
               >
                 <Upload className="w-4 h-4" /> Upload CSV
-              </button>
+              </Button>
               <input
                 ref={fileRef}
                 type="file"
@@ -561,15 +622,15 @@ export default function ClassPeoplePage() {
             </div>
 
             {importErr && (
-              <div className="surface px-5 py-4 mb-4 text-sm text-red-600">{importErr}</div>
+              <Card className="mb-4"><p className="text-sm text-kz-down">{importErr}</p></Card>
             )}
 
             {previewErrors.length > 0 && (
-              <div className="surface px-5 py-4 mb-4">
+              <Card className="mb-4">
                 <div className="section-title mb-2 text-sm">
                   Nothing was imported. Fix the rows below and upload again.
                 </div>
-                <ul className="text-sm text-red-600 space-y-1">
+                <ul className="text-sm text-kz-down space-y-1">
                   {previewErrors.map((e, i) => (
                     <li key={i}>
                       {e.row > 0 ? `Row ${e.row}: ` : ""}
@@ -577,11 +638,11 @@ export default function ClassPeoplePage() {
                     </li>
                   ))}
                 </ul>
-              </div>
+              </Card>
             )}
 
             {preview && (
-              <div className="surface px-5 py-4 mb-4">
+              <Card className="mb-4">
                 <div className="section-title mb-2 text-sm">Preview</div>
                 <div className="text-sm text-ink-muted mb-3">
                   {preview.teams_created + preview.teams_reused} teams
@@ -631,87 +692,67 @@ export default function ClassPeoplePage() {
                     />
                     Replace existing groups
                   </label>
-                  <button
-                    type="button"
-                    className="btn-primary"
+                  <Button
                     disabled={importBusy}
                     onClick={() => {
                       if (fileRef.current?.files?.[0]) runImport(fileRef.current.files[0], true);
                     }}
                   >
                     {importBusy ? "Importing..." : "Confirm import"}
-                  </button>
+                  </Button>
                 </div>
-              </div>
+              </Card>
             )}
 
             {shownTeams.length === 0 ? (
-
-            <div className="surface py-16 text-center">
-              <div className="w-14 h-14 rounded-full bg-[#EAE6FC] flex items-center justify-center mx-auto mb-4">
-                <Users className="w-6 h-6 text-brand-purple" />
+              <div className="bg-white rounded-[4px] shadow-card">
+                <EmptyState
+                  icon={<Users className="w-6 h-6" />}
+                  title="Better learning, together."
+                  text="Create a team to get started."
+                  actionLabel="Create team"
+                  href={`/educator/teams?classId=${id}`}
+                />
               </div>
-              <div className="section-title mb-1">Better learning, together.</div>
-              <p className="text-sm text-ink-muted mb-5">Create a team to get started.</p>
-              <Link href={`/educator/teams?classId=${id}`} className="btn-primary">Create team</Link>
-            </div>
-          ) : (
-            <div className="surface">
-              <div className="flex items-center justify-between px-5 py-3 bg-[#FAFAFB]">
-                <div className="t-head">Team</div>
-                <div className="flex items-center gap-10">
-                  <div className="t-head w-24 text-right">Members</div>
-                  <div className="t-head w-16 text-right">Points</div>
-                </div>
-              </div>
-              {shownTeams.map((t, i) => {
-                const max = Number(t.max_members) || 6;
-                const filled = bilAhli[String(t.id)] ?? Number(t.member_count ?? t.members_count ?? 0);
-                const pendingRows = invites.filter((iv) => iv.team_id === String(t.id));
-                return (
-                  <div key={String(t.id || i)} className="t-row px-5 py-3.5">
-                    <div className="flex items-center justify-between">
-                      <span className="text-[15px] text-ink truncate">{String(t.name || "Team")}</span>
-                      <div className="flex items-center gap-10">
-                        <div className="w-24 flex items-center justify-end gap-2">
-                          <span className="flex gap-0.5" aria-hidden>
-                            {Array.from({ length: Math.min(max, 8) }).map((_, k) => (
-                              <span
-                                key={k}
-                                className={`w-2 h-1.5 rounded-full ${k < filled ? "bg-brand-purple" : "bg-hairline"}`}
-                              />
-                            ))}
-                          </span>
-                          <span className="text-xs text-ink-muted tabular-nums">{filled} of {max}</span>
-                        </div>
-                        <div className="w-16 text-right text-[15px] text-ink tabular-nums">
-                          {scores[String(t.id)] ?? Number(t.score) ?? 0}
-                        </div>
-                      </div>
-                    </div>
-                    {pendingRows.length > 0 && (
-                      <ul className="mt-2 space-y-1">
+            ) : (
+              <>
+                <DataTable
+                  label="Class teams"
+                  columns={lajurKumpulan}
+                  rows={(shownTeams as unknown as Kumpulan[])}
+                  rowKey={(t, i) => String(t.id || i)}
+                  renderRowExtra={(t) => {
+                    const pendingRows = invites.filter((iv) => iv.team_id === String(t.id));
+                    if (pendingRows.length === 0) return null;
+                    return (
+                      <ul className="mt-1 space-y-1">
                         {pendingRows.map((iv) => (
-                          <li key={iv.id} className="flex items-center gap-2 text-sm">
-                            <span className="px-1.5 py-0.5 rounded-full text-xs bg-[#FBF0DC] text-[#96661A]">
+                          <li key={iv.id} className="flex items-center gap-2 text-[13px]">
+                            <span className="px-1.5 py-0.5 rounded-full text-[12px] bg-[#FBF0DC] text-[#96661A]">
                               pending
                             </span>
                             <span className="text-ink-muted truncate">{iv.email}</span>
                           </li>
                         ))}
                       </ul>
-                    )}
-                  </div>
-                );
-              })}
-              <div className="px-5 py-3 border-t border-hairline flex items-center justify-between">
-                <span className="text-xs text-ink-faint">{teams.length} teams</span>
-                <Link href={`/educator/teams?classId=${id}`} className="btn-quiet text-brand-purple">
-                  Manage teams
-                </Link>
-              </div>
-            </div>
-          )}</>
+                    );
+                  }}
+                  empty={
+                    <EmptyState
+                      icon={<Users className="w-6 h-6" />}
+                      title="No teams match."
+                      text="Try another search."
+                    />
+                  }
+                />
+                <div className="px-6 py-4 border-t border-kz-line flex items-center justify-between">
+                  <span className="text-[12px] text-ink-faint">{teams.length} teams</span>
+                  <Link href={`/educator/teams?classId=${id}`} className="text-[13px] font-medium text-brand-purple hover:underline">
+                    Manage teams
+                  </Link>
+                </div>
+              </>
+            )}</>
                     )}
 
                     {!loading && sub === "educators" && <EducatorsCard classId={id} />}
