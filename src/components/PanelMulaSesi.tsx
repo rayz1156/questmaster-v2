@@ -4,8 +4,15 @@
  * Panel pilihan mod sebelum memulakan sesi Live Quiz (KZ-012, KZ-013):
  * Classic (gaya Kahoot), Speed Race, atau Boss Battle, dengan masa bermain
  * dan cadangan bilangan soalan supaya soalan tidak berulang.
+ * KZ-026: kad teks kecil diganti galeri kad bergambar mengikut KZ-DS-v3,
+ * dengan tab penapis, panel seni SVG dan butang kit. Props, logik medan
+ * minit/tahap, teks cadangan dan nilai yang dihantar semasa mula sesi
+ * TIDAK berubah.
  */
-import { Flag, Users, Play, X, Swords } from "lucide-react";
+import { useState } from "react";
+import { Play, X, Check } from "lucide-react";
+import { Button, Tabs } from "@/components/ui";
+import SeniModPermainan, { LATAR_SENI } from "@/components/live/SeniModPermainan";
 import {
   RACE_MAX_MINUTES,
   RACE_MIN_MINUTES,
@@ -36,9 +43,53 @@ const TAHAP_LABEL: Record<TahapRaksasa, string> = {
   hard: "Hard",
 };
 
+/** Kategori penapis tab: mod individu atau seluruh kelas. */
+type KategoriMod = "individual" | "class";
+
+/** Konfigurasi galeri mod permainan (KZ-026). Jangan tambah mod lain. */
+const MOD_PERMAINAN: {
+  nilai: "classic" | "race" | "boss";
+  tajuk: string;
+  huraian: string;
+  kategori: KategoriMod;
+  baharu: boolean;
+}[] = [
+  {
+    nilai: "classic",
+    tajuk: "Classic",
+    huraian: "Everyone answers the same question together, Kahoot style.",
+    kategori: "individual",
+    baharu: false,
+  },
+  {
+    nilai: "race",
+    tajuk: "Speed Race",
+    huraian: "Each student races at their own pace. Fast, correct answers move their car further.",
+    kategori: "individual",
+    baharu: true,
+  },
+  {
+    nilai: "boss",
+    tajuk: "Boss Battle",
+    huraian: "The whole class teams up. Correct answers hit the boss; fast answers land critical hits.",
+    kategori: "class",
+    baharu: true,
+  },
+];
+
+const LABEL_KATEGORI: Record<KategoriMod, string> = {
+  individual: "Individual",
+  class: "Whole class",
+};
+
+/** Keadaan tab penapis; state tempatan komponen sahaja (tidak disimpan). */
+type TabPenapis = "semua" | KategoriMod;
+
 export default function PanelMulaSesi({
   bilSoalan, mod, setMod, minitTeks, setMinitTeks, tahap, setTahap, busy, onMula, onBatal,
 }: Props) {
+  const [tab, setTab] = useState<TabPenapis>("semua");
+
   const minit = sahMinitLumba(minitTeks);
   const cadangan = minit !== null && mod === "race" ? cadanganSoalan(minit) : null;
   const cadanganRaksasa = minit !== null && mod === "boss" ? cadanganSoalanRaksasa(minit) : null;
@@ -47,45 +98,124 @@ export default function PanelMulaSesi({
   const cukup = disyorkan > 0 ? bilSoalan >= disyorkan : false;
   const bolehMula = bilSoalan > 0 && (mod === "classic" || minit !== null);
 
-  const kad = (
-    nilai: "classic" | "race" | "boss",
-    tajuk: string,
-    huraian: string,
-    Ikon: typeof Flag,
-  ) => (
-    <button
-      type="button"
-      onClick={() => setMod(nilai)}
-      aria-pressed={mod === nilai}
-      className={`text-left rounded-xl border p-4 transition flex gap-3 items-start
-        ${mod === nilai ? "border-violet-500 bg-violet-50 ring-2 ring-violet-200" : "border-gray-200 hover:border-violet-300"}`}
-    >
-      <Ikon className={`w-5 h-5 mt-0.5 shrink-0 ${mod === nilai ? "text-violet-700" : "text-gray-400"}`} />
-      <span>
-        <span className="block font-semibold text-gray-900">{tajuk}</span>
-        <span className="block text-sm text-gray-500 mt-0.5">{huraian}</span>
-      </span>
-    </button>
-  );
+  // Kiraan tab dikira daripada konfigurasi; tab kosong tidak dipapar.
+  const bilIndividu = MOD_PERMAINAN.filter((m) => m.kategori === "individual").length;
+  const bilKelas = MOD_PERMAINAN.filter((m) => m.kategori === "class").length;
+  const tabItem = [
+    { label: `All (${MOD_PERMAINAN.length})`, onSelect: () => setTab("semua"), aktif: tab === "semua" },
+    ...(bilIndividu > 0
+      ? [{ label: `Individual (${bilIndividu})`, onSelect: () => setTab("individual"), aktif: tab === "individual" }]
+      : []),
+    ...(bilKelas > 0
+      ? [{ label: `Whole class (${bilKelas})`, onSelect: () => setTab("class"), aktif: tab === "class" }]
+      : []),
+  ];
+
+  const kad = (m: (typeof MOD_PERMAINAN)[number]) => {
+    const dipilih = mod === m.nilai;
+    return (
+      <button
+        key={m.nilai}
+        type="button"
+        onClick={() => setMod(m.nilai)}
+        aria-pressed={dipilih}
+        className="text-left flex flex-col bg-white rounded-[6px] border-2 transition"
+        style={{
+          borderColor: dipilih ? "#854fff" : "#e5e9f2",
+          boxShadow: "0 0 25px -12px rgba(31,43,58,.15)",
+        }}
+      >
+        {/* Panel seni 150px, warna latar ikut seni */}
+        <div
+          className="relative flex items-center justify-center overflow-hidden"
+          style={{ height: 150, backgroundColor: LATAR_SENI[m.nilai] }}
+        >
+          <SeniModPermainan nilai={m.nilai} />
+          {m.baharu && (
+            <span
+              className="absolute left-3 top-3 text-white font-bold"
+              style={{ backgroundColor: "#854fff", fontSize: 11, borderRadius: 3, padding: "2px 6px" }}
+            >
+              New
+            </span>
+          )}
+          {dipilih && (
+            <span
+              aria-hidden="true"
+              className="absolute right-3 top-3 flex items-center justify-center rounded-full text-white"
+              style={{ width: 26, height: 26, backgroundColor: "#854fff" }}
+            >
+              <Check className="w-4 h-4" strokeWidth={3} />
+            </span>
+          )}
+        </div>
+        {/* Badan kad */}
+        <div className="p-4">
+          <div className="flex items-center justify-between gap-2">
+            <span className="text-[16px] font-bold" style={{ color: "#364a63" }}>
+              {m.tajuk}
+            </span>
+            <span
+              className="text-[11px] font-bold whitespace-nowrap"
+              style={{ backgroundColor: "#f5f6fa", color: "#526484", borderRadius: 999, padding: "3px 10px" }}
+            >
+              {LABEL_KATEGORI[m.kategori]}
+            </span>
+          </div>
+          <p className="text-[13px] mt-2" style={{ color: "#526484" }}>
+            {m.huraian}
+          </p>
+          <div className="mt-3 pt-3" style={{ borderTop: "1px solid #e5e9f2" }}>
+            <span className="text-[12px]" style={{ color: "#6b7a99" }}>
+              Uses this quiz&apos;s questions
+            </span>
+          </div>
+        </div>
+      </button>
+    );
+  };
 
   return (
     <div className="card mb-4">
-      <div className="flex items-center justify-between mb-3">
-        <div className="font-semibold">Choose a game mode</div>
-        <button type="button" onClick={onBatal} title="Close" className="text-gray-400 hover:text-gray-700">
+      <div className="flex items-start justify-between gap-2">
+        <div>
+          <div className="font-semibold" style={{ color: "#364a63" }}>
+            Choose a game mode
+          </div>
+          <p className="text-[13px]" style={{ color: "#526484" }}>
+            Same questions, different ways to play.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={onBatal}
+          aria-label="Close"
+          title="Close"
+          className="w-11 h-11 shrink-0 flex items-center justify-center rounded-[4px] transition hover:bg-[#ebeef2]"
+          style={{ color: "#526484" }}
+        >
           <X className="w-5 h-5" />
         </button>
       </div>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-        {kad("classic", "Classic", "Everyone answers the same question together, Kahoot style.", Users)}
-        {kad("race", "Speed Race", "Each student races at their own pace. Fast, correct answers move their car further.", Flag)}
-        {kad("boss", "Boss Battle", "The whole class teams up. Correct answers hit the boss; fast answers land critical hits.", Swords)}
+
+      {/* Tab penapis atas grid */}
+      <Tabs items={tabItem} className="mt-2" />
+
+      <div
+        className="mt-4"
+        style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))", gap: "20px" }}
+      >
+        {MOD_PERMAINAN.filter((m) => tab === "semua" || m.kategori === tab).map(kad)}
       </div>
 
       {(mod === "race" || mod === "boss") && (
         <div className="mt-4 space-y-3">
           <div>
-            <label htmlFor="race-minutes" className="block text-sm font-medium text-gray-700 mb-1">
+            <label
+              htmlFor="race-minutes"
+              className="block text-sm font-medium mb-1"
+              style={{ color: "#344357" }}
+            >
               {mod === "race" ? "Race time (minutes)" : "Battle time (minutes)"}
             </label>
             <input
@@ -97,7 +227,7 @@ export default function PanelMulaSesi({
               step={1}
               value={minitTeks}
               onChange={(e) => setMinitTeks(e.target.value)}
-              className={`input rounded-xl w-32 ${minit === null ? "border-red-400" : ""}`}
+              className={`input rounded-[4px] w-32 ${minit === null ? "border-red-400" : ""}`}
             />
             {minit === null && (
               <p className="text-xs text-red-600 mt-1">
@@ -109,7 +239,9 @@ export default function PanelMulaSesi({
           {mod === "boss" && (
             <>
               <div>
-                <div className="block text-sm font-medium text-gray-700 mb-1">Boss level</div>
+                <div className="block text-sm font-medium mb-1" style={{ color: "#344357" }}>
+                  Boss level
+                </div>
                 <div className="flex gap-2" role="radiogroup" aria-label="Boss level">
                   {(Object.keys(TAHAP_LABEL) as TahapRaksasa[]).map((t) => (
                     <button
@@ -118,34 +250,37 @@ export default function PanelMulaSesi({
                       role="radio"
                       aria-checked={tahap === t}
                       onClick={() => setTahap(t)}
-                      className={`px-4 py-2 rounded-xl border text-sm font-semibold transition
+                      className={`px-4 py-3 rounded-[4px] border-2 text-sm font-bold transition
                         ${tahap === t
-                          ? "border-violet-500 bg-violet-50 text-violet-700 ring-2 ring-violet-200"
-                          : "border-gray-200 text-gray-600 hover:border-violet-300"}`}
+                          ? "border-[#854fff] text-[#854fff]"
+                          : "border-[#dbdfea] text-[#526484] hover:border-[#854fff]"}`}
+                      style={{ backgroundColor: tahap === t ? "#ebe2ff" : "#fff" }}
                     >
                       {TAHAP_LABEL[t]}
                     </button>
                   ))}
                 </div>
               </div>
-              <p className="text-sm text-gray-500">{jangkaanRaksasa(tahap)}</p>
+              <p className="text-sm" style={{ color: "#526484" }}>
+                {jangkaanRaksasa(tahap)}
+              </p>
             </>
           )}
 
           {mod === "race" && cadangan && (
-            <div className="rounded-xl bg-violet-50 border border-violet-200 p-4">
-              <div className="text-sm text-violet-900">
-                Recommended: at least <strong className="text-lg">{cadangan.disyorkan}</strong> questions so no
+            <div className="rounded-[4px] p-4" style={{ backgroundColor: "#f5f6fa", border: "1px solid #e5e9f2" }}>
+              <div className="text-sm" style={{ color: "#364a63" }}>
+                Recommended: at least <strong className="text-lg">{" "}{cadangan.disyorkan}</strong> questions so no
                 question repeats in a {minit}-minute race.
               </div>
               <div
-                className={`text-sm rounded-lg px-3 py-1.5 mt-2 inline-block ${cukup ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}
+                className={`text-sm rounded-[4px] px-3 py-1.5 mt-2 inline-block ${cukup ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}
               >
                 {cukup
                   ? `This quiz has ${bilSoalan} questions. Enough, no repeats.`
                   : `This quiz has ${bilSoalan} questions. Each question will repeat up to ${ulang} times. Add ${cadangan.disyorkan - bilSoalan} more.`}
               </div>
-              <ul className="text-xs text-violet-900/70 mt-2 space-y-0.5 list-disc pl-4">
+              <ul className="text-xs mt-2 space-y-0.5 list-disc pl-4" style={{ color: "#526484" }}>
                 {cadangan.profil.map((p) => (
                   <li key={p.nama}>
                     {p.nama === "laju" ? "Fast student" : p.nama === "biasa" ? "Typical student" : "Struggling student"}:{" "}
@@ -159,13 +294,13 @@ export default function PanelMulaSesi({
           )}
 
           {mod === "boss" && cadanganRaksasa !== null && (
-            <div className="rounded-xl bg-violet-50 border border-violet-200 p-4">
-              <div className="text-sm text-violet-900">
-                Recommended: at least <strong className="text-lg">{cadanganRaksasa}</strong> questions so no
+            <div className="rounded-[4px] p-4" style={{ backgroundColor: "#f5f6fa", border: "1px solid #e5e9f2" }}>
+              <div className="text-sm" style={{ color: "#364a63" }}>
+                Recommended: at least <strong className="text-lg">{" "}{cadanganRaksasa}</strong> questions so no
                 question repeats in a {minit}-minute battle.
               </div>
               <div
-                className={`text-sm rounded-lg px-3 py-1.5 mt-2 inline-block ${cukup ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}
+                className={`text-sm rounded-[4px] px-3 py-1.5 mt-2 inline-block ${cukup ? "bg-green-50 text-green-800 border border-green-200" : "bg-amber-50 text-amber-800 border border-amber-200"}`}
               >
                 {cukup
                   ? `This quiz has ${bilSoalan} questions. Enough, no repeats.`
@@ -176,25 +311,25 @@ export default function PanelMulaSesi({
         </div>
       )}
 
-      <div className="flex items-center gap-2 mt-4">
-        <button
-          type="button"
-          onClick={onMula}
-          disabled={busy || !bolehMula}
-          className="py-2 px-4 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50 flex items-center gap-1"
-        >
-          <Play className="w-4 h-4" />{" "}
-          {busy
-            ? "Starting…"
-            : mod === "race"
-              ? "Start Speed Race"
-              : mod === "boss"
-                ? "Start Boss Battle"
-                : "Start session"}
-        </button>
-        <button type="button" onClick={onBatal} className="px-3 py-2 rounded-xl border border-gray-300 hover:bg-gray-50 text-sm">
-          Cancel
-        </button>
+      <div className="flex flex-wrap items-center justify-between gap-3 mt-4">
+        <span className="text-[13px]" style={{ color: "#526484" }}>
+          Selected mode: <strong style={{ color: "#364a63" }}>{MOD_PERMAINAN.find((m) => m.nilai === mod)?.tajuk}</strong>
+        </span>
+        <div className="flex items-center gap-2">
+          <Button size="lg" onClick={onMula} disabled={busy || !bolehMula}>
+            <Play className="w-4 h-4" />
+            {busy
+              ? "Starting…"
+              : mod === "race"
+                ? "Start Speed Race"
+                : mod === "boss"
+                  ? "Start Boss Battle"
+                  : "Start session"}
+          </Button>
+          <Button size="lg" variant="outline" onClick={onBatal}>
+            Cancel
+          </Button>
+        </div>
       </div>
     </div>
   );
