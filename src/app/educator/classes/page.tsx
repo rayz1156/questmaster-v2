@@ -8,18 +8,18 @@ import type { EducatorClassRow, MyClassEducatorInvite } from "@/lib/types";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
 const tabs = [
-  { href: "/educator/classes", label: "Classes", icon: <GraduationCap className="w-5 h-5"/> },
-  { href: "/educator/activities", label: "Activities", icon: <ListChecks className="w-5 h-5"/> },
-  { href: "/educator/teams", label: "Teams", icon: <Users className="w-5 h-5"/> },
-  { href: "/educator/rankings", label: "Rankings", icon: <BarChart3 className="w-5 h-5"/> },
-  { href: "/educator/analytics", label: "Analytics", icon: <Activity className="w-5 h-5"/> },
-  { href: "/educator/profile", label: "Profile", icon: <UserIcon className="w-5 h-5"/> },
+  { href: "/educator/classes", label: "Kelas", icon: <GraduationCap className="w-5 h-5"/> },
+  { href: "/educator/activities", label: "Aktiviti", icon: <ListChecks className="w-5 h-5"/> },
+  { href: "/educator/teams", label: "Pasukan", icon: <Users className="w-5 h-5"/> },
+  { href: "/educator/rankings", label: "Kedudukan", icon: <BarChart3 className="w-5 h-5"/> },
+  { href: "/educator/analytics", label: "Analitik", icon: <Activity className="w-5 h-5"/> },
+  { href: "/educator/profile", label: "Profil", icon: <UserIcon className="w-5 h-5"/> },
 ];
 
 function roleLabel(role: string): string {
-  if (role === "owner") return "Owner";
-  if (role === "co-creator" || role === "co_creator") return "Co-creator";
-  if (role === "co-educator" || role === "co_educator") return "Co-educator";
+  if (role === "owner") return "Pemilik";
+  if (role === "co-creator" || role === "co_creator") return "Pencipta bersama";
+  if (role === "co-educator" || role === "co_educator") return "Pendidik bersama";
   return role;
 }
 
@@ -31,7 +31,7 @@ export default function EduClasses() {
   const [showNew, setShowNew] = useState(false);
   const [name, setName] = useState("");
   const [desc, setDesc] = useState("");
-  const [color, setColor] = useState("#6366f1");
+  const [color, setColor] = useState("#6576ff");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [inviteBusy, setInviteBusy] = useState<string | null>(null);
@@ -43,7 +43,7 @@ export default function EduClasses() {
       setClasses(cls);
       setInvites(inv);
     } catch (e: any) {
-      setErr(e.message || "Failed to load");
+      setErr(e.message || "Gagal memuatkan");
     } finally {
       setLoading(false);
     }
@@ -52,19 +52,19 @@ export default function EduClasses() {
 
   const onCreate = async () => {
     setErr(null);
-    if (!name.trim()) { setErr("Class name is required"); return; }
+    if (!name.trim()) { setErr("Nama kelas diperlukan"); return; }
     setBusy(true);
     try {
       await createClass(name.trim(), desc.trim() || undefined, color);
       setName(""); setDesc(""); setShowNew(false);
       await reload();
     } catch (e: any) {
-      setErr(e.message || "Failed to create class");
+      setErr(e.message || "Gagal mencipta kelas");
     } finally { setBusy(false); }
   };
 
 
-  // --- Duplicate class state ---
+  // --- Keadaan pendua kelas ---
   const [dupTarget, setDupTarget] = useState<EducatorClassRow | null>(null);
   const [dupTitle, setDupTitle] = useState('');
   const [dupLB, setDupLB] = useState(true);
@@ -77,7 +77,7 @@ export default function EduClasses() {
   const [dupErr, setDupErr] = useState<string | null>(null);
   const openDuplicate = (k: EducatorClassRow) => {
     setDupTarget(k);
-    setDupTitle(`Copy of ${k.name}`);
+    setDupTitle(`Salinan ${k.name}`);
     setDupLB(true); setDupAct(true); setDupMem(false); setDupEdu(true);
     setDupTpl(false); setDupDraft(true);
     setDupErr(null);
@@ -97,31 +97,31 @@ export default function EduClasses() {
       });
       setDupTarget(null);
       await reload();
-      alert(`Created "${res.name}". Copied: ${res.copied.columns} columns, ${res.copied.cards} cards, ${res.copied.hunts} activities, ${res.copied.members} members, ${res.copied.educators} educators.`);
+      alert(`"${res.name}" dicipta. Disalin: ${res.copied.columns} lajur, ${res.copied.cards} kad, ${res.copied.hunts} aktiviti, ${res.copied.members} ahli, ${res.copied.educators} pendidik.`);
     } catch (e: any) {
-      setDupErr(e?.message || 'Failed to duplicate');
+      setDupErr(e?.message || 'Gagal menduakan');
     } finally { setDupBusy(false); }
   };
 
   const onLeave = async (k: EducatorClassRow) => {
     if (k.role === "owner") return;
-    if (!(await confirm({ title: `Leave "${k.name}"?`, description: "You will lose your co-educator access to this class. The owner can re-invite you later.", tone: "danger", confirmLabel: "Leave class" }))) return;
+    if (!(await confirm({ title: `Tinggalkan "${k.name}"?`, description: "Anda akan hilang akses pendidik bersama kepada kelas ini. Pemilik boleh menjemput anda semula kelak.", tone: "danger", confirmLabel: "Tinggalkan kelas" }))) return;
     try {
       await leaveClassAsEducator(k.id);
       await reload();
     } catch (e: any) {
-      alert(e?.message || "Failed to leave class");
+      alert(e?.message || "Gagal meninggalkan kelas");
     }
   };
 
   const onDelete = async (k: EducatorClassRow) => {
     if (k.role !== "owner") return;
-    if (!(await confirm({ title: `Delete class "${k.name}"? All its activities will be deleted too.`, tone: 'danger' }))) return;
+    if (!(await confirm({ title: `Padam kelas "${k.name}"? Semua aktivitinya juga akan dipadam.`, tone: 'danger' }))) return;
     try {
       await deleteClass(k.id);
       await reload();
     } catch (e: any) {
-      alert(e.message || "Failed to delete class");
+      alert(e.message || "Gagal memadam kelas");
     }
   };
 
@@ -130,10 +130,10 @@ export default function EduClasses() {
     setInviteMsg(null);
     try {
       await acceptClassEducatorInviteByCode(code);
-      setInviteMsg({ type: "ok", text: "Invite accepted! The class has been added below." });
+      setInviteMsg({ type: "ok", text: "Jemputan diterima! Kelas telah ditambah di bawah." });
       await reload();
     } catch (e: any) {
-      setInviteMsg({ type: "err", text: e?.message || "Failed to accept invite" });
+      setInviteMsg({ type: "err", text: e?.message || "Gagal menerima jemputan" });
     } finally {
       setInviteBusy(null);
     }
@@ -142,27 +142,27 @@ export default function EduClasses() {
   return (
     <Shell tabs={tabs}>
       <div className="flex items-center justify-between mb-3 flex-wrap gap-2">
-        <h2 className="page-title">My Classes</h2>
-        <button onClick={() => setShowNew(s => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1"><Plus className="w-4 h-4"/> New Class</button>
+        <h2 className="page-title">Kelas Saya</h2>
+        <button onClick={() => setShowNew(s => !s)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1"><Plus className="w-4 h-4"/> Kelas Baharu</button>
       </div>
 
       {invites.length > 0 && (
-        <div className="card mb-4 border-l-4" style={{ borderLeftColor: "#6366f1" }}>
-          <div className="flex items-center gap-2 mb-1"><Mail className="w-4 h-4 text-indigo-600"/><div className="font-semibold">Pending educator invites ({invites.length})</div></div>
-          <p className="text-xs text-gray-500 mb-3">You have been invited to co-educate the following classes. Accept to gain access.</p>
+        <div className="card mb-4 border-l-4" style={{ borderLeftColor: "#6576ff" }}>
+          <div className="flex items-center gap-2 mb-1"><Mail className="w-4 h-4 text-primary"/><div className="font-semibold">Jemputan pendidik menunggu ({invites.length})</div></div>
+          <p className="text-xs text-slate-500 mb-3">Anda telah dijemput untuk mendidik bersama kelas berikut. Terima untuk mendapatkan akses.</p>
           {inviteMsg && (
-            <div className={`text-xs mb-2 ${inviteMsg.type === "ok" ? "text-green-600" : "text-red-600"}`}>{inviteMsg.text}</div>
+            <div className={`text-xs mb-2 ${inviteMsg.type === "ok" ? "text-status-success" : "text-status-danger"}`}>{inviteMsg.text}</div>
           )}
           <div className="space-y-2">
             {invites.map((i) => (
               <div key={i.id} className="flex items-center gap-2 py-2 border-b last:border-0">
-                <div className="w-6 h-6 rounded-md shrink-0" style={{ background: i.class_color || "#6366f1" }}/>
+                <div className="w-6 h-6 rounded shrink-0" style={{ background: i.class_color || "#6576ff" }}/>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium truncate">{i.class_name}</div>
-                  <div className="text-xs text-gray-500 truncate">Invited by {i.inviter_name || "another educator"} · expires {new Date(i.expires_at).toLocaleDateString()}</div>
+                  <div className="text-xs text-slate-500 truncate">Dijemput oleh {i.inviter_name || "pendidik lain"} · tamat {new Date(i.expires_at).toLocaleDateString()}</div>
                 </div>
-                <code className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">{i.code}</code>
-                <button disabled={inviteBusy === i.code} onClick={() => onAcceptInvite(i.code)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1"><Check className="w-4 h-4"/> Accept</button>
+                <code className="font-mono text-xs bg-slate-100 px-2 py-1 rounded">{i.code}</code>
+                <button disabled={inviteBusy === i.code} onClick={() => onAcceptInvite(i.code)} className="btn-primary py-1 px-3 text-sm flex items-center gap-1"><Check className="w-4 h-4"/> Terima</button>
               </div>
             ))}
           </div>
@@ -171,49 +171,49 @@ export default function EduClasses() {
 
       {showNew && (
         <div className="card mb-4">
-          <div className="font-semibold mb-2">Create new class</div>
-          <input className="input w-full mb-2" placeholder="Class name" value={name} onChange={e => setName(e.target.value)}/>
-          <input className="input w-full mb-2" placeholder="Description (optional)" value={desc} onChange={e => setDesc(e.target.value)}/>
+          <div className="font-semibold mb-2">Cipta kelas baharu</div>
+          <input className="input w-full mb-2" placeholder="Nama kelas" value={name} onChange={e => setName(e.target.value)}/>
+          <input className="input w-full mb-2" placeholder="Penerangan (pilihan)" value={desc} onChange={e => setDesc(e.target.value)}/>
           <div className="flex items-center gap-2">
-            <label className="text-xs text-gray-500">Color</label>
+            <label className="text-xs text-slate-500">Warna</label>
             <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-10 h-8 rounded"/>
-            <button type="button" disabled={busy} onClick={onCreate} className="btn-primary ml-auto py-1 px-3 text-sm">{busy ? "Creating…" : "Create"}</button>
+            <button type="button" disabled={busy} onClick={onCreate} className="btn-primary ml-auto py-1 px-3 text-sm">{busy ? "Mencipta…" : "Cipta"}</button>
           </div>
-          {err && <div className="text-xs text-red-600 mt-1">{err}</div>}
+          {err && <div className="text-xs text-status-danger mt-1">{err}</div>}
         </div>
       )}
 
-      {!showNew && err && <div className="text-xs text-red-600 mb-2">{err}</div>}
+      {!showNew && err && <div className="text-xs text-status-danger mb-2">{err}</div>}
 
       {loading ? (
-        <p className="text-sm text-gray-500">Loading…</p>
+        <p className="text-sm text-slate-500">Memuatkan…</p>
       ) : classes.length === 0 ? (
-        <p className="text-sm text-gray-500">No classes yet. Create one to organise your activities, teams and rankings.</p>
+        <p className="text-sm text-slate-500">Belum ada kelas. Cipta satu untuk menyusun aktiviti, pasukan dan kedudukan anda.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
           {classes.map(k => (
             <div key={k.id} className="card">
               <div className="flex items-center justify-between gap-2">
                 <div className="flex items-center gap-2 flex-1 min-w-0">
-                  <div className="w-8 h-8 rounded-lg shrink-0" style={{ background: k.color || "#6366f1" }}/>
+                  <div className="w-8 h-8 rounded shrink-0" style={{ background: k.color || "#6576ff" }}/>
                   <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 min-w-0"><Link href={`/educator/classes/${k.id}`} className="font-semibold truncate block">{k.name}</Link>{k.ended_at && <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Ended</span>}</div>
-                    {k.description && <div className="text-xs text-gray-500 truncate">{k.description}</div>}
+                    <div className="flex items-center gap-2 min-w-0"><Link href={`/educator/classes/${k.id}`} className="font-semibold truncate block">{k.name}</Link>{k.ended_at && <span data-class-pill="ended" className="shrink-0 text-[10px] uppercase tracking-wide font-semibold px-1.5 py-0.5 rounded bg-amber-100 text-amber-800 border border-amber-200">Tamat</span>}</div>
+                    {k.description && <div className="text-xs text-slate-500 truncate">{k.description}</div>}
                   </div>
                 </div>
                 {k.role === "owner" ? (
-                  <><button onClick={() => openDuplicate(k)} title="Duplicate class" className="text-gray-600 hover:bg-gray-100 rounded-lg px-2 py-1"><CopyPlus className="w-4 h-4"/></button><button onClick={() => onDelete(k)} title="Delete class" className="text-red-600 hover:bg-red-50 rounded-lg px-2 py-1"><Trash2 className="w-4 h-4"/></button></>
+                  <><button onClick={() => openDuplicate(k)} title="Duakan kelas" className="text-slate-600 hover:bg-slate-100 rounded px-2 py-1"><CopyPlus className="w-4 h-4"/></button><button onClick={() => onDelete(k)} title="Padam kelas" className="text-status-danger hover:bg-red-50 rounded px-2 py-1"><Trash2 className="w-4 h-4"/></button></>
                 ) : (
                   <div className="flex items-center gap-1 shrink-0">
-                    <span className="text-xs px-2 py-0.5 rounded bg-indigo-50 text-indigo-700">{roleLabel(k.role)}</span>
-                    <button onClick={() => onLeave(k)} title="Leave class" className="text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded-lg px-2 py-1 text-xs font-medium transition">Leave</button>
+                    <span className="text-xs px-2 py-0.5 rounded bg-primary-subtle text-primary-hover">{roleLabel(k.role)}</span>
+                    <button onClick={() => onLeave(k)} title="Tinggalkan kelas" className="text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded px-2 py-1 text-xs font-medium transition">Tinggalkan</button>
                   </div>
                 )}
               </div>
-              <div className="text-xs text-gray-400 mt-2 flex items-center gap-2">
-                Code: <code className="font-mono bg-gray-100 px-2 py-0.5 rounded">{k.join_code}</code>
-                <button onClick={() => navigator.clipboard.writeText(k.join_code)} className="text-blue-600 flex items-center gap-1"><Copy className="w-3 h-3"/>copy</button>
-                <Link href={`/educator/classes/${k.id}`} className="ml-auto text-brand-purple font-semibold">Manage →</Link>
+              <div className="text-xs text-slate-400 mt-2 flex items-center gap-2">
+                Kod: <code className="font-mono bg-slate-100 px-2 py-0.5 rounded">{k.join_code}</code>
+                <button onClick={() => navigator.clipboard.writeText(k.join_code)} className="text-status-info flex items-center gap-1"><Copy className="w-3 h-3"/>salin</button>
+                <Link href={`/educator/classes/${k.id}`} className="ml-auto text-primary font-semibold">Urus →</Link>
               </div>
             </div>
           ))}
@@ -221,30 +221,30 @@ export default function EduClasses() {
       )}
       {dupTarget && (
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !dupBusy && setDupTarget(null)}>
-          <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
+          <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded bg-white p-5 shadow-elevated">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold">Duplicate class</h3>
-              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="text-gray-500 hover:text-gray-900">✕</button>
+              <h3 className="text-base font-semibold">Duakan kelas</h3>
+              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="text-slate-500 hover:text-slate-900">✕</button>
             </div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">New class title</label>
-            <input value={dupTitle} onChange={(e)=>setDupTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder={`Copy of ${dupTarget.name}`} />
+            <label className="block text-xs font-medium text-slate-700 mb-1">Tajuk kelas baharu</label>
+            <input value={dupTitle} onChange={(e)=>setDupTitle(e.target.value)} className="w-full border border-slate-300 rounded px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-primary" placeholder={`Salinan ${dupTarget.name}`} />
             <div className="space-y-2 mb-4">
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupLB} onChange={(e)=>setDupLB(e.target.checked)} className="rounded"/> Copy learning board</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupAct} onChange={(e)=>setDupAct(e.target.checked)} className="rounded"/> Copy activities</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupMem} onChange={(e)=>setDupMem(e.target.checked)} className="rounded"/> Copy members</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupEdu} onChange={(e)=>setDupEdu(e.target.checked)} className="rounded"/> Copy educators</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupLB} onChange={(e)=>setDupLB(e.target.checked)} className="rounded"/> Salin papan pembelajaran</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupAct} onChange={(e)=>setDupAct(e.target.checked)} className="rounded"/> Salin aktiviti</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupMem} onChange={(e)=>setDupMem(e.target.checked)} className="rounded"/> Salin ahli</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupEdu} onChange={(e)=>setDupEdu(e.target.checked)} className="rounded"/> Salin pendidik</label>
             </div>
             <details className="mb-4">
-              <summary className="text-xs font-medium text-gray-700 cursor-pointer select-none">Advanced / Template options</summary>
+              <summary className="text-xs font-medium text-slate-700 cursor-pointer select-none">Pilihan Lanjutan / Templat</summary>
               <div className="mt-2 space-y-2 pl-1">
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupTpl} onChange={(e)=>setDupTpl(e.target.checked)} className="rounded"/> Save as reusable template <span className="text-xs text-gray-500">(strips content, keeps structure)</span></label>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupDraft} onChange={(e)=>setDupDraft(e.target.checked)} className="rounded"/> Save as draft <span className="text-xs text-gray-500">(don't publish until reviewed)</span></label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupTpl} onChange={(e)=>setDupTpl(e.target.checked)} className="rounded"/> Simpan sebagai templat boleh guna semula <span className="text-xs text-slate-500">(buang kandungan, kekalkan struktur)</span></label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupDraft} onChange={(e)=>setDupDraft(e.target.checked)} className="rounded"/> Simpan sebagai draf <span className="text-xs text-slate-500">(jangan terbitkan sebelum disemak)</span></label>
               </div>
             </details>
-            {dupErr && <div className="text-xs text-red-600 mb-2">{dupErr}</div>}
+            {dupErr && <div className="text-xs text-status-danger mb-2">{dupErr}</div>}
             <div className="flex items-center justify-end gap-2">
-              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
-              <button onClick={onDuplicate} disabled={dupBusy} className="btn-primary py-1.5 px-3 text-sm">{dupBusy ? 'Duplicating…' : 'Duplicate'}</button>
+              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="px-3 py-1.5 rounded border border-slate-300 hover:bg-slate-50 text-sm">Batal</button>
+              <button onClick={onDuplicate} disabled={dupBusy} className="btn-primary py-1.5 px-3 text-sm">{dupBusy ? 'Menduakan…' : 'Duakan'}</button>
             </div>
           </div>
         </div>

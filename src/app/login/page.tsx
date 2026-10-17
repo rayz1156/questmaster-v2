@@ -21,14 +21,14 @@ function LoginInner() {
     setBusy(true); setErr('');
     const creds = override ?? { email, password };
     const { data, error } = await supabase.auth.signInWithPassword(creds);
-    if (error || !data.user) { setBusy(false); setErr(error?.message || 'Sign-in failed'); return; }
-    // Fetch role from lms_profiles (authoritative), fall back to user_metadata
+    if (error || !data.user) { setBusy(false); setErr(error?.message || 'Log masuk gagal'); return; }
+    // Ambil peranan daripada lms_profiles (autoritatif), jatuh balik ke user_metadata
     let role: string = (data.user.user_metadata?.role as string) || 'participant';
     try {
       const { data: prof } = await supabase.from('lms_profiles').select('role').eq('id', data.user.id).maybeSingle();
       if (prof?.role) role = prof.role as string;
     } catch {}
-    // Ensure session is fully cached before navigation to avoid double-login
+    // Pastikan sesi tersimpan sepenuhnya sebelum navigasi supaya tiada log masuk berganda
     try { await supabase.auth.getUser(); } catch {}
     setBusy(false);
     const nextParam = searchParams?.get('next');
@@ -44,36 +44,33 @@ function LoginInner() {
       <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
         <div className="text-center mb-8">
           <div className="mb-3 flex justify-center"><KuizenAcademyLogo variant="mark" height={72} color="mono-light"/></div>
-          <h1 className="text-4xl font-bold text-white tracking-tight">Kuizen Academy</h1>
-          
-          
-          <p className="text-white/70 mt-3 text-sm">Welcome back 👋 Sign in to continue</p>
+          <h1 className="text-4xl font-bold text-white tracking-tight">StafKita Akademi</h1>
+          <p className="text-white/70 mt-3 text-sm">Selamat kembali 👋 Log masuk untuk teruskan</p>
         </div>
-        <form onSubmit={signIn} className="bg-white rounded-2xl shadow-xl p-6 space-y-4">
+        <form onSubmit={signIn} className="bg-white rounded shadow-xl p-6 space-y-4">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-            <input value={email} onChange={e=>{setEmail(e.target.value); setErr('');}} type="email" required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="you@example.com" />
+            <label className="block text-sm font-medium text-slate-700 mb-1">E-mel</label>
+            <input value={email} onChange={e=>{setEmail(e.target.value); setErr('');}} type="email" required className="w-full border border-slate-200 rounded px-3 py-2 focus:ring-2 focus:ring-primary outline-none" placeholder="anda@contoh.com" />
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Password</label>
-            <input value={password} onChange={e=>{setPassword(e.target.value); setErr('');}} type={show?'text':'password'} required className="w-full border border-gray-200 rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none" placeholder="••••••••" />
-            <label className="flex items-center gap-2 mt-2 text-sm text-gray-600">
-              <input type="checkbox" checked={show} onChange={e=>setShow(e.target.checked)} /> Show password
+            <label className="block text-sm font-medium text-slate-700 mb-1">Kata laluan</label>
+            <input value={password} onChange={e=>{setPassword(e.target.value); setErr('');}} type={show?'text':'password'} required className="w-full border border-slate-200 rounded px-3 py-2 focus:ring-2 focus:ring-primary outline-none" placeholder="••••••••" />
+            <label className="flex items-center gap-2 mt-2 text-sm text-slate-600">
+              <input type="checkbox" checked={show} onChange={e=>setShow(e.target.checked)} /> Tunjukkan kata laluan
             </label>
           </div>
-          {err && <p className="text-sm text-red-600">{err}</p>}
-          <button disabled={busy} className="w-full py-3 rounded-xl bg-gold-500 hover:bg-gold-600 text-veltrix-900 font-bold shadow-lg shadow-gold-500/30 transition disabled:opacity-60 disabled:cursor-not-allowed">{busy ? 'Signing in…' : 'Sign In'}</button>
+          {err && <p className="text-sm text-status-danger">{err}</p>}
+          <button disabled={busy} className="w-full py-3 rounded bg-primary hover:bg-primary-hover text-white font-bold transition disabled:opacity-60 disabled:cursor-not-allowed">{busy ? 'Sedang log masuk…' : 'Log Masuk'}</button>
           <div className="flex justify-between text-sm">
-            <Link href="/forgot-password" className="text-white/90 font-semibold hover:text-white underline-offset-2 hover:underline">Forgot password?</Link>
-            <Link href="/register" className="text-white/90 font-semibold hover:text-white underline-offset-2 hover:underline">Create account</Link>
+            <Link href="/forgot-password" className="text-white/90 font-semibold hover:text-white underline-offset-2 hover:underline">Lupa kata laluan?</Link>
+            <Link href="/register" className="text-white/90 font-semibold hover:text-white underline-offset-2 hover:underline">Cipta akaun</Link>
           </div>
         </form>
         </div>
     
       <div className="text-center mt-8 space-y-1">
-        <div className="text-[11px] text-white/60 uppercase tracking-widest">Powered by</div>
-        <div className="text-sm text-white/90 font-medium">Kuizen Academy</div>
-        <div className="text-[11px] text-white/60 mt-2"><span className="font-semibold text-white/80">A Veltrix Technology Center Product</span></div>
+        <div className="text-[11px] text-white/60 uppercase tracking-widest">Dikuasakan oleh</div>
+        <div className="text-sm text-white/90 font-medium">StafKita Akademi</div>
       </div>
 </div>
   );
