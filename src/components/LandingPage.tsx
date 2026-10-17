@@ -7,6 +7,7 @@ import TutorialVideo from "@/components/TutorialVideo";
 import BahagianHarga from "@/components/landing/BahagianHarga";
 import { TEKS_LANDING, TAPAK, LALUAN, type Bahasa } from "@/lib/landing-copy";
 import { HARGA_PELAN } from "@/lib/pelan";
+import { ARTIKEL, pautan } from "@/lib/blog";
 
 /**
  * Halaman utama awam, dikongsi oleh "/" (BM) dan "/en" (Inggeris).
@@ -291,6 +292,45 @@ export default function LandingPage({ bahasa }: { bahasa: Bahasa }) {
 
         <BahagianHarga bahasa={bahasa} />
 
+        {bahasa === "ms" && (
+          <section aria-labelledby="panduan-tajuk" className="px-6 sm:px-8 pt-14 pb-16 border-t border-hairline">
+            <div className="mx-auto w-full max-w-[1080px]">
+              <h2
+                id="panduan-tajuk"
+                style={DISPLAY}
+                className="text-[30px] sm:text-[38px] leading-tight font-semibold tracking-tight text-ink text-center"
+              >
+                Panduan untuk pendidik
+              </h2>
+              <p className="mt-3 text-center text-[15px] text-ink-muted">
+                Bacaan ringkas untuk memulakan kelas yang lebih hidup.
+              </p>
+              <ul className="mt-10 grid gap-5 sm:grid-cols-3">
+                {ARTIKEL.slice(0, 3).map((a) => (
+                  <li key={a.slug}>
+                    <Link
+                      href={pautan(a)}
+                      className="group block h-full rounded-2xl border border-hairline p-5 transition hover:border-brand-purple"
+                    >
+                      <div
+                        aria-hidden="true"
+                        className="h-20 rounded-xl"
+                        style={{ background: `linear-gradient(135deg, ${a.warna[0]}, ${a.warna[1]})` }}
+                      />
+                      <p className="mt-4 text-[12px] uppercase tracking-wide text-ink-faint">
+                        {a.kategori} · {a.minit} minit
+                      </p>
+                      <h3 className="mt-1 text-[17px] font-semibold text-ink group-hover:text-brand-purple">
+                        {a.tajuk}
+                      </h3>
+                      <p className="mt-2 text-[14px] leading-relaxed text-ink-muted">{a.ringkasan}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </section>
+        )}
         <section className="px-6 sm:px-8 pt-14 pb-16 border-t border-hairline">
           <div className="mx-auto w-full max-w-[760px]">
             <h2
