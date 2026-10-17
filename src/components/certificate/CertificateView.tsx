@@ -25,13 +25,13 @@ export function CertificateView({ config }: { config: CertificateConfig }) {
           <span style={{ height: 1, width: 60, background: '#d97706' }}/>
         </div>
         <p style={{ fontStyle: 'italic', fontSize: 42, color: '#0f1e35', fontWeight: 600, lineHeight: 1.1, margin: '8px 0' }}>{config.learner.name}</p>
-        <p style={{ fontFamily: "'Manrope',sans-serif", color: '#475569', fontSize: 14, marginTop: 8 }}>for successfully completing</p>
+        <p style={{ fontFamily: "'Roboto',sans-serif", color: '#475569', fontSize: 14, marginTop: 8 }}>for successfully completing</p>
         <p style={{ fontSize: 26, color: '#6576ff', fontWeight: 600, marginTop: 6, maxWidth: '80%' }}>&ldquo;{config.program.name}&rdquo;</p>
-        <p style={{ fontFamily: "'Manrope',sans-serif", color: '#475569', fontSize: 13, marginTop: 10 }}>{config.program.duration} hours of training · completed on {dateStr}</p>
+        <p style={{ fontFamily: "'Roboto',sans-serif", color: '#475569', fontSize: 13, marginTop: 10 }}>{config.program.duration} hours of training · completed on {dateStr}</p>
         {config.program.accreditations.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-center mt-5">
             {config.program.accreditations.map(a => (
-              <span key={a} style={{ background: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: 9999, fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: "'Manrope',sans-serif" }}>{a}</span>
+              <span key={a} style={{ background: '#fef3c7', color: '#92400e', padding: '4px 12px', borderRadius: 9999, fontSize: 10, fontWeight: 700, letterSpacing: '0.05em', textTransform: 'uppercase', fontFamily: "'Roboto',sans-serif" }}>{a}</span>
             ))}
           </div>
         )}
@@ -40,14 +40,14 @@ export function CertificateView({ config }: { config: CertificateConfig }) {
             {config.signatures.map((s, i) => (
               <div key={i} className="text-center">
                 <div style={{ borderBottom: '1px solid #94a3b8', minWidth: 140, height: 28, marginBottom: 4 }}/>
-                <p style={{ fontFamily: "'Manrope',sans-serif", fontSize: 11, color: '#0f1e35', fontWeight: 700 }}>{s.name}</p>
-                <p style={{ fontFamily: "'Manrope',sans-serif", fontSize: 10, color: '#64748b' }}>{s.title}</p>
+                <p style={{ fontFamily: "'Roboto',sans-serif", fontSize: 11, color: '#0f1e35', fontWeight: 700 }}>{s.name}</p>
+                <p style={{ fontFamily: "'Roboto',sans-serif", fontSize: 10, color: '#64748b' }}>{s.title}</p>
               </div>
             ))}
           </div>
         )}
       </div>
-      <div className="absolute bottom-3 left-0 right-0 px-10 flex items-end justify-between" style={{ fontFamily: "'Manrope',sans-serif" }}>
+      <div className="absolute bottom-3 left-0 right-0 px-10 flex items-end justify-between" style={{ fontFamily: "'Roboto',sans-serif" }}>
         <div style={{ fontSize: 9, color: '#64748b', textAlign: 'left' }}>
           <p style={{ fontWeight: 700, color: '#0f1e35' }}>Issued via StafKita Akademi</p>
           <p>A Veltrix Technology Center Product</p>
