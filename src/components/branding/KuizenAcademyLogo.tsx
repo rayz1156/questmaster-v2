@@ -35,7 +35,6 @@ export function KuizenAcademyLogo({
   // Warna teks mengikut konteks latar
   const strong = color === 'mono-light' ? '#ffffff' : '#364a63';
   const accent = color === 'mono-light' ? '#ffffff' : '#6576ff';
-  const muted  = color === 'mono-light' ? 'rgba(255,255,255,0.7)' : '#6e82a5';
   void iconConcept; // parameter legasi, tidak digunakan lagi
 
   if (variant === 'mark') {
