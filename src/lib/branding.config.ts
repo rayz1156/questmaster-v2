@@ -1,6 +1,6 @@
 // =====================================================================
-//  Kuizen Academy by Veltrix — Centralized Branding Configuration
-//  Single source of truth for product name, tagline, colors, contacts.
+//  StafKita Akademi — Konfigurasi penjenamaan berpusat
+//  Sumber tunggal untuk nama produk, tagline, warna dan kenalan.
 //  Import: import { BRANDING } from '@/lib/branding.config';
 // =====================================================================
 
