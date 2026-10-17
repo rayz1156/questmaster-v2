@@ -62,7 +62,7 @@ export default function OrgOverview() {
                 hrdcorpClaimable
                 assignedCount={47}
                 completionPct={78}
-                coverColor="#047857"
+                coverColor="#6576ff"
               />
               <ProgramCard
                 category="Leadership"

@@ -14,7 +14,7 @@ export function CertificateView({ config }: { config: CertificateConfig }) {
   const cd = typeof config.program.completionDate === 'string' ? new Date(config.program.completionDate) : config.program.completionDate;
   const dateStr = cd.toLocaleDateString('en-GB', { year: 'numeric', month: 'long', day: 'numeric' });
   return (
-    <div className="relative bg-white shadow-elevated mx-auto" style={{ aspectRatio: '297 / 210', width: '100%', maxWidth: 900, background: 'linear-gradient(135deg,#fffef9,#ffffff 50%,#fdf6e3)', border: '8px solid #047857', outline: '2px solid #d97706', outlineOffset: 6, fontFamily: "'Cormorant Garamond','Georgia',serif" }}>
+    <div className="relative bg-white shadow-elevated mx-auto" style={{ aspectRatio: '297 / 210', width: '100%', maxWidth: 900, background: 'linear-gradient(135deg,#fffef9,#ffffff 50%,#fdf6e3)', border: '8px solid #6576ff', outline: '2px solid #d97706', outlineOffset: 6, fontFamily: "'Nunito','Georgia',serif" }}>
       <Corner pos="tl"/><Corner pos="tr"/><Corner pos="bl"/><Corner pos="br"/>
       <div className="absolute inset-0 flex flex-col items-center justify-center px-12 text-center">
         <KAMark/>
@@ -26,7 +26,7 @@ export function CertificateView({ config }: { config: CertificateConfig }) {
         </div>
         <p style={{ fontStyle: 'italic', fontSize: 42, color: '#0f1e35', fontWeight: 600, lineHeight: 1.1, margin: '8px 0' }}>{config.learner.name}</p>
         <p style={{ fontFamily: "'Manrope',sans-serif", color: '#475569', fontSize: 14, marginTop: 8 }}>for successfully completing</p>
-        <p style={{ fontSize: 26, color: '#047857', fontWeight: 600, marginTop: 6, maxWidth: '80%' }}>&ldquo;{config.program.name}&rdquo;</p>
+        <p style={{ fontSize: 26, color: '#6576ff', fontWeight: 600, marginTop: 6, maxWidth: '80%' }}>&ldquo;{config.program.name}&rdquo;</p>
         <p style={{ fontFamily: "'Manrope',sans-serif", color: '#475569', fontSize: 13, marginTop: 10 }}>{config.program.duration} hours of training · completed on {dateStr}</p>
         {config.program.accreditations.length > 0 && (
           <div className="flex flex-wrap gap-2 justify-center mt-5">
@@ -49,13 +49,13 @@ export function CertificateView({ config }: { config: CertificateConfig }) {
       </div>
       <div className="absolute bottom-3 left-0 right-0 px-10 flex items-end justify-between" style={{ fontFamily: "'Manrope',sans-serif" }}>
         <div style={{ fontSize: 9, color: '#64748b', textAlign: 'left' }}>
-          <p style={{ fontWeight: 700, color: '#0f1e35' }}>Issued via Kuizen Academy</p>
+          <p style={{ fontWeight: 700, color: '#0f1e35' }}>Issued via StafKita Akademi</p>
           <p>A Veltrix Technology Center Product</p>
           <p>An UPSI Spin-Off Initiative</p>
         </div>
         <div style={{ fontSize: 9, color: '#64748b', textAlign: 'right' }}>
           <p>Certificate ID: <span style={{ fontFamily: 'monospace', color: '#0f1e35' }}>{config.verification.id}</span></p>
-          <p>Verify at: <span style={{ color: '#047857' }}>{config.verification.verifyUrl}</span></p>
+          <p>Verify at: <span style={{ color: '#6576ff' }}>{config.verification.verifyUrl}</span></p>
         </div>
       </div>
     </div>
@@ -83,7 +83,7 @@ function KAMark({ size = 64 }: { size?: number }) {
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none">
       <path d="M32 4 L56 16 V40 C56 50 44 58 32 60 C20 58 8 50 8 40 V16 Z" fill="#0f1e35"/>
-      <path d="M32 10 L50 19 V38 C50 46 41 53 32 55 C23 53 14 46 14 38 V19 Z" fill="#047857"/>
+      <path d="M32 10 L50 19 V38 C50 46 41 53 32 55 C23 53 14 46 14 38 V19 Z" fill="#6576ff"/>
       <path d="M24 22 V46 H28 V37 L36 46 H42 L32 34 L41 22 H35 L28 31 V22 Z" fill="#d97706"/>
       <circle cx="46" cy="18" r="3" fill="#d97706"/>
     </svg>

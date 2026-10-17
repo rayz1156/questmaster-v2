@@ -67,14 +67,14 @@ export async function generateMetadata(
 ): Promise<Metadata> {
   const { slug } = await params;
   const data = await loadCreator(slug);
-  if (!data) return { title: "Creator not found · Kuizen Academy" };
+  if (!data) return { title: "Creator not found · StafKita Akademi" };
   const { creator } = data;
   return {
-    title: `${creator.display_name} · Kuizen Academy`,
-    description: creator.tagline ?? "Courses on Kuizen Academy",
+    title: `${creator.display_name} · StafKita Akademi`,
+    description: creator.tagline ?? "Courses on StafKita Akademi",
     openGraph: {
       title: creator.display_name,
-      description: creator.tagline ?? "Courses on Kuizen Academy",
+      description: creator.tagline ?? "Courses on StafKita Akademi",
       images: creator.cover_url ? [creator.cover_url] : undefined,
     },
   };
@@ -240,7 +240,7 @@ export default async function StorefrontPage({
           <span>
             Powered by{" "}
             <Link href="/" className="font-semibold hover:text-emerald-700">
-              Kuizen Academy
+              StafKita Akademi
             </Link>
           </span>
         </div>

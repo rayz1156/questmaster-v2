@@ -33,7 +33,7 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   let projectId = (board.adilo_project_id || '').trim() || null;
   if (!projectId) {
     try {
-      const proj = await createAdiloProject(`Kuizen · ${owner.klass!.name}`);
+      const proj = await createAdiloProject(`StafKita Akademi · ${owner.klass!.name}`);
       projectId = proj.id;
       await owner.supa
         .from('lms_submission_boards').update({ adilo_project_id: projectId }).eq('id', board.id);

@@ -55,7 +55,7 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
     <div className="min-h-screen bg-slate-50 flex">
       <aside className="w-60 shrink-0 bg-white border-r border-slate-200 flex flex-col">
         <div className="px-5 py-5 border-b border-slate-100">
-          <Link href="/" aria-label="Kuizen Academy home"><KuizenAcademyLogo variant="horizontal" height={30} /></Link>
+          <Link href="/" aria-label="StafKita Akademi home"><KuizenAcademyLogo variant="horizontal" height={30} /></Link>
           <div className="mt-1 text-xs text-slate-500 truncate">{creator.display_name}</div>
         </div>
         <nav className="flex-1 px-3 py-4 space-y-1">

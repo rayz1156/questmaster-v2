@@ -60,7 +60,7 @@ export default function LearnerHome() {
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">Kuizen Academy</Link>
+          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">StafKita Akademi</Link>
           <div className="flex items-center gap-3">
             <span className="text-sm text-slate-600 hidden sm:inline">Hi, {displayName}</span>
             <button onClick={async () => { await supabase.auth.signOut(); router.push('/'); }} className="text-sm text-slate-500 hover:text-slate-900">Sign out</button>

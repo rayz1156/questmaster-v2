@@ -71,7 +71,7 @@ export interface ProgramCardProps {
   coverColor?: string;
   href?: string;
 }
-export function ProgramCard({ category, title, hours, modules, hasCertificate, hrdcorpClaimable, mbotRecognised, assignedCount, completionPct, coverColor = '#047857', href = '#' }: ProgramCardProps) {
+export function ProgramCard({ category, title, hours, modules, hasCertificate, hrdcorpClaimable, mbotRecognised, assignedCount, completionPct, coverColor = '#6576ff', href = '#' }: ProgramCardProps) {
   return (
     <div className="surface-card overflow-hidden flex flex-col">
       <div className="h-32 relative" style={{ background: `linear-gradient(135deg, ${coverColor}, #0f1e35)` }}>

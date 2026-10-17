@@ -56,7 +56,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
           'name': BRANDING.product.fullName,
-          'alternateName': ['StafKita Akademi', 'Kuizen LMS'],
+          'alternateName': ['StafKita Akademi'],
           'applicationCategory': 'BusinessApplication',
           'applicationSubCategory': 'Learning Management System',
           'operatingSystem': 'Web',

@@ -36,7 +36,7 @@ export default function DemoPage() {
       </header>
       <div className="max-w-3xl mx-auto px-6 py-12">
         <span className="section-eyebrow">Book a demo</span>
-        <h1 className="display-heading text-3xl sm:text-4xl mb-3">See Kuizen Academy in action.</h1>
+        <h1 className="display-heading text-3xl sm:text-4xl mb-3">See StafKita Akademi in action.</h1>
         <p className="text-lg text-slate-600 mb-8">A Veltrix consultant will reach out within one business day to schedule a 30-minute walkthrough tailored to your industry.</p>
         {ok ? (
           <div className="surface-card p-8 text-center">
@@ -66,7 +66,7 @@ export default function DemoPage() {
       </div>
       <style jsx global>{`
         .input { width: 100%; padding: 0.625rem 0.875rem; border-radius: 0.625rem; border: 1px solid #cbd5e1; background: white; font-size: 0.9375rem; transition: border-color 150ms ease; }
-        .input:focus { outline: none; border-color: #047857; box-shadow: 0 0 0 3px rgba(4,120,87,0.15); }
+        .input:focus { outline: none; border-color: #6576ff; box-shadow: 0 0 0 3px rgba(101,118,255,0.15); }
       `}</style>
     </main>
   );

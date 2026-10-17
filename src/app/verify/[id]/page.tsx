@@ -30,14 +30,14 @@ export default async function VerifyPage({ params }: { params: { id: string } })
               <span className="w-12 h-12 rounded-full bg-success-soft text-success flex items-center justify-center text-2xl font-bold">✓</span>
               <div>
                 <h1 className="text-2xl font-bold text-veltrix-900">Valid Certificate</h1>
-                <p className="text-sm text-slate-600">This certificate is genuine and was issued by Kuizen Academy.</p>
+                <p className="text-sm text-slate-600">This certificate is genuine and was issued by StafKita Akademi.</p>
               </div>
             </div>
             <dl className="grid sm:grid-cols-2 gap-4 mb-6">
               <Row k="Issued to" v={cert.learner_name || cert.learner_id}/>
               <Row k="Program" v={cert.program_name || cert.course_id}/>
               <Row k="Completion date" v={cert.completed_at ? new Date(cert.completed_at).toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'}) : '—'}/>
-              <Row k="Issuer" v={'Kuizen Academy by Veltrix'}/>
+              <Row k="Issuer" v={'StafKita Akademi by Veltrix'}/>
               <Row k="Certificate ID" v={cert.id} mono/>
               {cert.serial && <Row k="Serial" v={cert.serial} mono/>}
             </dl>
@@ -62,7 +62,7 @@ export default async function VerifyPage({ params }: { params: { id: string } })
             <Link href="/" className="btn-outline text-sm">← Back to home</Link>
           </div>
         )}
-        <p className="text-center text-xs text-slate-500 mt-8">Kuizen Academy · A Veltrix Technology Center Product</p>
+        <p className="text-center text-xs text-slate-500 mt-8">StafKita Akademi · A Veltrix Technology Center Product</p>
       </div>
     </main>
   );

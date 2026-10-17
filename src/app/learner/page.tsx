@@ -22,7 +22,7 @@ export default function LearnerHome() {
       <section className="mb-8">
         <h2 className="text-lg font-bold text-veltrix-900 mb-3">Continue learning</h2>
         <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-          <ProgramCard category="Compliance" title="Anti-Money Laundering Essentials" hours={4} modules={12} hasCertificate hrdcorpClaimable completionPct={67} coverColor="#047857" />
+          <ProgramCard category="Compliance" title="Anti-Money Laundering Essentials" hours={4} modules={12} hasCertificate hrdcorpClaimable completionPct={67} coverColor="#6576ff" />
           <ProgramCard category="Leadership" title="Leading High-Performing Teams" hours={12} modules={8} hasCertificate mbotRecognised completionPct={32} coverColor="#0f1e35" />
           <ProgramCard category="Product" title="Q1 Product Training Update" hours={2} modules={5} completionPct={0} coverColor="#d97706" />
         </div>

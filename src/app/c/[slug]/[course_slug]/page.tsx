@@ -17,9 +17,9 @@ export async function generateMetadata({ params }: { params: Promise<Params> }) 
   const { slug, course_slug } = await params;
   const client = db();
   const { data: cr } = await client.from('lms_creators').select('id, display_name').eq('slug', slug).eq('is_published', true).maybeSingle();
-  if (!cr) return { title: 'Course not found · Kuizen Academy' };
+  if (!cr) return { title: 'Course not found · StafKita Akademi' };
   const { data: course } = await client.from('lms_courses').select('title, subtitle').eq('creator_id', (cr as { id: string }).id).eq('slug', course_slug).eq('is_published', true).maybeSingle();
-  if (!course) return { title: 'Course not found · Kuizen Academy' };
+  if (!course) return { title: 'Course not found · StafKita Akademi' };
   const c = course as { title: string; subtitle: string | null };
   return { title: `${c.title} · ${(cr as { display_name: string }).display_name}`, description: c.subtitle || undefined };
 }
@@ -167,7 +167,7 @@ export default async function CourseLandingPage({ params }: { params: Promise<Pa
       </main>
 
       <footer className="border-t border-slate-200 py-8 text-center text-xs text-slate-400">
-        Powered by <Link href="/" className="hover:text-slate-600">Kuizen Academy</Link>
+        Powered by <Link href="/" className="hover:text-slate-600">StafKita Akademi</Link>
       </footer>
     </div>
   );

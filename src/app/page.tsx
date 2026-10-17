@@ -9,7 +9,7 @@ function Nav() {
   return (
     <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/95 border-b border-slate-200 shadow-sm">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link href="/" aria-label="Kuizen Academy home" className="flex items-center">
+        <Link href="/" aria-label="StafKita Akademi home" className="flex items-center">
           <KuizenAcademyLogo variant="horizontal" height={36} />
         </Link>
         <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-700">
@@ -43,7 +43,7 @@ function Hero() {
               Stay compliant.
             </h1>
             <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mb-8 leading-relaxed">
-              Kuizen Academy is the enterprise LMS for Malaysian organizations — built for HRDCorp claims, onboarding cohorts, compliance certifications, and measurable learning outcomes. Endorsed and operated by Veltrix.
+              StafKita Akademi is the enterprise LMS for Malaysian organizations — built for HRDCorp claims, onboarding cohorts, compliance certifications, and measurable learning outcomes. Endorsed and operated by Veltrix.
             </p>
             <div className="flex flex-wrap gap-3">
               <Link href="/demo" className="btn-academy">Book a 30-min demo →</Link>
@@ -275,7 +275,7 @@ function HRDCorp() {
             <span className="section-eyebrow" style={{color: "#b45309"}}>HRDCorp ready</span>
             <h2 className="display-heading text-3xl sm:text-4xl mb-5">Turn your levy into measurable upskilling.</h2>
             <p className="text-lg text-slate-700 mb-6 leading-relaxed">
-              Kuizen Academy generates HRDCorp-claim-ready reports out of the box. Track attendance hours, completion evidence, and assessment scores for SBL-Khas, HRDCorp Claimable Courses, and in-house schemes.
+              StafKita Akademi generates HRDCorp-claim-ready reports out of the box. Track attendance hours, completion evidence, and assessment scores for SBL-Khas, HRDCorp Claimable Courses, and in-house schemes.
             </p>
             <ul className="space-y-3 text-slate-700">
               {[
@@ -322,7 +322,7 @@ function Doctrine() {
         <span className="section-eyebrow">The Veltrix doctrine</span>
         <h2 className="display-heading text-3xl sm:text-4xl mb-6">Software alone doesn’t transform a workforce.</h2>
         <p className="text-lg sm:text-xl text-slate-700 leading-relaxed mb-8">
-          Every Kuizen Academy deployment is paired with a Veltrix consultant — because the platform is only as good as the instructional design, change management, and measurement discipline behind it. We don’t hand you a login. We hand you outcomes.
+          Every StafKita Akademi deployment is paired with a Veltrix consultant — because the platform is only as good as the instructional design, change management, and measurement discipline behind it. We don’t hand you a login. We hand you outcomes.
         </p>
         <div className="grid sm:grid-cols-3 gap-5 text-left">
           {[
@@ -422,7 +422,7 @@ function Footer() {
           <FooterCol title="Legal" links={[["Privacy","/legal/privacy"],["Terms","/legal/terms"],["PDPA","/legal/pdpa"]]} />
         </div>
         <div className="border-t border-veltrix-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-500">
-          <span>© {new Date().getFullYear()} Veltrix Sdn Bhd. Kuizen Academy is a Veltrix product.</span>
+          <span>© {new Date().getFullYear()} Veltrix Sdn Bhd. StafKita Akademi is a Veltrix product.</span>
           <span>Made in Malaysia · PDPA compliant</span>
         </div>
       </div>

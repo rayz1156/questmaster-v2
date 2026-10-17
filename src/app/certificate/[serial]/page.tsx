@@ -21,7 +21,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ se
         <div className="max-w-md w-full bg-white border border-slate-200 rounded-2xl p-8 text-center">
           <div className="text-rose-700 font-semibold text-lg">Certificate not found</div>
           <div className="text-sm text-slate-500 mt-2">Serial: <span className="font-mono">{serial}</span></div>
-          <a href="/" className="inline-block mt-4 text-sm text-emerald-700 hover:underline">Back to Kuizen Academy</a>
+          <a href="/" className="inline-block mt-4 text-sm text-emerald-700 hover:underline">Back to StafKita Akademi</a>
         </div>
       </main>
     );
@@ -33,7 +33,7 @@ export default async function CertificatePage({ params }: { params: Promise<{ se
     <main className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center p-6">
       <div className="max-w-2xl w-full bg-white border-2 border-emerald-200 rounded-2xl p-10 shadow-xl">
         <div className="text-center">
-          <div className="text-xs uppercase tracking-widest text-emerald-700 font-semibold">Kuizen Academy · Certificate of Completion</div>
+          <div className="text-xs uppercase tracking-widest text-emerald-700 font-semibold">StafKita Akademi · Certificate of Completion</div>
           <div className="mt-6 text-sm text-slate-500">This certifies that</div>
           <div className="mt-2 text-3xl font-bold text-slate-900">{cert.learner_name}</div>
           <div className="mt-4 text-sm text-slate-500">has successfully completed the course</div>

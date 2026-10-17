@@ -99,43 +99,43 @@ export default function InstallPrompt() {
   return (
     <div
       role="dialog"
-      aria-label="Install Kuizen"
-      className="fixed inset-x-3 bottom-3 z-[1000] rounded-2xl bg-white shadow-2xl ring-1 ring-purple-200 p-4 flex items-start gap-3 sm:hidden"
+      aria-label="Pasang StafKita Akademi"
+      className="fixed inset-x-3 bottom-3 z-[1000] rounded bg-white shadow-elevated ring-1 ring-primary-subtle p-4 flex items-start gap-3 sm:hidden"
     >
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-purple-500 to-purple-700 text-white text-xl font-bold">
-        C
+      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded bg-primary text-white text-xl font-bold">
+        SK
       </div>
       <div className="flex-1 min-w-0">
-        <div className="font-semibold text-gray-900">Install Kuizen</div>
+        <div className="font-semibold text-slate-900">Pasang StafKita Akademi</div>
         {deferred ? (
-          <p className="text-sm text-gray-600 mt-0.5">
-            Add to your home screen for a faster, fullscreen experience.
+          <p className="text-sm text-slate-600 mt-0.5">
+            Tambah ke skrin utama anda untuk pengalaman yang lebih pantas dan skrin penuh.
           </p>
         ) : (
-          <p className="text-sm text-gray-600 mt-0.5">
-            Tap the Share icon, then choose <strong>Add to Home Screen</strong>.
+          <p className="text-sm text-slate-600 mt-0.5">
+            Ketik ikon Kongsi, kemudian pilih <strong>Tambah ke Skrin Utama</strong>.
           </p>
         )}
         <div className="mt-2 flex gap-2">
           {deferred && (
             <button
               onClick={install}
-              className="rounded-lg bg-purple-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-purple-700"
+              className="rounded bg-primary px-3 py-1.5 text-sm font-medium text-white hover:bg-primary-hover"
             >
-              Install
+              Pasang
             </button>
           )}
           <button
             onClick={dismiss}
-            className="rounded-lg px-3 py-1.5 text-sm font-medium text-gray-600 hover:bg-gray-100"
+            className="rounded px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100"
           >
-            Not now
+            Bukan sekarang
           </button>
         </div>
       </div>
       <button
         onClick={dismiss}
-        aria-label="Dismiss"
+        aria-label="Tutup"
         className="text-gray-400 hover:text-gray-600 -mt-1 -mr-1 p-1"
       >
         ✕

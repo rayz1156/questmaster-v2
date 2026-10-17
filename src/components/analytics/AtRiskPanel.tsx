@@ -74,7 +74,7 @@ export default function AtRiskPanel({ classId }: { classId: string | null }) {
     const lines = [
       `Hi ${name},`,
       "",
-      "I noticed you haven\u2019t been very active on Kuizen lately and wanted to check in. A few things I saw:",
+      "I noticed you haven\u2019t been very active on StafKita Akademi lately and wanted to check in. A few things I saw:",
       ...(s.reasons ?? []).map(r => `\u2022 ${r}`),
       "",
       "If there\u2019s anything blocking you (technical issue, unclear instructions, scheduling) please reply and let me know. I\u2019m happy to help you catch up.",
