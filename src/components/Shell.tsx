@@ -2,18 +2,22 @@
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
-import { LogOut, HelpCircle } from "lucide-react";
+import { LogOut, HelpCircle, Menu, X } from "lucide-react";
 import { getSession, clearSession } from "@/lib/session";
 import type { User, Profile } from "@/lib/types";
 import { getMyProfile } from "@/lib/data";
 
 type Tab = { href: string; label: string; icon?: React.ReactNode };
 
+// Gaya bar sisi gelap StafKita (290px)
+const SIDEBAR_CLASSES = "w-[290px] shrink-0 bg-[#101924] text-[#6e82a5]";
+
 export default function Shell({ tabs, children }: { tabs: Tab[]; children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   useEffect(() => {
     let cancelled = false;
     let resolved = false;
@@ -32,7 +36,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
     const initial = getSession();
     if (initial) apply(initial);
     else {
-      // Wait briefly for Supabase async session hydration before redirecting
+      // Tunggu sebentar untuk penghidratan sesi Supabase asinkron sebelum ubah hala
       import("@/lib/supabase")
         .then(({ supabase }) => supabase.auth.getUser())
         .then(() => {
@@ -56,6 +60,10 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
       window.removeEventListener("qm-brand", onAuth);
     };
   }, [router]);
+  // Tutup laci bila laluan berubah
+  useEffect(() => {
+    setDrawerOpen(false);
+  }, [pathname]);
   if (!user) return null;
   const logoUrl = profile?.logo_url || null;
   const onLogout = () => {
@@ -63,116 +71,129 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
     router.replace("/login");
   };
 
-  // ---------- Brand block (re-used in mobile header + desktop sidebar) ----------
-  const Brand = ({ desktop = false }: { desktop?: boolean }) => (
-    <div className={`flex items-center gap-3 ${desktop ? "" : ""}`}>
+  // ---------- Blok jenama (digunakan dalam kepala dan bar sisi) ----------
+  const Brand = () => (
+    <div className="flex items-center gap-3 min-w-0">
       {logoUrl ? (
-        <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded-lg object-contain bg-white/90 p-1" />
+        <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded object-contain bg-white/90 p-1" />
       ) : (
-        <img src="/logo-mark.svg" alt="Kuizen" className="w-10 h-10 rounded-lg" />
+        <span className="w-10 h-10 rounded bg-[#6576ff] text-white flex items-center justify-center font-bold font-[Nunito,var(--font-nunito),sans-serif]">SK</span>
       )}
       <div className="min-w-0">
-        <div className="font-bold text-lg leading-tight truncate">Kuizen</div>
-        <div className="text-xs opacity-90 truncate">
+        <div className="font-bold text-lg leading-tight truncate text-white" style={{ fontFamily: "Nunito, var(--font-nunito), sans-serif" }}>
+          StafKita Akademi
+        </div>
+        <div className="text-xs text-[#6e82a5] truncate">
           {user.display_name} · {user.role}
         </div>
       </div>
     </div>
   );
 
-  return (
-    <div className="min-h-screen bg-gray-50 flex">
-      {/* ============ DESKTOP SIDEBAR (lg+) ============ */}
-      <aside className="hidden lg:flex lg:flex-col lg:w-64 xl:w-72 lg:fixed lg:inset-y-0 lg:left-0 bg-brand-gradient text-white shadow-xl">
-        <div className="p-5 border-b border-white/10">
-          <Brand desktop />
-        </div>
-        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {tabs.map((t) => {
-            const active = pathname === t.href || pathname?.startsWith(t.href + "/");
-            return (
-              <Link
-                key={t.href}
-                href={t.href}
-                className={`flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium transition ${
-                  active
-                    ? "bg-white text-brand-purple shadow-sm"
-                    : "text-white/90 hover:bg-white/10"
-                }`}
-              >
-                <span className={active ? "text-brand-purple" : "text-white"}>{t.icon}</span>
-                <span>{t.label}</span>
-              </Link>
-            );
-          })}
-                <Link
-          href="/help"
-          className={`flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium transition mt-2 ${
-            pathname === "/help" || pathname?.startsWith("/help/")
-              ? "bg-white text-brand-purple shadow-sm"
-              : "text-white/90 hover:bg-white/10"
-          }`}
-        >
-          <span className={pathname === "/help" ? "text-brand-purple" : "text-white"}><HelpCircle className="w-5 h-5" /></span>
-          <span>Help</span>
-        </Link>
-          <button
-            onClick={onLogout}
-            className="w-full flex items-center gap-3 px-3 py-3 rounded-lg text-base font-medium text-white/90 hover:bg-white/10 transition mt-1"
-          >
-            <LogOut className="w-5 h-5" />
-            <span>Sign out</span>
-          </button>
-        </nav>
+  // ---------- Item navigasi ----------
+  const navItem = (t: Tab, active: boolean) => (
+    <Link
+      key={t.href}
+      href={t.href}
+      className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition ${
+        active ? "text-[#6576ff] bg-[#6576ff]/10" : "text-[#6e82a5] hover:text-white hover:bg-[#203247]"
+      }`}
+    >
+      <span className={active ? "text-[#6576ff]" : "text-[#6e82a5]"}>{t.icon}</span>
+      <span>{t.label}</span>
+    </Link>
+  );
 
+  const helpActive = pathname === "/help" || pathname?.startsWith("/help/");
+  const helpItem = (
+    <Link
+      href="/help"
+      className={`flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium transition ${
+        helpActive ? "text-[#6576ff] bg-[#6576ff]/10" : "text-[#6e82a5] hover:text-white hover:bg-[#203247]"
+      }`}
+    >
+      <span className={helpActive ? "text-[#6576ff]" : "text-[#6e82a5]"}><HelpCircle className="w-5 h-5" /></span>
+      <span>Bantuan</span>
+    </Link>
+  );
+  const logoutItem = (
+    <button
+      onClick={onLogout}
+      className="w-full flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-[#6e82a5] hover:text-white hover:bg-[#203247] transition"
+    >
+      <LogOut className="w-5 h-5" />
+      <span>Log keluar</span>
+    </button>
+  );
+
+  // ---------- Kandungan bar sisi ----------
+  const SidebarContent = () => (
+    <>
+      <div className="p-5 border-b border-[#203247]">
+        <Brand />
+      </div>
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {tabs.map((t) => navItem(t, pathname === t.href || pathname?.startsWith(t.href + "/")))}
+        {helpItem}
+      </nav>
+      <div className="p-3 border-t border-[#203247]">{logoutItem}</div>
+    </>
+  );
+
+  return (
+    <div className="min-h-screen bg-[#f5f6fa] flex text-[#526484]">
+      {/* ============ BAR SISI DESKTOP (1024px+) ============ */}
+      <aside className={`hidden lg:flex lg:flex-col lg:fixed lg:inset-y-0 lg:left-0 ${SIDEBAR_CLASSES}`}>
+        <SidebarContent />
       </aside>
 
-      {/* ============ MAIN COLUMN ============ */}
-      <div className="flex-1 flex flex-col min-w-0 lg:ml-64 xl:ml-72">
-        {/* ---- Mobile header (hidden on lg+) ---- */}
-        <header className="lg:hidden bg-brand-gradient text-white p-5 rounded-b-3xl flex items-center justify-between">
-          <Brand />
-          <button onClick={onLogout} className="opacity-90 hover:opacity-100" aria-label="Sign out">
-            <LogOut className="w-5 h-5" />
-          </button>
+      {/* ============ LACI MOBILE (<1024px) ============ */}
+      {drawerOpen && (
+        <div className="lg:hidden fixed inset-0 z-50 flex">
+          <div className="absolute inset-0 bg-black/50" onClick={() => setDrawerOpen(false)} aria-hidden="true" />
+          <aside className={`relative flex flex-col h-full ${SIDEBAR_CLASSES} shadow-elevated`}>
+            <button
+              onClick={() => setDrawerOpen(false)}
+              className="absolute top-4 right-4 text-[#6e82a5] hover:text-white"
+              aria-label="Tutup menu"
+            >
+              <X className="w-5 h-5" />
+            </button>
+            <SidebarContent />
+          </aside>
+        </div>
+      )}
+
+      {/* ============ LAJUR UTAMA ============ */}
+      <div className="flex-1 flex flex-col min-w-0 lg:ml-[290px]">
+        {/* ---- Kepala putih 65px ---- */}
+        <header className="h-[65px] shrink-0 bg-white border-b border-[#e5e9f2] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-40">
+          <div className="lg:hidden flex items-center gap-3">
+            <button onClick={() => setDrawerOpen(true)} className="p-2 text-[#526484]" aria-label="Buka menu">
+              <Menu className="w-6 h-6" />
+            </button>
+            <span className="font-bold text-lg" style={{ fontFamily: "Nunito, var(--font-nunito), sans-serif" }}>
+              StafKita <span className="text-[#6576ff]">Akademi</span>
+            </span>
+          </div>
+          <div className="hidden lg:block text-sm font-semibold text-[#364a63]">
+            StafKita Akademi
+          </div>
+          <div className="flex items-center gap-3">
+            <span className="text-sm text-[#6e82a5] truncate max-w-[40vw]">{user.display_name}</span>
+            <button onClick={onLogout} className="p-2 text-[#6e82a5] hover:text-[#e85347] transition" aria-label="Log keluar">
+              <LogOut className="w-5 h-5" />
+            </button>
+          </div>
         </header>
 
-        <main className="flex-1 px-4 py-5 lg:px-10 lg:py-8 pb-24 lg:pb-10">
+        <main className="flex-1 px-4 py-5 lg:px-10 lg:py-8">
           <div className="max-w-6xl mx-auto w-full">{children}</div>
         </main>
 
-        <footer className="hidden lg:block text-center text-xs text-gray-400 py-4">
-          <span className="font-semibold text-gray-500">UPSI · AFK · Veltrix</span>
+        <footer className="text-center text-xs text-[#8094ae] py-4">
+          <span>&copy; StafKita Akademi</span>
         </footer>
-
-        {/* ---- Mobile bottom tab bar (hidden on lg+) ---- */}
-        <nav className="lg:hidden fixed bottom-0 left-0 right-0 bg-white border-t flex justify-around py-2 z-30">
-          {tabs.map((t) => {
-            const active = pathname === t.href || pathname?.startsWith(t.href + "/");
-            return (
-              <Link
-                key={t.href}
-                href={t.href}
-                className={`flex flex-col items-center text-xs px-2 py-1 ${
-                  active ? "text-brand-purple font-semibold" : "text-gray-500"
-                }`}
-              >
-                {t.icon}
-                {t.label}
-              </Link>
-            );
-          })}
-                    <Link
-              key="__help"
-              href="/help"
-              className={`flex flex-col items-center text-xs px-2 py-1 ${
-                pathname === "/help" ? "text-brand-purple font-semibold" : "text-gray-500"
-              }`}
-            >
-              <HelpCircle className="w-5 h-5" />
-              Help
-            </Link>
-</nav>
       </div>
     </div>
   );
