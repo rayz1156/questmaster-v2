@@ -13,7 +13,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
   if (typeof body.position === 'number') updates.position = body.position;
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   const { data, error } = await owner.supa
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .update(updates)
     .eq('id', params.columnId)
     .select('*')
@@ -26,7 +26,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { classId: 
   const owner = await requireClassMember(req, params.classId);
   if (owner.response) return owner.response;
   const admin = getServiceSupabase();
-  const { error } = await admin.from('qm_learning_columns').delete().eq('id', params.columnId);
+  const { error } = await admin.from('lms_learning_columns').delete().eq('id', params.columnId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

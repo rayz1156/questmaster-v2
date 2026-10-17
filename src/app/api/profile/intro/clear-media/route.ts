@@ -8,7 +8,7 @@ export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
   const admin = getServiceSupabase();
-  const { error } = await admin.from('qm_profiles').update({
+  const { error } = await admin.from('lms_profiles').update({
     intro_media_type: null,
     intro_image_file_code: null,
     intro_image_path: null,

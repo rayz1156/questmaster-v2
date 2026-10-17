@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const { data: userData } = await supa.auth.getUser();
     if (!userData?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data, error } = await supa.rpc('qm_at_risk_summary', { p_class_id: class_id });
+    const { data, error } = await supa.rpc('lms_at_risk_summary', { p_class_id: class_id });
     if (error) {
       console.error('at-risk rpc failed', error);
       return NextResponse.json({ error: error.message }, { status: 500 });

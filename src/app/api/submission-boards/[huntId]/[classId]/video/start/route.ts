@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
 
   // Ensure board exists and get/create Adilo project
   const { data: board } = await owner.supa
-    .from('qm_submission_boards').select('id, adilo_project_id').eq('activity_id', params.huntId).eq('class_id', params.classId).single();
+    .from('lms_submission_boards').select('id, adilo_project_id').eq('activity_id', params.huntId).eq('class_id', params.classId).single();
   if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
 
   let projectId = (board.adilo_project_id || '').trim() || null;
@@ -36,7 +36,7 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
       const proj = await createAdiloProject(`Kuizen · ${owner.klass!.name}`);
       projectId = proj.id;
       await owner.supa
-        .from('qm_submission_boards').update({ adilo_project_id: projectId }).eq('id', board.id);
+        .from('lms_submission_boards').update({ adilo_project_id: projectId }).eq('id', board.id);
     } catch (e: any) {
       return NextResponse.json({ error: `Adilo project create failed: ${e.message}` }, { status: 502 });
     }

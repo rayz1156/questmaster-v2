@@ -68,7 +68,7 @@ export async function requireClassOwner(req: NextRequest | Request | null, class
   const auth = await requireUser(req);
   if (auth.response) return { ...auth, klass: null as null };
   const { data: klass } = await auth.supa
-    .from('qm_classes')
+    .from('lms_classes')
     .select('id, name, owner_id')
     .eq('id', classId)
     .single();
@@ -87,7 +87,7 @@ export async function requireClassMember(req: NextRequest | Request | null, clas
   const auth = await requireUser(req);
   if (auth.response) return { ...auth, klass: null as null };
   const { data: klass } = await auth.supa
-    .from('qm_classes')
+    .from('lms_classes')
     .select('id, name, owner_id')
     .eq('id', classId)
     .single();
@@ -98,7 +98,7 @@ export async function requireClassMember(req: NextRequest | Request | null, clas
     return { ...auth, klass };
   }
   const { data: member } = await auth.supa
-    .from('qm_class_members')
+    .from('lms_class_members')
     .select('user_id')
     .eq('class_id', classId)
     .eq('user_id', auth.user!.id)

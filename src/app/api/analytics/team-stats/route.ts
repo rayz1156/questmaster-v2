@@ -21,7 +21,7 @@ export async function GET(req: NextRequest) {
   if (!userData?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
   const { data: huntsData, error: huntsErr } = await supa
-    .from('qm_hunts')
+    .from('lms_hunts')
     .select('id,title,class_id')
     .eq('class_id', classId);
   if (huntsErr) return NextResponse.json({ error: huntsErr.message }, { status: 500 });
@@ -31,7 +31,7 @@ export async function GET(req: NextRequest) {
   const huntIds = hunts.map(h => h.id);
 
   const { data: teamsData } = await supa
-    .from('qm_teams')
+    .from('lms_teams')
     .select('id,name,score,max_members,hunt_id')
     .in('hunt_id', huntIds);
   const teams: TeamRow[] = (teamsData ?? []) as TeamRow[];
@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
   const teamIds = teams.map(t => t.id);
 
   const { data: membersData } = await supa
-    .from('qm_team_members')
+    .from('lms_team_members')
     .select('team_id,user_id')
     .in('team_id', teamIds);
   const members: MemberRow[] = (membersData ?? []) as MemberRow[];
@@ -51,13 +51,13 @@ export async function GET(req: NextRequest) {
 
   let profiles: ProfileRow[] = [];
   if (userIds.length > 0) {
-    const { data: profilesData } = await supa.from('qm_profiles').select('id,display_name,username').in('id', userIds);
+    const { data: profilesData } = await supa.from('lms_profiles').select('id,display_name,username').in('id', userIds);
     profiles = (profilesData ?? []) as ProfileRow[];
   }
   const profileMap = new Map<string, ProfileRow>(profiles.map(p => [p.id, p]));
 
   const { data: chData } = await supa
-    .from('qm_challenges')
+    .from('lms_challenges')
     .select('id,hunt_id')
     .in('hunt_id', huntIds);
   const challenges: ChallengeRow[] = (chData ?? []) as ChallengeRow[];
@@ -66,14 +66,14 @@ export async function GET(req: NextRequest) {
   let submissions: SubmissionRow[] = [];
   if (challengeIds.length > 0) {
     const { data: subData } = await supa
-      .from('qm_submissions')
+      .from('lms_submissions')
       .select('team_id,user_id,status,challenge_id')
       .in('challenge_id', challengeIds);
     submissions = (subData ?? []) as SubmissionRow[];
   }
 
   const { data: comps } = await supa
-    .from('qm_team_quest_completions')
+    .from('lms_team_quest_completions')
     .select('team_id,hunt_id,awarded_points')
     .in('hunt_id', huntIds);
   const completions: CompletionRow[] = (comps ?? []) as CompletionRow[];

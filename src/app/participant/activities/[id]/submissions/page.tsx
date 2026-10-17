@@ -31,7 +31,7 @@ export default function ParticipantSubmissionsPage() {
     (async () => {
       try {
         // Find the class this hunt belongs to (hunts.class_id), then load the board.
-        const { data: hunt } = await supabase.from('qm_hunts').select('class_id').eq('id', huntId).maybeSingle();
+        const { data: hunt } = await supabase.from('lms_hunts').select('class_id').eq('id', huntId).maybeSingle();
         if (!hunt) throw new Error('Activity not found');
         setClassId(hunt.class_id);
         const r = await authedFetch(`/api/submission-boards/${huntId}/${hunt.class_id}`, { cache: 'no-store' });

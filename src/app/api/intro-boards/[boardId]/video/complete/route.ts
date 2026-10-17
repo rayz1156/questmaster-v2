@@ -9,7 +9,7 @@ export const maxDuration = 60;
  * POST /api/intro-boards/[boardId]/video/complete
  * Body: { uploadId, key, eTag, projectId, filename, mimeType, sizeBytes, durationSeconds?,
  *         displayName, description? }
- * Finalizes the Adilo multipart upload and upserts the qm_intro_posts row
+ * Finalizes the Adilo multipart upload and upserts the lms_intro_posts row
  * (one per board+author) with media_type='video'.
  */
 export async function POST(req: NextRequest, { params }: { params: { boardId: string } }) {
@@ -30,14 +30,14 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
 
   // Verify board + class membership again
   const { data: board } = await admin
-    .from('qm_boards').select('id, class_id').eq('id', params.boardId).single();
+    .from('lms_boards').select('id, class_id').eq('id', params.boardId).single();
   if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
   const { data: klass } = await admin
-    .from('qm_classes').select('id, owner_id').eq('id', board.class_id).single();
+    .from('lms_classes').select('id, owner_id').eq('id', board.class_id).single();
   if (!klass) return NextResponse.json({ error: 'Class not found' }, { status: 404 });
   if (klass.owner_id !== auth.user!.id) {
     const { data: member } = await admin
-      .from('qm_class_members').select('user_id')
+      .from('lms_class_members').select('user_id')
       .eq('class_id', board.class_id).eq('user_id', auth.user!.id).maybeSingle();
     if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
@@ -81,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   };
 
   const { data, error } = await admin
-    .from('qm_intro_posts')
+    .from('lms_intro_posts')
     .upsert(row, { onConflict: 'board_id,author_id' })
     .select('*')
     .single();

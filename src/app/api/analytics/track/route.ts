@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
     const user_id = userData?.user?.id || null;
 
     // Soft-fail: never break the page if analytics insert fails.
-    const { error } = await supa.from('qm_analytics_events').insert({
+    const { error } = await supa.from('lms_analytics_events').insert({
       user_id,
       event_type,
       path,

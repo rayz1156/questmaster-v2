@@ -19,12 +19,12 @@ export default function ActivitySubmissionsIndex() {
       try {
         const { data: u } = await supabase.auth.getUser();
         if (!u.user) throw new Error('Not signed in');
-        // Find classes where this hunt is used. qm_hunts has class_id; also can be assigned via qm_team_quest_completions etc.
+        // Find classes where this hunt is used. lms_hunts has class_id; also can be assigned via lms_team_quest_completions etc.
         // Simplest: get hunts.class_id
-        const { data: hunt } = await supabase.from('qm_hunts').select('id, class_id').eq('id', huntId).maybeSingle();
+        const { data: hunt } = await supabase.from('lms_hunts').select('id, class_id').eq('id', huntId).maybeSingle();
         if (!hunt) throw new Error('Activity not found');
         // Get the class name (and any other classes the user manages where this hunt is used).
-        const { data: kls } = await supabase.from('qm_classes').select('id, name').eq('id', hunt.class_id);
+        const { data: kls } = await supabase.from('lms_classes').select('id, name').eq('id', hunt.class_id);
         setClasses(kls || []);
       } catch (e: any) { setErr(e.message); }
       finally { setLoading(false); }

@@ -5,7 +5,7 @@ export const dynamic = 'force-dynamic';
 
 async function isEducator(supa: any, classId: string, userId: string, ownerId: string): Promise<boolean> {
   if (ownerId === userId) return true;
-  const { data } = await supa.from('qm_class_educators').select('user_id').eq('class_id', classId).eq('user_id', userId).maybeSingle();
+  const { data } = await supa.from('lms_class_educators').select('user_id').eq('class_id', classId).eq('user_id', userId).maybeSingle();
   return Boolean(data);
 }
 
@@ -15,7 +15,7 @@ export async function GET(req: NextRequest, { params }: { params: { huntId: stri
   const { supa, klass, user } = auth;
 
   const { data: board } = await supa
-    .from('qm_submission_boards')
+    .from('lms_submission_boards')
     .select('*')
     .eq('activity_id', params.huntId)
     .eq('class_id', params.classId)
@@ -28,7 +28,7 @@ export async function GET(req: NextRequest, { params }: { params: { huntId: stri
   }
 
   const { data: items } = await supa
-    .from('qm_submission_board_items')
+    .from('lms_submission_board_items')
     .select('*')
     .eq('board_id', board.id)
     .order('created_at', { ascending: false });
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: { huntId: stri
   const submitterIds = Array.from(new Set((items || []).map((i: any) => i.submitted_by)));
   let profiles: any[] = [];
   if (submitterIds.length) {
-    const { data: profs } = await supa.from('qm_profiles').select('id, display_name, avatar_url').in('id', submitterIds);
+    const { data: profs } = await supa.from('lms_profiles').select('id, display_name, avatar_url').in('id', submitterIds);
     profiles = profs || [];
   }
   const profById = new Map(profiles.map((p: any) => [p.id, p]));
@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: { huntId: stri
 
   // Load columns for this board (RLS enforces class membership).
   const { data: cols } = await supa
-    .from('qm_submission_board_columns')
+    .from('lms_submission_board_columns')
     .select('*')
     .eq('board_id', board.id)
     .order('position', { ascending: true })
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   const visibility: string = ['public', 'private', 'class_scoped'].includes(body.visibility) ? body.visibility : 'class_scoped';
 
   const { data, error } = await supa
-    .from('qm_submission_boards')
+    .from('lms_submission_boards')
     .insert({
       activity_id: params.huntId,
       class_id: params.classId,
@@ -102,7 +102,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
   if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
 
   const { data, error } = await supa
-    .from('qm_submission_boards')
+    .from('lms_submission_boards')
     .update(updates)
     .eq('activity_id', params.huntId)
     .eq('class_id', params.classId)

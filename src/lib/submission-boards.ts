@@ -1,6 +1,6 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-export type SubmissionItemType = 'text' | 'image' | 'video' | 'link' | 'file';
+export type SubmissionItemType = 'text' | 'image' | 'video' | 'link' | 'file' | 'chatbot';
 export type SubmissionVisibility = 'public' | 'private' | 'class_scoped';
 
 export interface SubmissionBoard {
@@ -44,6 +44,8 @@ export interface SubmissionBoardItem {
   file_size_bytes: number | null;
   file_extension: string | null;
   filelu_file_code: string | null;
+  chatbot_url: string | null;
+  chatbot_provider: string | null;
   created_at: string;
   updated_at: string;
   // Layout (columns + mood board)

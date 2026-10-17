@@ -16,7 +16,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
   if (typeof body.column_id === 'string') updates.column_id = body.column_id;
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   const { data, error } = await admin
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .update(updates)
     .eq('id', params.cardId)
     .select('*')
@@ -31,7 +31,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { classId: 
   const admin = getServiceSupabase();
   // Note: Adilo file is intentionally NOT deleted here — the educator may
   // re-link or recover. Cleanup is a Phase 2 admin operation.
-  const { error } = await admin.from('qm_learning_cards').delete().eq('id', params.cardId);
+  const { error } = await admin.from('lms_learning_cards').delete().eq('id', params.cardId);
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ ok: true });
 }

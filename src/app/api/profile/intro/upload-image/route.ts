@@ -31,7 +31,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Persist on profile (and clear any existing video fields).
-  const { error: upErr } = await admin.from('qm_profiles').update({
+  const { error: upErr } = await admin.from('lms_profiles').update({
     intro_media_type: 'image',
     intro_image_file_code: uploaded.fileCode,
     intro_image_path: uploaded.fileCode,

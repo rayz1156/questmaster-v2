@@ -15,7 +15,7 @@ export async function GET(
 
   // Find the board
   const { data: board, error: bErr } = await supa
-    .from('qm_submission_boards')
+    .from('lms_submission_boards')
     .select('id')
     .eq('activity_id', params.huntId)
     .eq('class_id', params.classId)
@@ -24,7 +24,7 @@ export async function GET(
   if (!board) return NextResponse.json({ columns: [] });
 
   const { data, error } = await supa
-    .from('qm_submission_board_columns')
+    .from('lms_submission_board_columns')
     .select('*')
     .eq('board_id', board.id)
     .order('position', { ascending: true })
@@ -49,7 +49,7 @@ export async function POST(
   if (title.length > 80) return NextResponse.json({ error: 'title too long (max 80)' }, { status: 400 });
 
   const { data: board, error: bErr } = await supa
-    .from('qm_submission_boards')
+    .from('lms_submission_boards')
     .select('id')
     .eq('activity_id', params.huntId)
     .eq('class_id', params.classId)
@@ -58,7 +58,7 @@ export async function POST(
 
   // Next position = max(position)+1
   const { data: existing } = await supa
-    .from('qm_submission_board_columns')
+    .from('lms_submission_board_columns')
     .select('position')
     .eq('board_id', board.id)
     .order('position', { ascending: false })
@@ -66,7 +66,7 @@ export async function POST(
   const nextPos = (existing && existing[0]?.position != null) ? existing[0].position + 1 : 0;
 
   const { data, error } = await supa
-    .from('qm_submission_board_columns')
+    .from('lms_submission_board_columns')
     .insert({ board_id: board.id, title, position: nextPos, created_by: user!.id })
     .select('*')
     .single();

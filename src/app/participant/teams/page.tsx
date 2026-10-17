@@ -119,7 +119,7 @@ function Inner() {
         }
         try {
           const { supabase } = await import("@/lib/supabaseClient");
-          const { data } = await supabase.rpc("qm_team_member_counts", { p_class_id: activeClassId });
+          const { data } = await supabase.rpc("lms_team_member_counts", { p_class_id: activeClassId });
           if (data) {
             const m: Record<string, number> = {};
             for (const r of data as any[]) m[r.team_id] = Number(r.cnt);

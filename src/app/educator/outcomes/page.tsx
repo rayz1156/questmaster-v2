@@ -53,17 +53,17 @@ function OutcomesPageInner() {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return;
       const { data: owned } = await supabase
-        .from("qm_classes")
+        .from("lms_classes")
         .select("id, name")
         .eq("owner_id", user.id);
       const { data: coed } = await supabase
-        .from("qm_class_educators")
-        .select("class_id, qm_classes:class_id(id, name)")
+        .from("lms_class_educators")
+        .select("class_id, lms_classes:class_id(id, name)")
         .eq("educator_id", user.id);
       const list: Klass[] = [];
       (owned ?? []).forEach((c) => list.push({ id: c.id as string, name: c.name as string }));
       (coed ?? []).forEach((row) => {
-        const raw = (row as { qm_classes?: { id: string; name: string } | { id: string; name: string }[] }).qm_classes;
+        const raw = (row as { lms_classes?: { id: string; name: string } | { id: string; name: string }[] }).lms_classes;
         const c = Array.isArray(raw) ? raw[0] : raw;
         if (c && !list.find((x) => x.id === c.id)) list.push({ id: c.id, name: c.name });
       });

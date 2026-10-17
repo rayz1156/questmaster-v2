@@ -16,8 +16,8 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
   // Confirm this fileId actually belongs to this class's board (don't allow
   // a member of class A to fetch embed URLs for class B's videos).
   const { data: card } = await access.supa
-    .from('qm_learning_cards')
-    .select('id, adilo_file_id, video_thumbnail_url, video_duration_seconds, board_id, qm_learning_boards!inner(class_id)')
+    .from('lms_learning_cards')
+    .select('id, adilo_file_id, video_thumbnail_url, video_duration_seconds, board_id, lms_learning_boards!inner(class_id)')
     .eq('adilo_file_id', params.fileId)
     .maybeSingle();
   if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 });

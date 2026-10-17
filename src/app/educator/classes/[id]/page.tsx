@@ -4,7 +4,7 @@ import { useParams } from "next/navigation";
 import Link from "next/link";
 import { ListChecks, Users, BarChart3, Settings as SettingsIcon, GraduationCap, Copy, Trash2, Link as LinkIcon, User as UserIcon, Pencil, Check, X, Mail, Inbox, Search, ShieldCheck, UserPlus, ChevronDown, MoreHorizontal, Activity } from "lucide-react";
 import Shell from "@/components/Shell";
-import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, Klass, ClassInvite } from "@/lib/data";
+import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, endClass, reopenClass, Klass, ClassInvite } from "@/lib/data";
 import EducatorsCard from "@/components/EducatorsCard";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
 
@@ -95,13 +95,13 @@ export default function ClassDetail() {
     let arr = [...members];
     if(q){
       arr = arr.filter(m => {
-        const name = (m.qm_profiles?.display_name || "").toLowerCase();
-        const email = (m.qm_profiles?.email || "").toLowerCase();
+        const name = (m.lms_profiles?.display_name || "").toLowerCase();
+        const email = (m.lms_profiles?.email || "").toLowerCase();
         return name.includes(q) || email.includes(q);
       });
     }
     if(sortBy === "name"){
-      arr.sort((a,b) => (a.qm_profiles?.display_name||"").localeCompare(b.qm_profiles?.display_name||""));
+      arr.sort((a,b) => (a.lms_profiles?.display_name||"").localeCompare(b.lms_profiles?.display_name||""));
     } else if (sortBy === "joined"){
       arr.sort((a,b) => new Date(a.joined_at||0).getTime() - new Date(b.joined_at||0).getTime());
     } else {
@@ -136,6 +136,46 @@ export default function ClassDetail() {
               </div>
             )}
             {klass.description && <div className="text-xs text-gray-500 mt-0.5">{klass.description}</div>}
+                {/* class-end-banner */}
+                {klass.ended_at ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-2 rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <Inbox className="w-4 h-4 shrink-0"/>
+                    <span className="flex-1 min-w-0">
+                      <span className="font-semibold">This class has ended</span>
+                      <span className="text-amber-700"> on {new Date(klass.ended_at).toLocaleDateString(undefined,{month:'short',day:'numeric',year:'numeric'})}.</span>
+                      <span className="text-amber-700"> Students keep read access. New joins and submissions are blocked.</span>
+                    </span>
+                    <button
+                      className="btn-secondary py-1 px-2 text-xs whitespace-nowrap"
+                      disabled={busy}
+                      onClick={async ()=>{
+                        const ok = await confirm({ title:'Reopen this class?', description:'Students will be able to submit again. New students can join with the code.', confirmLabel:'Reopen class', tone:'default' });
+                        if(!ok) return;
+                        setBusy(true); setMsg(null);
+                        try{ await reopenClass(klass.id); setMsg('Class reopened'); await reload(); }
+                        catch(err:any){ setMsg(err.message||'Failed to reopen'); }
+                        finally{ setBusy(false); }
+                      }}>
+                      Reopen class
+                    </button>
+                  </div>
+                ) : (
+                  <div className="mt-3 flex justify-end">
+                    <button
+                      className="text-xs text-gray-500 hover:text-amber-700 underline underline-offset-2 decoration-dotted"
+                      disabled={busy}
+                      onClick={async ()=>{
+                        const ok = await confirm({ title:'End this class?', description:'New students will not be able to join with the code, and submissions will be closed. Students keep read access to materials and the leaderboard. You can reopen the class anytime.', confirmLabel:'End class', tone:'danger' });
+                        if(!ok) return;
+                        setBusy(true); setMsg(null);
+                        try{ await endClass(klass.id); setMsg('Class ended'); await reload(); }
+                        catch(err:any){ setMsg(err.message||'Failed to end class'); }
+                        finally{ setBusy(false); }
+                      }}>
+                      End class
+                    </button>
+                  </div>
+                )}
           </div>
         </div>
 
@@ -251,8 +291,8 @@ export default function ClassDetail() {
               </thead>
               <tbody className="divide-y divide-gray-100">
                 {filteredMembers.map((m:any) => {
-                  const name = m.qm_profiles?.display_name || (m.user_id ? ('User ' + String(m.user_id).slice(0,8)) : 'User');
-                  const email = m.qm_profiles?.email || '';
+                  const name = m.lms_profiles?.display_name || (m.user_id ? ('User ' + String(m.user_id).slice(0,8)) : 'User');
+                  const email = m.lms_profiles?.email || '';
                   const seed = m.user_id || name;
                   const pal = paletteFor(String(seed));
                   const inactive = false; // placeholder - no last_active field yet
@@ -273,7 +313,7 @@ export default function ClassDetail() {
                         )}
                       </td>
                       <td className="px-5 py-3 text-gray-700">{formatJoined(m.joined_at)}</td>
-                      <td className="px-5 py-3 text-gray-700">{formatLastActive(m.qm_profiles?.last_active_at || m.joined_at)}</td>
+                      <td className="px-5 py-3 text-gray-700">{formatLastActive(m.lms_profiles?.last_active_at || m.joined_at)}</td>
                       <td className="px-5 py-3 text-right">
                         <button onClick={async()=>{ if((await confirm({ title: 'Remove this member?', tone: 'danger' }))){ await removeClassMember(id, m.user_id); reload(); } }} title="Remove member" className="inline-flex items-center justify-center w-8 h-8 rounded-lg text-gray-400 hover:text-red-600 hover:bg-red-50"><MoreHorizontal className="w-4 h-4"/></button>
                       </td>

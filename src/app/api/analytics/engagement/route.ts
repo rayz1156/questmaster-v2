@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
 
     // Call the SQL helper function (defined in the migration) which enforces
     // class ownership/co-educator membership via RLS.
-    const { data, error } = await supa.rpc('qm_engagement_summary', {
+    const { data, error } = await supa.rpc('lms_engagement_summary', {
       p_class_id: class_id,
     });
     if (error) {

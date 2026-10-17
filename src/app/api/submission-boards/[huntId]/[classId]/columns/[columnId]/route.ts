@@ -29,7 +29,7 @@ export async function PATCH(
   }
 
   const { data, error } = await supa
-    .from('qm_submission_board_columns')
+    .from('lms_submission_board_columns')
     .update(updates)
     .eq('id', params.columnId)
     .select('*')
@@ -53,12 +53,12 @@ export async function DELETE(
 
   // Pre-check: count items in this column for a clearer error message.
   const { count } = await supa
-    .from('qm_submission_board_items')
+    .from('lms_submission_board_items')
     .select('id', { count: 'exact', head: true })
     .eq('column_id', params.columnId);
 
   const { error } = await supa
-    .from('qm_submission_board_columns')
+    .from('lms_submission_board_columns')
     .delete()
     .eq('id', params.columnId);
 

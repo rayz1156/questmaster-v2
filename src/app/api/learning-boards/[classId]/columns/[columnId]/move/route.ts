@@ -16,14 +16,14 @@ export async function PATCH(
   const action = String(body?.action || '').toLowerCase();
 
   const { data: col, error: colErr } = await admin
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .select('id, board_id, position')
     .eq('id', params.columnId)
     .single();
   if (colErr || !col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
 
   const { data: board } = await admin
-    .from('qm_learning_boards')
+    .from('lms_learning_boards')
     .select('id, class_id')
     .eq('id', col.board_id)
     .single();
@@ -32,7 +32,7 @@ export async function PATCH(
   }
 
   const { data: list, error: listErr } = await admin
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .select('id, position')
     .eq('board_id', col.board_id)
     .order('position', { ascending: true })
@@ -62,7 +62,7 @@ export async function PATCH(
 
   for (let i = 0; i < next.length; i++) {
     const { error } = await admin
-      .from('qm_learning_columns')
+      .from('lms_learning_columns')
       .update({ position: i })
       .eq('id', next[i].id);
     if (error) return NextResponse.json({ error: error.message }, { status: 500 });

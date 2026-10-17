@@ -121,7 +121,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
     } finally { refresh(); }
   }, [classId, refresh]);
 
-  if (loading && !snap) return <div className="text-gray-600 p-8">Loading…</div>;
+  if (loading && !snap) return <div className="text-gray-600 p-8">Loadingâ¦</div>;
   if (error) return <div className="text-red-400 p-8">Error: {error}</div>;
   if (!snap || !snap.board) {
     return (
@@ -252,33 +252,33 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
         />
       )}
     {impOpen && (
-      <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" onClick={()=>!impBusy && setImpOpen(false)}>
+   <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" >
         <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
           <div className="flex items-center justify-between mb-3">
             <h3 className="text-base font-semibold text-gray-900">Import learning board</h3>
-            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="text-gray-500 hover:text-gray-900">✕</button>
+            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="text-gray-500 hover:text-gray-900">â</button>
           </div>
           <p className="text-xs text-gray-600 mb-3">Copy columns and cards from another class you own or co-educate. File references are reused (no re-upload).</p>
           <label className="block text-xs font-medium text-gray-700 mb-1">Source class</label>
           <select value={impSourceId} onChange={(e)=>setImpSourceId(e.target.value)} disabled={impLoading || impBusy} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 bg-white">
-            <option value="">{impLoading ? 'Loading…' : '— Select a class —'}</option>
+            <option value="">{impLoading ? 'Loadingâ¦' : 'â Select a class â'}</option>
             {impClasses.map((c:any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
           </select>
           <label className="block text-xs font-medium text-gray-700 mb-1">Mode</label>
           <div className="space-y-1.5 mb-4">
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input type="radio" name="impmode" value="append" checked={impMode==='append'} onChange={()=>setImpMode('append')} className="mt-1"/>
-              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">— add source columns after existing ones (safe)</span></span>
+              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">â add source columns after existing ones (safe)</span></span>
             </label>
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input type="radio" name="impmode" value="replace" checked={impMode==='replace'} onChange={()=>setImpMode('replace')} className="mt-1"/>
-              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">— delete the current board on this class first</span></span>
+              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">â delete the current board on this class first</span></span>
             </label>
           </div>
           {impErr && <div className="text-xs text-red-600 mb-2">{impErr}</div>}
           <div className="flex items-center justify-end gap-2">
             <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-700">Cancel</button>
-            <button onClick={onImport} disabled={impBusy || !impSourceId} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm disabled:opacity-60">{impBusy ? 'Importing…' : 'Import'}</button>
+            <button onClick={onImport} disabled={impBusy || !impSourceId} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm disabled:opacity-60">{impBusy ? 'Importingâ¦' : 'Import'}</button>
           </div>
         </div>
       </div>
@@ -394,7 +394,7 @@ function ColumnCard({
         }}
         onDragEnd={() => onColumnDragEnd()}
       >
-        <span className={`select-none ${isEditor ? 'text-gray-600 cursor-grab active:cursor-grabbing' : 'text-gray-400'}`} aria-hidden title={isEditor ? 'Drag column to reorder' : ''}>≡</span>
+        <span className={`select-none ${isEditor ? 'text-gray-600 cursor-grab active:cursor-grabbing' : 'text-gray-400'}`} aria-hidden title={isEditor ? 'Drag column to reorder' : ''}>â¡</span>
         <div className="flex-1 flex items-center gap-2 min-w-0">
         <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${cardGradient(column.title || column.id).from}, ${cardGradient(column.title || column.id).to})` }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -407,7 +407,7 @@ function ColumnCard({
               className="text-gray-600 hover:text-gray-900 px-1"
               aria-label="Column menu"
               onClick={() => onToggleMenu(!menuOpen)}
-            >…</button>
+            >â¦</button>
             {menuOpen && (
               <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
                 <button onClick={renameColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">Rename</button>
@@ -626,10 +626,10 @@ function CardRenderer({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={card.video_thumbnail_url} alt={card.title || ''} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Processing…</div>
+              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Processingâ¦</div>
             )}
             <div className="absolute inset-0 flex items-center justify-center">
-              <div className="bg-black/60 rounded-full w-12 h-12 flex items-center justify-center text-white">▶</div>
+              <div className="bg-black/60 rounded-full w-12 h-12 flex items-center justify-center text-white">â¶</div>
             </div>
             {card.video_duration_seconds ? (
               <div className="absolute bottom-1 right-1 bg-black/50 text-white text-[10px] px-1.5 py-0.5 rounded">
@@ -661,7 +661,7 @@ function CardRenderer({
               rel="noopener noreferrer"
               className="absolute bottom-1 right-1 inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded-md hover:bg-indigo-500"
               title="Open link"
-            >Open ↗</a>
+            >Open â</a>
           </div>
         );
       }
@@ -682,7 +682,7 @@ function CardRenderer({
               <div className="w-14 h-14 rounded-xl bg-white/95 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                 <span className="text-2xl font-bold tracking-tight" style={{ color: grad.from }}>{letter}</span>
               </div>
-              <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 text-slate-700 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm" title="Open link">Open ↗</div>
+              <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 text-slate-700 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm" title="Open link">Open â</div>
             </div>
           )}
         </a>
@@ -700,6 +700,9 @@ function CardRenderer({
         <img src={card.image_url} alt={card.title || ''} className="w-full object-cover transition-opacity group-hover:opacity-90" />
       </button>
     );
+  }
+  if (card.card_type === 'chatbot' && card.chatbot_url) {
+    return <ChatbotCardBody url={card.chatbot_url} title={card.title} />;
   }
     if (card.card_type === 'file' && card.file_url) {
       const ext = (card.file_extension || '').toLowerCase();
@@ -743,7 +746,7 @@ function CardRenderer({
           // eslint-disable-next-line @next/next/no-img-element
           <img src={card.link_favicon_url} alt="" className="w-4 h-4 rounded" />
         ) : (
-          <span aria-hidden>🔗</span>
+          <span aria-hidden>ð</span>
         )}
         <span className="truncate">{host}</span>
       </div>
@@ -756,7 +759,7 @@ function CardRenderer({
   return (
     <div className="bg-white border border-slate-200 rounded-xl p-3 relative shadow-[0_1px_2px_rgba(15,23,42,0.04)] hover:shadow-[0_4px_16px_rgba(15,23,42,0.08)] hover:border-slate-300 transition-all duration-150">
       <div className="flex items-center gap-2 mb-2">
-        <span className="text-gray-500 select-none flex-shrink-0" aria-hidden>≡</span>
+        <span className="text-gray-500 select-none flex-shrink-0" aria-hidden>â¡</span>
         <div className="flex-1" />
         {isEditor && (
           <div className="relative" onClick={(e) => e.stopPropagation()}>
@@ -764,7 +767,7 @@ function CardRenderer({
               className="text-gray-600 hover:text-gray-900 px-1"
               onClick={() => setMenuOpen((v) => !v)}
               aria-label="Card menu"
-            >…</button>
+            >â¦</button>
             {menuOpen && (
               <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
                 <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'top' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to top</button>
@@ -782,7 +785,7 @@ function CardRenderer({
                   } catch (e: any) {
                     alert('AI thumbnail failed: ' + (e?.message || 'unknown error'));
                   }
-                }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-indigo-600">✨ Generate AI thumbnail</button>
+                }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-indigo-600">â¨ Generate AI thumbnail</button>
               <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
               </div>
             )}
@@ -827,17 +830,17 @@ function AddCardModal({
 }) {
   const [tab, setTab] = useState<LearningCardType | 'qr'>('link');
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+  <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div
         className="bg-white border border-gray-200 rounded-xl w-full max-w-lg p-5 shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-xl font-semibold">Add card</h3>
-          <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
+          <button onClick={onClose} className="text-gray-600 hover:text-gray-900">â</button>
         </div>
         <div className="flex gap-1 mb-5 bg-white p-1 rounded-lg">
-          {(['link', 'qr', 'text', 'file', 'image', 'video'] as Array<LearningCardType | 'qr'>).map((t) => (
+          {(['link', 'qr', 'text', 'file', 'image', 'video', 'chatbot'] as Array<LearningCardType | 'qr'>).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -851,6 +854,7 @@ function AddCardModal({
         {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'file'  && <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
+      {tab === 'chatbot' && <ChatbotForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       </div>
     </div>
   );
@@ -977,7 +981,7 @@ function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: str
       />
       {stage !== 'idle' && stage !== 'done' && stage !== 'error' && (
         <div>
-          <div className="text-xs text-gray-600 mb-1 capitalize">{stage}… {progress > 0 && `${progress}%`}</div>
+          <div className="text-xs text-gray-600 mb-1 capitalize">{stage}â¦ {progress > 0 && `${progress}%`}</div>
           <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
             <div className="bg-indigo-500 h-full transition-all" style={{ width: `${progress}%` }} />
           </div>
@@ -1115,7 +1119,7 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
           disabled={uploading}
           className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500"
         />
-        {uploading && <div className="text-xs text-gray-500 mt-1">Uploading thumbnail…</div>}
+        {uploading && <div className="text-xs text-gray-500 mt-1">Uploading thumbnailâ¦</div>}
       </div>
 
       {err && <div className="text-red-400 text-xs">{err}</div>}
@@ -1123,7 +1127,7 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         onClick={submit}
         disabled={!url || busy || uploading}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Adding…' : 'Add link'}</button>
+      >{busy ? 'Addingâ¦' : 'Add link'}</button>
     </div>
   );
 }
@@ -1228,7 +1232,7 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
       />
       {file && (
         <div className="text-xs text-gray-600">
-          {file.name} · {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
+          {file.name} Â· {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
         </div>
       )}
       <input
@@ -1246,7 +1250,7 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
         onClick={submit}
         disabled={!file || busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Uploading…' : 'Add image'}</button>
+      >{busy ? 'Uploadingâ¦' : 'Add image'}</button>
     </div>
   );
 }
@@ -1287,7 +1291,7 @@ function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         onClick={submit}
         disabled={busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Adding…' : 'Add note'}</button>
+      >{busy ? 'Addingâ¦' : 'Add note'}</button>
     </div>
   );
 }
@@ -1357,7 +1361,7 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
       />
       {file && (
         <div className="text-xs text-gray-600">
-          {file.name} · {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
+          {file.name} Â· {file.size >= 1024 * 1024 ? `${(file.size / 1024 / 1024).toFixed(1)} MB` : `${Math.round(file.size / 1024)} KB`}
         </div>
       )}
       <input
@@ -1375,7 +1379,7 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         onClick={submit}
         disabled={!file || busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Uploading…' : 'Upload file'}</button>
+      >{busy ? 'Uploadingâ¦' : 'Upload file'}</button>
       <div className="text-[11px] text-gray-500">Supports PDF, Word, Excel, PowerPoint, text, archives, and more (up to 50 MB).</div>
     </div>
   );
@@ -1484,7 +1488,7 @@ function MoodBoardGrid({
           <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Mood Board</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">{allCards.length} item{allCards.length === 1 ? '' : 's'} · {snap.columns.length} topic{snap.columns.length === 1 ? '' : 's'}</span>
+          <span className="text-xs text-slate-500">{allCards.length} item{allCards.length === 1 ? '' : 's'} Â· {snap.columns.length} topic{snap.columns.length === 1 ? '' : 's'}</span>
           {isEditor && (
             <button
               onClick={() => setPickerOpen(true)}
@@ -1550,17 +1554,17 @@ function MoodBoardGrid({
             className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-5 text-gray-900"
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold">Add resource to…</h3>
-              <button onClick={() => setPickerOpen(false)} className="text-gray-500 hover:text-gray-900">×</button>
+              <h3 className="text-base font-semibold">Add resource toâ¦</h3>
+              <button onClick={() => setPickerOpen(false)} className="text-gray-500 hover:text-gray-900">Ã</button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">Pick a topic for the new card. Choose “No topic” to add it without a category.</p>
+            <p className="text-xs text-slate-400 mb-3">Pick a topic for the new card. Choose âNo topicâ to add it without a category.</p>
             <div className="max-h-[55vh] overflow-y-auto pr-1 -mr-1 space-y-1.5">
               <button
                 onClick={() => handleStartAdd(null)}
                 disabled={creatingUncat}
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-dashed border-white/15 text-left disabled:opacity-60"
               >
-                <span className="inline-flex w-6 h-6 rounded-md items-center justify-center bg-slate-800 text-slate-300 text-xs">—</span>
+                <span className="inline-flex w-6 h-6 rounded-md items-center justify-center bg-slate-800 text-slate-300 text-xs">â</span>
                 <span className="text-sm">No topic <span className="text-slate-500">(Uncategorized)</span></span>
               </button>
               {snap.columns.map((c) => {
@@ -1592,7 +1596,7 @@ function MoodBoardGrid({
 
 
 // -----------------------------------------------------------------------------
-// AI Thumbnail Batch Button — drives the SSE stream from /ai-thumbnail-all.
+// AI Thumbnail Batch Button â drives the SSE stream from /ai-thumbnail-all.
 // -----------------------------------------------------------------------------
 function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: () => void }) {
   const [confirmOpen, setConfirmOpen] = useState(false);
@@ -1672,11 +1676,11 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
         title="Generate AI thumbnails for cards without a real image"
         className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-400 hover:to-fuchsia-400 text-white shadow disabled:opacity-60"
       >
-        ✨ {running ? `${progress?.processed ?? 0}/${progress?.total ?? '…'}` : 'AI thumbnails'}
+        â¨ {running ? `${progress?.processed ?? 0}/${progress?.total ?? 'â¦'}` : 'AI thumbnails'}
       </button>
 
       {confirmOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" onClick={() => setConfirmOpen(false)}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" >
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-5" onClick={(e)=>e.stopPropagation()}>
             <h3 className="text-lg font-semibold text-gray-900 mb-2">Generate AI thumbnails?</h3>
             <p className="text-sm text-gray-600">This will create AI-generated images for every card that is still using the default gradient tile. It uses free AI providers (AI Horde &rarr; Cloudflare &rarr; Hugging Face &rarr; Pollinations) in parallel and may take several minutes depending on queue load. Existing custom thumbnails are not touched.</p>
@@ -1691,10 +1695,10 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
       {running && progress && (
         <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl bg-white text-gray-900 border border-gray-200 shadow-2xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold">✨ Generating AI thumbnails</div>
+            <div className="text-sm font-semibold">â¨ Generating AI thumbnails</div>
             <button onClick={() => abortRef.current?.abort()} className="text-xs text-gray-500 hover:text-gray-900">Cancel</button>
           </div>
-          <div className="text-xs text-gray-500 mb-2">{progress.processed} / {progress.total} · {progress.succeeded} ok · {progress.failed} failed</div>
+          <div className="text-xs text-gray-500 mb-2">{progress.processed} / {progress.total} Â· {progress.succeeded} ok Â· {progress.failed} failed</div>
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-indigo-400 to-fuchsia-400 transition-all" style={{ width: `${progress.total ? (progress.processed / progress.total) * 100 : 0}%` }} />
           </div>
@@ -1769,11 +1773,11 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
   };
 
   return (
-    <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" onClick={onClose}>
+  <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
           <h3 className="text-lg font-semibold text-gray-900">Edit card</h3>
-          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">✕</button>
+          <button onClick={onClose} className="text-gray-500 hover:text-gray-800">â</button>
         </div>
 
         <div className="space-y-3">
@@ -1817,17 +1821,88 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadThumb(f); }}
                 disabled={uploading}
                 className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500" />
-              {uploading && <div className="text-xs text-gray-500 mt-1">Working…</div>}
+              {uploading && <div className="text-xs text-gray-500 mt-1">Workingâ¦</div>}
             </div>
           )}
           {err && <div className="text-red-500 text-xs">{err}</div>}
           <div className="flex justify-end gap-2 pt-2">
             <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">Cancel</button>
             <button onClick={save} disabled={busy || uploading}
-              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-md">{busy ? 'Saving…' : 'Save'}</button>
+              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-md">{busy ? 'Savingâ¦' : 'Save'}</button>
           </div>
         </div>
       </div>
+    </div>
+  );
+}
+
+function ChatbotCardBody({ url, title }: { url: string; title: string | null }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <div className="w-full">
+      <button
+        onClick={() => setOpen(true)}
+        className="flex items-center gap-3 rounded-md bg-white p-3 hover:bg-slate-50 transition-colors w-full text-left"
+      >
+        <div className="w-12 h-12 rounded-md flex items-center justify-center bg-indigo-100 text-indigo-600 text-xs font-bold">
+          AI
+        </div>
+        <div className="flex-1 min-w-0">
+          <div className="text-sm font-medium text-gray-900 truncate">{title || 'Learning Assistant'}</div>
+          <div className="text-xs text-indigo-600">Chat with assistant</div>
+        </div>
+      </button>
+      {open && (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" >
+          <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
+              <div className="text-sm font-semibold text-gray-900">{title || 'Learning Assistant'}</div>
+              <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-900 text-lg leading-none px-2">{'\u00D7'}</button>
+            </div>
+            <iframe src={url} title={title || 'Assistant'} className="flex-1 w-full border-0" />
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ChatbotForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const [title, setTitle] = useState('');
+  const [url, setUrl] = useState('');
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const submit = async () => {
+    if (!url) { setErr('Enter the assistant embed URL'); return; }
+    let finalUrl = url.trim();
+    if (/landrr/i.test(finalUrl) && !/^https?:\/\//i.test(finalUrl)) {
+      const m = finalUrl.match(/source\s*[:=]\s*['\"]([A-Za-z0-9+/=_-]+)['\"]/);
+      if (m && m[1]) { finalUrl = '/embeds/landrr-chat.html?source=' + encodeURIComponent(m[1]); }
+      else { setErr('Could not find the chatbot token in that embed code.'); return; }
+    }
+    let valid = false;
+    if (finalUrl.startsWith('/embeds/')) { valid = true; }
+    else { try { valid = new URL(finalUrl).protocol === 'https:'; } catch { valid = false; } }
+    if (!valid) { setErr('Paste an https:// iframe URL or a chatbot script embed (e.g. Landrr).'); return; }
+    setBusy(true); setErr(null);
+    try {
+      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ columnId, cardType: 'chatbot', title: title || null, chatbotUrl: finalUrl, insertIndex }),
+      });
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || 'Failed');
+      onCreated();
+    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
+  };
+  return (
+    <div className="space-y-3">
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Assistant embed URL (https://...)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
+      <p className="text-xs text-gray-500">Paste an https:// iframe URL, or paste a chatbot script embed (Landrr supported).</p>
+      {err && <div className="text-red-400 text-xs">{err}</div>}
+      <button onClick={submit} disabled={busy} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm">{busy ? 'Adding...' : 'Add assistant'}</button>
     </div>
   );
 }

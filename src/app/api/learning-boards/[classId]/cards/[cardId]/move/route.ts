@@ -17,7 +17,7 @@ export async function PATCH(
 
   // Load the card
   const { data: card, error: cardErr } = await admin
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .select('id, board_id, column_id, position')
     .eq('id', params.cardId)
     .single();
@@ -25,7 +25,7 @@ export async function PATCH(
 
   // Verify the board belongs to this class
   const { data: board } = await admin
-    .from('qm_learning_boards')
+    .from('lms_learning_boards')
     .select('id, class_id')
     .eq('id', card.board_id)
     .single();
@@ -36,7 +36,7 @@ export async function PATCH(
   // Helper: load all cards in a column ordered
   async function loadColumnCards(columnId: string) {
     const { data, error } = await admin
-      .from('qm_learning_cards')
+      .from('lms_learning_cards')
       .select('id, position')
       .eq('column_id', columnId)
       .order('position', { ascending: true })
@@ -50,7 +50,7 @@ export async function PATCH(
     // Update each row whose new position differs
     for (let i = 0; i < rows.length; i++) {
       const { error } = await admin
-        .from('qm_learning_cards')
+        .from('lms_learning_cards')
         .update({ position: i, column_id: columnId })
         .eq('id', rows[i].id);
       if (error) throw new Error(error.message);
@@ -82,7 +82,7 @@ export async function PATCH(
 
       // Verify target column belongs to same board
       const { data: targetCol } = await admin
-        .from('qm_learning_columns')
+        .from('lms_learning_columns')
         .select('id, board_id')
         .eq('id', targetColumnId)
         .single();

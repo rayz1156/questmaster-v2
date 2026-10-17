@@ -1,9 +1,9 @@
 module.exports = {
   apps: [{
-    name: 'questmaster-v2',
+    name: 'kuizen-lms',
     script: 'node_modules/.bin/next',
-    args: 'start -p 3004',
-    cwd: '/var/www/questmaster-v2',
+    args: 'start -p 3011',
+    cwd: '/var/www/kuizen-lms',
     env: {
       NODE_ENV: 'production',
     },

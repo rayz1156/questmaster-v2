@@ -9,10 +9,10 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const admin = getServiceSupabase();
   const { title } = await req.json().catch(() => ({}));
   if (!title || typeof title !== 'string') return NextResponse.json({ error: 'title required' }, { status: 400 });
-  const { data: board } = await admin.from('qm_learning_boards').select('id').eq('class_id', params.classId).single();
+  const { data: board } = await admin.from('lms_learning_boards').select('id').eq('class_id', params.classId).single();
   if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
   const { data: maxRow } = await owner.supa
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .select('position')
     .eq('board_id', board.id)
     .order('position', { ascending: false })
@@ -20,7 +20,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .maybeSingle();
   const nextPos = (maxRow?.position ?? -1) + 1;
   const { data, error } = await owner.supa
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .insert({ board_id: board.id, title, position: nextPos })
     .select('*')
     .single();

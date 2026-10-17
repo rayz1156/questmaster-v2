@@ -12,7 +12,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
   const classId = params.classId;
 
   let { data: board } = await supa
-    .from('qm_learning_boards')
+    .from('lms_learning_boards')
     .select('*')
     .eq('class_id', classId)
     .maybeSingle();
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
     const owner = await requireClassMember(req, classId);
     if (owner.response) return NextResponse.json({ board: null, columns: [] });
     const { data: created, error: cErr } = await owner.supa
-      .from('qm_learning_boards')
+      .from('lms_learning_boards')
       .insert({ class_id: classId, title: 'Learning Board' })
       .select('*')
       .single();
@@ -31,13 +31,13 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
   }
 
   const { data: columns } = await supa
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .select('*')
     .eq('board_id', board.id)
     .order('position', { ascending: true });
 
   const { data: cards } = await supa
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .select('*')
     .eq('board_id', board.id)
     .order('position', { ascending: true });
@@ -56,7 +56,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
         if (info.thumbnailUrl) updates.video_thumbnail_url = info.thumbnailUrl;
         if (typeof info.durationSeconds === 'number' && !c.video_duration_seconds) updates.video_duration_seconds = info.durationSeconds;
         if (Object.keys(updates).length) {
-          await admin.from('qm_learning_cards').update(updates).eq('id', c.id);
+          await admin.from('lms_learning_cards').update(updates).eq('id', c.id);
           Object.assign(c, updates);
         }
       } catch { /* ignore - Adilo may still be processing */ }
@@ -80,7 +80,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
   if (typeof body.is_published === 'boolean') updates.is_published = body.is_published;
   if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
   const { data, error } = await owner.supa
-    .from('qm_learning_boards')
+    .from('lms_learning_boards')
     .update(updates)
     .eq('class_id', params.classId)
     .select('*')

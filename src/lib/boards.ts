@@ -1,6 +1,6 @@
 // =============================================================================
 // Boards data layer (Padlet/Wakelet-style content sharing for Kuizen)
-// Tables: qm_boards, qm_intro_posts, qm_group_submissions
+// Tables: lms_boards, lms_intro_posts, lms_group_submissions
 // Storage buckets: intro-photos, quest-submissions
 // =============================================================================
 import { supabase } from './supabase';
@@ -47,7 +47,7 @@ export interface IntroPost {
   video_adilo_project_id?: string | null;
   video_thumbnail_url?: string | null;
   video_duration_seconds?: number | null;
-  // Live profile bio (joined from qm_profiles) - overrides description when present
+  // Live profile bio (joined from lms_profiles) - overrides description when present
   author_bio?: string | null;
   author_display_name?: string | null;
   author_avatar_url?: string | null;
@@ -88,7 +88,7 @@ export interface GroupSubmission {
 // ============================== BOARDS =====================================
 export async function getBoardForClass(classId: string): Promise<Board | null> {
   const { data, error } = await supabase
-    .from('qm_boards')
+    .from('lms_boards')
     .select('*')
     .eq('class_id', classId)
     .eq('board_type', 'introduction')
@@ -99,7 +99,7 @@ export async function getBoardForClass(classId: string): Promise<Board | null> {
 
 export async function getBoardForHunt(huntId: string): Promise<Board | null> {
   const { data, error } = await supabase
-    .from('qm_boards')
+    .from('lms_boards')
     .select('*')
     .eq('hunt_id', huntId)
     .eq('board_type', 'quest_submission')
@@ -110,7 +110,7 @@ export async function getBoardForHunt(huntId: string): Promise<Board | null> {
 
 export async function getBoard(boardId: string): Promise<Board | null> {
   const { data, error } = await supabase
-    .from('qm_boards').select('*').eq('id', boardId).maybeSingle();
+    .from('lms_boards').select('*').eq('id', boardId).maybeSingle();
   if (error) throw error;
   return data as Board | null;
 }
@@ -118,7 +118,7 @@ export async function getBoard(boardId: string): Promise<Board | null> {
 export async function updateBoard(boardId: string, patch: Partial<Pick<Board,
   'title'|'description'|'layout_mode'|'cover_color'|'due_date'|'max_score'|'show_scores_publicly'|'is_archived'
 >>) {
-  const { error } = await supabase.from('qm_boards').update(patch).eq('id', boardId);
+  const { error } = await supabase.from('lms_boards').update(patch).eq('id', boardId);
   if (error) throw error;
 }
 
@@ -131,28 +131,28 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
   // Auto-populate: every class member (educator + student) shows up using their current profile.
   // 1. Find the board's class_id.
   const { data: board, error: bErr } = await supabase
-    .from('qm_boards').select('id, class_id, created_at').eq('id', boardId).maybeSingle();
+    .from('lms_boards').select('id, class_id, created_at').eq('id', boardId).maybeSingle();
   if (bErr) throw bErr;
   if (!board?.class_id) return [];
   // 2a. Educators of that class (owners + co-creators) -- shown first, at the top.
   let educatorIds: string[] = [];
   try {
-    const { data: eds } = await supabase.rpc('qm_list_class_educators', { p_class: board.class_id });
+    const { data: eds } = await supabase.rpc('lms_list_class_educators', { p_class: board.class_id });
     educatorIds = ((eds || []) as any[]).map((e: any) => (e.educator_id || e.id) as string).filter(Boolean);
   } catch { /* RPC may not be available in some envs; ignore */ }
   // 2b. ALL class members (educators + students) via SECURITY DEFINER RPC.
-  //     Direct SELECT on qm_class_members is restricted by RLS to caller's own row,
-  //     so we use qm_list_class_members which returns every member if the caller
+  //     Direct SELECT on lms_class_members is restricted by RLS to caller's own row,
+  //     so we use lms_list_class_members which returns every member if the caller
   //     is themselves a member/educator/admin.
   let memberIds: string[] = [];
   try {
-    const { data: members, error: mErr } = await supabase.rpc('qm_list_class_members', { p_class: board.class_id });
+    const { data: members, error: mErr } = await supabase.rpc('lms_list_class_members', { p_class: board.class_id });
     if (mErr) throw mErr;
     memberIds = ((members || []) as any[]).map((m: any) => m.user_id as string).filter(Boolean);
   } catch {
     // RPC unavailable on older envs: fall back to direct SELECT (will only return caller's row under RLS).
     const { data: members, error: mErr } = await supabase
-      .from('qm_class_members').select('user_id').eq('class_id', board.class_id);
+      .from('lms_class_members').select('user_id').eq('class_id', board.class_id);
     if (mErr) throw mErr;
     memberIds = (members || []).map((m: any) => m.user_id as string).filter(Boolean);
   }
@@ -162,7 +162,7 @@ export async function listIntroPosts(boardId: string): Promise<IntroPost[]> {
   if (allIds.length === 0) return [];
   // 4. Fetch profiles for everyone.
   const { data: profs, error: pErr } = await supabase
-    .from('qm_profiles')
+    .from('lms_profiles')
     .select('id, display_name, bio, avatar_url, intro_display_name, intro_media_type, intro_image_file_code, intro_video_adilo_file_id, intro_video_adilo_project_id, intro_video_thumbnail_url, intro_video_duration_seconds, intro_media_updated_at')
     .in('id', allIds);
   if (pErr) throw pErr;
@@ -218,7 +218,7 @@ export async function getMyIntroPost(boardId: string): Promise<IntroPost | null>
   const { data: u } = await supabase.auth.getUser();
   if (!u.user) return null;
   const { data, error } = await supabase
-    .from('qm_intro_posts')
+    .from('lms_intro_posts')
     .select('*')
     .eq('board_id', boardId)
     .eq('author_id', u.user.id)
@@ -273,7 +273,7 @@ export async function createOrUpdateIntroPost(input: {
     image_path,
   };
   const { data, error } = await supabase
-    .from('qm_intro_posts')
+    .from('lms_intro_posts')
     .upsert(row, { onConflict: 'board_id,author_id' })
     .select('*')
     .single();
@@ -283,8 +283,8 @@ export async function createOrUpdateIntroPost(input: {
 
 export async function deleteIntroPost(postId: string): Promise<void> {
   const { data: post } = await supabase
-    .from('qm_intro_posts').select('image_path').eq('id', postId).maybeSingle();
-  const { error } = await supabase.from('qm_intro_posts').delete().eq('id', postId);
+    .from('lms_intro_posts').select('image_path').eq('id', postId).maybeSingle();
+  const { error } = await supabase.from('lms_intro_posts').delete().eq('id', postId);
   if (error) throw error;
   if (post?.image_path) {
     await supabase.storage.from('intro-photos').remove([post.image_path]).catch(() => {});
@@ -293,7 +293,7 @@ export async function deleteIntroPost(postId: string): Promise<void> {
 
 export async function hideIntroPost(postId: string, hide: boolean): Promise<void> {
   const { data: u } = await supabase.auth.getUser();
-  const { error } = await supabase.from('qm_intro_posts').update({
+  const { error } = await supabase.from('lms_intro_posts').update({
     is_hidden: hide,
     hidden_by: hide ? u.user?.id : null,
     hidden_at: hide ? new Date().toISOString() : null,
@@ -317,7 +317,7 @@ export function detectFileType(mime: string): FileType {
 
 export async function listGroupSubmissions(boardId: string): Promise<GroupSubmission[]> {
   const { data, error } = await supabase
-    .from('qm_group_submissions')
+    .from('lms_group_submissions')
     .select('*')
     .eq('board_id', boardId)
     .order('created_at', { ascending: false });
@@ -327,7 +327,7 @@ export async function listGroupSubmissions(boardId: string): Promise<GroupSubmis
 
 export async function getMyGroupSubmission(boardId: string, teamId: string): Promise<GroupSubmission | null> {
   const { data, error } = await supabase
-    .from('qm_group_submissions')
+    .from('lms_group_submissions')
     .select('*')
     .eq('board_id', boardId)
     .eq('team_id', teamId)
@@ -338,7 +338,7 @@ export async function getMyGroupSubmission(boardId: string, teamId: string): Pro
 
 // Returns the team_id of the current user for the hunt linked to a board
 export async function getMyTeamForBoard(boardId: string): Promise<string | null> {
-  const { data, error } = await supabase.rpc('qm_my_team_for_board', { p_board_id: boardId });
+  const { data, error } = await supabase.rpc('lms_my_team_for_board', { p_board_id: boardId });
   if (error) throw error;
   return (data as string | null) || null;
 }
@@ -393,7 +393,7 @@ export async function createOrUpdateGroupSubmission(input: {
   // late detection: compare board.due_date
   let is_late = false;
   const { data: board } = await supabase
-    .from('qm_boards').select('due_date').eq('id', input.boardId).maybeSingle();
+    .from('lms_boards').select('due_date').eq('id', input.boardId).maybeSingle();
   if (board?.due_date) is_late = new Date() > new Date(board.due_date);
 
   const row = {
@@ -409,7 +409,7 @@ export async function createOrUpdateGroupSubmission(input: {
     score: null, feedback: null, graded_by: null, graded_at: null,
   };
   const { data, error } = await supabase
-    .from('qm_group_submissions')
+    .from('lms_group_submissions')
     .upsert(row, { onConflict: 'board_id,team_id' })
     .select('*')
     .single();
@@ -431,14 +431,14 @@ export async function gradeSubmission(submissionId: string, input: {
     graded_at: new Date().toISOString(),
   };
   const { error } = await supabase
-    .from('qm_group_submissions').update(patch).eq('id', submissionId);
+    .from('lms_group_submissions').update(patch).eq('id', submissionId);
   if (error) throw error;
 }
 
 export async function deleteGroupSubmission(submissionId: string): Promise<void> {
   const { data: row } = await supabase
-    .from('qm_group_submissions').select('file_path').eq('id', submissionId).maybeSingle();
-  const { error } = await supabase.from('qm_group_submissions').delete().eq('id', submissionId);
+    .from('lms_group_submissions').select('file_path').eq('id', submissionId).maybeSingle();
+  const { error } = await supabase.from('lms_group_submissions').delete().eq('id', submissionId);
   if (error) throw error;
   if (row?.file_path) {
     await supabase.storage.from('quest-submissions').remove([row.file_path]).catch(() => {});
@@ -451,12 +451,12 @@ export async function listTeamsForHunt(huntId: string): Promise<Array<{ id: stri
   // and class-level teams (current model). Every quest in a class auto-gets
   // a column per team in that class.
   const { data: hunt, error: hErr } = await supabase
-    .from('qm_hunts').select('class_id').eq('id', huntId).maybeSingle();
+    .from('lms_hunts').select('class_id').eq('id', huntId).maybeSingle();
   if (hErr) throw hErr;
   const classId = (hunt as any)?.class_id || null;
   const filter = classId ? `hunt_id.eq.${huntId},class_id.eq.${classId}` : `hunt_id.eq.${huntId}`;
   const { data, error } = await supabase
-    .from('qm_teams').select('id,name,score').or(filter).order('name');
+    .from('lms_teams').select('id,name,score').or(filter).order('name');
   if (error) throw error;
   // Deduplicate in case a team is linked by both hunt_id and class_id.
   const seen = new Set<string>();
@@ -471,13 +471,13 @@ export async function listTeamsForHunt(huntId: string): Promise<Array<{ id: stri
 
 export async function listTeamMembers(teamId: string): Promise<Array<{ user_id: string; display_name: string | null }>> {
   const { data, error } = await supabase
-    .from('qm_team_members')
-    .select('user_id, qm_profiles:qm_profiles!inner(display_name)')
+    .from('lms_team_members')
+    .select('user_id, lms_profiles:lms_profiles!inner(display_name)')
     .eq('team_id', teamId);
   if (error) throw error;
   return (data || []).map((r: any) => ({
     user_id: r.user_id,
-    display_name: r.qm_profiles?.display_name || null,
+    display_name: r.lms_profiles?.display_name || null,
   }));
 }
 
@@ -489,7 +489,7 @@ export interface HuntSubmissionLink {
 }
 export async function getHuntSubmissionLink(huntId: string): Promise<HuntSubmissionLink> {
   const { data, error } = await supabase
-    .from('qm_hunts')
+    .from('lms_hunts')
     .select('submission_link, submission_link_label, submission_link_embed')
     .eq('id', huntId)
     .single();

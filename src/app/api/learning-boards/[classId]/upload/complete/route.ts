@@ -49,14 +49,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   }
 
   const { data: col } = await owner.supa
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .select('id, board_id')
     .eq('id', columnId)
     .single();
   if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
 
   const { data: existingCards } = await owner.supa
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .select('id, position')
     .eq('column_id', columnId)
     .order('position', { ascending: true });
@@ -68,13 +68,13 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     for (let i = cardsList.length - 1; i >= 0; i--) {
       const c = cardsList[i];
       if (c.position >= insertIndex) {
-        await admin.from('qm_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
+        await admin.from('lms_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
       }
     }
   }
 
   const { data, error } = await owner.supa
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .insert({
       column_id: columnId,
       board_id: col.board_id,

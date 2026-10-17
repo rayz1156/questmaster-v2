@@ -15,16 +15,16 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
 
   // Look up board + class; ensure user is owner or member
   const { data: board } = await admin
-    .from('qm_boards').select('id, class_id').eq('id', params.boardId).single();
+    .from('lms_boards').select('id, class_id').eq('id', params.boardId).single();
   if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
   if (!board.class_id) return NextResponse.json({ error: 'Board has no class' }, { status: 400 });
 
   const { data: klass } = await admin
-    .from('qm_classes').select('id, owner_id').eq('id', board.class_id).single();
+    .from('lms_classes').select('id, owner_id').eq('id', board.class_id).single();
   if (!klass) return NextResponse.json({ error: 'Class not found' }, { status: 404 });
   if (klass.owner_id !== auth.user!.id) {
     const { data: member } = await admin
-      .from('qm_class_members').select('user_id').eq('class_id', board.class_id).eq('user_id', auth.user!.id).maybeSingle();
+      .from('lms_class_members').select('user_id').eq('class_id', board.class_id).eq('user_id', auth.user!.id).maybeSingle();
     if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   }
 

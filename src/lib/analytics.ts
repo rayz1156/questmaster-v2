@@ -18,10 +18,10 @@ export type AnalyticsEvent =
 
 function getSessionId(): string {
   if (typeof window === 'undefined') return '';
-  let sid = sessionStorage.getItem('qm_sid');
+  let sid = sessionStorage.getItem('lms_sid');
   if (!sid) {
     sid = (crypto.randomUUID?.() ?? Math.random().toString(36).slice(2)) + '-' + Date.now();
-    sessionStorage.setItem('qm_sid', sid);
+    sessionStorage.setItem('lms_sid', sid);
   }
   return sid;
 }

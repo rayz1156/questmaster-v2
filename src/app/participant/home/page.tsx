@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Home, Compass, Trophy, User as UserIcon, Users, GraduationCap, Zap, ClipboardList, BarChart3, ArrowRight, Megaphone, CheckCircle2, Clock, Star, KeyRound, BookOpen } from "lucide-react";
 import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
-import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, type Hunt } from "@/lib/data";
+import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
 
 const tabs = [
@@ -76,10 +76,10 @@ export default function Page() {
       } catch { setScores([]); }
       try {
         const { data } = await supabase
-          .from('qm_team_members')
-          .select('team_id, qm_teams!inner(class_id)')
+          .from('lms_team_members')
+          .select('team_id, lms_teams!inner(class_id)')
           .eq('user_id', (user as any).id)
-          .eq('qm_teams.class_id', activeClassId)
+          .eq('lms_teams.class_id', activeClassId)
           .maybeSingle();
         setMyTeamId((data as any)?.team_id ?? null);
       } catch { setMyTeamId(null); }
@@ -134,6 +134,36 @@ export default function Page() {
                 <span className="inline-block w-2 h-2 rounded-full bg-emerald-500" />
                 <span>Active class</span>
               </div>
+                {activeClass?.ended_at && (
+                  <div data-class-banner="ended" className="mt-3 flex items-start gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
+                    <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <div className="font-semibold">This class has ended.</div>
+                      <div className="text-amber-700 mt-0.5">You can still review the Learning Board, Activities and final Ranking. New submissions are closed.</div>
+                    </div>
+                  </div>
+                )}
+              {activeClassId && (
+                <button
+                  type="button"
+                  onClick={async () => {
+                    const target = classes.find((c: any) => c.id === activeClassId);
+                    if (!target) return;
+                    if (!confirm(`Leave "${target.name}"? You will lose access to its activities and rankings.`)) return;
+                    try {
+                      await leaveClassAsStudent(activeClassId);
+                      const remaining = classes.filter((c: any) => c.id !== activeClassId);
+                      setClasses(remaining);
+                      setActiveClassId(remaining[0]?.id || "");
+                    } catch (err: any) {
+                      alert(err?.message || "Failed to leave class");
+                    }
+                  }}
+                  className="mt-3 w-full text-xs font-medium text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded-lg px-3 py-2 transition"
+                >
+                  Leave this class
+                </button>
+              )}
             </div>
 
             <div className="bg-white rounded-2xl shadow-sm border border-slate-100 p-5">

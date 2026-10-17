@@ -44,7 +44,7 @@ function Inner() {
       setClasses(cls);
       const sel = huntId ? (list.find(h => h.id === huntId) || null) : (list[0] || null);
       setActive(sel);
-      const { data: tm } = await supabase.from('qm_team_members').select('team_id').eq('user_id', user.id);
+      const { data: tm } = await supabase.from('lms_team_members').select('team_id').eq('user_id', user.id);
       setMyTeamIds((((tm as any[]) || [])).map((r) => r.team_id).filter(Boolean));
       if (sel) {
         const cs = await listQuestCompletions(sel.id);

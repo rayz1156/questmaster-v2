@@ -18,14 +18,14 @@ export async function GET(req: NextRequest) {
 
   // RLS will enforce the educator can only read their own classes; if zero rows return, surface as forbidden
   const { data: hunts, error: huntsErr } = await supa
-    .from('qm_hunts')
+    .from('lms_hunts')
     .select('id,title,points,status,start_at,end_at,created_at')
     .eq('class_id', classId)
     .order('created_at', { ascending: true });
   if (huntsErr) return NextResponse.json({ error: huntsErr.message }, { status: 500 });
 
   const { count: memberCount } = await supa
-    .from('qm_class_members')
+    .from('lms_class_members')
     .select('*', { count: 'exact', head: true })
     .eq('class_id', classId);
 
@@ -35,7 +35,7 @@ export async function GET(req: NextRequest) {
   }
 
   const { data: challenges } = await supa
-    .from('qm_challenges')
+    .from('lms_challenges')
     .select('id,hunt_id,points')
     .in('hunt_id', huntIds);
 
@@ -50,7 +50,7 @@ export async function GET(req: NextRequest) {
   let submissions: { challenge_id: string; user_id: string; status: string; created_at: string }[] = [];
   if (challengeIds.length > 0) {
     const { data: subs } = await supa
-      .from('qm_submissions')
+      .from('lms_submissions')
       .select('challenge_id,user_id,status,created_at')
       .in('challenge_id', challengeIds);
     submissions = subs ?? [];

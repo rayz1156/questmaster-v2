@@ -35,7 +35,7 @@ export async function POST(req: NextRequest) {
 
     // Verify caller is owner of the class (using the user's RLS-scoped token)
     const { data: klass, error: kErr } = await supa
-      .from('qm_classes')
+      .from('lms_classes')
       .select('id, name, owner_id')
       .eq('id', classId)
       .single();
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
 
     // Inviter display name
     const { data: profile } = await supa
-      .from('qm_profiles')
+      .from('lms_profiles')
       .select('display_name')
       .eq('id', user.id)
       .maybeSingle();

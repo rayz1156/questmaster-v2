@@ -49,6 +49,7 @@ function TeamsInner() {
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<'name'|'members'|'score'>('name');
   const [selected, setSelected] = useState<Set<string>>(new Set());
+  const [bulkMarkHuntId, setBulkMarkHuntId] = useState<string>("");
   const [memberCountByTeam, setMemberCountByTeam] = useState<Record<string,number>>({});
 
   const reloadClassTeams = useCallback(async (classId: string) => {
@@ -58,7 +59,7 @@ function TeamsInner() {
       try {
         if (classId) {
           const { supabase } = await import('@/lib/supabaseClient');
-          const { data: cnts } = await supabase.rpc('qm_team_member_counts', { p_class_id: classId });
+          const { data: cnts } = await supabase.rpc('lms_team_member_counts', { p_class_id: classId });
           if (cnts) {
             const map: Record<string, number> = {};
             for (const r of cnts as any[]) map[r.team_id] = Number(r.cnt) || 0;
@@ -113,6 +114,7 @@ function TeamsInner() {
   const toggleOne = (id:string) => setSelected(p=>{ const s=new Set(p); if(s.has(id)) s.delete(id); else s.add(id); return s; });
   const toggleAll = () => setSelected(p=>p.size===teams.length?new Set():new Set(teams.map(t=>t.id)));
   const onBulkDelete = async () => { if(!selected.size) return; const ok = await showConfirm({ title: `Delete ${selected.size} team(s)?`, description: 'This action cannot be undone.', confirmLabel: 'Delete', tone: 'danger' }); if(!ok) return; await Promise.all(Array.from(selected).map(id=>deleteTeam(id))); await reloadClassTeams(activeClassId); };
+  const onBulkMarkComplete = async () => { if(!selected.size || !bulkMarkHuntId) return; const h = hunts.find(x=>x.id===bulkMarkHuntId); if(!h) return; const ok = await showConfirm({ title: `Mark "${h.title}" complete for ${selected.size} team(s)?`, description: 'Each team will receive the activity points. Already-completed teams are skipped.', confirmLabel: 'Mark Complete' }); if(!ok) return; const ids = Array.from(selected); let okN=0, skipN=0, failN=0; for (const tid of ids) { const exists = completions.find(c=>c.hunt_id===bulkMarkHuntId && c.team_id===tid); if(exists){skipN++; continue;} try { await markTeamCompletion(bulkMarkHuntId, tid); okN++; } catch(e:any){ if(String(e?.message||'').toLowerCase().includes('duplicate')) skipN++; else failN++; } } await reloadCompletions(activeId); await reloadClassTeams(activeClassId); alert(`Bulk mark: ${okN} marked, ${skipN} already done, ${failN} failed.`); };
 
   const sel = teams.find(t=>t.id===selectedTeamId);
   const filtered = teams.filter(t=>!search||t.name?.toLowerCase().includes(search.toLowerCase())).sort((a:any,b:any)=>{
@@ -151,7 +153,11 @@ function TeamsInner() {
             <div className="flex items-center gap-2 mb-2">
               <label className="text-xs text-gray-500">Sort by:</label>
               <select value={sortBy} onChange={e=>setSortBy(e.target.value as any)} className="text-xs border border-gray-200 rounded-md px-2 py-1 bg-white"><option value="name">Name</option><option value="members">Members</option><option value="score">Score</option></select>
-              {selected.size>0 && <button onClick={onBulkDelete} className="ml-auto text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded-md"><Trash2 className="w-3 h-3 inline mr-0.5"/>{selected.size}</button>}
+              {selected.size>0 && hunts.length>0 && (<>
+              <select value={bulkMarkHuntId} onChange={e=>setBulkMarkHuntId(e.target.value)} className="text-xs border border-gray-300 rounded px-2 py-1 ml-2" data-testid="bulk-hunt-select"><option value="">— Activity —</option>{hunts.map(h=>(<option key={h.id} value={h.id}>{h.title}</option>))}</select>
+              <button onClick={onBulkMarkComplete} disabled={!bulkMarkHuntId} className="text-xs text-green-700 hover:bg-green-50 disabled:opacity-40 px-2 py-1 rounded-md border border-green-300" data-testid="bulk-mark-btn">✓ Mark complete ({selected.size})</button>
+            </>)}
+            {selected.size>0 && <button onClick={onBulkDelete} className="ml-auto text-xs text-red-500 hover:bg-red-50 px-2 py-1 rounded-md"><Trash2 className="w-3 h-3 inline mr-0.5"/>{selected.size}</button>}
             </div>
 
             <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pb-2">

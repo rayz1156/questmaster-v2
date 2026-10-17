@@ -42,7 +42,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `Adilo complete failed: ${e.message}` }, { status: 502 });
   }
 
-  const { error } = await admin.from('qm_profiles').update({
+  const { error } = await admin.from('lms_profiles').update({
     intro_media_type: 'video',
     intro_video_adilo_file_id: fileId,
     intro_video_adilo_project_id: projectId,

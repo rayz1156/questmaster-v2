@@ -30,7 +30,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
 
   // RLS: owner can update own; educator can update any. We just attempt the update.
   const { data, error } = await supa
-    .from('qm_submission_board_items')
+    .from('lms_submission_board_items')
     .update(updates)
     .eq('id', params.itemId)
     .select('*')
@@ -45,7 +45,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { huntId: s
   const { supa } = auth;
 
   // RLS enforces who can delete (owner or class educator)
-  const { error } = await supa.from('qm_submission_board_items').delete().eq('id', params.itemId);
+  const { error } = await supa.from('lms_submission_board_items').delete().eq('id', params.itemId);
   if (error) return NextResponse.json({ error: error.message }, { status: 403 });
   return NextResponse.json({ ok: true });
 }

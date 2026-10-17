@@ -17,7 +17,7 @@ export async function POST(
 
   // Load the card to build a prompt from its title/description/url.
   const { data: card, error: loadErr } = await admin
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .select('*')
     .eq('id', params.cardId)
     .single();
@@ -67,7 +67,7 @@ export async function POST(
   }
 
   const { data: updated, error: updErr } = await admin
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .update(updates)
     .eq('id', params.cardId)
     .select('*')

@@ -12,7 +12,7 @@ export async function GET(req: NextRequest) {
     const supa = getRouteSupabase(req);
     const { data: userData } = await supa.auth.getUser();
     if (!userData?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    const { data, error } = await supa.rpc('qm_mastery_summary', { p_class_id: class_id });
+    const { data, error } = await supa.rpc('lms_mastery_summary', { p_class_id: class_id });
     if (error) {
       console.error('mastery rpc failed', error);
       return NextResponse.json({ error: error.message }, { status: 500 });

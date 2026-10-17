@@ -16,14 +16,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const body = await req.json().catch(() => ({}));
   const { columnId, cardType } = body;
   if (!columnId || !cardType) return NextResponse.json({ error: 'columnId and cardType required' }, { status: 400 });
-  if (!['link', 'image', 'text', 'file'].includes(cardType)) {
+  if (!['link', 'image', 'text', 'file', 'chatbot'].includes(cardType)) {
     return NextResponse.json({ error: 'Use upload/complete for video cards' }, { status: 400 });
   }
-  const { data: col } = await admin.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
+  const { data: col } = await admin.from('lms_learning_columns').select('id, board_id').eq('id', columnId).single();
   if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
 
   const { data: existing } = await owner.supa
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .select('id, position')
     .eq('column_id', columnId)
     .order('position', { ascending: true });
@@ -37,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     for (let i = cardsList.length - 1; i >= 0; i--) {
       const c = cardsList[i];
       if (c.position >= rawInsert) {
-        await admin.from('qm_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
+        await admin.from('lms_learning_cards').update({ position: c.position + 1 }).eq('id', c.id);
       }
     }
   }
@@ -75,9 +75,15 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     insert.file_extension = body.fileExtension ?? null;
     if (typeof body.fileluFileCode === 'string') insert.filelu_file_code = body.fileluFileCode;
   }
+  if (cardType === 'chatbot') {
+    if (!body.chatbotUrl || typeof body.chatbotUrl !== 'string') return NextResponse.json({ error: 'chatbotUrl required' }, { status: 400 });
+    if (!body.chatbotUrl.startsWith('/embeds/')) { try { const u = new URL(body.chatbotUrl); if (u.protocol !== 'https:') return NextResponse.json({ error: 'chatbotUrl must be https' }, { status: 400 }); } catch { return NextResponse.json({ error: 'chatbotUrl invalid' }, { status: 400 }); } }
+    insert.chatbot_url = body.chatbotUrl;
+    insert.chatbot_provider = typeof body.chatbotProvider === 'string' ? body.chatbotProvider : null;
+  }
   // 'text' card just uses title + description.
 
-  const { data, error } = await admin.from('qm_learning_cards').insert(insert).select('*').single();
+  const { data, error } = await admin.from('lms_learning_cards').insert(insert).select('*').single();
   if (error) return NextResponse.json({ error: error.message }, { status: 500 });
   return NextResponse.json({ card: data });
 }

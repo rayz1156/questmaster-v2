@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
 
     const ua = req.headers.get('user-agent')?.slice(0, 300) || null;
 
-    const { error } = await supa.from('qm_feedback').insert({
+    const { error } = await supa.from('lms_feedback').insert({
       user_id,
       user_email,
       type,

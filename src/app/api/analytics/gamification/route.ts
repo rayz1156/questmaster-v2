@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
     const { data: userData } = await supa.auth.getUser();
     if (!userData?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
-    const { data, error } = await supa.rpc('qm_gamification_summary', { p_class_id: class_id });
+    const { data, error } = await supa.rpc('lms_gamification_summary', { p_class_id: class_id });
     if (error) {
       console.error('gamification rpc failed', error);
       return NextResponse.json({ error: error.message }, { status: 500 });

@@ -15,9 +15,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const { data: { user } } = await supa.auth.getUser();
     if (!user) return NextResponse.json({ error: 'Not authed' }, { status: 401 });
     // verify ownership
-    const { data: klass } = await supa.from('qm_classes').select('id, name, owner_id').eq('id', params.id).single();
+    const { data: klass } = await supa.from('lms_classes').select('id, name, owner_id').eq('id', params.id).single();
     if (!klass || klass.owner_id !== user.id) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
-    const { data: inv, error: ie } = await supa.from('qm_class_invites').insert({ class_id: params.id, email, invited_by: user.id }).select().single();
+    const { data: inv, error: ie } = await supa.from('lms_class_invites').insert({ class_id: params.id, email, invited_by: user.id }).select().single();
     if (ie) return NextResponse.json({ error: ie.message }, { status: 500 });
     const origin = req.nextUrl.origin;
     const link = `${origin}/join/${inv.token}`;

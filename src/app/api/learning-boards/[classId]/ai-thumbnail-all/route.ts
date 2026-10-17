@@ -27,7 +27,7 @@ export async function POST(
 
   // Resolve the board id for this class.
   const { data: board } = await admin
-    .from('qm_learning_boards')
+    .from('lms_learning_boards')
     .select('id')
     .eq('class_id', params.classId)
     .single();
@@ -37,7 +37,7 @@ export async function POST(
 
   // Pull cards belonging to columns of this board.
   const { data: cols } = await admin
-    .from('qm_learning_columns')
+    .from('lms_learning_columns')
     .select('id')
     .eq('board_id', board.id);
   const columnIds = (cols || []).map((c: any) => c.id);
@@ -48,7 +48,7 @@ export async function POST(
   }
 
   const { data: allCards } = await admin
-    .from('qm_learning_cards')
+    .from('lms_learning_cards')
     .select('*')
     .in('column_id', columnIds);
   const cards = allCards || [];
@@ -102,7 +102,7 @@ export async function POST(
               ? { image_url: fileluFileUrl }
               : { link_image_url: fileluFileUrl };
           await admin
-            .from('qm_learning_cards')
+            .from('lms_learning_cards')
             .update(updates)
             .eq('id', card.id);
           succeeded++;

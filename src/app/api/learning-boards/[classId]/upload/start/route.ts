@@ -27,7 +27,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
 
   // Ensure board exists and get/create Adilo project
   const { data: board } = await owner.supa
-    .from('qm_learning_boards')
+    .from('lms_learning_boards')
     .select('id, adilo_project_id')
     .eq('class_id', params.classId)
     .single();
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       const proj = await createAdiloProject(`Kuizen · ${owner.klass!.name}`);
       projectId = proj.id;
       await owner.supa
-        .from('qm_learning_boards')
+        .from('lms_learning_boards')
         .update({ adilo_project_id: projectId })
         .eq('id', board.id);
     } catch (e: any) {

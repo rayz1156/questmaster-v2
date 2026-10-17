@@ -25,7 +25,7 @@ export async function POST(req: NextRequest) {
 
   // Get/create a per-user Adilo project for their profile intro video.
   const { data: prof } = await admin
-    .from('qm_profiles')
+    .from('lms_profiles')
     .select('id, display_name, intro_video_adilo_project_id')
     .eq('id', auth.user!.id)
     .single();
@@ -34,7 +34,7 @@ export async function POST(req: NextRequest) {
     try {
       const proj = await createAdiloProject(`Kuizen · ${prof?.display_name || auth.user!.email || auth.user!.id} · Profile Intro`);
       projectId = proj.id;
-      await admin.from('qm_profiles').update({ intro_video_adilo_project_id: projectId }).eq('id', auth.user!.id);
+      await admin.from('lms_profiles').update({ intro_video_adilo_project_id: projectId }).eq('id', auth.user!.id);
     } catch (e: any) {
       return NextResponse.json({ error: `Adilo project create failed: ${e.message}` }, { status: 502 });
     }
