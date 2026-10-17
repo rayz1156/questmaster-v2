@@ -1,5 +1,20 @@
 import type { Config } from "tailwindcss";
 
+// Palet kelabu tema StafKita Akademi (dimetakan semula ke slate dan gray)
+const slatePalette = {
+  50: "#f5f6fa",
+  100: "#ebeef2",
+  200: "#dbdfea",
+  300: "#c7cfdc",
+  400: "#8094ae",
+  500: "#6e82a5",
+  600: "#526484",
+  700: "#44556f",
+  800: "#3c4d62",
+  900: "#364a63",
+  950: "#1c2b46",
+};
+
 const config: Config = {
   content: [
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
@@ -9,97 +24,111 @@ const config: Config = {
   theme: {
     extend: {
       fontFamily: {
-        sans: ["Inter", "Poppins", "system-ui", "sans-serif"],
-        display: ["Sora", "Inter", "system-ui", "sans-serif"],
+        // Fon tema: badan Roboto, tajuk Nunito (dimuat melalui next/font)
+        sans: ["var(--font-roboto)", "Roboto", "system-ui", "sans-serif"],
+        display: ["var(--font-nunito)", "Nunito", "system-ui", "sans-serif"],
         mono: ["JetBrains Mono", "Menlo", "monospace"],
       },
       colors: {
-        // Kuizen Academy primary (deepened emerald)
+        // Warna utama StafKita
+        primary: {
+          DEFAULT: "#6576ff",
+          hover: "#5664d9",
+          subtle: "#ebeeff",
+        },
+        // Kelabu (menggantikan palet slate/gray lalai)
+        slate: { ...slatePalette },
+        gray: { ...slatePalette },
+        // Bar sisi gelap
+        sidebar: {
+          bg: "#101924",
+          border: "#203247",
+          text: "#6e82a5",
+          heading: "#4f6178",
+          active: "#6576ff",
+        },
+        // Warna status
+        status: {
+          success: "#1ee0ac",
+          danger: "#e85347",
+          warning: "#f4bd0e",
+          info: "#09c2de",
+        },
+        // Alias legasi "academy" dipetakan ke warna utama baharu
         academy: {
-          50: "#ecfdf5",
-          100: "#d1fae5",
-          200: "#a7f3d0",
-          300: "#6ee7b7",
-          400: "#34d399",
-          500: "#10b981",
-          600: "#059669",
-          700: "#047857", // PRIMARY
-          800: "#065f46",
-          900: "#064e3b",
-          950: "#022c22",
-          DEFAULT: "#047857",
+          50: "#ebeeff",
+          100: "#e0e5ff",
+          200: "#c8cffb",
+          300: "#a9b4f9",
+          400: "#8a95f4",
+          500: "#7383fa",
+          600: "#6576ff",
+          700: "#5664d9",
+          800: "#4a54b8",
+          900: "#3e478f",
+          950: "#232a55",
+          DEFAULT: "#6576ff",
         },
-        // Veltrix endorser — deep navy authority
-        veltrix: {
-          50: "#f0f4fa",
-          100: "#dbe5f1",
-          200: "#b7cbe3",
-          300: "#8aa9cf",
-          400: "#5b82b4",
-          500: "#3d629a",
-          600: "#2f4d7e",
-          700: "#243d65",
-          800: "#1b2d4b",
-          900: "#0f1e35", // ENDORSER PRIMARY
-          950: "#070f1c",
-          DEFAULT: "#0f1e35",
-        },
-        // Accent gold (certification, achievement)
-        gold: {
-          50: "#fffbeb",
-          100: "#fef3c7",
-          200: "#fde68a",
-          300: "#fcd34d",
-          400: "#fbbf24",
-          500: "#f59e0b",
-          600: "#d97706", // ACCENT PRIMARY
-          700: "#b45309",
-          800: "#92400e",
-          900: "#78350f",
-          DEFAULT: "#d97706",
-        },
-        // Legacy brand (kept for backwards compat with existing components)
+        // Alias legasi "veltrix" dipetakan ke kelabu gelap baharu
+        veltrix: { ...slatePalette, DEFAULT: "#364a63" },
+        // Alias legasi "brand" dipetakan ke warna utama baharu
         brand: {
-          DEFAULT: "#047857",
-          purple: "#047857", // legacy alias
-          blue: "#0d9488",  // legacy alias
-          50: "#ecfdf5",
-          100: "#d1fae5",
-          500: "#10b981",
-          600: "#059669",
-          700: "#047857",
-          800: "#065f46",
-          900: "#064e3b",
+          DEFAULT: "#6576ff",
+          purple: "#6576ff",
+          blue: "#6576ff",
+          50: "#ebeeff",
+          100: "#e0e5ff",
+          500: "#6576ff",
+          600: "#6576ff",
+          700: "#5664d9",
+          800: "#4a54b8",
+          900: "#3e478f",
         },
+        // Alias legasi "accent" dipetakan ke warna utama baharu
         accent: {
-          DEFAULT: "#14b8a6",
-          500: "#14b8a6",
-          600: "#0d9488",
-          700: "#0f766e",
+          DEFAULT: "#6576ff",
+          500: "#6576ff",
+          600: "#5664d9",
+          700: "#4a54b8",
         },
-        // Semantic
-        success: { DEFAULT: "#059669", soft: "#d1fae5" },
-        warning: { DEFAULT: "#d97706", soft: "#fef3c7" },
-        danger:  { DEFAULT: "#dc2626", soft: "#fee2e2" },
-        info:    { DEFAULT: "#2563eb", soft: "#dbeafe" },
+        // Alias legasi "gold" dipetakan ke kuning status
+        gold: {
+          50: "#fdf8e7",
+          100: "#fdf3d7",
+          200: "#fbe8ae",
+          300: "#f9dd85",
+          400: "#f6cd4b",
+          500: "#f4bd0e",
+          600: "#d9a30c",
+          700: "#b4870a",
+          800: "#8f6c08",
+          900: "#6b5006",
+          DEFAULT: "#f4bd0e",
+        },
+        // Semantik (mengikut warna status StafKita)
+        success: { DEFAULT: "#1ee0ac", soft: "#d8f7ee" },
+        warning: { DEFAULT: "#f4bd0e", soft: "#fdf3d7" },
+        danger:  { DEFAULT: "#e85347", soft: "#fde8e6" },
+        info:    { DEFAULT: "#09c2de", soft: "#dcf7fb" },
       },
       backgroundImage: {
-        "brand-gradient":
-          "linear-gradient(135deg, #047857 0%, #059669 50%, #14b8a6 100%)",
-        "academy-gradient":
-          "linear-gradient(135deg, #0f1e35 0%, #243d65 45%, #047857 100%)",
-        "hero-mesh":
-          "radial-gradient(at 20% 10%, #04785722 0px, transparent 50%), radial-gradient(at 80% 30%, #0f1e3522 0px, transparent 50%), radial-gradient(at 60% 90%, #d9770622 0px, transparent 50%)",
+        // Gradien legasi dimetakan ke warna padu tema baharu
+        "brand-gradient": "linear-gradient(#6576ff, #6576ff)",
+        "academy-gradient": "linear-gradient(#101924, #101924)",
+        "hero-mesh": "linear-gradient(#ffffff, #ffffff)",
       },
       boxShadow: {
-        card: "0 4px 20px rgba(15, 30, 53, 0.06)",
-        "card-hover": "0 8px 32px rgba(15, 30, 53, 0.10)",
-        elevated: "0 12px 40px rgba(15, 30, 53, 0.12)",
-        focus: "0 0 0 3px rgba(4, 120, 87, 0.20)",
+        // Bayang hanya untuk elemen terapung; kad biasa guna sempadan
+        card: "0 1px 2px 0 rgba(28, 43, 70, 0.05)",
+        "card-hover": "0 3px 12px 1px rgba(44, 55, 130, 0.15)",
+        elevated: "0 12px 32px rgba(28, 43, 70, 0.18)",
+        focus: "0 0 0 3px rgba(101, 118, 255, 0.20)",
       },
       borderRadius: {
-        "2xl": "1rem",
-        "3xl": "1.5rem",
+        // Sudut 4px untuk semua elemen bertema
+        xl: "4px",
+        "2xl": "4px",
+        "3xl": "4px",
       },
       fontSize: {
         "display-2xl": ["4.5rem", { lineHeight: "1.05", letterSpacing: "-0.02em", fontWeight: "700" }],
