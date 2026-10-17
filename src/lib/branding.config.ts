@@ -165,7 +165,7 @@ export const BRANDING = {
 
   migration: {
     legacyDomain: 'lms.kuizen.fun',
-    newDomain: 'academy.stafkita.com',
+    newDomain: 'akademi.stafkita.com',
     legacyName: 'Kuizen LMS',
     newName: 'StafKita Akademi',
     migrationDate: 'TBD',
