@@ -1,5 +1,5 @@
 'use client';
-import Image from 'next/image';
+import { KuizenAcademyLogo } from '@/components/branding/KuizenAcademyLogo';
 import { useState } from 'react';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabaseClient';
@@ -30,7 +30,7 @@ export default function Register() {
     <div className="min-h-screen flex flex-col bg-primary px-6 py-10">
       <div className="flex-1 flex flex-col justify-center max-w-md w-full mx-auto">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded bg-white/15 backdrop-blur-sm shadow-lg mb-3" aria-hidden="true"><Image src="/logo-mark.svg" alt="StafKita Akademi" width={56} height={56} priority /></div>
+          <div className="inline-flex items-center justify-center w-16 h-16 rounded bg-white/15 backdrop-blur-sm shadow-lg mb-3" aria-hidden="true"><KuizenAcademyLogo variant="mark" color="mono-light" height={48} /></div>
           <h1 className="text-3xl font-bold text-white tracking-tight">Cipta akaun anda</h1>
           <p className="text-white/80 mt-1">Sertai StafKita Akademi sebagai peserta atau pencipta</p>
         </div>
@@ -71,7 +71,6 @@ export default function Register() {
       <div className="text-center mt-8 space-y-1">
         <div className="text-[11px] text-white/60 uppercase tracking-widest">Dikuasakan oleh</div>
         <div className="text-sm text-white/90 font-medium">StafKita Akademi</div>
-        <div className="text-[11px] text-white/60 mt-2"><span className="font-semibold text-white/80">Bina kursus. Bina komuniti. Bina perniagaan.</span></div>
       </div>
 </div>
   );

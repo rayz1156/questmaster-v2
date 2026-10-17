@@ -1,338 +1,164 @@
 import Link from "next/link";
-import { BRANDING } from "@/lib/branding.config";
 import { KuizenAcademyLogo } from "@/components/branding/KuizenAcademyLogo";
 
 export const dynamic = "force-dynamic";
 
-// ===== Section: Nav =====
+// Halaman utama StafKita Akademi.
+// Prinsip: satu mesej, satu tindakan. Hanya ciri yang benar-benar ada dalam aplikasi.
+
+const ciri = [
+  {
+    tajuk: "Kursus dan kuiz",
+    teks: "Bina kursus, kuiz dan tugasan untuk staf dalam satu kelas.",
+    ikon: "M4 6h16M4 12h16M4 18h10",
+  },
+  {
+    tajuk: "Belajar berpasukan",
+    teks: "Staf belajar dalam pasukan. Markah terkumpul dalam papan pendahulu.",
+    ikon: "M17 20v-2a4 4 0 0 0-4-4H7a4 4 0 0 0-4 4v2M10 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8M21 20v-2a4 4 0 0 0-3-3.9M16 2.1a4 4 0 0 1 0 7.8",
+  },
+  {
+    tajuk: "Sijil yang boleh disemak",
+    teks: "Setiap sijil ada pautan semakan sendiri.",
+    ikon: "M12 15a6 6 0 1 0 0-12 6 6 0 0 0 0 12M8.2 13.9 7 22l5-3 5 3-1.2-8.1",
+  },
+];
+
+const langkah = [
+  { n: "1", tajuk: "Cipta kelas", teks: "Satu kelas untuk satu kursus, satu jabatan atau satu kohort." },
+  { n: "2", tajuk: "Jemput staf", teks: "Staf menyertai dengan kod kelas atau pautan jemputan." },
+  { n: "3", tajuk: "Lihat kemajuan", teks: "Pantau markah setiap staf dan keluarkan sijil apabila selesai." },
+];
+
+const soalan = [
+  {
+    s: "Apakah StafKita Akademi?",
+    j: "Platform pembelajaran untuk latihan staf. Pendidik mencipta kelas, kursus dan kuiz. Staf belajar dalam pasukan, mengumpul markah dan menerima sijil.",
+  },
+  {
+    s: "Bagaimana staf menyertai kelas?",
+    j: "Pendidik memberi kod kelas lapan aksara atau pautan jemputan. Staf log masuk, kemudian tampal kod atau buka pautan itu.",
+  },
+  {
+    s: "Bolehkah sijil disahkan oleh pihak lain?",
+    j: "Boleh. Setiap sijil mempunyai pautan semakan yang boleh dibuka oleh sesiapa sahaja.",
+  },
+  {
+    s: "Adakah ia berfungsi di telefon?",
+    j: "Ya. Semua halaman direka untuk skrin telefon, dan aplikasi boleh dipasang terus dari pelayar.",
+  },
+];
+
+function Ikon({ d }: { d: string }) {
+  return (
+    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={d} />
+    </svg>
+  );
+}
+
 function Nav() {
   return (
-    <header className="sticky top-0 z-40 backdrop-blur-lg bg-white/95 border-b border-slate-200 shadow-sm">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-        <Link href="/" aria-label="StafKita Akademi home" className="flex items-center">
-          <KuizenAcademyLogo variant="horizontal" height={36} />
+    <header className="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-slate-100">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
+        <Link href="/" aria-label="StafKita Akademi" className="flex items-center">
+          <KuizenAcademyLogo variant="horizontal" height={32} />
         </Link>
-        <nav className="hidden md:flex items-center gap-7 text-sm font-medium text-slate-700">
-          <a href="#capabilities" className="hover:text-academy-700">Capabilities</a>
-          <a href="#how-it-works" className="hover:text-academy-700">How it works</a>
-          <a href="#industries" className="hover:text-academy-700">Industries</a>
-          <a href="#hrdcorp" className="hover:text-academy-700">HRDCorp</a>
-          <a href="#pricing" className="hover:text-academy-700">Pricing</a>
+        <nav className="hidden md:flex items-center gap-8 text-sm text-slate-600">
+          <a href="#ciri" className="hover:text-slate-900">Ciri</a>
+          <a href="#cara" className="hover:text-slate-900">Cara guna</a>
+          <a href="#soalan" className="hover:text-slate-900">Soalan</a>
+          <Link href="/help" className="hover:text-slate-900">Bantuan</Link>
         </nav>
         <div className="flex items-center gap-2">
-          <Link href="/login" className="hidden sm:inline-flex btn-outline text-sm px-4 py-2">Sign in</Link>
-          <Link href="/demo" className="btn-academy text-sm px-4 py-2">Book a demo</Link>
+          <Link href="/login" className="text-sm font-medium text-slate-700 hover:text-slate-900 px-3 py-2">Log masuk</Link>
+          <Link href="/register" className="hidden sm:inline-flex text-sm font-medium text-white bg-primary hover:bg-primary-hover rounded px-4 py-2 transition">Daftar</Link>
         </div>
       </div>
     </header>
   );
 }
 
-// ===== Section 1: Hero =====
 function Hero() {
   return (
-    <section className="relative overflow-hidden bg-hero-mesh">
-      <div className="absolute inset-0 bg-gradient-to-b from-white via-white to-slate-50" aria-hidden="true" />
-      <div className="relative max-w-7xl mx-auto px-4 sm:px-6 pt-16 pb-20 lg:pt-24 lg:pb-28">
-        <div className="grid lg:grid-cols-12 gap-12 items-center">
-          <div className="lg:col-span-7">
-            <span className="section-eyebrow">Corporate Training, Engineered</span>
-            <h1 className="display-heading text-4xl sm:text-5xl lg:text-display-xl mb-6">
-              Train your workforce.<br/>
-              <span className="text-academy-700">Prove the outcomes.</span><br/>
-              Stay compliant.
-            </h1>
-            <p className="text-lg sm:text-xl text-slate-600 max-w-2xl mb-8 leading-relaxed">
-              StafKita Akademi is the enterprise LMS for Malaysian organizations — built for HRDCorp claims, onboarding cohorts, compliance certifications, and measurable learning outcomes. Endorsed and operated by Veltrix.
-            </p>
-            <div className="flex flex-wrap gap-3">
-              <Link href="/demo" className="btn-academy">Book a 30-min demo →</Link>
-              <Link href="#capabilities" className="btn-outline">See capabilities</Link>
-            </div>
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-slate-600">
-              <span className="inline-flex items-center gap-1.5"><Dot/> HRDCorp claimable</span>
-              <span className="inline-flex items-center gap-1.5"><Dot/> PDPA compliant</span>
-              <span className="inline-flex items-center gap-1.5"><Dot/> Malaysia-hosted</span>
-              <span className="inline-flex items-center gap-1.5"><Dot/> BM &amp; EN ready</span>
-            </div>
-          </div>
-          <div className="lg:col-span-5">
-            <DashboardPreview />
-          </div>
-        </div>
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 pt-16 sm:pt-24 pb-16 text-center">
+      <p className="text-sm font-medium text-primary mb-5">Untuk pasukan latihan dan HR</p>
+      <h1 className="font-display font-extrabold text-slate-900 text-5xl sm:text-6xl lg:text-7xl leading-[1.05] tracking-tight">
+        Latih staf anda.<br />
+        <span className="text-primary">Lihat hasilnya.</span>
+      </h1>
+      <p className="mt-6 text-lg sm:text-xl text-slate-500 max-w-xl mx-auto">
+        Kursus, kuiz dan sijil staf. Semua dalam satu tempat.
+      </p>
+      <div className="mt-9 flex flex-col sm:flex-row items-center justify-center gap-3">
+        <Link href="/register" className="w-full sm:w-auto inline-flex items-center justify-center text-base font-semibold text-white bg-primary hover:bg-primary-hover rounded px-7 py-3.5 transition">
+          Mula sekarang
+        </Link>
+        <Link href="/login" className="w-full sm:w-auto inline-flex items-center justify-center text-base font-medium text-slate-700 border border-slate-200 hover:border-slate-300 rounded px-7 py-3.5 transition">
+          Saya sudah ada akaun
+        </Link>
       </div>
+      <Pratonton />
     </section>
   );
 }
 
-function Dot() { return <span className="w-1.5 h-1.5 rounded-full bg-academy-600 inline-block" />; }
-
-function DashboardPreview() {
-  return (
-    <div className="relative">
-      <div className="absolute -inset-4 bg-academy-gradient opacity-10 blur-3xl rounded-3xl" aria-hidden="true" />
-      <div className="relative surface-card p-6">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <p className="text-xs uppercase tracking-wider text-slate-500 font-semibold">L&amp;D Dashboard</p>
-            <p className="text-lg font-bold text-veltrix-900">Compliance overview · Q2 2026</p>
-          </div>
-          <span className="compliance-pill completed">94% on track</span>
-        </div>
-        <div className="grid grid-cols-3 gap-3 mb-5">
-          <StatTile label="Learners" value="1,284"/>
-          <StatTile label="Active cohorts" value="17"/>
-          <StatTile label="HRDCorp claims" value="RM 84k"/>
-        </div>
-        <div className="space-y-3">
-          <CohortRow name="Workplace Safety 2026" progress={92} required/>
-          <CohortRow name="Anti-Bribery Refresher" progress={71} required/>
-          <CohortRow name="Leadership Track · Q2" progress={45}/>
-          <CohortRow name="Customer Service Mastery" progress={88}/>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function StatTile({ label, value }: { label: string; value: string }) {
-  return (
-    <div className="rounded-xl bg-slate-50 border border-slate-200 p-3">
-      <div className="text-xs text-slate-500 mb-1">{label}</div>
-      <div className="text-xl font-bold text-veltrix-900">{value}</div>
-    </div>
-  );
-}
-
-function CohortRow({ name, progress, required }: { name: string; progress: number; required?: boolean }) {
-  return (
-    <div>
-      <div className="flex items-center justify-between mb-1.5 text-sm">
-        <span className="font-medium text-slate-700 flex items-center gap-2">
-          {name}
-          {required && <span className="compliance-pill required text-[10px] px-2 py-0.5">Required</span>}
-        </span>
-        <span className="font-semibold text-veltrix-900">{progress}%</span>
-      </div>
-      <div className="progress-track"><div className="progress-fill" style={{ width: `${progress}%` }} /></div>
-    </div>
-  );
-}
-
-// ===== Section 2: Trust Indicators =====
-function TrustBar() {
-  const logos = ["Bank Berhad", "PETRONAS Group", "KPJ Healthcare", "Sunway Holdings", "Maxis Berhad", "MIDF Amanah"];
-  return (
-    <section className="border-y border-slate-200 bg-white py-10">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <p className="text-center text-xs uppercase tracking-[0.2em] font-semibold text-slate-500 mb-6">
-          Trusted by L&amp;D teams across Malaysia
-        </p>
-        <div className="flex flex-wrap items-center justify-center gap-x-10 gap-y-4 opacity-70">
-          {logos.map(l => (
-            <span key={l} className="text-base sm:text-lg font-bold tracking-tight text-slate-400">{l}</span>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ===== Section 3: Audience Cards =====
-function Audience() {
-  const cards = [
-    { role: "L&D Leaders", desc: "Design role-based learning paths, assign by department, and prove outcomes to the board.", icon: "📊" },
-    { role: "Compliance Officers", desc: "Automate annual refreshers, audit-ready certificates, overdue alerts, and PDPA controls.", icon: "🛡️" },
-    { role: "People Managers", desc: "Track your team's progress, assign onboarding playbooks, and intervene before deadlines slip.", icon: "👥" },
-    { role: "HRDCorp Coordinators", desc: "Generate HRDCorp-claim-ready reports with attendance, completion, and assessment data.", icon: "📑" },
+// Gambaran antara muka (ilustrasi sahaja, bukan data sebenar)
+function Pratonton() {
+  const pasukan = [
+    { nama: "Pasukan Jualan", markah: 920, lebar: 92 },
+    { nama: "Pasukan Operasi", markah: 860, lebar: 86 },
+    { nama: "Pasukan Kewangan", markah: 780, lebar: 78 },
   ];
   return (
-    <section className="pt-24 pb-20 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-12 max-w-3xl mx-auto">
-          <span className="section-eyebrow">Built for your team</span>
-          <h2 className="display-heading text-3xl sm:text-4xl mb-4">One platform. Every stakeholder served.</h2>
-          <p className="text-lg text-slate-600">From frontline learners to the board’s compliance committee — everyone gets the view they need.</p>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
-          {cards.map(c => (
-            <div key={c.role} className="surface-card p-6">
-              <div className="text-3xl mb-3">{c.icon}</div>
-              <h3 className="font-bold text-lg text-veltrix-900 mb-2">{c.role}</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">{c.desc}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ===== Section 4: Capabilities =====
-function Capabilities() {
-  const features = [
-    { t: "Cohort Management", d: "Group learners by department, role, or onboarding wave. Schedule starts, due dates, and reminders automatically." },
-    { t: "Compliance Tracking", d: "Mandatory courses with due dates, escalation paths, and audit logs. Built for ISO, BNM, MCMC, and SC requirements." },
-    { t: "HRDCorp Integration", d: "Pre-formatted reports for claim submission. Track scheme eligibility, employer codes, and attendance hours." },
-    { t: "Certifications", d: "Issue tamper-evident certificates with verification URLs. Auto-expire and trigger refresher cycles." },
-    { t: "Manager Dashboards", d: "Every manager sees their direct reports' progress, overdue items, and skill coverage at a glance." },
-    { t: "Skills & Competencies", d: "Map courses to competencies. Identify gaps, plan succession, and quantify readiness by role." },
-    { t: "Assessments & Quizzes", d: "Question banks, randomization, proctoring options, and pass-mark gating before certification." },
-    { t: "Single Sign-On (SSO)", d: "SAML 2.0 and OIDC. Provision via SCIM. Sync org charts from your HRIS in near real time." },
-    { t: "Analytics & ROI", d: "Course-level ROI, completion velocity, manager benchmarks, and exportable board-ready reports." },
-  ];
-  return (
-    <section id="capabilities" className="pt-24 pb-20 bg-white scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-14 max-w-3xl mx-auto">
-          <span className="section-eyebrow">Capabilities</span>
-          <h2 className="display-heading text-3xl sm:text-4xl mb-4">Everything corporate learning demands.</h2>
-          <p className="text-lg text-slate-600">No bolt-ons. No surprises. A single source of truth for workforce development.</p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {features.map(f => (
-            <div key={f.t} className="surface-card p-6">
-              <div className="w-10 h-10 rounded-lg bg-academy-50 flex items-center justify-center mb-4">
-                <span className="w-5 h-5 rounded-sm bg-academy-700" />
-              </div>
-              <h3 className="font-bold text-base text-veltrix-900 mb-2">{f.t}</h3>
-              <p className="text-sm text-slate-600 leading-relaxed">{f.d}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ===== Section 5: How It Works =====
-function HowItWorks() {
-  const steps = [
-    { n: "01", t: "Discovery", d: "We map your org chart, compliance calendar, and existing content into a tailored rollout plan." },
-    { n: "02", t: "Configure", d: "Brand the portal, set up SSO, import learners, and assign your first cohorts within days, not months." },
-    { n: "03", t: "Launch", d: "Roll out by department or wave. Managers get dashboards. Learners get clear, mobile-friendly journeys." },
-    { n: "04", t: "Measure", d: "Quarterly business reviews with your Veltrix CSM cover adoption, outcomes, and HRDCorp claim summaries." },
-  ];
-  return (
-    <section id="how-it-works" className="pt-24 pb-20 bg-veltrix-900 text-white scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-14 max-w-3xl mx-auto">
-          <span className="section-eyebrow" style={{color: "#fbbf24"}}>Implementation</span>
-          <h2 className="display-heading text-3xl sm:text-4xl mb-4 text-white">Live in weeks. Compounding from day one.</h2>
-          <p className="text-lg text-slate-300">A Veltrix consultant guides your launch — not a chatbot.</p>
-        </div>
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5">
-          {steps.map(s => (
-            <div key={s.n} className="rounded-2xl bg-veltrix-800/50 border border-veltrix-700 p-6">
-              <div className="text-3xl font-bold text-gold-500 mb-3">{s.n}</div>
-              <h3 className="font-bold text-lg text-white mb-2">{s.t}</h3>
-              <p className="text-sm text-slate-300 leading-relaxed">{s.d}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ===== Section 6: Industries =====
-function Industries() {
-  const industries = [
-    { name: "Financial Services", use: "BNM-mandated AML/CFT refreshers, anti-bribery, code of conduct." },
-    { name: "Healthcare", use: "Infection control, patient safety, clinical onboarding, license renewals." },
-    { name: "Manufacturing", use: "DOSH safety, machinery handling, ESG audits, supervisor uplift." },
-    { name: "Oil &amp; Gas", use: "PETRONAS-aligned HSE, contractor onboarding, technical certifications." },
-    { name: "Government &amp; GLCs", use: "Integrity training, INTAN-aligned programs, multi-agency cohorts." },
-    { name: "Retail &amp; Hospitality", use: "Service standards, brand academies, seasonal onboarding at scale." },
-  ];
-  return (
-    <section id="industries" className="pt-24 pb-20 bg-white scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-14 max-w-3xl mx-auto">
-          <span className="section-eyebrow">Industries</span>
-          <h2 className="display-heading text-3xl sm:text-4xl mb-4">Configured for Malaysian regulators.</h2>
-        </div>
-        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
-          {industries.map(i => (
-            <div key={i.name} className="surface-card p-6">
-              <h3 className="font-bold text-lg text-veltrix-900 mb-2" dangerouslySetInnerHTML={{__html: i.name}} />
-              <p className="text-sm text-slate-600 leading-relaxed">{i.use}</p>
-            </div>
-          ))}
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ===== Section 7: HRDCorp Spotlight =====
-function HRDCorp() {
-  return (
-    <section id="hrdcorp" className="pt-24 pb-20 bg-gradient-to-br from-gold-50 via-white to-academy-50 scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="grid lg:grid-cols-2 gap-12 items-center">
-          <div>
-            <span className="section-eyebrow" style={{color: "#b45309"}}>HRDCorp ready</span>
-            <h2 className="display-heading text-3xl sm:text-4xl mb-5">Turn your levy into measurable upskilling.</h2>
-            <p className="text-lg text-slate-700 mb-6 leading-relaxed">
-              StafKita Akademi generates HRDCorp-claim-ready reports out of the box. Track attendance hours, completion evidence, and assessment scores for SBL-Khas, HRDCorp Claimable Courses, and in-house schemes.
-            </p>
-            <ul className="space-y-3 text-slate-700">
-              {[
-                "Pre-formatted attendance sheets with timestamps",
-                "Completion certificates with verification URLs",
-                "Trainer credentials and TTT certificates linked",
-                "Claim-package ZIP export per cohort",
-              ].map(li => (
-                <li key={li} className="flex items-start gap-2.5">
-                  <span className="w-5 h-5 rounded-full bg-academy-700 text-white flex-shrink-0 flex items-center justify-center text-xs font-bold mt-0.5">✓</span>
-                  <span>{li}</span>
-                </li>
-              ))}
-            </ul>
-          </div>
-          <div className="surface-card p-6">
-            <div className="flex items-center justify-between mb-4">
-              <span className="cert-badge text-xs">HRDCorp Claim Package</span>
-              <span className="text-xs text-slate-500">Q2 2026</span>
-            </div>
-            <div className="text-2xl font-bold text-veltrix-900 mb-1">Workplace Safety Refresher</div>
-            <div className="text-sm text-slate-600 mb-5">Scheme · SBL-Khas · 128 learners · 6 hrs</div>
-            <div className="space-y-2 text-sm">
-              {[["Attendance evidence", "128 / 128"],["Assessment pass rate","96%"],["Total trainer hours","768"],["Claimable amount","RM 24,300"]].map(([k,v]) => (
-                <div key={k} className="flex justify-between border-b border-slate-100 pb-2">
-                  <span className="text-slate-600">{k}</span>
-                  <span className="font-semibold text-veltrix-900">{v}</span>
+    <div className="mt-16 sm:mt-20 mx-auto max-w-4xl text-left">
+      <div className="rounded-lg border border-slate-200 bg-white shadow-[0_3px_12px_1px_rgba(44,55,130,0.15)] overflow-hidden">
+        <div className="flex">
+          <aside className="hidden sm:flex w-48 flex-col gap-1 bg-[#101924] p-4 text-sm">
+            <span className="text-[11px] uppercase tracking-wider text-[#4f6178] mb-2">Kelas</span>
+            {["Kursus", "Aktiviti", "Pasukan", "Sijil", "Laporan"].map((m, i) => (
+              <span key={m} className={i === 2 ? "text-[#6576ff] font-medium py-1.5" : "text-[#6e82a5] py-1.5"}>{m}</span>
+            ))}
+          </aside>
+          <div className="flex-1 p-5 sm:p-7">
+            <p className="text-xs text-slate-400">Kelas</p>
+            <p className="font-display font-bold text-slate-800 text-lg">Latihan Khidmat Pelanggan</p>
+            <div className="mt-5 space-y-4">
+              {pasukan.map((p, i) => (
+                <div key={p.nama}>
+                  <div className="flex justify-between text-sm mb-1.5">
+                    <span className="text-slate-700"><span className="text-slate-400 mr-2">{i + 1}</span>{p.nama}</span>
+                    <span className="font-semibold text-slate-800">{p.markah}</span>
+                  </div>
+                  <div className="h-2 rounded-full bg-slate-100">
+                    <div className="h-2 rounded-full bg-primary" style={{ width: `${p.lebar}%` }} />
+                  </div>
                 </div>
               ))}
             </div>
-            <button className="mt-5 w-full btn-academy">Download claim package</button>
           </div>
         </div>
       </div>
-    </section>
+      <p className="mt-3 text-center text-xs text-slate-400">Gambaran antara muka</p>
+    </div>
   );
 }
 
-// ===== Section 8: Veltrix Doctrine =====
-function Doctrine() {
+function Ciri() {
   return (
-    <section className="pt-24 pb-20 bg-white">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-        <span className="section-eyebrow">The Veltrix doctrine</span>
-        <h2 className="display-heading text-3xl sm:text-4xl mb-6">Software alone doesn’t transform a workforce.</h2>
-        <p className="text-lg sm:text-xl text-slate-700 leading-relaxed mb-8">
-          Every StafKita Akademi deployment is paired with a Veltrix consultant — because the platform is only as good as the instructional design, change management, and measurement discipline behind it. We don’t hand you a login. We hand you outcomes.
-        </p>
-        <div className="grid sm:grid-cols-3 gap-5 text-left">
-          {[
-            { k: "94%", l: "Average 90-day learner activation" },
-            { k: "3.2×", l: "Faster onboarding to productivity" },
-            { k: "RM 1.4M", l: "Median HRDCorp claims processed / yr" },
-          ].map(m => (
-            <div key={m.k} className="rounded-2xl bg-slate-50 border border-slate-200 p-6">
-              <div className="text-3xl font-bold text-academy-700 mb-1">{m.k}</div>
-              <div className="text-sm text-slate-600">{m.l}</div>
+    <section id="ciri" className="bg-slate-50 scroll-mt-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
+        <h2 className="font-display font-extrabold text-slate-900 text-3xl sm:text-5xl text-center tracking-tight">
+          Satu kelas. Semua latihan.
+        </h2>
+        <div className="mt-14 grid gap-10 sm:grid-cols-3">
+          {ciri.map((c) => (
+            <div key={c.tajuk} className="text-center sm:text-left">
+              <div className="inline-flex w-11 h-11 items-center justify-center rounded bg-primary-subtle text-primary">
+                <Ikon d={c.ikon} />
+              </div>
+              <h3 className="mt-5 font-display font-bold text-xl text-slate-900">{c.tajuk}</h3>
+              <p className="mt-2 text-slate-500 leading-relaxed">{c.teks}</p>
             </div>
           ))}
         </div>
@@ -341,20 +167,43 @@ function Doctrine() {
   );
 }
 
-// ===== Section 9: Ecosystem =====
-function Ecosystem() {
-  const integrations = ["Workday", "SAP SuccessFactors", "BambooHR", "Microsoft Teams", "Slack", "Google Workspace", "Azure AD", "Okta", "Zoom"];
+function Cara() {
   return (
-    <section className="pt-24 pb-20 bg-slate-50">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-12 max-w-3xl mx-auto">
-          <span className="section-eyebrow">Ecosystem</span>
-          <h2 className="display-heading text-3xl sm:text-4xl mb-4">Plays well with your stack.</h2>
-          <p className="text-lg text-slate-600">SSO, SCIM provisioning, calendar sync, and webhooks for the systems your IT team already trusts.</p>
-        </div>
-        <div className="flex flex-wrap items-center justify-center gap-3">
-          {integrations.map(i => (
-            <span key={i} className="px-4 py-2 rounded-full bg-white border border-slate-200 text-sm font-medium text-slate-700">{i}</span>
+    <section id="cara" className="scroll-mt-16">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
+        <h2 className="font-display font-extrabold text-slate-900 text-3xl sm:text-5xl text-center tracking-tight">
+          Tiga langkah.
+        </h2>
+        <ol className="mt-14 grid gap-10 sm:grid-cols-3">
+          {langkah.map((l) => (
+            <li key={l.n} className="text-center">
+              <span className="inline-flex w-12 h-12 items-center justify-center rounded-full border-2 border-primary text-primary font-display font-extrabold text-lg">{l.n}</span>
+              <h3 className="mt-5 font-display font-bold text-xl text-slate-900">{l.tajuk}</h3>
+              <p className="mt-2 text-slate-500 leading-relaxed max-w-xs mx-auto">{l.teks}</p>
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+function Soalan() {
+  return (
+    <section id="soalan" className="bg-slate-50 scroll-mt-16">
+      <div className="max-w-3xl mx-auto px-4 sm:px-6 py-20 sm:py-28">
+        <h2 className="font-display font-extrabold text-slate-900 text-3xl sm:text-5xl text-center tracking-tight">
+          Soalan ringkas. Jawapan jelas.
+        </h2>
+        <div className="mt-12 divide-y divide-slate-200 border-y border-slate-200">
+          {soalan.map((q) => (
+            <details key={q.s} className="group py-5">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-4 font-display font-bold text-lg text-slate-900">
+                {q.s}
+                <span className="text-primary text-2xl leading-none transition group-open:rotate-45" aria-hidden="true">+</span>
+              </summary>
+              <p className="mt-3 text-slate-500 leading-relaxed">{q.j}</p>
+            </details>
           ))}
         </div>
       </div>
@@ -362,103 +211,45 @@ function Ecosystem() {
   );
 }
 
-// ===== Section 10: Pricing =====
-function Pricing() {
-  const tiers = [
-    { name: "Growth", desc: "Up to 250 learners. SSO, HRDCorp reports, manager dashboards.", cta: "Talk to sales", featured: false },
-    { name: "Enterprise", desc: "Unlimited learners, custom SLAs, dedicated CSM, advanced compliance.", cta: "Book a demo", featured: true },
-    { name: "Veltrix Partnership", desc: "Co-built academies, content production, and ongoing instructional design.", cta: "Apply for partnership", featured: false },
-  ];
+function Penutup() {
   return (
-    <section id="pricing" className="pt-24 pb-20 bg-white scroll-mt-20">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="text-center mb-14 max-w-3xl mx-auto">
-          <span className="section-eyebrow">Pricing</span>
-          <h2 className="display-heading text-3xl sm:text-4xl mb-4">Tailored to your headcount and ambition.</h2>
-          <p className="text-lg text-slate-600">Annual licensing. Implementation included. No surprise per-feature charges.</p>
-        </div>
-        <div className="grid md:grid-cols-3 gap-5">
-          {tiers.map(t => (
-            <div key={t.name} className={`p-7 rounded-2xl border ${t.featured ? "bg-veltrix-900 text-white border-veltrix-900 shadow-elevated -translate-y-1" : "surface-card"}`}>
-              <h3 className={`font-bold text-xl mb-1 ${t.featured ? "text-white" : "text-veltrix-900"}`}>{t.name}</h3>
-              <p className={`text-sm mb-6 ${t.featured ? "text-slate-300" : "text-slate-600"}`}>{t.desc}</p>
-              <Link href="/demo" className={t.featured ? "btn-academy w-full" : "btn-outline w-full"}>{t.cta}</Link>
-            </div>
-          ))}
-        </div>
-      </div>
+    <section className="max-w-6xl mx-auto px-4 sm:px-6 py-24 sm:py-32 text-center">
+      <h2 className="font-display font-extrabold text-slate-900 text-3xl sm:text-5xl tracking-tight">
+        Latihan seterusnya, lebih bermakna.
+      </h2>
+      <Link href="/register" className="mt-9 inline-flex items-center justify-center text-base font-semibold text-white bg-primary hover:bg-primary-hover rounded px-8 py-3.5 transition">
+        Mula sekarang
+      </Link>
     </section>
   );
 }
 
-// ===== Section 11: CTA Band =====
-function CTABand() {
-  return (
-    <section className="py-16 bg-academy-gradient text-white">
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 text-center">
-        <h2 className="display-heading text-3xl sm:text-4xl mb-4 text-white">Ready to upgrade your L&amp;D function?</h2>
-        <p className="text-lg text-slate-100 mb-7 max-w-2xl mx-auto">30-minute demo. We’ll show you a sandbox seeded with your org structure.</p>
-        <div className="flex flex-wrap justify-center gap-3">
-          <Link href="/demo" className="inline-flex items-center justify-center bg-white text-academy-700 font-bold px-6 py-3 rounded-xl hover:bg-slate-50 transition">Book a demo →</Link>
-          <a href={`mailto:${BRANDING.contact.salesEmail}`} className="inline-flex items-center justify-center border-2 border-white/40 text-white font-semibold px-6 py-3 rounded-xl hover:bg-white/10 transition">Email sales</a>
-        </div>
-      </div>
-    </section>
-  );
-}
-
-// ===== Section 12: Footer =====
 function Footer() {
   return (
-    <footer className="bg-veltrix-900 text-slate-300 pt-16 pb-8">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
-        <div className="grid md:grid-cols-4 gap-10 mb-12">
-          <div>
-            <KuizenAcademyLogo variant="horizontal" color="mono-light" height={36} />
-            <p className="text-sm mt-4 text-slate-400 leading-relaxed">Enterprise learning, engineered for Malaysian organizations. Endorsed and operated by Veltrix.</p>
-          </div>
-          <FooterCol title="Product" links={[["Capabilities","#capabilities"],["How it works","#how-it-works"],["Industries","#industries"],["Pricing","#pricing"]]} />
-          <FooterCol title="Company" links={[["About Veltrix","/about"],["Customers","/customers"],["Contact","/demo"]]} />
-          <FooterCol title="Legal" links={[["Privacy","/legal/privacy"],["Terms","/legal/terms"],["PDPA","/legal/pdpa"]]} />
-        </div>
-        <div className="border-t border-veltrix-800 pt-6 flex flex-col sm:flex-row justify-between items-center gap-3 text-xs text-slate-500">
-          <span>© {new Date().getFullYear()} Veltrix Sdn Bhd. StafKita Akademi is a Veltrix product.</span>
-          <span>Made in Malaysia · PDPA compliant</span>
-        </div>
+    <footer className="border-t border-slate-100">
+      <div className="max-w-6xl mx-auto px-4 sm:px-6 py-10 flex flex-col sm:flex-row items-center justify-between gap-4 text-sm text-slate-500">
+        <KuizenAcademyLogo variant="horizontal" height={26} />
+        <nav className="flex flex-wrap justify-center gap-6">
+          <Link href="/help" className="hover:text-slate-800">Bantuan</Link>
+          <Link href="/legal/privacy" className="hover:text-slate-800">Privasi</Link>
+          <Link href="/legal/terms" className="hover:text-slate-800">Terma</Link>
+          <Link href="/legal/pdpa" className="hover:text-slate-800">PDPA</Link>
+        </nav>
+        <span>&copy; {new Date().getFullYear()} StafKita Akademi</span>
       </div>
     </footer>
   );
 }
 
-function FooterCol({ title, links }: { title: string; links: [string,string][] }) {
-  return (
-    <div>
-      <h4 className="text-white font-semibold mb-3 text-sm uppercase tracking-wider">{title}</h4>
-      <ul className="space-y-2 text-sm">
-        {links.map(([label, href]) => (
-          <li key={label}><Link href={href} className="hover:text-white transition">{label}</Link></li>
-        ))}
-      </ul>
-    </div>
-  );
-}
-
-// ===== Page =====
 export default function HomePage() {
   return (
     <main className="bg-white text-slate-900">
       <Nav />
       <Hero />
-      <TrustBar />
-      <Audience />
-      <Capabilities />
-      <HowItWorks />
-      <Industries />
-      <HRDCorp />
-      <Doctrine />
-      <Ecosystem />
-      <Pricing />
-      <CTABand />
+      <Ciri />
+      <Cara />
+      <Soalan />
+      <Penutup />
       <Footer />
     </main>
   );
