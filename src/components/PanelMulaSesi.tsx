@@ -270,7 +270,7 @@ export default function PanelMulaSesi({
           {mod === "race" && cadangan && (
             <div className="rounded-[4px] p-4" style={{ backgroundColor: "#f5f6fa", border: "1px solid #e5e9f2" }}>
               <div className="text-sm" style={{ color: "#364a63" }}>
-                Recommended: at least <strong className="text-lg">{" "}{cadangan.disyorkan}</strong> questions so no
+                Recommended: at least <strong className="text-lg">{cadangan.disyorkan}</strong> questions so no
                 question repeats in a {minit}-minute race.
               </div>
               <div
@@ -296,7 +296,7 @@ export default function PanelMulaSesi({
           {mod === "boss" && cadanganRaksasa !== null && (
             <div className="rounded-[4px] p-4" style={{ backgroundColor: "#f5f6fa", border: "1px solid #e5e9f2" }}>
               <div className="text-sm" style={{ color: "#364a63" }}>
-                Recommended: at least <strong className="text-lg">{" "}{cadanganRaksasa}</strong> questions so no
+                Recommended: at least <strong className="text-lg">{cadanganRaksasa}</strong> questions so no
                 question repeats in a {minit}-minute battle.
               </div>
               <div
