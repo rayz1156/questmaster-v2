@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { Poppins } from "next/font/google";
+import { Roboto, Nunito } from "next/font/google";
 import "./globals.css";
 import InstallPrompt from "@/components/pwa/InstallPrompt";
 import RegisterSW from "@/components/pwa/RegisterSW";
@@ -8,7 +8,9 @@ import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 import { BRANDING } from '@/lib/branding.config';
 
-const poppins = Poppins({ subsets: ["latin"], weight: ["300","400","500","600","700"] });
+// Fon tema StafKita: badan Roboto, tajuk Nunito
+const roboto = Roboto({ subsets: ["latin"], weight: ["300","400","500","700"], variable: "--font-roboto" });
+const nunito = Nunito({ subsets: ["latin"], weight: ["400","600","700","800"], variable: "--font-nunito" });
 
 export const metadata: Metadata = {
   metadataBase: new URL(`https://${BRANDING.migration.newDomain}`),
@@ -48,17 +50,17 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <body data-app="kuizen-academy" className={poppins.className}>
+    <html lang="ms">
+      <body data-app="kuizen-academy" className={`${roboto.variable} ${nunito.variable} ${roboto.className}`}>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
-          'name': 'Kuizen Academy',
-          'alternateName': ['Kuizen Academy by Veltrix', 'Kuizen LMS'],
+          'name': BRANDING.product.fullName,
+          'alternateName': ['StafKita Akademi', 'Kuizen LMS'],
           'applicationCategory': 'BusinessApplication',
           'applicationSubCategory': 'Learning Management System',
           'operatingSystem': 'Web',
-          'description': 'Enterprise Learning Management Platform for corporate training and compliance',
+          'description': 'Platform pembelajaran korporat StafKita Akademi untuk latihan pekerja, pematuhan dan pembangunan tenaga kerja',
           'url': `https://${BRANDING.migration.newDomain}`,
           'provider': {
             '@type': 'Organization',
@@ -70,7 +72,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
           },
           'offers': { '@type': 'Offer', 'priceCurrency': 'MYR', 'availability': 'https://schema.org/InStock' },
         }) }} />
-        
+
         <ConfirmProvider>{children}</ConfirmProvider>
         <InstallPrompt />
         <TranslateWidget />

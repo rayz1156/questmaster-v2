@@ -6,14 +6,14 @@
 
 export const BRANDING = {
   product: {
-    name: 'Kuizen Academy',
-    fullName: 'Kuizen Academy by Veltrix',
-    shortName: 'Kuizen Academy',
+    name: 'StafKita Akademi',
+    fullName: 'StafKita Akademi',
+    shortName: 'StafKita Akademi',
     legacy: 'Kuizen LMS',
-    tagline: 'Enterprise Learning, Engineered for Outcomes',
+    tagline: 'Pembelajaran Korporat untuk Hasil yang Terukur',
     taglineBM: 'Pembelajaran Korporat untuk Hasil yang Terukur',
     description:
-      'Enterprise Learning Management Platform for corporate training, compliance, and workforce development.',
+      'Platform pembelajaran korporat StafKita Akademi untuk latihan pekerja, pematuhan dan pembangunan tenaga kerja.',
     productType: 'Enterprise LMS',
     keywords: [
       'enterprise LMS',
@@ -22,8 +22,7 @@ export const BRANDING = {
       'compliance training',
       'L&D platform',
       'workforce learning',
-      'Kuizen Academy',
-      'Veltrix learning',
+      'StafKita Akademi',
     ],
   },
 
@@ -51,55 +50,55 @@ export const BRANDING = {
   },
 
   colors: {
-    // Kuizen Academy Primary
-    primary: '#047857',
-    primaryDeep: '#064E3B',
-    primaryLight: '#10B981',
-    primaryGlow: 'rgba(4, 120, 87, 0.25)',
-    primaryGradient: 'linear-gradient(135deg, #047857 0%, #065F46 100%)',
+    // Warna utama StafKita Akademi
+    primary: '#6576ff',
+    primaryDeep: '#5664d9',
+    primaryLight: '#ebeeff',
+    primaryGlow: 'rgba(101, 118, 255, 0.25)',
+    primaryGradient: '#6576ff',
 
-    // Veltrix Foundation
-    navyDeepest: '#060F1F',
-    navyDeep: '#0A1628',
-    navyMid: '#102849',
+    // Asas gelap StafKita (bar sisi)
+    navyDeepest: '#101924',
+    navyDeep: '#1c2b46',
+    navyMid: '#203247',
 
-    // Veltrix Gold
-    gold: '#D4AF37',
-    goldBright: '#F5C842',
-    goldSoft: 'rgba(212, 175, 55, 0.15)',
-    goldBorder: 'rgba(212, 175, 55, 0.35)',
-    goldGradient: 'linear-gradient(135deg, #D4AF37 0%, #F5C842 100%)',
+    // Kuning status StafKita
+    gold: '#f4bd0e',
+    goldBright: '#f4bd0e',
+    goldSoft: 'rgba(244, 189, 14, 0.15)',
+    goldBorder: 'rgba(244, 189, 14, 0.35)',
+    goldGradient: '#f4bd0e',
 
-    // Shared neutrals
+    // Neutral kelabu StafKita
     textPrimary: '#FFFFFF',
-    textBody: '#B8C5D6',
-    textMuted: '#6B7894',
-    silver: '#C0C8D4',
-    silverDim: '#8995A8',
-    borderLine: 'rgba(192, 200, 212, 0.12)',
+    textBody: '#6e82a5',
+    textMuted: '#8094ae',
+    silver: '#c7cfdc',
+    silverDim: '#8094ae',
+    borderLine: 'rgba(32, 50, 71, 0.12)',
 
-    // Functional
-    success: '#10B981',
-    warning: '#F59E0B',
-    error: '#EF4444',
-    info: '#3B82F6',
+    // Berfungsi (warna status StafKita)
+    success: '#1ee0ac',
+    warning: '#f4bd0e',
+    error: '#e85347',
+    info: '#09c2de',
   },
 
   fonts: {
-    heading: "'Cormorant Garamond', serif",
-    body: "'Manrope', sans-serif",
+    heading: "'Nunito', sans-serif",
+    body: "'Roboto', sans-serif",
     mono: "'JetBrains Mono', monospace",
   },
 
   contact: {
-    supportEmail: 'support@kuizen-academy.com',
-    salesEmail: 'sales@kuizen-academy.com',
-    adminEmail: 'admin@kuizen-academy.com',
+    supportEmail: 'support@stafkita.com',
+    salesEmail: 'support@stafkita.com',
+    adminEmail: 'support@stafkita.com',
     veltricsEmail: 'hello@veltrix.technology',
   },
 
   legal: {
-    copyright: `\u00A9 ${new Date().getFullYear()} Kuizen Academy. A Veltrix Technology Center product.`,
+    copyright: `\u00A9 ${new Date().getFullYear()} StafKita Akademi.`,
     companyRegistration: 'Veltrix Technology Centre Sdn Bhd',
     spinOffNote: 'An UPSI Spin-Off Initiative',
   },
@@ -166,9 +165,9 @@ export const BRANDING = {
 
   migration: {
     legacyDomain: 'lms.kuizen.fun',
-    newDomain: 'academy.kuizen.fun',
+    newDomain: 'academy.stafkita.com',
     legacyName: 'Kuizen LMS',
-    newName: 'Kuizen Academy',
+    newName: 'StafKita Akademi',
     migrationDate: 'TBD',
     creatorMigrationPath:
       'Existing creators can continue or migrate to enterprise tier.',
