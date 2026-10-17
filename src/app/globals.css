@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --foreground: 82 100 132; /* #526484 — teks badan StafKita */
-  --background: 245 246 250; /* #f5f6fa — latar badan StafKita */
+  --foreground: 82 100 132; /* #526484, teks badan StafKita */
+  --background: 245 246 250; /* #f5f6fa, latar badan StafKita */
 }
 
 html { font-size: 16px; }
@@ -67,7 +67,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 /* ============================================ */
-/* StafKita Akademi — Sistem Reka Bentuk v2 */
+/* StafKita Akademi, Sistem Reka Bentuk v2 */
 /* ============================================ */
 :root {
   /* Token jenama */

@@ -102,7 +102,7 @@ export const Emails = {
     const body = `
       <h1 style="font-family:'Nunito','Arial',sans-serif;color:#6576ff;font-size:28px;margin:0 0 14px">The platform is now StafKita Akademi</h1>
       <p>Dear ${escapeHtml(ctx.recipientName)},</p>
-      <p>We’re excited to share that the platform has evolved into <strong>StafKita Akademi</strong> — part of the Veltrix Technology ecosystem.</p>
+      <p>We’re excited to share that the platform has evolved into <strong>StafKita Akademi</strong>, part of the Veltrix Technology ecosystem.</p>
       <p><strong>What’s changing:</strong></p>
       <ul style="line-height:1.8;color:#475569"><li>New name: StafKita Akademi by Veltrix</li><li>New domain: <code>${BRANDING.migration.newDomain}</code> (current URL will redirect)</li><li>Enhanced enterprise features for corporate training</li><li>HRDCorp claimable programs</li><li>Same data, same login</li></ul>
       <p><strong>What you need to do:</strong> Nothing! Your data and credentials are preserved. Update your bookmarks when convenient.</p>

@@ -24,14 +24,14 @@ const KB_ARTICLES = [
     items: [
       { t: "Mencipta kelas", b: "Klik '+ Kelas Baharu' pada halaman Kelas, berikan nama dan warna, dan sistem akan menjana kod sertai secara automatik. Kongsi kod tersebut dengan pelajar anda." },
       { t: "Merekabentuk aktiviti", b: "Pergi ke Aktiviti → Aktiviti Baharu. Tambah tajuk, arahan, sehingga dua pautan rujukan, folder penghantaran (pilihan), nilai mata dan tempoh aktif. Simpan sebagai Draf, kemudian terbitkan apabila sedia." },
-      { t: "Membaca papan pendahulu", b: "Tab Kedudukan menunjukkan mata pasukan secara langsung bagi setiap kelas. Gunakannya semasa kuliah untuk mendorong penyertaan — pelajar suka melihat kedudukan dikemas kini dalam masa nyata." },
+      { t: "Membaca papan pendahulu", b: "Tab Kedudukan menunjukkan mata pasukan secara langsung bagi setiap kelas. Gunakannya semasa kuliah untuk mendorong penyertaan, pelajar suka melihat kedudukan dikemas kini dalam masa nyata." },
       { t: "Menjemput pendidik bersama", b: "Dari halaman Urus kelas anda, gunakan bahagian Jemputan untuk menambah pendidik bersama melalui e-mel. Mereka mendapat akses sunting yang sama seperti anda." },
     ],
   },
   {
     role: "Untuk Pelajar",
     items: [
-      { t: "Mencari pasukan anda", b: "Selepas menyertai kelas, pergi ke Pasukan dan sama ada sertai pasukan sedia ada atau cipta satu. Sesetengah kelas mempunyai pasukan yang ditetapkan guru — dalam kes itu, pasukan anda sudah sedia ditetapkan." },
+      { t: "Mencari pasukan anda", b: "Selepas menyertai kelas, pergi ke Pasukan dan sama ada sertai pasukan sedia ada atau cipta satu. Sesetengah kelas mempunyai pasukan yang ditetapkan guru, dalam kes itu, pasukan anda sudah sedia ditetapkan." },
       { t: "Menghantar aktiviti", b: "Buka aktiviti dari halaman Aktiviti, baca arahan, klik pautan rujukan jika ada, lakukan kerja, kemudian muat naik penghantaran anda ke folder yang dipautkan (jika disediakan) dan tandakan aktiviti sebagai selesai." },
       { t: "Menjejak kemajuan anda", b: "Halaman Utama menunjukkan aktiviti aktif dan tarikh akhir. Tab Papan Pendahulu menunjukkan kedudukan pasukan anda. Profil anda menunjukkan jumlah mata yang diperoleh." },
     ],
@@ -40,14 +40,14 @@ const KB_ARTICLES = [
 
 // Soalan lazim (teks statik UI, dalam Bahasa Melayu)
 const FAQS = [
-  { q: "Saya terlupa kata laluan — apa perlu saya buat?", a: "Pada halaman log masuk, klik 'Lupa kata laluan'. Anda akan menerima pautan tetapan semula melalui e-mel. Jika ia tidak tiba dalam masa 5 minit, semak folder spam anda." },
+  { q: "Saya terlupa kata laluan, apa perlu saya buat?", a: "Pada halaman log masuk, klik 'Lupa kata laluan'. Anda akan menerima pautan tetapan semula melalui e-mel. Jika ia tidak tiba dalam masa 5 minit, semak folder spam anda." },
   { q: "Kod kelas saya tidak berfungsi.", a: "Kod kelas ialah kod 8 aksara yang sensitif huruf besar/kecil. Pastikan tiada ruang kosong. Jika masih gagal, minta pendidik anda mengesahkan kelas tersebut masih aktif." },
   { q: "Bolehkah saya berada dalam lebih daripada satu kelas?", a: "Ya. Anda boleh menyertai seberapa banyak kelas yang pendidik anda jemput. Setiap kelas mempunyai pasukan, aktiviti dan papan pendahulu tersendiri." },
   { q: "Saya menghantar aktiviti tetapi tidak mendapat mata.", a: "Mata diberikan apabila pendidik anda menandakan aktiviti sebagai lengkap untuk pasukan anda. Jika anda menghantar dalam masa dan masih tidak melihat mata selepas 48 jam, hubungi pendidik anda." },
   { q: "Bagaimana saya menukar bahasa?", a: "Klik bendera bahasa di penjuru kanan bawah mana-mana halaman. StafKita Akademi menyokong Bahasa Melayu, Mandarin, Arab, Tamil, Hindi, Jepun, Korea, Indonesia dan Inggeris." },
-  { q: "Adakah StafKita Akademi berfungsi di telefon mudah alih?", a: "Ya. Ia ialah Progressive Web App — buka dalam pelayar anda dan ketik 'Pasang aplikasi' untuk menambahkannya ke skrin utama. Ia berfungsi luar talian untuk kandungan yang pernah dilihat." },
+  { q: "Adakah StafKita Akademi berfungsi di telefon mudah alih?", a: "Ya. Ia ialah Progressive Web App, buka dalam pelayar anda dan ketik 'Pasang aplikasi' untuk menambahkannya ke skrin utama. Ia berfungsi luar talian untuk kandungan yang pernah dilihat." },
   { q: "Adakah data saya sulit?", a: "Penghantaran, mata dan aktiviti anda dapat dilihat oleh pendidik dan rakan sekelas sebagai sebahagian papan pendahulu. Maklumat peribadi (e-mel, telefon) tidak dikongsi dengan rakan sekelas. StafKita Akademi mengikut dasar tadbir data yang ditetapkan." },
-  { q: "Bagaimana saya melaporkan pepijat?", a: "Gunakan tab Maklum Balas pada halaman ini — pilih 'Laporan pepijat' sebagai jenis. Sertakan apa yang anda lakukan ketika ia berlaku." },
+  { q: "Bagaimana saya melaporkan pepijat?", a: "Gunakan tab Maklum Balas pada halaman ini, pilih 'Laporan pepijat' sebagai jenis. Sertakan apa yang anda lakukan ketika ia berlaku." },
 ];
 
 export default function HelpPage() {
@@ -203,7 +203,7 @@ export default function HelpPage() {
               <form onSubmit={submitFeedback} className="space-y-4">
                 <div>
                   <h2 className="text-lg font-bold text-slate-900">Bantu kami menambah baik StafKita Akademi</h2>
-                  <p className="text-sm text-slate-600 mt-1">Pepijat? Idea ciri? Keliru tentang sesuatu? Beritahu kami — kami gunakannya untuk merancang keluaran akan datang.</p>
+                  <p className="text-sm text-slate-600 mt-1">Pepijat? Idea ciri? Keliru tentang sesuatu? Beritahu kami, kami gunakannya untuk merancang keluaran akan datang.</p>
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-2">Jenis maklum balas</label>

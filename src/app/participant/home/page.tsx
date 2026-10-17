@@ -268,7 +268,7 @@ export default function Page() {
             <div className="min-w-0">
               <div className="text-3xl font-extrabold text-orange-700">{myRank > 0 ? `#${myRank}` : '—'}</div>
               <div className="font-semibold text-slate-800">Kedudukan Papan Pendahulu</div>
-              <div className="text-xs text-slate-500 mt-0.5">{myRank > 0 && myRank <= 3 ? "Anda dalam 3 teratas. Teruskan!" : myRank > 0 ? 'Daki lebih tinggi — anda boleh buat!' : 'Sertai pasukan untuk dikedudukkan.'}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{myRank > 0 && myRank <= 3 ? "Anda dalam 3 teratas. Teruskan!" : myRank > 0 ? 'Daki lebih tinggi, anda boleh buat!' : 'Sertai pasukan untuk dikedudukkan.'}</div>
             </div>
           </div>
         </div>

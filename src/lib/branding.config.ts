@@ -1,5 +1,5 @@
 // =====================================================================
-//  StafKita Akademi — Konfigurasi penjenamaan berpusat
+//  StafKita Akademi, Konfigurasi penjenamaan berpusat
 //  Sumber tunggal untuk nama produk, tagline, warna dan kenalan.
 //  Import: import { BRANDING } from '@/lib/branding.config';
 // =====================================================================
