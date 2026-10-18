@@ -7,6 +7,8 @@ import TranslateWidget from "@/components/TranslateWidget";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
 import { BRANDING } from '@/lib/branding.config';
+import { JENAMA } from '@/lib/brand';
+import { teks } from '@/i18n/teks';
 
 // Fon tema StafKita: badan Roboto, tajuk Nunito
 const roboto = Roboto({ subsets: ["latin"], weight: ["300","400","500","700"], variable: "--font-roboto" });
@@ -50,17 +52,17 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ms">
+    <html lang={JENAMA === 'veltrix' ? 'en' : 'ms'}>
       <body data-app="kuizen-academy" className={`${roboto.variable} ${nunito.variable} ${roboto.className}`}>
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify({
           '@context': 'https://schema.org',
           '@type': 'SoftwareApplication',
           'name': BRANDING.product.fullName,
-          'alternateName': ['StafKita Akademi'],
+          'alternateName': [teks.jenama.nama],
           'applicationCategory': 'BusinessApplication',
           'applicationSubCategory': 'Learning Management System',
           'operatingSystem': 'Web',
-          'description': 'Platform pembelajaran korporat StafKita Akademi untuk latihan pekerja, pematuhan dan pembangunan tenaga kerja',
+          'description': teks.jsonLd.deskripsi,
           'url': `https://${BRANDING.migration.newDomain}`,
           'provider': {
             '@type': 'Organization',
