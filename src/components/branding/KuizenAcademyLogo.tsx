@@ -1,6 +1,7 @@
 import * as React from 'react';
+import { teks } from '@/i18n/teks';
 
-// Logo teks StafKita Akademi (tiada imej baharu; hanya teks + monogram SVG inline)
+// Logo teks produk (tiada imej baharu; hanya teks + monogram SVG inline)
 export type LogoVariant = 'full' | 'horizontal' | 'mark';
 export type LogoColor = 'default' | 'mono-dark' | 'mono-light';
 
@@ -20,7 +21,7 @@ function Mark({ size = 40, color = 'default' }: { size?: number; color?: LogoCol
   return (
     <svg width={size} height={size} viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect x="4" y="4" width="56" height="56" rx="12" fill={bg} />
-      <text x="32" y="41" textAnchor="middle" fontSize="26" fontWeight="800" fontFamily="Nunito, Arial, sans-serif" fill={fg}>SK</text>
+      <text x="32" y="41" textAnchor="middle" fontSize="26" fontWeight="800" fontFamily="Nunito, Arial, sans-serif" fill={fg}>{teks.jenama.monogram}</text>
     </svg>
   );
 }
@@ -39,7 +40,7 @@ export function KuizenAcademyLogo({
 
   if (variant === 'mark') {
     return (
-      <span className={className} role="img" aria-label="StafKita Akademi">
+      <span className={className} role="img" aria-label={teks.jenama.nama}>
         <Mark size={height} color={color} />
       </span>
     );
@@ -48,11 +49,11 @@ export function KuizenAcademyLogo({
   if (variant === 'full') {
     // Bertindan: mark di atas, lockup teks penuh di bawah
     return (
-      <span className={`inline-flex flex-col items-center gap-2 ${className}`} role="img" aria-label="StafKita Akademi">
+      <span className={`inline-flex flex-col items-center gap-2 ${className}`} role="img" aria-label={teks.jenama.nama}>
         <Mark size={height} color={color} />
         <span className="flex flex-col items-center leading-tight">
           <span className="text-xl font-bold tracking-tight" style={{ color: strong, fontFamily: 'Nunito, var(--font-nunito), sans-serif' }}>
-            StafKita <span style={{ color: accent }}>Akademi</span>
+            {teks.jenama.bahagian1} <span style={{ color: accent }}>{teks.jenama.bahagian2}</span>
           </span>
         </span>
       </span>
@@ -61,11 +62,11 @@ export function KuizenAcademyLogo({
 
   // horizontal (lalai)
   return (
-    <span className={`inline-flex items-center gap-3 ${className}`} role="img" aria-label="StafKita Akademi">
+    <span className={`inline-flex items-center gap-3 ${className}`} role="img" aria-label={teks.jenama.nama}>
       <Mark size={Math.min(height, 40)} color={color} />
       <span className="flex flex-col leading-tight">
         <span className="text-lg font-bold tracking-tight" style={{ color: strong, fontFamily: 'Nunito, var(--font-nunito), sans-serif' }}>
-          StafKita <span style={{ color: accent }}>Akademi</span>
+          {teks.jenama.bahagian1} <span style={{ color: accent }}>{teks.jenama.bahagian2}</span>
         </span>
       </span>
     </span>

@@ -6,14 +6,15 @@ import Shell from "@/components/Shell";
 import { useSession } from "@/lib/session";
 import { listQuestsForParticipant, listEnrolledClasses, getMyProfile, listClassTeamScores, joinClassByCode, leaveClassAsStudent, type Hunt } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
+import { teks } from "@/i18n/teks";
 
 const tabs = [
-  { href: '/participant/home', label: 'Utama', icon: <Home className="w-5 h-5" /> },
-      { href: '/participant/learning', label: 'Pembelajaran', icon: <BookOpen className="w-5 h-5" /> },
-      { href: '/participant/activities', label: 'Aktiviti', icon: <Compass className="w-5 h-5" /> },
-  { href: '/participant/teams', label: 'Pasukan', icon: <Users className="w-5 h-5" /> },
-    { href: '/participant/leaderboard', label: 'Kedudukan', icon: <Trophy className="w-5 h-5" /> },
-  { href: '/participant/profile', label: 'Profil', icon: <UserIcon className="w-5 h-5" /> },
+  { href: '/participant/home', label: teks.peserta.tabUtama, icon: <Home className="w-5 h-5" /> },
+      { href: '/participant/learning', label: teks.peserta.tabPembelajaran, icon: <BookOpen className="w-5 h-5" /> },
+      { href: '/participant/activities', label: teks.peserta.tabAktiviti, icon: <Compass className="w-5 h-5" /> },
+  { href: '/participant/teams', label: teks.peserta.tabPasukan, icon: <Users className="w-5 h-5" /> },
+    { href: '/participant/leaderboard', label: teks.peserta.tabKedudukan, icon: <Trophy className="w-5 h-5" /> },
+  { href: '/participant/profile', label: teks.peserta.tabProfil, icon: <UserIcon className="w-5 h-5" /> },
 ];
 
 function initials(s: string) {
@@ -39,11 +40,11 @@ export default function Page() {
     setJoinErr(null); setJoinOk(null); setJoinBusy(true);
     try {
       await joinClassByCode(joinCode.trim().toUpperCase());
-      setJoinOk("Berjaya disertai! Memuatkan semula…");
+      setJoinOk(teks.peserta.berjayaSertai);
       setTimeout(() => { window.location.reload(); }, 700);
     } catch (err: any) {
-      const msg = String(err?.message || "Gagal");
-      setJoinErr(/Invalid class code/i.test(msg) ? `Kod "${joinCode.trim().toUpperCase()}" tidak sah. Sila semak dengan pendidik anda.` : msg);
+      const msg = String(err?.message || teks.peserta.gagal);
+      setJoinErr(/Invalid class code/i.test(msg) ? teks.peserta.kodTidakSah(joinCode.trim().toUpperCase()) : msg);
     } finally {
       setJoinBusy(false);
     }
@@ -104,9 +105,9 @@ export default function Page() {
         {/* Hero aluan */}
         <div className="relative overflow-hidden rounded bg-primary-subtle border border-primary-subtle p-6 sm:p-8">
           <div className="relative z-10 max-w-[60%]">
-            <div className="text-xs font-semibold text-primary-hover tracking-widest mb-1">✋ SELAMAT DATANG</div>
-            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900">{dataReady ? (name || 'Peserta') : ''}</div>
-            <div className="mt-2 text-sm text-slate-600">Terus belajar, terus berkembang! Anda sedang hebat! <span className="text-amber-500">⭐</span></div>
+            <div className="text-xs font-semibold text-primary-hover tracking-widest mb-1">{teks.peserta.aluanPinggir}</div>
+            <div className="text-3xl sm:text-4xl font-extrabold text-slate-900">{dataReady ? (name || teks.peserta.peserta) : ''}</div>
+            <div className="mt-2 text-sm text-slate-600">{teks.peserta.aluanCepat} <span className="text-amber-500">⭐</span></div>
           </div>
           <div aria-hidden className="hidden sm:block absolute right-6 top-1/2 -translate-y-1/2 text-7xl select-none">
             <span className="inline-block">🏆</span>
@@ -119,10 +120,10 @@ export default function Page() {
             <div className="bg-white rounded shadow-sm border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="inline-flex items-center justify-center w-9 h-9 rounded bg-primary-subtle text-primary"><Users className="w-5 h-5" /></span>
-                <span className="font-semibold text-slate-800">Pilih kelas anda</span>
+                <span className="font-semibold text-slate-800">{teks.peserta.pilihKelas}</span>
               </div>
               {classes.length === 0 ? (
-                <p className="text-sm text-slate-500">Belum sertai mana-mana kelas. <Link href="/participant/join" className="text-primary-hover underline">Sertai satu</Link>.</p>
+                <p className="text-sm text-slate-500">{teks.peserta.belumSertai} <Link href="/participant/join" className="text-primary-hover underline">{teks.peserta.belumSertaiLink}</Link>.</p>
               ) : (
                 <select value={activeClassId} onChange={e => setActiveClassId(e.target.value)} className="w-full px-3 py-2.5 rounded border border-slate-200 bg-white text-sm focus:outline-none focus:ring-2 focus:ring-primary/40">
                   {classes.map((c: any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
@@ -130,14 +131,14 @@ export default function Page() {
               )}
               <div className="mt-3 flex items-center gap-2 text-xs text-status-success">
                 <span className="inline-block w-2 h-2 rounded-full bg-status-success" />
-                <span>Kelas aktif</span>
+                <span>{teks.peserta.kelasAktif}</span>
               </div>
                 {activeClass?.ended_at && (
                   <div data-class-banner="ended" className="mt-3 flex items-start gap-2 rounded border border-amber-300 bg-amber-50 px-3 py-2 text-xs text-amber-900">
                     <span className="mt-0.5 inline-block w-2 h-2 rounded-full bg-amber-500 shrink-0" />
                     <div className="flex-1 min-w-0">
-                      <div className="font-semibold">Kelas ini telah tamat.</div>
-                      <div className="text-amber-700 mt-0.5">Anda masih boleh menyemak Papan Pembelajaran, Aktiviti dan Kedudukan akhir. Penghantaran baharu telah ditutup.</div>
+                      <div className="font-semibold">{teks.peserta.kelasTamat}</div>
+                      <div className="text-amber-700 mt-0.5">{teks.peserta.kelasTamatSub}</div>
                     </div>
                   </div>
                 )}
@@ -147,19 +148,19 @@ export default function Page() {
                   onClick={async () => {
                     const target = classes.find((c: any) => c.id === activeClassId);
                     if (!target) return;
-                    if (!confirm(`Tinggalkan "${target.name}"? Anda akan hilang akses kepada aktiviti dan kedudukannya.`)) return;
+                    if (!confirm(teks.peserta.tinggalkanSoalan(target.name))) return;
                     try {
                       await leaveClassAsStudent(activeClassId);
                       const remaining = classes.filter((c: any) => c.id !== activeClassId);
                       setClasses(remaining);
                       setActiveClassId(remaining[0]?.id || "");
                     } catch (err: any) {
-                      alert(err?.message || "Gagal meninggalkan kelas");
+                      alert(err?.message || teks.peserta.gagalTinggalkan);
                     }
                   }}
                   className="mt-3 w-full text-xs font-medium text-rose-600 hover:text-white hover:bg-rose-500 border border-rose-200 hover:border-rose-500 rounded px-3 py-2 transition"
                 >
-                  Tinggalkan kelas ini
+                  {teks.peserta.tinggalkanButang}
                 </button>
               )}
             </div>
@@ -167,7 +168,7 @@ export default function Page() {
             <div className="bg-white rounded shadow-sm border border-slate-200 p-5">
               <div className="flex items-center gap-2 mb-3">
                 <span className="inline-flex items-center justify-center w-9 h-9 rounded bg-primary-subtle text-primary"><KeyRound className="w-5 h-5" /></span>
-                <span className="font-semibold text-slate-800">Sertai Kelas</span>
+                <span className="font-semibold text-slate-800">{teks.peserta.sertaiKelas}</span>
               </div>
               <form onSubmit={onJoinClass} className="space-y-2">
                 <input
@@ -184,12 +185,12 @@ export default function Page() {
                   disabled={joinBusy || !joinCode.trim()}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded bg-primary text-white text-sm font-semibold hover:bg-primary-hover disabled:opacity-60 disabled:cursor-not-allowed transition"
                 >
-                  {joinBusy ? "Menyertai…" : (<><Compass className="w-4 h-4" /> Sertai kelas</>)}
+                  {joinBusy ? teks.peserta.menyertai : (<><Compass className="w-4 h-4" /> {teks.peserta.sertaiButang}</>)}
                 </button>
               </form>
               {joinErr && <p className="mt-2 text-xs text-status-danger">{joinErr}</p>}
               {joinOk && <p className="mt-2 text-xs text-status-success">{joinOk}</p>}
-              {!joinErr && !joinOk && <p className="mt-3 text-xs text-slate-500">Masukkan kod kelas yang diberikan oleh pendidik anda.</p>}
+              {!joinErr && !joinOk && <p className="mt-3 text-xs text-slate-500">{teks.peserta.masukkanKod}</p>}
             </div>
           </div>
 
@@ -198,23 +199,23 @@ export default function Page() {
             <div className="flex items-start gap-3">
               <span className="inline-flex items-center justify-center w-10 h-10 rounded bg-primary-subtle text-primary shrink-0"><ClipboardList className="w-5 h-5" /></span>
               <div className="flex-1">
-                <div className="text-xl font-bold text-slate-900">Papan Pengenalan</div>
+                <div className="text-xl font-bold text-slate-900">{teks.peserta.papanPengenalan}</div>
                 {activeClass && (<div className="mt-1 inline-block text-xs font-medium text-primary-hover bg-primary-subtle px-3 py-1 rounded-full">{activeClass.name}</div>)}
-                <p className="mt-3 text-sm text-slate-600 max-w-md">Semua yang anda perlukan untuk bermula dalam kelas anda. Cari maklumat kelas, pengumuman dan garis panduan.</p>
+                <p className="mt-3 text-sm text-slate-600 max-w-md">{teks.peserta.pengenalanSub}</p>
                 <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                  <li className="flex items-center gap-2"><Clock className="w-4 h-4 text-primary" /> Maklumat kelas</li>
-                  <li className="flex items-center gap-2"><Megaphone className="w-4 h-4 text-primary" /> Pengumuman</li>
-                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary" /> Garis panduan &amp; sumber</li>
+                  <li className="flex items-center gap-2"><Clock className="w-4 h-4 text-primary" /> {teks.peserta.maklumatKelas}</li>
+                  <li className="flex items-center gap-2"><Megaphone className="w-4 h-4 text-primary" /> {teks.peserta.pengumuman}</li>
+                  <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-primary" /> {teks.peserta.garisPanduan}</li>
                 </ul>
               </div>
               <div aria-hidden className="hidden sm:flex w-32 h-32 rounded-full bg-primary-subtle items-center justify-center shrink-0"><ClipboardList className="w-16 h-16 text-primary" /></div>
             </div>
             {activeClassId ? (
               <Link href={`/participant/classes/${activeClassId}/board`} className="mt-5 flex items-center justify-center gap-2 w-full bg-primary hover:bg-primary-hover text-white font-semibold py-3 rounded transition">
-                Buka Papan Pengenalan <ArrowRight className="w-4 h-4" />
+                {teks.peserta.bukaPapanPengenalan} <ArrowRight className="w-4 h-4" />
               </Link>
             ) : (
-              <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded cursor-not-allowed">Pilih kelas untuk membuka Papan Pengenalan</button>
+              <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded cursor-not-allowed">{teks.peserta.pilihUntukPengenalan}</button>
             )}
           </div>
 
@@ -223,23 +224,23 @@ export default function Page() {
           <div className="flex items-start gap-3">
             <span className="inline-flex items-center justify-center w-10 h-10 rounded bg-emerald-100 text-emerald-700 shrink-0"><BookOpen className="w-5 h-5" /></span>
             <div className="flex-1">
-              <div className="text-xl font-bold text-slate-900">Papan Pembelajaran</div>
+              <div className="text-xl font-bold text-slate-900">{teks.peserta.papanPembelajaran}</div>
               {activeClass && (<div className="mt-1 inline-block text-xs font-medium text-emerald-700 bg-emerald-100 px-3 py-1 rounded-full">{activeClass.name}</div>)}
-              <p className="mt-3 text-sm text-slate-600 max-w-md">Pusat pembelajaran harian anda. Akses modul, pelajaran dan bahan, serta jejak kemajuan anda.</p>
+              <p className="mt-3 text-sm text-slate-600 max-w-md">{teks.peserta.pembelajaranSub}</p>
               <ul className="mt-4 space-y-2 text-sm text-slate-700">
-                <li className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-emerald-600" /> Modul &amp; pelajaran</li>
-                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-emerald-600" /> Bahan pembelajaran</li>
-                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> Jejak kemajuan anda</li>
+                <li className="flex items-center gap-2"><ClipboardList className="w-4 h-4 text-emerald-600" /> {teks.peserta.modulPelajaran}</li>
+                <li className="flex items-center gap-2"><Star className="w-4 h-4 text-emerald-600" /> {teks.peserta.bahanPembelajaran}</li>
+                <li className="flex items-center gap-2"><CheckCircle2 className="w-4 h-4 text-emerald-600" /> {teks.peserta.jejakKemajuan}</li>
               </ul>
             </div>
             <div aria-hidden className="hidden sm:flex w-32 h-32 rounded-full bg-emerald-50 items-center justify-center shrink-0"><BookOpen className="w-16 h-16 text-emerald-500" /></div>
           </div>
           {activeClassId ? (
             <Link href={`/participant/classes/${activeClassId}/learning-board`} className="mt-5 flex items-center justify-center gap-2 w-full bg-emerald-600 hover:bg-emerald-700 text-white font-semibold py-3 rounded transition">
-              Teruskan Pembelajaran <ArrowRight className="w-4 h-4" />
+              {teks.peserta.teruskanPembelajaran} <ArrowRight className="w-4 h-4" />
             </Link>
           ) : (
-            <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded cursor-not-allowed">Pilih kelas untuk membuka Papan Pembelajaran</button>
+            <button disabled className="mt-5 flex items-center justify-center gap-2 w-full bg-slate-200 text-slate-500 font-semibold py-3 rounded cursor-not-allowed">{teks.peserta.pilihUntukPembelajaran}</button>
           )}
         </div>
         </div>
@@ -250,25 +251,25 @@ export default function Page() {
             <span className="inline-flex items-center justify-center w-14 h-14 rounded bg-white text-primary shrink-0"><ClipboardList className="w-7 h-7" /></span>
             <div className="min-w-0">
               <div className="text-3xl font-extrabold text-primary-hover">{dataReady ? activeQuestCount : 0}</div>
-              <div className="font-semibold text-slate-800">Aktiviti Aktif</div>
-              <div className="text-xs text-slate-500 mt-0.5">Teruskan! Lengkapkan lebih banyak untuk meraih mata.</div>
-              <Link href="/participant/activities" className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary-hover hover:text-primary">Pergi ke Aktiviti <ArrowRight className="w-3 h-3" /></Link>
+              <div className="font-semibold text-slate-800">{teks.peserta.aktivitiAktif}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{teks.peserta.teruskanAktiviti}</div>
+              <Link href="/participant/activities" className="mt-1 inline-flex items-center gap-1 text-xs font-semibold text-primary-hover hover:text-primary">{teks.peserta.pergiAktiviti} <ArrowRight className="w-3 h-3" /></Link>
             </div>
           </div>
           <div className="bg-emerald-50 rounded p-5 flex items-center gap-4">
             <span className="inline-flex items-center justify-center w-14 h-14 rounded bg-emerald-100 text-emerald-700 shrink-0"><Trophy className="w-7 h-7" /></span>
             <div className="min-w-0">
               <div className="text-3xl font-extrabold text-emerald-700">{totalPoints.toLocaleString()}</div>
-              <div className="font-semibold text-slate-800">Jumlah Mata</div>
-              <div className="text-xs text-slate-500 mt-0.5">{totalPoints > 0 ? 'Bagus! Terus mendaki papan pendahulu.' : 'Sertai pasukan dan raih mata untuk melihat skor anda.'}</div>
+              <div className="font-semibold text-slate-800">{teks.peserta.jumlahMata}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{totalPoints > 0 ? teks.peserta.mataBagus : teks.peserta.mataKosong}</div>
             </div>
           </div>
           <div className="bg-orange-50 rounded p-5 flex items-center gap-4">
             <span className="inline-flex items-center justify-center w-14 h-14 rounded bg-orange-100 text-orange-700 shrink-0"><BarChart3 className="w-7 h-7" /></span>
             <div className="min-w-0">
-              <div className="text-3xl font-extrabold text-orange-700">{myRank > 0 ? `#${myRank}` : '—'}</div>
-              <div className="font-semibold text-slate-800">Kedudukan Papan Pendahulu</div>
-              <div className="text-xs text-slate-500 mt-0.5">{myRank > 0 && myRank <= 3 ? "Anda dalam 3 teratas. Teruskan!" : myRank > 0 ? 'Daki lebih tinggi, anda boleh buat!' : 'Sertai pasukan untuk dikedudukkan.'}</div>
+              <div className="text-3xl font-extrabold text-orange-700">{myRank > 0 ? `#${myRank}` : '-'}</div>
+              <div className="font-semibold text-slate-800">{teks.peserta.kedudukanPapan}</div>
+              <div className="text-xs text-slate-500 mt-0.5">{myRank > 0 && myRank <= 3 ? teks.peserta.tigaTeratas : myRank > 0 ? teks.peserta.dakiLagi : teks.peserta.sertaiUntukKedudukan}</div>
             </div>
           </div>
         </div>
@@ -279,17 +280,17 @@ export default function Page() {
             <div className="flex items-start gap-3">
               <span className="inline-flex items-center justify-center w-10 h-10 rounded bg-primary-subtle text-primary shrink-0"><BarChart3 className="w-5 h-5" /></span>
               <div>
-                <div className="font-bold text-slate-900">Papan Pendahulu Kelas</div>
-                <div className="text-xs text-slate-500">Terbaik{activeClass ? ` dalam ${activeClass.name}` : ''}</div>
+                <div className="font-bold text-slate-900">{teks.peserta.papanPendahuluKelas}</div>
+                <div className="text-xs text-slate-500">{teks.peserta.terbaik}{activeClass ? teks.peserta.terbaikDalam(activeClass.name) : ''}</div>
               </div>
             </div>
-            <Link href="/participant/leaderboard" className="text-sm font-semibold text-primary-hover hover:text-primary inline-flex items-center gap-1">Lihat papan pendahulu penuh <ArrowRight className="w-4 h-4" /></Link>
+            <Link href="/participant/leaderboard" className="text-sm font-semibold text-primary-hover hover:text-primary inline-flex items-center gap-1">{teks.peserta.lihatPapanPenuh} <ArrowRight className="w-4 h-4" /></Link>
           </div>
 
           {scoresLoading ? (
             <div className="space-y-2">{[1,2,3].map(i => <div key={i} className="h-14 bg-slate-100 rounded animate-pulse" />)}</div>
           ) : top4.length === 0 ? (
-            <p className="text-sm text-slate-500 py-6 text-center">Belum ada skor pasukan untuk kelas ini.</p>
+            <p className="text-sm text-slate-500 py-6 text-center">{teks.peserta.belumSkor}</p>
           ) : (
             <div className="space-y-2">
               {top4.map((r: any, idx: number) => {
@@ -300,13 +301,13 @@ export default function Page() {
                       {idx + 1}
                     </span>
                     <span className={`shrink-0 w-9 h-9 rounded-full flex items-center justify-center font-bold text-xs ${teamPalette[idx % teamPalette.length]}`}>
-                      {initials(r.team_name || ('Pasukan ' + String(r.team_id).slice(0,2)))}
+                      {initials(r.team_name || teks.peserta.pasukanNama(String(r.team_id).slice(0,2)))}
                     </span>
                     <div className="flex-1 min-w-0">
-                      <span className="font-semibold text-slate-900 truncate">{r.team_name || ('Pasukan ' + String(r.team_id).slice(0,8))}</span>
-                      {isMine && <span className="ml-2 text-xs text-primary-hover font-medium">(Pasukan Anda)</span>}
+                      <span className="font-semibold text-slate-900 truncate">{r.team_name || teks.peserta.pasukanNama(String(r.team_id).slice(0,8))}</span>
+                      {isMine && <span className="ml-2 text-xs text-primary-hover font-medium">{teks.peserta.pasukanAnda}</span>}
                     </div>
-                    <div className="text-primary-hover font-bold text-sm whitespace-nowrap">{(Number(r.total_score)||0).toLocaleString()} mata</div>
+                    <div className="text-primary-hover font-bold text-sm whitespace-nowrap">{(Number(r.total_score)||0).toLocaleString()} {teks.peserta.mata}</div>
                   </div>
                 );
               })}
@@ -317,8 +318,8 @@ export default function Page() {
         {/* Sepanduk pengaki */}
         <div className="flex items-center gap-3 bg-amber-50 border border-amber-100 rounded p-4">
           <span className="inline-flex items-center justify-center w-10 h-10 rounded-full bg-amber-100 text-amber-600 shrink-0"><Star className="w-5 h-5" /></span>
-          <div className="flex-1 text-sm text-slate-700">Lengkapkan aktiviti, raih mata dan daki papan pendahulu!</div>
-          <Link href="/participant/activities" className="text-sm font-semibold text-amber-600 hover:text-amber-800 inline-flex items-center gap-1 whitespace-nowrap">Pergi ke Aktiviti <ArrowRight className="w-4 h-4" /></Link>
+          <div className="flex-1 text-sm text-slate-700">{teks.peserta.pengaki}</div>
+          <Link href="/participant/activities" className="text-sm font-semibold text-amber-600 hover:text-amber-800 inline-flex items-center gap-1 whitespace-nowrap">{teks.peserta.pergiAktiviti} <ArrowRight className="w-4 h-4" /></Link>
         </div>
       </div>
     </Shell>

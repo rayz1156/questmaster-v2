@@ -6,6 +6,7 @@ import { LogOut, HelpCircle, Menu, X } from "lucide-react";
 import { getSession, clearSession } from "@/lib/session";
 import type { User, Profile } from "@/lib/types";
 import { getMyProfile } from "@/lib/data";
+import { teks } from "@/i18n/teks";
 
 type Tab = { href: string; label: string; icon?: React.ReactNode };
 
@@ -75,13 +76,13 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
   const Brand = () => (
     <div className="flex items-center gap-3 min-w-0">
       {logoUrl ? (
-        <img src={logoUrl} alt="Logo" className="w-10 h-10 rounded object-contain bg-white/90 p-1" />
+        <img src={logoUrl} alt={teks.shell.logo} className="w-10 h-10 rounded object-contain bg-white/90 p-1" />
       ) : (
-        <span className="w-10 h-10 rounded bg-[#6576ff] text-white flex items-center justify-center font-bold font-[Nunito,var(--font-nunito),sans-serif]">SK</span>
+        <span className="w-10 h-10 rounded bg-[#6576ff] text-white flex items-center justify-center font-bold font-[Nunito,var(--font-nunito),sans-serif]">{teks.jenama.monogram}</span>
       )}
       <div className="min-w-0">
         <div className="font-bold text-lg leading-tight truncate text-white" style={{ fontFamily: "Nunito, var(--font-nunito), sans-serif" }}>
-          StafKita Akademi
+          {teks.jenama.nama}
         </div>
         <div className="text-xs text-[#6e82a5] truncate">
           {user.display_name} · {user.role}
@@ -113,7 +114,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
       }`}
     >
       <span className={helpActive ? "text-[#6576ff]" : "text-[#6e82a5]"}><HelpCircle className="w-5 h-5" /></span>
-      <span>Bantuan</span>
+      <span>{teks.shell.bantuan}</span>
     </Link>
   );
   const logoutItem = (
@@ -122,7 +123,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
       className="w-full flex items-center gap-3 px-3 py-2.5 rounded text-sm font-medium text-[#6e82a5] hover:text-white hover:bg-[#203247] transition"
     >
       <LogOut className="w-5 h-5" />
-      <span>Log keluar</span>
+      <span>{teks.shell.logKeluar}</span>
     </button>
   );
 
@@ -155,7 +156,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
             <button
               onClick={() => setDrawerOpen(false)}
               className="absolute top-4 right-4 text-[#6e82a5] hover:text-white"
-              aria-label="Tutup menu"
+              aria-label={teks.shell.tutupMenu}
             >
               <X className="w-5 h-5" />
             </button>
@@ -169,19 +170,19 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
         {/* ---- Kepala putih 65px ---- */}
         <header className="h-[65px] shrink-0 bg-white border-b border-[#e5e9f2] flex items-center justify-between px-4 lg:px-8 sticky top-0 z-40">
           <div className="lg:hidden flex items-center gap-3">
-            <button onClick={() => setDrawerOpen(true)} className="p-2 text-[#526484]" aria-label="Buka menu">
+            <button onClick={() => setDrawerOpen(true)} className="p-2 text-[#526484]" aria-label={teks.shell.bukaMenu}>
               <Menu className="w-6 h-6" />
             </button>
             <span className="font-bold text-lg" style={{ fontFamily: "Nunito, var(--font-nunito), sans-serif" }}>
-              StafKita <span className="text-[#6576ff]">Akademi</span>
+              {teks.jenama.bahagian1} <span className="text-[#6576ff]">{teks.jenama.bahagian2}</span>
             </span>
           </div>
           <div className="hidden lg:block text-sm font-semibold text-[#364a63]">
-            StafKita Akademi
+            {teks.jenama.nama}
           </div>
           <div className="flex items-center gap-3">
             <span className="text-sm text-[#6e82a5] truncate max-w-[40vw]">{user.display_name}</span>
-            <button onClick={onLogout} className="p-2 text-[#6e82a5] hover:text-[#e85347] transition" aria-label="Log keluar">
+            <button onClick={onLogout} className="p-2 text-[#6e82a5] hover:text-[#e85347] transition" aria-label={teks.shell.logKeluar}>
               <LogOut className="w-5 h-5" />
             </button>
           </div>
@@ -192,7 +193,7 @@ export default function Shell({ tabs, children }: { tabs: Tab[]; children: React
         </main>
 
         <footer className="text-center text-xs text-[#8094ae] py-4">
-          <span>&copy; StafKita Akademi</span>
+          <span>&copy; {teks.jenama.nama}</span>
         </footer>
       </div>
     </div>

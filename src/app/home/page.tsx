@@ -3,6 +3,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
+import { teks } from '@/i18n/teks';
 
 type EnrolRow = {
   id: string;
@@ -60,26 +61,26 @@ export default function LearnerHome() {
     <div className="min-h-screen bg-slate-50">
       <header className="bg-white border-b border-slate-200">
         <div className="max-w-6xl mx-auto px-6 py-4 flex items-center justify-between">
-          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">StafKita Akademi</Link>
+          <Link href="/" className="text-xl font-bold bg-gradient-to-r from-emerald-600 to-teal-500 bg-clip-text text-transparent">{teks.jenama.nama}</Link>
           <div className="flex items-center gap-3">
-            <span className="text-sm text-slate-600 hidden sm:inline">Hi, {displayName}</span>
-            <button onClick={async () => { await supabase.auth.signOut(); router.push('/'); }} className="text-sm text-slate-500 hover:text-slate-900">Sign out</button>
+            <span className="text-sm text-slate-600 hidden sm:inline">{teks.rumah.hi(displayName)}</span>
+            <button onClick={async () => { await supabase.auth.signOut(); router.push('/'); }} className="text-sm text-slate-500 hover:text-slate-900">{teks.rumah.logKeluar}</button>
           </div>
         </div>
       </header>
 
       <main className="max-w-6xl mx-auto px-6 py-10">
-        <h1 className="text-3xl font-bold text-slate-900">My learning</h1>
-        <p className="mt-1 text-slate-600">Pick up where you left off.</p>
+        <h1 className="text-3xl font-bold text-slate-900">{teks.rumah.tajuk}</h1>
+        <p className="mt-1 text-slate-600">{teks.rumah.sub}</p>
 
         {loading ? (
-          <div className="mt-10 text-center text-slate-500">Loading…</div>
+          <div className="mt-10 text-center text-slate-500">{teks.rumah.memuatkan}</div>
         ) : enrols.length === 0 ? (
           <div className="mt-10 bg-white border-2 border-dashed border-slate-200 rounded-2xl p-12 text-center">
             <div className="text-5xl">🎓</div>
-            <h2 className="mt-3 text-xl font-semibold text-slate-900">You're not enrolled in anything yet</h2>
-            <p className="mt-1 text-sm text-slate-500">Browse creator storefronts and enrol in your first course.</p>
-            <Link href="/" className="mt-5 inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">Discover courses</Link>
+            <h2 className="mt-3 text-xl font-semibold text-slate-900">{teks.rumah.tiada}</h2>
+            <p className="mt-1 text-sm text-slate-500">{teks.rumah.tiadaSub}</p>
+            <Link href="/" className="mt-5 inline-flex items-center px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-medium hover:bg-emerald-700">{teks.rumah.cari}</Link>
           </div>
         ) : (
           <div className="mt-8 grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
