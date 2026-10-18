@@ -162,7 +162,7 @@ export default function HelpPage() {
             ) : (
               <form onSubmit={submitFeedback} className="space-y-4">
                 <div>
-                  <h2 className="text-lg font-bold text-slate-900">{teks.bantuan.bantuTajuk(teks.jenama.nama)}</h2>
+                  <h2 className="text-lg font-bold text-slate-900">{teks.bantuan.bantuTajuk}</h2>
                   <p className="text-sm text-slate-600 mt-1">{teks.bantuan.bantuSub}</p>
                 </div>
                 <div>

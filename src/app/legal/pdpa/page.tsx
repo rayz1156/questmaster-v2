@@ -10,8 +10,8 @@ export default function Page() {
         <p className="section-eyebrow">{teks.undang.pinggir}</p>
         <h1 className="display-heading text-3xl mb-3">{teks.undang.pdpa}</h1>
         <p className="text-slate-600">{teks.undang.dikemaskini}</p>
-        <p>{teks.undang.pdpaTeks(teks.jenama.nama)}</p>
-        <p className="text-slate-500 text-sm">{teks.undang.dikendali(teks.jenama.nama)}</p>
+        <p>{teks.undang.pdpaTeks}</p>
+        <p className="text-slate-500 text-sm">{teks.undang.dikendali}</p>
       </div>
     </main>
   );

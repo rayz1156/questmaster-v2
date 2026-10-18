@@ -45,13 +45,13 @@ export const Emails = {
   welcomeLearner(ctx: EmailContext & { firstProgram?: string; loginUrl: string }) {
     const greeting = ctx.lang === 'ms' ? teks.emel.salam(ctx.recipientName) : teks.emel.sapaan(ctx.recipientName);
     const body = `
-      <h1 style="font-family:'Nunito','Arial',sans-serif;color:#6576ff;font-size:28px;margin:0 0 14px">${teks.emel.tajukSambutan(teks.jenama.nama)}</h1>
+      <h1 style="font-family:'Nunito','Arial',sans-serif;color:#6576ff;font-size:28px;margin:0 0 14px">${teks.emel.tajukSambutan}</h1>
       <p style="margin:0 0 14px;line-height:1.6">${greeting}</p>
       <p style="margin:0 0 14px;line-height:1.6">${ctx.orgName ? escapeHtml(ctx.orgName) : teks.emel.organisasiAnda}${teks.emel.sambutanBadan}</p>
       ${ctx.firstProgram ? `<p style="margin:0 0 14px;line-height:1.6">${teks.emel.programPertama}<strong>${escapeHtml(ctx.firstProgram)}</strong></p>` : ''}
       ${cta(teks.emel.ctaSambutan, ctx.loginUrl)}
       <p style="margin:14px 0 0;line-height:1.6;color:#475569;font-size:13px">${teks.emel.sambutanBantuan}</p>`;
-    return { subject: teks.emel.subjekSambutan(teks.jenama.nama, ctx.orgName), html: baseTemplate({ title: teks.emel.tajukSambutan(teks.jenama.nama), previewText: teks.emel.pratontonSambutan, body }) };
+    return { subject: teks.emel.subjekSambutan(teks.jenama.nama, ctx.orgName), html: baseTemplate({ title: teks.emel.tajukSambutan, previewText: teks.emel.pratontonSambutan, body }) };
   },
   assignmentNotification(ctx: EmailContext & { programName: string; hours: number; dueDate: string; mandatory: boolean; accreditations: string[]; learnUrl: string; outcomes?: string[] }) {
     const greeting = ctx.lang === 'ms' ? teks.emel.salam(ctx.recipientName) : teks.emel.sapaan(ctx.recipientName);
@@ -97,17 +97,17 @@ export const Emails = {
         ${ctx.topPerformer ? `<li>${teks.emel.cemerlang}<strong>${escapeHtml(ctx.topPerformer)}</strong></li>` : ''}
       </ul>
       ${cta(teks.emel.ctaLaporan, ctx.reportUrl)}`;
-    return { subject: teks.emel.subjekRingkasan(teks.jenama.nama), html: baseTemplate({ title: teks.emel.tajukRingkasan, previewText: teks.emel.pratontonRingkasan(ctx.overdueCount), body }) };
+    return { subject: teks.emel.subjekRingkasan, html: baseTemplate({ title: teks.emel.tajukRingkasan, previewText: teks.emel.pratontonRingkasan(ctx.overdueCount), body }) };
   },
   migrationAnnouncement(ctx: EmailContext & { newDomainUrl: string }) {
     const body = `
-      <h1 style="font-family:'Nunito','Arial',sans-serif;color:#6576ff;font-size:28px;margin:0 0 14px">${teks.emel.migrasiTajuk(teks.jenama.nama)}</h1>
+      <h1 style="font-family:'Nunito','Arial',sans-serif;color:#6576ff;font-size:28px;margin:0 0 14px">${teks.emel.migrasiTajuk}</h1>
       <p>${teks.emel.sapaan(escapeHtml(ctx.recipientName))}</p>
-      <p>${teks.emel.migrasiBadan(teks.jenama.nama)}</p>
+      <p>${teks.emel.migrasiBadan}</p>
       <p><strong>${teks.emel.migrasiPerubahan}</strong></p>
-      <ul style="line-height:1.8;color:#475569"><li>${teks.emel.migrasiNama(teks.jenama.nama)}</li><li>${teks.emel.migrasiDomain(BRANDING.migration.newDomain)}</li><li>${teks.emel.migrasiCiri}</li><li>${teks.emel.migrasiHrdc}</li><li>${teks.emel.migrasiData}</li></ul>
+      <ul style="line-height:1.8;color:#475569"><li>${teks.emel.migrasiNama}</li><li>${teks.emel.migrasiDomain(BRANDING.migration.newDomain)}</li><li>${teks.emel.migrasiCiri}</li><li>${teks.emel.migrasiHrdc}</li><li>${teks.emel.migrasiData}</li></ul>
       <p><strong>${teks.emel.migrasiArahan}</strong> ${teks.emel.migrasiArahanBadan}</p>
-      ${cta(teks.emel.ctaLawat(teks.jenama.nama), ctx.newDomainUrl)}`;
-    return { subject: teks.emel.subjekMigrasi(teks.jenama.nama), html: baseTemplate({ title: teks.emel.tajukMigrasi, previewText: teks.emel.pratontonMigrasi, body }) };
+      ${cta(teks.emel.ctaLawat, ctx.newDomainUrl)}`;
+    return { subject: teks.emel.subjekMigrasi, html: baseTemplate({ title: teks.emel.tajukMigrasi, previewText: teks.emel.pratontonMigrasi, body }) };
   },
 };

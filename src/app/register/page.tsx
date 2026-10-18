@@ -33,7 +33,7 @@ export default function Register() {
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded bg-white/15 backdrop-blur-sm shadow-lg mb-3" aria-hidden="true"><KuizenAcademyLogo variant="mark" color="mono-light" height={48} /></div>
           <h1 className="text-3xl font-bold text-white tracking-tight">{teks.daftar.tajuk}</h1>
-          <p className="text-white/80 mt-1">{teks.daftar.sertai(teks.jenama.nama)}</p>
+          <p className="text-white/80 mt-1">{teks.daftar.sertai}</p>
         </div>
         {done ? (
           <div className="bg-white rounded shadow-xl p-6 space-y-3">
