@@ -48,7 +48,7 @@ export default function OnboardingPage() {
           <div>
             <label className="text-sm font-medium text-slate-700">Public URL</label>
             <div className="mt-1 flex items-stretch rounded-lg border border-slate-300 focus-within:ring-2 focus-within:ring-emerald-500 overflow-hidden">
-              <span className="px-3 flex items-center bg-slate-50 text-sm text-slate-500 border-r border-slate-300">lms.kuizen.fun/c/</span>
+              <span className="px-3 flex items-center bg-slate-50 text-sm text-slate-500 border-r border-slate-300">akademi.stafkita.com/c/</span>
               <input value={slug} onChange={(e) => setSlug(slugify(e.target.value))} className="flex-1 px-3 py-2 outline-none" placeholder="jane" />
             </div>
           </div>

@@ -9,7 +9,7 @@ export default function Page() {
         <p className="section-eyebrow">Legal</p>
         <h1 className="display-heading text-3xl mb-3">PDPA Statement</h1>
         <p className="text-slate-600">Last updated: 24 May 2026</p>
-        <p>This PDPA Statement applies to your use of StafKita Akademi by Veltrix. Full document is being prepared. For specific inquiries, contact <a href="mailto:legal@kuizen-academy.com">legal@kuizen-academy.com</a>.</p>
+        <p>This PDPA Statement applies to your use of StafKita Akademi by Veltrix. Full document is being prepared.</p>
         <p className="text-slate-500 text-sm">StafKita Akademi is operated by Veltrix Technology Centre Sdn Bhd, an UPSI Spin-Off Initiative.</p>
       </div>
     </main>

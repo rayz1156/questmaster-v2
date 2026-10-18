@@ -4,7 +4,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 async function fetchCert(serial: string) {
-  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://lms.kuizen.fun';
+  const base = process.env.NEXT_PUBLIC_SITE_URL || 'https://akademi.stafkita.com';
   try {
     const r = await fetch(`${base}/api/certificates/verify/${serial}`, { cache: 'no-store' });
     if (!r.ok && r.status !== 404) return null;

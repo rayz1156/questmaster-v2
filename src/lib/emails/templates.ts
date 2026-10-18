@@ -27,7 +27,7 @@ function baseTemplate(opts: { title: string; previewText: string; body: string }
         <strong style="color:#fff">StafKita Akademi</strong><br/>
         A Veltrix Technology Center Product<br/>
         An UPSI Spin-Off Initiative<br/><br/>
-        <a href="mailto:${BRANDING.contact.supportEmail}" style="color:#fbbf24;text-decoration:none">${BRANDING.contact.supportEmail}</a> &nbsp;·&nbsp; <a href="https://${BRANDING.migration.newDomain}" style="color:#fbbf24;text-decoration:none">${BRANDING.migration.newDomain}</a>
+        <a href="https://${BRANDING.migration.newDomain}" style="color:#fbbf24;text-decoration:none">${BRANDING.migration.newDomain}</a>
       </td></tr>
     </table>
   </td></tr>
@@ -49,7 +49,7 @@ export const Emails = {
       <p style="margin:0 0 14px;line-height:1.6">${ctx.orgName ? escapeHtml(ctx.orgName) : 'Your organization'} has set up your learning account. You can now access your assigned programs, track progress, and earn HRDCorp-claimable certificates.</p>
       ${ctx.firstProgram ? `<p style="margin:0 0 14px;line-height:1.6">Your first program: <strong>${escapeHtml(ctx.firstProgram)}</strong></p>` : ''}
       ${cta('Sign in to your account →', ctx.loginUrl)}
-      <p style="margin:14px 0 0;line-height:1.6;color:#475569;font-size:13px">Need help getting started? Reach your L&D administrator or our team at ${BRANDING.contact.supportEmail}.</p>`;
+      <p style="margin:14px 0 0;line-height:1.6;color:#475569;font-size:13px">Need help getting started? Reach your L&D administrator.</p>`;
     return { subject: `Welcome to StafKita Akademi${ctx.orgName ? ', ' + ctx.orgName : ''}`, html: baseTemplate({ title: 'Welcome to StafKita Akademi', previewText: 'Your learning account is ready.', body }) };
   },
   assignmentNotification(ctx: EmailContext & { programName: string; hours: number; dueDate: string; mandatory: boolean; accreditations: string[]; learnUrl: string; outcomes?: string[] }) {

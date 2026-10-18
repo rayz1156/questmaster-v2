@@ -99,7 +99,7 @@ export default function SettingsPage() {
           {error && <span className="text-sm text-rose-600">{error}</span>}
         </div>
         <div className="text-xs text-slate-500 pt-2 border-t border-slate-100">
-          Storefront URL: <code className="px-1 py-0.5 bg-slate-100 rounded">lms.kuizen.fun/c/{c.slug}</code>
+          Storefront URL: <code className="px-1 py-0.5 bg-slate-100 rounded">akademi.stafkita.com/c/{c.slug}</code>
           {saving && <span className="ml-3 text-slate-400">Saving…</span>}
           {ok && <span className="ml-3 text-emerald-600">Saved ✓</span>}
           {error && <span className="ml-3 text-rose-600">{error}</span>}

@@ -91,9 +91,9 @@ export const BRANDING = {
   },
 
   contact: {
-    supportEmail: 'support@stafkita.com',
-    salesEmail: 'support@stafkita.com',
-    adminEmail: 'support@stafkita.com',
+    supportEmail: '',
+    salesEmail: '',
+    adminEmail: '',
     veltricsEmail: 'hello@veltrix.technology',
   },
 
