@@ -2,28 +2,45 @@
 //  StafKita Akademi, Konfigurasi penjenamaan berpusat
 //  Sumber tunggal untuk nama produk, tagline, warna dan kenalan.
 //  Import: import { BRANDING } from '@/lib/branding.config';
+//  Sejak KZ-028a: nama, deskripsi dan kata kunci produk berjenama
+//  (Veltrix Academy apabila NEXT_PUBLIC_BRAND='veltrix').
 // =====================================================================
+import { JENAMA } from '@/lib/brand';
+
+// Nama produk mengikut jenama pemasangan
+const NAMA_PRODUK = JENAMA === 'veltrix' ? 'Veltrix Academy' : 'StafKita Akademi';
 
 export const BRANDING = {
   product: {
-    name: 'StafKita Akademi',
-    fullName: 'StafKita Akademi',
-    shortName: 'StafKita Akademi',
+    name: NAMA_PRODUK,
+    fullName: NAMA_PRODUK,
+    shortName: NAMA_PRODUK,
     legacy: 'Kuizen LMS',
-    tagline: 'Pembelajaran Korporat untuk Hasil yang Terukur',
+    tagline: JENAMA === 'veltrix' ? 'Corporate Learning for Measurable Results' : 'Pembelajaran Korporat untuk Hasil yang Terukur',
     taglineBM: 'Pembelajaran Korporat untuk Hasil yang Terukur',
-    description:
-      'Platform pembelajaran korporat StafKita Akademi untuk latihan pekerja, pematuhan dan pembangunan tenaga kerja.',
+    description: JENAMA === 'veltrix'
+      ? 'The Veltrix Academy corporate learning platform for employee training, compliance and workforce development.'
+      : 'Platform pembelajaran korporat StafKita Akademi untuk latihan pekerja, pematuhan dan pembangunan tenaga kerja.',
     productType: 'Enterprise LMS',
-    keywords: [
-      'enterprise LMS',
-      'corporate training Malaysia',
-      'HRDCorp training platform',
-      'compliance training',
-      'L&D platform',
-      'workforce learning',
-      'StafKita Akademi',
-    ],
+    keywords: JENAMA === 'veltrix'
+      ? [
+          'enterprise LMS',
+          'corporate training',
+          'HRDCorp training platform',
+          'compliance training',
+          'L&D platform',
+          'workforce learning',
+          'Veltrix Academy',
+        ]
+      : [
+          'enterprise LMS',
+          'corporate training Malaysia',
+          'HRDCorp training platform',
+          'compliance training',
+          'L&D platform',
+          'workforce learning',
+          'StafKita Akademi',
+        ],
   },
 
   endorser: {
