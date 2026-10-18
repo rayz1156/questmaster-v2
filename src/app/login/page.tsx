@@ -1,15 +1,13 @@
 'use client';
-import Image from 'next/image';
 import { KuizenAcademyLogo } from '@/components/branding/KuizenAcademyLogo';
 import { useState, Suspense } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { supabase } from '@/lib/supabase';
 import { teks } from '@/i18n/teks';
 
 
 function LoginInner() {
-  const router = useRouter();
   const searchParams = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
