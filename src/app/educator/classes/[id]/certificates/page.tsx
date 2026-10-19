@@ -28,7 +28,7 @@
 import Link from "next/link";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useParams } from "next/navigation";
-import { Award, Download, Eye, Mail, Plus, RefreshCw } from "lucide-react";
+import { Award, Download, Eye, Mail, Plus, RefreshCw, Trash2 } from "lucide-react";
 import Shell from "@/components/Shell";
 import ClassShell, { type ClassTabKey } from "@/components/ClassShell";
 import { EDU_TABS } from "@/lib/eduTabs";
@@ -55,7 +55,13 @@ import {
   Tabs,
   type DataColumn,
 } from "@/components/ui";
-import { idBolehPilih, pecahKelompok, tickLayak } from "@/lib/sijil/ui";
+import {
+  idBolehPilih,
+  idRekaBentukLama,
+  idTerpilihKemasKini,
+  pecahKelompok,
+  tickLayak,
+} from "@/lib/sijil/ui";
 import { normaliseSusunAtur } from "@/lib/sijil/susunAtur";
 import { normaliseMedan, type MedanSijil } from "@/lib/sijil/medan";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
@@ -641,6 +647,16 @@ export default function CertificatesPage() {
   const [pilihEmel, setPilihEmel] = useState<Record<string, boolean>>({});
   const [emelBusy, setEmelBusy] = useState(false);
 
+  // KZ-029: kemas kini reka bentuk sijil (jana semula PDF dengan templat
+  // aktif). Pilihan kotak semak sedia ada (pilihEmel) dipakai semula.
+  const [regenBusy, setRegenBusy] = useState(false);
+  const [kemajuanRegen, setKemajuanRegen] = useState<{ semasa: number; jumlah: number } | null>(null);
+
+  // KZ-029: templat aktif kelas dan sijil yang reka bentuknya lapuk.
+  const templatAktif = templat.find((t) => t.is_active) ?? null;
+  const idsRekaLama = idRekaBentukLama(sijil, templatAktif?.id ?? null);
+  const idsTerpilihReka = idTerpilihKemasKini(sijil, pilihEmel);
+
   // Sijil boleh diemel: tidak dibatalkan dan PDF sudah ada.
   const sijilBolehEmel = (s: Sijil) => !s.revoked_at && !!s.pdf_path;
   const terpilihEmel = sijil.filter((s) => sijilBolehEmel(s) && pilihEmel[s.id]);
@@ -744,6 +760,91 @@ export default function CertificatesPage() {
 
   const [revokeSijil, setRevokeSijil] = useState<Sijil | null>(null);
   const [sebabBatalkan, setSebabBatalkan] = useState("");
+
+  /**
+   * KZ-029: kemas kini reka bentuk sijil terpilih (atau semua yang lapuk):
+   * jana semula PDF dengan templat aktif melalui laluan regenerate,
+   * berkelompok 10 berurutan. Kod, nama, tarikh dan status emel kekal;
+   * pendidik menekan Resend selepas itu untuk menghantar PDF baharu.
+   */
+  const kemasKiniReka = async (ids: string[]) => {
+    if (!templatAktif || ids.length === 0 || regenBusy) return;
+    const ok = await confirm({
+      title: "Update certificate design",
+      description: `Regenerate ${ids.length} certificate PDF${ids.length === 1 ? "" : "s"} with the active template "${templatAktif.title}"? Codes and names stay the same. Use Resend afterwards to email the new PDF.`,
+      confirmLabel: "Update design",
+    });
+    if (!ok) return;
+    setRegenBusy(true);
+    setKemajuanRegen({ semasa: 0, jumlah: ids.length });
+    let jumlahDikemas = 0;
+    let jumlahLangkau = 0;
+    let ralatRegen: string | null = null;
+    try {
+      const kelompok = pecahKelompok(ids, 10);
+      for (let i = 0; i < kelompok.length; i++) {
+        setKemajuanRegen({ semasa: Math.min((i + 1) * 10, ids.length), jumlah: ids.length });
+        const res = await api(`/api/classes/${classId}/certificates/regenerate`, {
+          certificate_ids: kelompok[i],
+        });
+        const j = await res.json().catch(() => ({}));
+        if (!res.ok) {
+          ralatRegen = j.error ?? "Could not update the certificate design.";
+          break;
+        }
+        jumlahDikemas += j.updated ?? 0;
+        jumlahLangkau += j.skipped ?? 0;
+      }
+    } finally {
+      setRegenBusy(false);
+      setKemajuanRegen(null);
+    }
+    if (ralatRegen) {
+      setMsg(
+        `Updated ${jumlahDikemas} certificate${jumlahDikemas === 1 ? "" : "s"} before stopping: ${ralatRegen}`,
+      );
+    } else {
+      setMsg(`Updated ${jumlahDikemas} certificates. Skipped ${jumlahLangkau}.`);
+    }
+    setPilihEmel({});
+    await muatSemula();
+  };
+
+  /**
+   * KZ-029: padam templat sijil melalui RPC qm_delete_certificate_template
+   * terus dengan klien Supabase (sesi pengguna). Mesej ralat RPC dipapar
+   * apa adanya. Selepas berjaya: jika templat itu dipilih di bahagian
+   * Issue, pilih templat aktif.
+   */
+  const [padamBusy, setPadamBusy] = useState<string | null>(null);
+  const padamTemplat = async (t: Templat) => {
+    if (padamBusy) return;
+    const ok = await confirm({
+      title: "Delete template",
+      description: `Delete template "${t.title}"? This cannot be undone.`,
+      confirmLabel: "Delete",
+      tone: "danger",
+    });
+    if (!ok) return;
+    setPadamBusy(t.id);
+    try {
+      const { error } = await supabase.rpc("qm_delete_certificate_template", {
+        p_template: t.id,
+      });
+      if (error) {
+        setMsg(error.message);
+        return;
+      }
+      setMsg(null);
+      const senarai = await muatSemula();
+      if (pilihTemplat === t.id) {
+        const aktif = senarai.find((x) => x.is_active) ?? senarai[0] ?? null;
+        setPilihTemplat(aktif ? aktif.id : "");
+      }
+    } finally {
+      setPadamBusy(null);
+    }
+  };
 
   // Editor susun atur (V2-015): templat yang sedang dibuka.
   const [editor, setEditor] = useState<Templat | null>(null);
@@ -1091,6 +1192,23 @@ export default function CertificatesPage() {
       hideOnMobile: true,
       render: (s) => (
         <span className="text-ink-faint">{new Date(s.issued_at).toLocaleDateString()}</span>
+      ),
+    },
+    {
+      /* KZ-029: tajuk templat sijil dan lencana Old design bila templatnya
+         bukan templat aktif kelas. */
+      key: "templat",
+      header: "Template",
+      hideOnMobile: true,
+      render: (s) => (
+        <span className="inline-flex items-center gap-2 min-w-0">
+          <span className="text-[13px] text-ink truncate max-w-[180px]">
+            {templat.find((t) => t.id === s.template_id)?.title ?? "Unknown template"}
+          </span>
+          {!s.revoked_at && templatAktif && s.template_id !== templatAktif.id && (
+            <Badge warna="yellow">Old design</Badge>
+          )}
+        </span>
       ),
     },
     {
@@ -1514,6 +1632,17 @@ export default function CertificatesPage() {
                   <Button size="sm" variant="ghost" onClick={() => bukaMedan(t)}>
                     Certificate details
                   </Button>
+                  {/* KZ-029: padam templat; merah lembut, hujung baris tindakan. */}
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    className="text-kz-down"
+                    disabled={padamBusy === t.id}
+                    title="Delete this template"
+                    onClick={() => padamTemplat(t)}
+                  >
+                    <Trash2 className="w-4 h-4" /> Delete
+                  </Button>
                 </div>
                 </div>
 
@@ -1760,7 +1889,48 @@ export default function CertificatesPage() {
 
         {/* Sijil dikeluarkan */}
         <Card>
-          <CardHead title="Issued certificates" />
+          <CardHead
+            title="Issued certificates"
+            right={
+              <div className="flex items-center gap-2 flex-wrap">
+                {/* KZ-029: kemas kini reka bentuk sijil terpilih dengan
+                    templat aktif; pilihan kotak semak sedia ada dipakai. */}
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={!templatAktif || idsTerpilihReka.length === 0 || regenBusy || emelBusy}
+                  title={
+                    templatAktif
+                      ? "Regenerate the selected certificates with the active template"
+                      : "No active certificate template"
+                  }
+                  onClick={() => kemasKiniReka(idsTerpilihReka)}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  {kemajuanRegen
+                    ? `Updating ${kemajuanRegen.semasa} of ${kemajuanRegen.jumlah}...`
+                    : `Update design (${idsTerpilihReka.length} selected)`}
+                </Button>
+                {/* KZ-029: semua sijil tidak dibatalkan yang reka bentuknya
+                    bukan templat aktif. */}
+                <Button
+                  size="sm"
+                  disabled={!templatAktif || idsRekaLama.length === 0 || regenBusy || emelBusy}
+                  title={
+                    templatAktif
+                      ? "Regenerate every active certificate with the active template"
+                      : "No active certificate template"
+                  }
+                  onClick={() => kemasKiniReka(idsRekaLama)}
+                >
+                  <RefreshCw className="w-4 h-4" />
+                  {kemajuanRegen
+                    ? `Updating ${kemajuanRegen.semasa} of ${kemajuanRegen.jumlah}...`
+                    : `Update all to active design (${idsRekaLama.length})`}
+                </Button>
+              </div>
+            }
+          />
           {sijil.length === 0 ? (
             <EmptyState
               className="mt-2"
