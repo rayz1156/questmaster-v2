@@ -68,3 +68,42 @@ export function pecahKelompok<T>(ids: T[], saiz: number): T[][] {
   }
   return kelompok;
 }
+
+/**
+ * KZ-029: baris jadual sijil yang diperlukan oleh fungsi tulen kemas kini
+ * reka bentuk.
+ */
+export type BarisSijilJadual = {
+  id: string;
+  revoked_at: string | null;
+  template_id: string;
+};
+
+/**
+ * KZ-029: sijil "Old design" iaitu tidak dibatalkan dan templatnya BUKAN
+ * templat aktif kelas. Dipakai oleh butang "Update all to active design (M)"
+ * dan lencana Old design. Tiada templat aktif -> tiada yang boleh dikemas.
+ */
+export function idRekaBentukLama(
+  baris: BarisSijilJadual[],
+  aktifId: string | null,
+): string[] {
+  if (!aktifId) return [];
+  return baris
+    .filter((s) => !s.revoked_at && s.template_id !== aktifId)
+    .map((s) => s.id);
+}
+
+/**
+ * KZ-029: id terpilih untuk "Update design (N selected)": kotak semak sedia
+ * ada pada jadual, tetapi sijil tidak dibatalkan sahaja dikira (pilihan lama
+ * pada baris yang sudah dibatalkan diabaikan secara senyap).
+ */
+export function idTerpilihKemasKini(
+  baris: BarisSijilJadual[],
+  pilihan: Record<string, boolean>,
+): string[] {
+  return baris
+    .filter((s) => !s.revoked_at && pilihan[s.id] === true)
+    .map((s) => s.id);
+}
