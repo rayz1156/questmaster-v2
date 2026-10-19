@@ -107,6 +107,12 @@ type Sijil = {
 
 type Pilihan = { id: string; title: string };
 
+/** KZ-030: templat dianggap ada penandatangan bila fields.signer_name
+ *  ialah rentetan tidak kosong; dipakai lencana "Missing signer". */
+function adaSigner(t: Templat): boolean {
+  return typeof t.fields?.signer_name === "string" && (t.fields.signer_name as string).trim() !== "";
+}
+
 /** Gambar kecil latar sebuah templat: muat URL bertandatangan sekali bagi
  *  setiap templat dan papar nisbah A4 landskap. Klik membuka editor.
  *  Templat tanpa background_path tidak memaparkan apa-apa. */
@@ -1519,6 +1525,9 @@ export default function CertificatesPage() {
                     </span>
                     {/* KZ-009: lencana kit pada templat aktif kelas. */}
                     {t.is_active && <Badge variant="solid" warna="purple">Active</Badge>}
+                    {/* KZ-030: petunjuk butiran kurang (bukan penghalang). */}
+                    {!adaSigner(t) && <Badge warna="yellow">Missing signer</Badge>}
+                    {!t.signature_path && <Badge warna="yellow">No signature</Badge>}
                   </div>
                   <div className="text-[13px] text-ink-faint">
                     {t.criteria?.type === "all_members" && "All members"}
