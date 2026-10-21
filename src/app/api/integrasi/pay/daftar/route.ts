@@ -1,16 +1,22 @@
 // KZ-031: POST /api/integrasi/pay/daftar (pelayan ke pelayan).
 // Daftar pembeli kursus dari Veltrix Pay secara automatik dan idempoten,
 // cipta akaun jika tiada, dan hantar e-mel pautan log masuk hanya bila
-// pendaftaran baharu dicipta. Respons tidak pernah mengandungi user_id
-// atau pautan log masuk (elak pengambilalihan akaun).
+// pendaftaran baharu dicipta. Medan pilihan hantar_semula (temuan 2 CTO):
+// bila true dan pendaftaran sedia ada dengan source 'pay', e-mel dihantar
+// semula tertakluk kepada had 10 minit bagi setiap (kunci, e-mel, kursus).
+// Respons tidak pernah mengandungi user_id atau pautan log masuk
+// (elak pengambilalihan akaun).
 import { NextRequest, NextResponse } from 'next/server';
 import {
+  benarkanEmelSemula,
   benarkanKadar,
   bacaBadanTerhad,
+  contentTypeJson,
   hantarEmelAksesKursus,
   lamanUrl,
   sahkanBadanDaftar,
   sahkanKunciApi,
+  tandaEmelDihantar,
   tandaKunciDigunakan,
 } from '@/lib/integrasi-pay';
 
@@ -23,6 +29,11 @@ export async function POST(req: NextRequest) {
     const kunci = await sahkanKunciApi(req);
     if (!kunci) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     if (!benarkanKadar(kunci.id)) return NextResponse.json({ error: 'Too many requests' }, { status: 429 });
+
+    // M-03: badan mesti application/json, selain itu 415
+    if (!contentTypeJson(req)) {
+      return NextResponse.json({ error: 'Unsupported Media Type' }, { status: 415 });
+    }
 
     // Had badan 8 KB, kemudian pengesahan medan
     const mentah = await bacaBadanTerhad(req);
@@ -75,7 +86,11 @@ export async function POST(req: NextRequest) {
           penggunaId = typeof semula === 'string' ? semula : null;
         }
         if (!penggunaId) {
-          console.error('KZ-031 daftar: gagal cipta pengguna', ralatCipta.message);
+          // L-01: log kod atau status sahaja; mesej ralat mungkin mengandungi e-mel
+          console.error(
+            'KZ-031 daftar: gagal cipta pengguna',
+            ralatCipta.code ?? ralatCipta.status ?? 'tiada kod',
+          );
           return NextResponse.json({ error: 'Server error' }, { status: 500 });
         }
       } else if (cipta?.user) {
@@ -111,10 +126,26 @@ export async function POST(req: NextRequest) {
     }
     const baharu = Array.isArray(didaftar) && didaftar.length > 0;
 
-    // e. E-mel akses hanya bila pendaftaran baharu dicipta.
-    //    Pautan magic link dihantar terus ke e-mel pembeli, tidak pernah
-    //    dipulangkan dalam respons API.
-    if (baharu) {
+    // e. E-mel akses: pasti bila pendaftaran baharu dicipta. Bila sedia_ada,
+    //    hanya dihantar semula bila hantar_semula true, pendaftaran sedia ada
+    //    dengan source 'pay', dan had 10 minit bagi (kunci, e-mel, kursus)
+    //    dibenarkan. Pautan magic link dihantar terus ke e-mel pembeli,
+    //    tidak pernah dipulangkan dalam respons API.
+    let emelDihantar = false;
+    const pengenalEmel = `${kunci.id}:${badan.email}:${badan.course_id}`;
+    let layakSemula = false;
+    if (!baharu && badan.hantar_semula) {
+      const { data: sediaPay } = await db
+        .from('lms_enrollments')
+        .select('id')
+        .eq('user_id', penggunaId)
+        .eq('course_id', badan.course_id)
+        .eq('source', 'pay')
+        .maybeSingle();
+      layakSemula = !!sediaPay && benarkanEmelSemula(pengenalEmel);
+    }
+    if (baharu || layakSemula) {
+      if (baharu) tandaEmelDihantar(pengenalEmel);
       const { data: pautan, error: ralatPautan } = await db.auth.admin.generateLink({
         type: 'magiclink',
         email: badan.email,
@@ -122,9 +153,13 @@ export async function POST(req: NextRequest) {
       });
       const url = pautan?.properties?.action_link;
       if (ralatPautan || !url) {
-        console.error('KZ-031 daftar: gagal jana pautan log masuk', ralatPautan?.message);
+        // L-01: log kod atau status sahaja; mesej ralat mungkin mengandungi e-mel
+        console.error(
+          'KZ-031 daftar: gagal jana pautan log masuk',
+          ralatPautan?.code ?? ralatPautan?.status ?? 'tiada kod',
+        );
       } else {
-        await hantarEmelAksesKursus({
+        emelDihantar = await hantarEmelAksesKursus({
           kepada: badan.email,
           nama: badan.nama,
           tajukKursus: kursus.title,
@@ -141,6 +176,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({
       status: baharu ? 'didaftar' : 'sedia_ada',
       akaun_baharu: akaunBaharu,
+      emel_dihantar: emelDihantar,
     });
   } catch (e) {
     console.error('KZ-031 daftar: ralat tidak dijangka', e);

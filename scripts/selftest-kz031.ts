@@ -4,17 +4,22 @@
 import {
   AWALAN_KUNCI,
   HAD_BADAN_BAIT,
+  SAIZ_PETA_MAX,
+  TINGKAP_EMEL_MS,
   awalanKunci,
   bandingMasaMalar,
   bacaBadanTerhad,
+  benarkanEmelSemula,
   benarkanKadar,
   cincangKunci,
+  contentTypeJson,
   formatKunciSah,
   janaKunciApi,
   kunciDaripadaReq,
   sahkanBadanDaftar,
   MAX_EMEL,
   MAX_NAMA,
+  tandaEmelDihantar,
 } from '../src/lib/integrasi-pay';
 
 let gagal = 0;
@@ -129,6 +134,16 @@ function badan(overrides: Record<string, unknown> = {}) {
   semak('U5 mata wang huruf kecil dinormalisasi', sahkanBadanDaftar(badan({ mata_wang: 'myr' })).ok === true);
   semak('U5 mata wang 2 huruf ditolak', !sahkanBadanDaftar(badan({ mata_wang: 'MY' })).ok);
   semak('U5 mata wang dengan digit ditolak', !sahkanBadanDaftar(badan({ mata_wang: 'M4R' })).ok);
+
+  // hantar_semula (temuan 2 CTO): medan pilihan boolean
+  const ralaiP = sahkanBadanDaftar(badan());
+  semak('U5 hantar_semula lalai false', ralaiP.ok && ralaiP.badan.hantar_semula === false);
+  const ralaiYa = sahkanBadanDaftar(badan({ hantar_semula: true }));
+  semak('U5 hantar_semula true diterima', ralaiYa.ok && ralaiYa.badan.hantar_semula === true);
+  const ralaiNull = sahkanBadanDaftar(badan({ hantar_semula: null }));
+  semak('U5 hantar_semula null menjadi false', ralaiNull.ok && ralaiNull.badan.hantar_semula === false);
+  semak('U5 hantar_semula rentetan ditolak', !sahkanBadanDaftar(badan({ hantar_semula: 'ya' })).ok);
+  semak('U5 hantar_semula integer ditolak', !sahkanBadanDaftar(badan({ hantar_semula: 1 })).ok);
 }
 
 // ---- U6: had badan 8 KB ----
@@ -174,6 +189,61 @@ async function ujiBadan() {
   for (let i = 0; i < 60; i++) if (!benarkanKadar(pengenal2, 60, 60_000, 2000 + i)) semuaLulus = false;
   semak('U7 60 permintaan pertama dibenarkan', semuaLulus);
   semak('U7 permintaan ke-61 ditolak', !benarkanKadar(pengenal2, 60, 60_000, 2060));
+}
+
+// ---- U7b: peta had kadar terkawal (M-01: tiada pertumbuhan tanpa batas) ----
+{
+  // Isi peta hingga had saiz keras dengan pengenal berbeza
+  for (let i = 0; i < SAIZ_PETA_MAX; i++) {
+    if (!benarkanKadar('isi-' + i, 1, 1000, 5000)) {
+      semak('U7b peta diisi sepenuhnya', false, 'gagal pada ' + i);
+      break;
+    }
+  }
+  semak('U7b peta penuh menolak pengenal baharu (429)', !benarkanKadar('lebih-' + janaKunciApi().slice(8), 1, 1000, 5000));
+  // Selepas tetingkap berlalu, pembersihan membebaskan peta
+  semak('U7b entri luput dibersihkan, baharu dibenarkan', benarkanKadar('selepas-' + janaKunciApi().slice(8), 1, 1000, 5000 + 1500));
+}
+
+// ---- U8: had e-mel semula 10 minit (temuan 2 CTO) ----
+{
+  const id = 'ujian-emel-' + janaKunciApi().slice(8);
+  semak('U8 penghantaran pertama dibenarkan', benarkanEmelSemula(id, 1000));
+  semak('U8 kedua dalam tetingkap ditolak', !benarkanEmelSemula(id, 1000 + 60_000));
+  semak('U8 selepas 10 minit dibenarkan semula', benarkanEmelSemula(id, 1000 + TINGKAP_EMEL_MS));
+  const idLain = 'ujian-emel-lain-' + janaKunciApi().slice(8);
+  semak('U8 pengenal lain tak terjejas', benarkanEmelSemula(idLain, 1000 + TINGKAP_EMEL_MS));
+  // tandaEmelDihantar merekod penghantaran pertama supaya hantar_semula ditolak
+  const idTanda = 'ujian-emel-tanda-' + janaKunciApi().slice(8);
+  tandaEmelDihantar(idTanda, 2000);
+  semak('U8 tandaEmelDihantar menyekat semula dalam tetingkap', !benarkanEmelSemula(idTanda, 2000 + 60_000));
+  semak('U8 tandaEmelDihantar lepaskan selepas tetingkap', benarkanEmelSemula(idTanda, 2000 + TINGKAP_EMEL_MS));
+}
+
+// ---- U9: Content-Type application/json (M-03) ----
+{
+  const sah = new Request('https://contoh.invalid/api', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+  });
+  semak('U9 application/json diterima', contentTypeJson(sah));
+  const charset = new Request('https://contoh.invalid/api', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json; charset=utf-8' },
+  });
+  semak('U9 charset suffix diterima', contentTypeJson(charset));
+  const teks = new Request('https://contoh.invalid/api', {
+    method: 'POST',
+    headers: { 'content-type': 'text/plain' },
+  });
+  semak('U9 text/plain ditolak', !contentTypeJson(teks));
+  const hilang = new Request('https://contoh.invalid/api', { method: 'POST' });
+  semak('U9 tanpa content-type ditolak', !contentTypeJson(hilang));
+  const besar = new Request('https://contoh.invalid/api', {
+    method: 'POST',
+    headers: { 'content-type': 'Application/JSON' },
+  });
+  semak('U9 huruf besar tidak peka', contentTypeJson(besar));
 }
 
 // ---- Ringkasan ----

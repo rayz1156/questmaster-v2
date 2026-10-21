@@ -25,6 +25,9 @@ export const AMAUN_MIN = 0;
 export const AMAUN_MAX = 100000000; // amaun_sen integer 0 hingga 100000000
 export const HAD_KADAR = 60; // 60 permintaan seminit bagi setiap kunci
 export const TINGKAP_KADAR_MS = 60_000;
+export const TINGKAP_EMEL_MS = 10 * 60_000; // had e-mel semula: sekali setiap 10 minit
+// M-01: had saiz keras peta dalam memori supaya ia tidak berkembang tanpa batas.
+export const SAIZ_PETA_MAX = 5000;
 
 // E-mel: regex munasabah (bukan RFC penuh, memadai untuk pintu masuk API)
 const REGEX_EMEL = /^[A-Za-z0-9.!#$%&'*+/=?^_`{|}~-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)+$/;
@@ -73,6 +76,7 @@ export interface BadanDaftar {
   rujukan_pesanan: string | null;
   amaun_sen: number;
   mata_wang: string;
+  hantar_semula: boolean;
 }
 
 /** Sahkan kunci dalam senarai aksara dibenarkan dan format base64url. */
@@ -140,6 +144,16 @@ export function sahkanBadanDaftar(mentah: unknown): { ok: true; badan: BadanDaft
     return { ok: false, ralat: 'mata_wang mesti 3 huruf besar' };
   }
 
+  // hantar_semula: medan pilihan boolean (temuan 2 CTO). Bila true dan
+  // pendaftaran sedia ada dengan source 'pay', e-mel akses dihantar semula.
+  let hantarSemula = false;
+  if (o.hantar_semula !== undefined && o.hantar_semula !== null) {
+    if (typeof o.hantar_semula !== 'boolean') {
+      return { ok: false, ralat: 'hantar_semula mesti boolean' };
+    }
+    hantarSemula = o.hantar_semula;
+  }
+
   return {
     ok: true,
     badan: {
@@ -149,6 +163,7 @@ export function sahkanBadanDaftar(mentah: unknown): { ok: true; badan: BadanDaft
       rujukan_pesanan: rujukan,
       amaun_sen: o.amaun_sen,
       mata_wang: mataWang,
+      hantar_semula: hantarSemula,
     },
   };
 }
@@ -161,6 +176,11 @@ const tetingkapKadar = new Map<string, number[]>();
  * Semak had kadar bagi satu pengenal (id kunci). Pulangkan true jika
  * permintaan dibenarkan dan rekodkannya, false jika melebihi had.
  * masaKini boleh diinject untuk ujian.
+ *
+ * M-01: peta ini terkawal. Entri bagi pengenal semasa disaring setiap
+ * kali, dan bila saiz peta mencapai had keras seluruh peta dibersihkan
+ * daripada entri luput. Bila peta masih penuh selepas pembersihan,
+ * permintaan ditolak (pemanggil memulangkan 429).
  */
 export function benarkanKadar(
   pengenal: string,
@@ -169,6 +189,16 @@ export function benarkanKadar(
   masaKini: number = Date.now(),
 ): boolean {
   const lepas = (tetingkapKadar.get(pengenal) ?? []).filter((t) => masaKini - t < tetingkapMs);
+  // M-01: bila peta mencapai had saiz, buang entri luput di seluruh peta.
+  if (tetingkapKadar.size >= SAIZ_PETA_MAX) {
+    tetingkapKadar.forEach((v: number[], k: string) => {
+      const f = v.filter((t) => masaKini - t < tetingkapMs);
+      if (f.length === 0) tetingkapKadar.delete(k);
+      else if (f.length !== v.length) tetingkapKadar.set(k, f);
+    });
+  }
+  // Had saiz keras: bila peta masih penuh selepas pembersihan, tolak (429).
+  if (tetingkapKadar.size >= SAIZ_PETA_MAX) return false;
   if (lepas.length >= had) {
     tetingkapKadar.set(pengenal, lepas);
     return false;
@@ -176,6 +206,55 @@ export function benarkanKadar(
   lepas.push(masaKini);
   tetingkapKadar.set(pengenal, lepas);
   return true;
+}
+
+// ---- Had e-mel akses dalam memori (temuan 2 CTO): sekali setiap 10
+// ---- minit bagi setiap (kunci, e-mel, kursus) ----
+
+const emelTerakhir = new Map<string, number>();
+
+/** Bersihkan peta e-mel daripada entri luput bila ia mencapai had saiz (M-01). */
+function bersihPetaEmel(masaKini: number): void {
+  if (emelTerakhir.size < SAIZ_PETA_MAX) return;
+  emelTerakhir.forEach((t: number, k: string) => {
+    if (masaKini - t >= TINGKAP_EMEL_MS) emelTerakhir.delete(k);
+  });
+}
+
+/**
+ * Semak had penghantaran e-mel semula bagi satu pengenal
+ * (kunci, e-mel, kursus). Pulangkan true jika dibenarkan dan rekodkannya;
+ * false jika masih dalam tetingkap 10 minit atau peta penuh.
+ * masaKini boleh diinject untuk ujian.
+ */
+export function benarkanEmelSemula(pengenal: string, masaKini: number = Date.now()): boolean {
+  bersihPetaEmel(masaKini);
+  if (emelTerakhir.size >= SAIZ_PETA_MAX) return false;
+  const t = emelTerakhir.get(pengenal);
+  if (t !== undefined && masaKini - t < TINGKAP_EMEL_MS) return false;
+  emelTerakhir.set(pengenal, masaKini);
+  return true;
+}
+
+/**
+ * Rekod cop masa e-mel yang dihantar bagi pendaftaran baharu supaya
+ * hantar_semula dalam tetingkap 10 minit akan ditolak.
+ */
+export function tandaEmelDihantar(pengenal: string, masaKini: number = Date.now()): void {
+  bersihPetaEmel(masaKini);
+  emelTerakhir.set(pengenal, masaKini);
+}
+
+// ---- Pengepala Content-Type (M-03) ----
+
+/**
+ * Semak pengepala Content-Type mesti application/json (suffix parameter
+ * seperti charset dibenarkan). POST/PATCH memulangkan 415 jika tidak.
+ */
+export function contentTypeJson(req: Request): boolean {
+  const ct = req.headers.get('content-type');
+  if (!ct) return false;
+  return ct.split(';')[0].trim().toLowerCase() === 'application/json';
 }
 
 // ---- Sahkan kunci API terhadap DB (hanya di pelayan) ----

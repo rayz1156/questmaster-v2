@@ -1,5 +1,9 @@
 -- KZ-031: Integrasi Pay ke Akademi (kunci API pencipta dan pendaftaran automatik)
 -- Idempoten. CTO jalankan di production pada supabase-db dan supabase-db-veltrix.
+-- M-04: migrasi ini BERGANTUNG pada skema LMS penuh (jadual lms_api_keys dan
+-- lms_enrollments) yang telah dicipta oleh CTO pada 21 Okt 2026 di kedua-dua
+-- DB dan TIDAK dicipta oleh sebarang migrasi dalam repo ini. Pada pangkalan
+-- data tanpa skema LMS ia akan gagal dengan "relation ... does not exist".
 
 -- 1. Benarkan source 'pay' pada pendaftaran (check constraint sedia ada dibina semula)
 alter table lms_enrollments
@@ -39,6 +43,11 @@ create unique index if not exists lms_api_keys_key_hash_uidx
 --    tanpa mendedahkan jadual itu kepada peranan lain. EXECUTE hanya
 --    service_role; anon dan authenticated ditolak kerana fungsi ini
 --    boleh membocorkan sama ada sesebuah e-mel mempunyai akaun.
+--    Lapisan kedua (temuan 1 CTO): pemanggil yang bukan service_role,
+--    postgres atau supabase_admin ditolak di DALAM fungsi juga, walau
+--    GRANT EXECUTE tersilap diberikan pada masa hadapan. Dalam
+--    SECURITY DEFINER, current_user ialah pemilik fungsi, jadi kita
+--    gunakan session_user dan peranan dalam JWT PostgREST.
 create or replace function public.lms_pay_cari_pengguna(p_email text)
 returns uuid
 language plpgsql
@@ -47,7 +56,18 @@ set search_path = public, auth
 as $$
 declare
   v_id uuid;
+  v_peranan text;
 begin
+  -- Lapisan kedua: peranan pemanggil mesti service_role, postgres atau
+  -- supabase_admin. PostgREST menetapkan peranan sebenar dalam
+  -- request.jwt.claims; session_user mengesan pemanggil psql terus.
+  v_peranan := nullif(current_setting('request.jwt.claims', true), '')::jsonb ->> 'role';
+  if coalesce(v_peranan, '') <> 'service_role'
+     and session_user not in ('service_role', 'postgres', 'supabase_admin') then
+    raise exception 'lms_pay_cari_pengguna: hanya service_role dibenarkan'
+      using errcode = 'insufficient_privilege';
+  end if;
+
   if p_email is null or btrim(p_email) = '' then
     return null;
   end if;

@@ -1,10 +1,12 @@
 // KZ-031: urus kunci API pencipta oleh pencipta yang log masuk.
 // GET senarai kunci, POST jana kunci (dipaparkan sekali sahaja dalam
 // respons), PATCH batalkan kunci (revoked_at). RLS lms_api_keys milik
-// sendiri menyempadkan akses; key_hash tidak pernah dipulangkan.
+// sendiri menyempadankan akses, dan PATCH turut mengesahkan pemilikan
+// secara eksplisit (user_id = auth uid, temuan L-02 CTO, bukan sekadar
+// bergantung pada RLS). key_hash tidak pernah dipulangkan.
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
-import { awalanKunci, cincangKunci, janaKunciApi } from '@/lib/integrasi-pay';
+import { awalanKunci, cincangKunci, contentTypeJson, janaKunciApi } from '@/lib/integrasi-pay';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +26,11 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
+
+  // M-03: badan mesti application/json, selain itu 415
+  if (!contentTypeJson(req)) {
+    return NextResponse.json({ error: 'Unsupported Media Type' }, { status: 415 });
+  }
 
   let mentah: unknown;
   try {
@@ -68,6 +75,11 @@ export async function PATCH(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
 
+  // M-03: badan mesti application/json, selain itu 415
+  if (!contentTypeJson(req)) {
+    return NextResponse.json({ error: 'Unsupported Media Type' }, { status: 415 });
+  }
+
   let mentah: unknown;
   try {
     mentah = await req.json();
@@ -78,6 +90,18 @@ export async function PATCH(req: NextRequest) {
   if (typeof o.id !== 'string' || !/^[0-9a-f-]{36}$/i.test(o.id)) {
     return NextResponse.json({ error: 'id kunci tidak sah' }, { status: 400 });
   }
+
+  // L-02: semakan pemilikan eksplisit sebelum kemas kini: kunci mesti
+  // milik pengguna yang log masuk (user_id = auth uid), bukan sekadar
+  // bersandar pada RLS.
+  const { data: milik, error: ralatMilik } = await auth.supa
+    .from('lms_api_keys')
+    .select('id')
+    .eq('id', o.id)
+    .eq('user_id', auth.user!.id)
+    .maybeSingle();
+  if (ralatMilik) return NextResponse.json({ error: ralatMilik.message }, { status: 500 });
+  if (!milik) return NextResponse.json({ error: 'Kunci tidak dijumpai' }, { status: 404 });
 
   const { data, error } = await auth.supa
     .from('lms_api_keys')
