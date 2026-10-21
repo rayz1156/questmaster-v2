@@ -435,6 +435,15 @@ export const en = Object.freeze({
     subjekMigrasi: 'Important: We are becoming Veltrix Academy',
     tajukMigrasi: 'We have evolved',
     pratontonMigrasi: 'New name. Same data. Same login.',
+    payTajuk: 'Your course access',
+    payBadanBaharu: (nama: string) =>
+      `Your account at ${nama} has been created. You have been enrolled in the following course:`,
+    payBadanSedia: (nama: string) =>
+      `You have been enrolled in the following course at ${nama}:`,
+    payCtaMula: 'Start learning',
+    paySubjek: (kursus: string, nama: string) => `Your course access: ${kursus} | ${nama}`,
+    payPratonton: 'Your sign-in link is ready.',
+    payNota: 'This link can only be used once and expires after a while. If it no longer works, request a new one on the sign-in page.',
   },
 
   jsonLd: {

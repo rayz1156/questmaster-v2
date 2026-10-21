@@ -99,6 +99,29 @@ export const Emails = {
       ${cta(teks.emel.ctaLaporan, ctx.reportUrl)}`;
     return { subject: teks.emel.subjekRingkasan, html: baseTemplate({ title: teks.emel.tajukRingkasan, previewText: teks.emel.pratontonRingkasan(ctx.overdueCount), body }) };
   },
+  // KZ-031: e-mel akses kursus selepas pembelian di Veltrix Pay.
+  // BM tulen untuk StafKita, EN untuk Veltrix (melalui lapisan teks).
+  payAksesKursus(ctx: EmailContext & { courseTitle: string; loginUrl: string; akaunBaharu: boolean }) {
+    const greeting = ctx.lang === 'ms'
+      ? teks.emel.salam(escapeHtml(ctx.recipientName))
+      : teks.emel.sapaan(escapeHtml(ctx.recipientName));
+    const perenggan = ctx.akaunBaharu
+      ? teks.emel.payBadanBaharu(teks.jenama.nama)
+      : teks.emel.payBadanSedia(teks.jenama.nama);
+    const body = `
+      <h1 style="font-family:'Nunito','Arial',sans-serif;color:#6576ff;font-size:28px;margin:0 0 14px">${teks.emel.payTajuk}</h1>
+      <p style="margin:0 0 14px;line-height:1.6">${greeting}</p>
+      <p style="margin:0 0 14px;line-height:1.6">${perenggan}</p>
+      <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:12px;padding:18px;margin:0 0 18px">
+        <p style="margin:0;font-size:18px;font-weight:700;color:#0f1e35">🎓 ${escapeHtml(ctx.courseTitle)}</p>
+      </div>
+      ${cta(teks.emel.payCtaMula, ctx.loginUrl)}
+      <p style="margin:14px 0 0;line-height:1.6;color:#475569;font-size:13px">${teks.emel.payNota}</p>`;
+    return {
+      subject: teks.emel.paySubjek(ctx.courseTitle, teks.jenama.nama),
+      html: baseTemplate({ title: teks.emel.payTajuk, previewText: teks.emel.payPratonton, body }),
+    };
+  },
   migrationAnnouncement(ctx: EmailContext & { newDomainUrl: string }) {
     const body = `
       <h1 style="font-family:'Nunito','Arial',sans-serif;color:#6576ff;font-size:28px;margin:0 0 14px">${teks.emel.migrasiTajuk}</h1>

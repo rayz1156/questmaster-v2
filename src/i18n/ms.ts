@@ -434,6 +434,15 @@ export const ms = Object.freeze({
     subjekMigrasi: 'Important: We are becoming StafKita Akademi',
     tajukMigrasi: 'We have evolved',
     pratontonMigrasi: 'New name. Same data. Same login.',
+    payTajuk: 'Akses kursus anda',
+    payBadanBaharu: (nama: string) =>
+      `Akaun anda di ${nama} telah dicipta. Anda didaftarkan ke kursus berikut:`,
+    payBadanSedia: (nama: string) =>
+      `Anda didaftarkan ke kursus berikut di ${nama}:`,
+    payCtaMula: 'Mula belajar',
+    paySubjek: (kursus: string, nama: string) => `Akses kursus anda: ${kursus} | ${nama}`,
+    payPratonton: 'Pautan log masuk anda sudah sedia.',
+    payNota: 'Pautan ini sah untuk satu masa sahaja. Jika ia tidak berfungsi lagi, minta pautan baharu pada halaman log masuk.',
   },
 
   jsonLd: {
