@@ -49,7 +49,7 @@ export function cincangKunci(kunci: string): string {
 }
 
 /** Banding dua rentetan secara masa malar (elak serangan pemasaan). */
-export function bandangMasaMalar(a: string, b: string): boolean {
+export function bandingMasaMalar(a: string, b: string): boolean {
   const ha = Buffer.from(a, 'utf8');
   const hb = Buffer.from(b, 'utf8');
   if (ha.length !== hb.length) return false;
@@ -205,7 +205,7 @@ export async function sahkanKunciApi(req: Request): Promise<KunciSah | null> {
     .maybeSingle();
   if (!data) return null;
   // Banding semula secara masa malar sebagai lapisan kedua
-  if (!bandangMasaMalar(cincang, String(data.key_hash))) return null;
+  if (!bandingMasaMalar(cincang, String(data.key_hash))) return null;
   return { id: String(data.id), user_id: String(data.user_id) };
 }
 
