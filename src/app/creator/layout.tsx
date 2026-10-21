@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { teks } from '@/i18n/teks';
 
 type Creator = { id: string; slug: string; display_name: string; is_published: boolean };
 
@@ -48,6 +49,8 @@ export default function CreatorLayout({ children }: { children: React.ReactNode 
     { href: '/creator', label: 'Overview', icon: '▢' },
     { href: '/creator/courses', label: 'Courses', icon: '■' },
     { href: `/c/${creator.slug}`, label: 'View storefront', icon: '↗', external: true },
+    // KZ-031: pautan integrasi Pay, teks ikut lapisan jenama
+    { href: '/creator/integrasi', label: teks.integrasi.nav, icon: '🔗' },
     { href: '/creator/settings', label: 'Settings', icon: '⚙' },
   ];
 
