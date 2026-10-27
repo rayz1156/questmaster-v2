@@ -14,6 +14,7 @@ import {
   Flame, Zap, HeartPulse, Trophy,
 } from "lucide-react";
 import {
+  BONUS_LALAI_SEC,
   TAHAP_RAKSASA,
   cadanganSoalanRaksasa,
   fasaRaksasa,
@@ -39,6 +40,7 @@ export interface SesiRaksasaHos {
   status: string;
   game_mode?: string | null;
   race_minutes?: number | null;
+  race_bonus_sec?: number | null;
   race_ends_at?: string | null;
   review_index?: number | null;
   review_revealed?: boolean | null;
@@ -238,6 +240,8 @@ export default function BossHostPanel({
   if (session.status === "lobby") {
     const minit = session.race_minutes ?? 5;
     const k = session.boss_k ?? TAHAP_RAKSASA.medium;
+    // KZ-032: tempoh bonus kelajuan dipilih guru; lalai 30 untuk sesi lama.
+    const bonus = session.race_bonus_sec ?? BONUS_LALAI_SEC;
     const disyorkan = cadanganSoalanRaksasa(minit);
     const ulang = ulanganSoalan(disyorkan, questionCount);
     const nyawaDijangka = nyawaRaksasa(players.length, minit, k);
@@ -257,6 +261,9 @@ export default function BossHostPanel({
                 {players.length > 0
                   ? `Expected boss health if you start now: ${nyawaDijangka.toLocaleString()} HP.`
                   : "The boss health is set from the number of players when you press Start."}
+              </p>
+              <p className="text-xs text-violet-900/70 mt-1">
+                Speed bonus: {bonus}s
               </p>
             </div>
             <div className="flex items-center gap-2">

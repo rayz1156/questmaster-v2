@@ -16,7 +16,7 @@ import { EDU_TABS } from "@/lib/eduTabs";
 import { ArrowLeft, Plus, Trash2, Play, Upload, Pencil, Check, X, Download, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import PanelMulaSesi from "@/components/PanelMulaSesi";
-import { RACE_DEFAULT_MINUTES, sahMinitLumba, type TahapRaksasa } from "@/lib/lumba-laju";
+import { BONUS_LALAI_SEC, RACE_DEFAULT_MINUTES, sahMinitLumba, type TahapRaksasa } from "@/lib/lumba-laju";
 import {
   Alert,
   Button,
@@ -290,9 +290,9 @@ export default function EditorKuizLangsung() {
     try {
       const badan =
         modPilih === "race"
-          ? { mode: "race", raceMinutes: minit }
+          ? { mode: "race", raceMinutes: minit, raceBonusSec: bonusSecPilih }
           : modPilih === "boss"
-            ? { mode: "boss", raceMinutes: minit, bossLevel: tahapPilih }
+            ? { mode: "boss", raceMinutes: minit, bossLevel: tahapPilih, raceBonusSec: bonusSecPilih }
             : { mode: "classic" };
       const json = await authedFetch(`/api/live/quizzes/${quizId}/sessions`, {
         method: "POST",
@@ -310,6 +310,8 @@ export default function EditorKuizLangsung() {
   const [modPilih, setModPilih] = useState<"classic" | "race" | "boss">("classic");
   const [minitTeks, setMinitTeks] = useState(String(RACE_DEFAULT_MINUTES));
   const [tahapPilih, setTahapPilih] = useState<TahapRaksasa>("medium");
+  // KZ-032: tempoh bar bonus kelajuan untuk race dan boss, lalai 30 saat.
+  const [bonusSecPilih, setBonusSecPilih] = useState(BONUS_LALAI_SEC);
 
   if (loading) {
     return (
@@ -395,6 +397,8 @@ export default function EditorKuizLangsung() {
           setMinitTeks={setMinitTeks}
           tahap={tahapPilih}
           setTahap={setTahapPilih}
+          bonusSec={bonusSecPilih}
+          setBonusSec={setBonusSecPilih}
           busy={busy}
           onMula={onMulaSesi}
           onBatal={() => setPanelMula(false)}

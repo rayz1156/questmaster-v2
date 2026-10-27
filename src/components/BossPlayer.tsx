@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Swords, Flame, Snowflake, Timer, Zap, Trophy, Check, X } from "lucide-react";
-import { formatJam, kocok, nitroBaki, ordinal } from "@/lib/lumba-laju";
+import { BONUS_LALAI_SEC, formatJam, kocok, bonusBaki, ordinal } from "@/lib/lumba-laju";
 import QuestionReviewPlayer, { type ReviewPemain } from "@/components/QuestionReviewPlayer";
 
 interface Pilihan { key: string; text: string }
@@ -35,6 +35,7 @@ interface KeadaanRaksasa {
   playerCount: number;
   questionId: string | null;
   servedAt: string | null;
+  bonusSec: number | null;
   lastHitByMe: boolean | null;
   review: ReviewPemain | null;
 }
@@ -115,9 +116,14 @@ export default function BossPlayer({ kod, playerId, playerToken, nickname, soala
   const jamPelayan = kini - sorokRef.current;
   const pengsanMs = k?.frozenUntil ? Date.parse(k.frozenUntil) - jamPelayan : 0;
   const pengsan = pengsanMs > 0;
+  // KZ-032: bar kritikal ikut tempoh bonus dipilih guru (lalai 30 saat),
+  // bukan had masa soalan. Jawapan selepas bar habis tetap diterima.
+  const bonusSec = k?.bonusSec ?? BONUS_LALAI_SEC;
+  const laluMs = k?.servedAt ? Math.max(0, jamPelayan - Date.parse(k.servedAt)) : 0;
   const kritikal = k?.servedAt && soalanSemasa && !kunci && !pengsan
-    ? nitroBaki(Date.parse(k.servedAt), jamPelayan, soalanSemasa.timeLimitSec ?? 20)
+    ? bonusBaki(Date.parse(k.servedAt), jamPelayan, bonusSec)
     : 0;
+  const bakiBonusSaat = Math.ceil(Math.max(0, bonusSec * 1000 - laluMs) / 1000);
   const bakiMs = k?.endsAt ? Date.parse(k.endsAt) - jamPelayan : null;
   const nisbahHp = k && k.maxHp > 0 ? Math.max(0, Math.min(100, (k.hp / k.maxHp) * 100)) : 0;
 
@@ -252,11 +258,15 @@ export default function BossPlayer({ kod, playerId, playerToken, nickname, soala
         <div className="text-[11px] text-gray-500 mt-0.5 tabular-nums text-right">Boss {Math.round(nisbahHp)}%</div>
       </div>
 
-      <div className="mt-2 grid grid-cols-[auto_1fr] items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-600">
-        <span className="inline-flex items-center gap-1"><Zap className="w-3.5 h-3.5" />Critical</span>
+      {/* KZ-032: bar kritikal ikut tempoh bonus guru, bukan had masa. */}
+      <div className="mt-2 grid grid-cols-[auto_1fr_auto] items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-amber-600">
+        <span className="inline-flex items-center gap-1"><Zap className="w-3.5 h-3.5" />Critical bonus</span>
         <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
           <div className="h-full bg-gradient-to-r from-amber-500 to-yellow-300" style={{ width: `${kritikal * 100}%` }} />
         </div>
+        <span className="normal-case font-medium text-gray-500">
+          {kritikal > 0 ? `${bakiBonusSaat}s` : "No bonus, keep going"}
+        </span>
       </div>
 
       {soalanSemasa ? (

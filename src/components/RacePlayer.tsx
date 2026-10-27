@@ -13,7 +13,7 @@
  */
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Flag, Flame, Snowflake, Timer, Trophy, Check, X } from "lucide-react";
-import { formatJam, kocok, nitroBaki, ordinal } from "@/lib/lumba-laju";
+import { BONUS_LALAI_SEC, formatJam, kocok, bonusBaki, ordinal } from "@/lib/lumba-laju";
 import QuestionReviewPlayer, { type ReviewPemain } from "@/components/QuestionReviewPlayer";
 
 interface Pilihan { key: string; text: string }
@@ -33,6 +33,7 @@ interface KeadaanLumba {
   finishedCount: number;
   questionId: string | null;
   servedAt: string | null;
+  bonusSec: number | null;
   review: ReviewPemain | null;
 }
 interface Maklum {
@@ -112,9 +113,14 @@ export default function RacePlayer({ kod, playerId, playerToken, nickname, soala
   const jamPelayan = kini - sorokRef.current;
   const bekuMs = k?.frozenUntil ? Date.parse(k.frozenUntil) - jamPelayan : 0;
   const beku = bekuMs > 0;
-  const nitro = k?.servedAt && soalanSemasa && !kunci && !beku
-    ? nitroBaki(Date.parse(k.servedAt), jamPelayan, soalanSemasa.timeLimitSec ?? 20)
+  // KZ-032: bar bonus kelajuan ikut tempoh dipilih guru (lalai 30 saat),
+  // bukan had masa soalan. Jawapan selepas bar habis tetap diterima.
+  const bonusSec = k?.bonusSec ?? BONUS_LALAI_SEC;
+  const laluMs = k?.servedAt ? Math.max(0, jamPelayan - Date.parse(k.servedAt)) : 0;
+  const bonus = k?.servedAt && soalanSemasa && !kunci && !beku
+    ? bonusBaki(Date.parse(k.servedAt), jamPelayan, bonusSec)
     : 0;
+  const bakiBonusSaat = Math.ceil(Math.max(0, bonusSec * 1000 - laluMs) / 1000);
   const bakiMs = k?.endsAt ? Date.parse(k.endsAt) - jamPelayan : null;
 
   const jawab = async (kunciPilihan: string) => {
@@ -260,11 +266,15 @@ export default function RacePlayer({ kod, playerId, playerToken, nickname, soala
         )}
       </div>
 
-      <div className="mt-3 grid grid-cols-[auto_1fr] items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-orange-600">
-        <span>Nitro</span>
+      {/* KZ-032: bar bonus kelajuan ikut tempoh guru, bukan had masa. */}
+      <div className="mt-3 grid grid-cols-[auto_1fr_auto] items-center gap-2 text-[11px] font-bold uppercase tracking-wider text-orange-600">
+        <span>Speed bonus</span>
         <div className="h-1.5 rounded-full bg-gray-200 overflow-hidden">
-          <div className="h-full bg-gradient-to-r from-orange-500 to-yellow-400" style={{ width: `${nitro * 100}%` }} />
+          <div className="h-full bg-gradient-to-r from-orange-500 to-yellow-400" style={{ width: `${bonus * 100}%` }} />
         </div>
+        <span className="normal-case font-medium text-gray-500">
+          {bonus > 0 ? `${bakiBonusSaat}s` : "No bonus, keep going"}
+        </span>
       </div>
 
       {soalanSemasa ? (

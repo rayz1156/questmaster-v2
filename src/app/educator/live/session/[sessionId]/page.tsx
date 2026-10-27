@@ -39,6 +39,8 @@ interface Sesi {
   race_minutes?: number | null;
   race_ends_at?: string | null;
   race_finished?: number | null;
+  // KZ-032: tempoh bonus kelajuan dipilih guru.
+  race_bonus_sec?: number | null;
   review_index?: number | null;
   review_revealed?: boolean | null;
   // KZ-013: Boss Battle

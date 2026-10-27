@@ -13,7 +13,7 @@ import { useEffect, useRef, useState } from "react";
 import {
   Play, Square, RotateCcw, Flag, Flame, Timer, Users, MessageSquare, Maximize2, Minimize2, Trophy,
 } from "lucide-react";
-import { formatJam, ordinal, cadanganSoalan, ulanganSoalan } from "@/lib/lumba-laju";
+import { BONUS_LALAI_SEC, formatJam, ordinal, cadanganSoalan, ulanganSoalan } from "@/lib/lumba-laju";
 import QuestionReview, { type ReviewHos } from "@/components/QuestionReview";
 
 // KZ-013: jenis kekal dieksport dari sini supaya halaman hos tidak berubah.
@@ -37,6 +37,7 @@ export interface SesiLumbaHos {
   status: string;
   game_mode?: string | null;
   race_minutes?: number | null;
+  race_bonus_sec?: number | null;
   race_ends_at?: string | null;
   race_finished?: number | null;
   review_index?: number | null;
@@ -133,6 +134,8 @@ export default function RaceHostPanel({ session, players, questionCount, serverN
   // ---------- Lobi ----------
   if (session.status === "lobby") {
     const minit = session.race_minutes ?? 5;
+    // KZ-032: tempoh bonus kelajuan dipilih guru; lalai 30 untuk sesi lama.
+    const bonus = session.race_bonus_sec ?? BONUS_LALAI_SEC;
     const c = cadanganSoalan(minit);
     const ulang = ulanganSoalan(c.disyorkan, questionCount);
     return (
@@ -146,6 +149,9 @@ export default function RaceHostPanel({ session, players, questionCount, serverN
               <p className="text-sm text-violet-900/80 mt-1">
                 Students answer at their own pace. Correct, fast answers move their car further.
                 Three wrong answers in a row freeze a car for 5 seconds.
+              </p>
+              <p className="text-xs text-violet-900/70 mt-2">
+                Speed bonus: {bonus}s
               </p>
             </div>
             <div className="flex items-center gap-2">

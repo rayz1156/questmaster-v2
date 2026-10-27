@@ -14,6 +14,7 @@ import { Play, X, Check } from "lucide-react";
 import { Button, Tabs } from "@/components/ui";
 import SeniModPermainan, { LATAR_SENI } from "@/components/live/SeniModPermainan";
 import {
+  NILAI_BONUS_SEC,
   RACE_MAX_MINUTES,
   RACE_MIN_MINUTES,
   cadanganSoalan,
@@ -32,6 +33,8 @@ interface Props {
   setMinitTeks: (v: string) => void;
   tahap: TahapRaksasa;
   setTahap: (t: TahapRaksasa) => void;
+  bonusSec: number;
+  setBonusSec: (n: number) => void;
   busy: boolean;
   onMula: () => void;
   onBatal: () => void;
@@ -86,7 +89,7 @@ const LABEL_KATEGORI: Record<KategoriMod, string> = {
 type TabPenapis = "semua" | KategoriMod;
 
 export default function PanelMulaSesi({
-  bilSoalan, mod, setMod, minitTeks, setMinitTeks, tahap, setTahap, busy, onMula, onBatal,
+  bilSoalan, mod, setMod, minitTeks, setMinitTeks, tahap, setTahap, bonusSec, setBonusSec, busy, onMula, onBatal,
 }: Props) {
   const [tab, setTab] = useState<TabPenapis>("semua");
 
@@ -234,6 +237,34 @@ export default function PanelMulaSesi({
                 Enter a whole number of minutes from {RACE_MIN_MINUTES} to {RACE_MAX_MINUTES}.
               </p>
             )}
+          </div>
+
+          {/* KZ-032: tempoh bar bonus kelajuan, dipilih guru untuk semua soalan. */}
+          <div>
+            <div className="block text-sm font-medium mb-1" style={{ color: "#344357" }}>
+              Speed bonus
+            </div>
+            <div className="flex gap-2" role="radiogroup" aria-label="Speed bonus">
+              {NILAI_BONUS_SEC.map((n) => (
+                <button
+                  key={n}
+                  type="button"
+                  role="radio"
+                  aria-checked={bonusSec === n}
+                  onClick={() => setBonusSec(n)}
+                  className={`px-4 py-3 rounded-[4px] border-2 text-sm font-bold transition
+                    ${bonusSec === n
+                      ? "border-[#854fff] text-[#854fff]"
+                      : "border-[#dbdfea] text-[#526484] hover:border-[#854fff]"}`}
+                  style={{ backgroundColor: bonusSec === n ? "#ebe2ff" : "#fff" }}
+                >
+                  {n}s
+                </button>
+              ))}
+            </div>
+            <p className="text-xs mt-2" style={{ color: "#6b7a99" }}>
+              Answering before the bar empties gives a speed bonus. Players can still answer after it empties.
+            </p>
           </div>
 
           {mod === "boss" && (
