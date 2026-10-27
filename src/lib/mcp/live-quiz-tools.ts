@@ -9,7 +9,9 @@
 import { callApi } from "./api";
 import { validateOptions, parseQuizCsv, parseAiken } from "@/lib/live-quiz";
 import {
+  BONUS_LALAI_SEC,
   RACE_DEFAULT_MINUTES,
+  sahBonusKelajuan,
   sahMinitLumba,
   sahModPermainan,
   sahTahapRaksasa,
@@ -341,11 +343,15 @@ export async function deleteLiveQuestion(
   return { deleted: true, question_id: questionId };
 }
 
-/** Mula sesi baharu dan pulangkan kod, pautan sertai dan pautan QR. */
+/**
+ * Mula sesi baharu dan pulangkan kod, pautan sertai dan pautan QR.
+ * KZ-032: race_bonus_sec (15/30/45/60 saat, lalai 30) menetapkan tempoh
+ * bar bonus kelajuan untuk mode race dan boss; ia bukan had masa.
+ */
 export async function startLiveSession(
   accessToken: string,
   quizId: string,
-  args: { mode?: unknown; race_minutes?: unknown; boss_level?: unknown } = {}
+  args: { mode?: unknown; race_minutes?: unknown; boss_level?: unknown; race_bonus_sec?: unknown } = {}
 ): Promise<Record<string, unknown>> {
   // KZ-012: mode pilihan. Tiada mode = classic, sama seperti sebelum ini.
   // KZ-013: mode 'boss' (Boss Battle), boss_level lalai medium.
@@ -355,14 +361,24 @@ export async function startLiveSession(
   if (mode === "race") {
     const minit = args?.race_minutes === undefined ? RACE_DEFAULT_MINUTES : sahMinitLumba(args.race_minutes);
     if (minit === null) throw new Error("race_minutes mesti nombor bulat 1 hingga 60");
-    body = { mode: "race", raceMinutes: minit };
+    const bonus =
+      args?.race_bonus_sec === undefined || args?.race_bonus_sec === null
+        ? BONUS_LALAI_SEC
+        : sahBonusKelajuan(args.race_bonus_sec);
+    if (bonus === null) throw new Error("race_bonus_sec mesti 15, 30, 45 atau 60 saat");
+    body = { mode: "race", raceMinutes: minit, raceBonusSec: bonus };
   } else if (mode === "boss") {
     // Boss Battle menggunakan race_minutes untuk masa pertarungan.
     const minit = args?.race_minutes === undefined ? RACE_DEFAULT_MINUTES : sahMinitLumba(args.race_minutes);
     if (minit === null) throw new Error("race_minutes mesti nombor bulat 1 hingga 60");
     const tahap = sahTahapRaksasa(args?.boss_level);
     if (tahap === null) throw new Error("boss_level mesti easy, medium atau hard");
-    body = { mode: "boss", raceMinutes: minit, bossLevel: tahap };
+    const bonus =
+      args?.race_bonus_sec === undefined || args?.race_bonus_sec === null
+        ? BONUS_LALAI_SEC
+        : sahBonusKelajuan(args.race_bonus_sec);
+    if (bonus === null) throw new Error("race_bonus_sec mesti 15, 30, 45 atau 60 saat");
+    body = { mode: "boss", raceMinutes: minit, bossLevel: tahap, raceBonusSec: bonus };
   }
   const res = await callApi<{ data?: { sessionId?: string; code?: string; gameMode?: string } }>(
     accessToken,

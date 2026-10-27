@@ -169,6 +169,42 @@ export function nitroBaki(servedAtMs: number, nowMs: number, hadSaat: number): n
   return Math.max(0, Math.min(1, 1 - lalu / (hadSaat * 500)));
 }
 
+/* ============================================================
+ * Masa bonus kelajuan ditetapkan guru (KZ-032). Guru memilih
+ * tempoh bonus sesi semasa Start session; bar pemain dan
+ * pengiraan nitro/kritikal di pelayan (migrasi 0067) mesti guna
+ * tempoh yang sama. BUKAN had masa: jawapan selepas bar habis
+ * masih diterima, hanya bonus yang hilang.
+ * ============================================================ */
+
+/** Nilai tempoh bonus yang sah, keputusan Boss 27 Okt 2026. */
+export const NILAI_BONUS_SEC = [15, 30, 45, 60] as const;
+
+/** Tempoh bonus lalai untuk sesi lama yang tiada race_bonus_sec. */
+export const BONUS_LALAI_SEC = 30;
+
+/** Sahkan tempoh bonus daripada badan permintaan; 15/30/45/60 sahaja. */
+export function sahBonusKelajuan(v: unknown): number | null {
+  let n: number;
+  if (typeof v === 'number') n = v;
+  else if (typeof v === 'string' && /^\s*\d+\s*$/.test(v)) n = Number(v);
+  else return null;
+  if (!Number.isInteger(n)) return null;
+  return (NILAI_BONUS_SEC as readonly number[]).includes(n) ? n : null;
+}
+
+/**
+ * Baki bonus kelajuan 0..1: penuh serta-merta, sifar selepas tempoh
+ * bonus guru (bonusSec saat) habis. Menggantikan nitroBaki pada bar
+ * pemain race/boss mulai KZ-032; nitroBaki kekal supaya padanan formula
+ * lama dalam selftest-live-quiz tidak berubah.
+ */
+export function bonusBaki(servedAtMs: number, nowMs: number, bonusSec: number): number {
+  if (!Number.isFinite(servedAtMs) || !Number.isFinite(nowMs) || !(bonusSec > 0)) return 0;
+  const lalu = Math.max(0, nowMs - servedAtMs);
+  return Math.max(0, Math.min(1, 1 - lalu / (bonusSec * 1000)));
+}
+
 /** Akhiran ordinal Inggeris: 1st, 2nd, 3rd, 4th, 11th, 21st, 112th. */
 export function ordinal(n: number): string {
   const v = Math.abs(Math.trunc(n));

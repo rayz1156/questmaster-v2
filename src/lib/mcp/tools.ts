@@ -1675,8 +1675,10 @@ export const TOOLS: ToolDef[] = [
       "menjawab ikut rentak sendiri dan kereta maju di trek) atau boss (Boss Battle: seluruh " +
       "kelas bekerjasama melawan satu raksasa; jawapan betul mencederakannya, jawapan salah " +
       "memulihkannya). Untuk race dan boss, race_minutes 1 hingga 60 (lalai 5) menetapkan masa " +
-      "permainan. Untuk boss, boss_level easy, medium (lalai) atau hard menetapkan kesukaran " +
-      "raksasa. Selepas ini gunakan control_live_session dengan action start.",
+      "permainan. KZ-032: untuk race dan boss, race_bonus_sec 15, 30, 45 atau 60 saat (lalai 30) " +
+      "menetapkan tempoh bar bonus kelajuan; ia BUKAN had masa, pelajar masih boleh menjawab " +
+      "selepas bar habis. Untuk boss, boss_level easy, medium (lalai) atau hard menetapkan " +
+      "kesukaran raksasa. Selepas ini gunakan control_live_session dengan action start.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -1685,6 +1687,7 @@ export const TOOLS: ToolDef[] = [
         quiz_id: { type: "string" },
         mode: { type: "string", enum: ["classic", "race", "boss"], description: "Lalai classic" },
         race_minutes: { type: "integer", minimum: 1, maximum: 60, description: "Masa permainan (minit), untuk mode race dan boss. Lalai 5." },
+        race_bonus_sec: { type: "integer", enum: [15, 30, 45, 60], description: "Tempoh bar bonus kelajuan (saat), untuk mode race dan boss. Bukan had masa. Lalai 30." },
         boss_level: { type: "string", enum: ["easy", "medium", "hard"], description: "Kesukaran raksasa, mode boss sahaja. Lalai medium." },
       },
       required: ["quiz_id"],

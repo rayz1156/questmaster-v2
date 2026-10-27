@@ -1,8 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost, generateSessionCode } from '@/lib/live-quiz';
 import {
+  BONUS_LALAI_SEC,
   RACE_DEFAULT_MINUTES,
   TAHAP_RAKSASA,
+  sahBonusKelajuan,
   sahMinitLumba,
   sahModPermainan,
   sahTahapRaksasa,
@@ -25,10 +27,13 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   // KZ-012: badan pilihan { mode, raceMinutes }. Badan kosong = classic,
   // supaya klien lama dan alat MCP lama berkelakuan sama seperti dahulu.
   // KZ-013: mode 'boss' menambah bossLevel (easy/medium/hard, lalai medium).
+  // KZ-032: race dan boss menambah raceBonusSec (15/30/45/60 saat, lalai 30),
+  // tempoh bar bonus kelajuan yang dipilih guru.
   const badan = (await req.json().catch(() => ({}))) as {
     mode?: unknown;
     raceMinutes?: unknown;
     bossLevel?: unknown;
+    raceBonusSec?: unknown;
   };
   const mod = sahModPermainan(badan?.mode);
   if (!mod) {
@@ -44,6 +49,21 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       );
     }
     minitLumba = m;
+  }
+  // Tempoh bonus kelajuan hanya untuk mod race dan boss; classic abaikan.
+  let bonusKelajuan = BONUS_LALAI_SEC;
+  if (mod === 'race' || mod === 'boss') {
+    const b =
+      badan?.raceBonusSec === undefined || badan?.raceBonusSec === null || badan?.raceBonusSec === ''
+        ? BONUS_LALAI_SEC
+        : sahBonusKelajuan(badan.raceBonusSec);
+    if (b === null) {
+      return NextResponse.json(
+        { error: 'Speed bonus must be 15, 30, 45 or 60 seconds.' },
+        { status: 400 },
+      );
+    }
+    bonusKelajuan = b;
   }
   let tahapRaksasa: 'easy' | 'medium' | 'hard' = 'medium';
   if (mod === 'boss') {
@@ -94,6 +114,9 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
       // KZ-013: tahap raksasa dipetik kepada pemalar k sekarang, supaya
       // menukarnya kemudian tidak mengubah sesi yang sedang berjalan.
       ...(mod === 'boss' ? { boss_k: TAHAP_RAKSASA[tahapRaksasa] } : {}),
+      // KZ-032: tempoh bonus kelajuan dipetik sekarang supaya menukar
+      // tetapan kemudian tidak mengubah sesi yang sedang berjalan.
+      ...(mod === 'race' || mod === 'boss' ? { race_bonus_sec: bonusKelajuan } : {}),
     })
     .select('id, quiz_id, code, status, current_index, game_mode')
     .single();

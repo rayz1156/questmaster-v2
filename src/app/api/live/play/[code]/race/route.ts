@@ -19,7 +19,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
-import { susunPapan, type BarisPapanLumba } from '@/lib/lumba-laju';
+import { BONUS_LALAI_SEC, susunPapan, type BarisPapanLumba } from '@/lib/lumba-laju';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +35,7 @@ interface SesiLumba {
   quiz_id: string;
   status: string;
   game_mode: string | null;
+  race_bonus_sec: number | null;
   review_index: number | null;
   review_revealed: boolean | null;
 }
@@ -51,7 +52,7 @@ async function sahkanPemain(code: string, playerId: string, playerToken: string)
   const supa = getServiceSupabase();
   const { data: sesi } = (await supa
     .from('qm_live_sessions')
-    .select('id, quiz_id, status, game_mode, review_index, review_revealed')
+    .select('id, quiz_id, status, game_mode, race_bonus_sec, review_index, review_revealed')
     .eq('code', code)
     .maybeSingle()) as { data: SesiLumba | null };
   if (!sesi) {
@@ -88,6 +89,9 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     return NextResponse.json({ error: 'Could not read the race.' }, { status: 500 });
   }
   const k = keadaan as Record<string, unknown>;
+  // KZ-032: tempoh bonus kelajuan sesi, untuk bar pemain. Lalai 30 untuk
+  // sesi yang dicipta sebelum lajur ini wujud.
+  k.bonusSec = sah.sesi.race_bonus_sec ?? BONUS_LALAI_SEC;
 
   // Kedudukan dikira dengan susunPapan yang sama dengan skrin guru, supaya
   // dua pemain pada jarak sama tidak kedua-duanya nampak "1st" di telefon
@@ -152,7 +156,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const MEDAN_KEADAAN = [
     'status', 'gameMode', 'endsAt', 'serverNow', 'distance', 'score', 'streak',
     'wrongStreak', 'frozenUntil', 'rank', 'position', 'playerCount', 'finishedCount',
-    'questionId', 'servedAt',
+    'questionId', 'servedAt', 'bonusSec',
   ] as const;
   const balas: Record<string, unknown> = {};
   for (const m of MEDAN_KEADAAN) balas[m] = k[m] ?? null;

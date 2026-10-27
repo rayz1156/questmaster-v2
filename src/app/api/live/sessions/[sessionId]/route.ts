@@ -19,6 +19,8 @@ interface SesiHos extends LiveSessionRow {
   race_finished?: number | null;
   review_index?: number | null;
   review_revealed?: boolean | null;
+  // KZ-032: tempoh bonus kelajuan dipilih guru.
+  race_bonus_sec?: number | null;
   // KZ-013
   boss_k?: number | null;
   boss_max_hp?: number | null;
@@ -91,6 +93,8 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
   const LAJUR_SESI =
     'id, quiz_id, host_id, code, status, current_index, question_started_at, max_players, created_at, ended_at, ' +
     'game_mode, race_minutes, race_ends_at, race_finished, review_index, review_revealed, ' +
+    // KZ-032: tempoh bonus kelajuan untuk bar panel hos.
+    'race_bonus_sec, ' +
     // KZ-013: keadaan raksasa untuk panel hos.
     'boss_k, boss_max_hp, boss_hp, boss_crits, boss_healed, boss_last_hit, boss_result';
   const { data: session } = await auth.supa
