@@ -172,4 +172,64 @@ finalize_certificate_asset, kemudian tetapkan kedudukan nama dengan
 update_certificate_template dan semak hasilnya dengan preview_certificate.
 Muat naik melalui UI pendidik turut disokong (bucket certificate-assets).
 Latarnya hanya untuk pelan Pro/Institusi (pencetus 0042). Emel pukal sijil
-hanya melalui UI pendidik.
+kini juga melalui alat email_certificates (Pro/Institusi).
+
+## Alat tambahan (src/lib/mcp/tambahan-tools.ts)
+
+Alat bertanda **confirm** menolak panggilan tanpa `confirm: true` sebelum
+sebarang tulisan. Sumber: route bila ada, kalau tidak RPC `qm_*` yang
+dipanggil pelayar, dan tulisan jadual terus hanya bila aplikasi sendiri
+berbuat demikian dari `src/lib/data.ts`. Ujian: `npx tsx scripts/selftest-mcp-tambahan.ts`.
+
+| Alat | Peranan | Kegunaan |
+|---|---|---|
+| delete_class | STAFF, tulis, confirm | Padam kelas kekal (RLS: pemilik atau admin). |
+| duplicate_class | STAFF, tulis | Salin kelas: aktiviti, board, peserta, pendidik; as_template, as_draft. |
+| pin_class | ALL, tulis | Sematkan atau tanggalkan sematan kelas. |
+| remove_member | STAFF, tulis, confirm | Keluarkan peserta daripada kelas. |
+| export_members | STAFF | Peserta dengan pecahan markah (task, live, pelarasan, jumlah). |
+| get_member_scores | ALL | Markah terperinci seorang peserta. |
+| list_class_educators | STAFF | Pemilik dan pendidik bersama kelas. |
+| list_educator_invites, revoke_educator_invite | STAFF | Senarai dan batal jemputan pendidik bersama. |
+| remove_class_educator, transfer_class_ownership, leave_class_as_educator | STAFF, tulis, confirm | Urus pendidik bersama dan pemilikan. |
+| list_my_educator_invites, accept_educator_invite | STAFF | Jemputan untuk emel saya, terima dengan kod. |
+| create_team | STAFF, tulis | Cipta satu atau beberapa pasukan (count, prefix, max_members). |
+| update_team | STAFF, tulis | Nama dan max_members pasukan. |
+| delete_team | STAFF, tulis, confirm | Padam pasukan. |
+| get_team_csv_template | STAFF | Templat CSV untuk import_teams_csv. |
+| list_score_adjustments | STAFF | Pelarasan markah pasukan (hunt_id) atau pelajar (class_id). |
+| adjust_team_score, adjust_student_score | STAFF, tulis | Tambah/tolak mata manual; created_by sentiasa pengguna sesi. |
+| delete_score_adjustment | STAFF, tulis, confirm | Padam satu pelarasan. |
+| list_quest_completions, mark_quest_completed | STAFF | Quest selesai pasukan; tanda memberi mata aktiviti dan diundur jika gagal. |
+| unmark_quest_completed | STAFF, tulis, confirm | Batal tanda dan tarik balik mata. |
+| delete_hunt | STAFF, tulis, confirm | Padam aktiviti. |
+| list_outcomes, create_outcome, update_outcome | STAFF | Hasil pembelajaran (CLO) kelas. |
+| delete_outcome | STAFF, tulis, confirm | Padam hasil pembelajaran. |
+| list_outcome_tags, tag_challenge_outcome, untag_challenge_outcome | STAFF | Kaitan cabaran dengan hasil pembelajaran (weight). |
+| delete_board_card, delete_board_column | STAFF, tulis, confirm | Padam kad atau kolum (bersama kadnya). |
+| move_board_card, move_board_column | STAFF, tulis | up, down, top, bottom, atau to (kolum dan kedudukan). |
+| update_board_column | STAFF, tulis | Tajuk kolum. |
+| add_qr_card | STAFF, tulis | Kad kod QR bagi URL. |
+| import_board | STAFF, tulis | Salin board kelas lain; mode replace perlu confirm. |
+| ai_thumbnail_card, ai_thumbnail_all | STAFF, tulis | Thumbnail AI untuk kad. |
+| link_preview | ALL | Tajuk dan imej pratonton URL. |
+| update_live_quiz | STAFF, tulis | Tajuk, penerangan, streak_bonus. |
+| delete_live_quiz | STAFF, tulis, confirm | Padam Live Quiz. |
+| import_live_questions_aiken | STAFF, tulis | Import soalan format Aiken, semua atau tiada. |
+| set_active_certificate_template | STAFF, tulis | Templat aktif kelas. |
+| delete_certificate_template | STAFF, tulis, confirm | Padam templat sijil. |
+| regenerate_certificates | STAFF, tulis | Jana semula PDF sijil. |
+| email_certificates | STAFF, tulis, confirm | Emel sijil PDF kepada peserta (Pro/Institusi). |
+| delete_certificate_library_item | STAFF, tulis, confirm | Padam item Templat saya. |
+| get_activity_stats, get_team_stats, get_gamification_stats, get_mastery_stats, get_at_risk_students | STAFF | Analitik kelas seperti halaman Analytics. |
+| get_plan_usage | ALL | Pelan dan penggunaan. |
+| send_feedback | ALL, tulis | Maklum balas kepada admin (subject, message, type). |
+| join_class_by_code | ALL, tulis | Sertai kelas sebagai peserta. |
+| leave_class | ALL, tulis, confirm | Keluar kelas sebagai peserta. |
+| peer_my_status, get_peer_form | ALL | Status dan borang penilaian rakan. |
+| submit_peer_ratings | ALL, tulis, confirm | Hantar penilaian rakan (sekali sahaja). |
+
+Tidak disokong dengan sengaja: tambah/buang ahli pasukan oleh pendidik
+(aplikasi tiada aliran itu), muat turun PDF sijil (route membalas redirect
+fail, bukan JSON), papan hantaran pasukan dan intro board (aliran muat naik
+video dan fail pelayar), alat admin.

@@ -44,6 +44,7 @@ import {
   deletePeerRound,
 } from "./peer-tools";
 import { inviteEducator } from "./invite-tools";
+import { TOOLS_TAMBAHAN } from "./tambahan-tools";
 import {
   createCertificateTemplate,
   updateCertificateTemplate,
@@ -2589,8 +2590,8 @@ export const TOOLS: ToolDef[] = [
       "Cipta jemputan pendidik (co-educator) untuk satu kelas melalui emel. Pemilik kelas " +
       "sahaja; semakan dijalankan oleh route. send_email: true menghantar emel jemputan " +
       "melalui route notify selepas jemputan dicipta (lalai false). Kod jemputan dan pautan " +
-      "dipulangkan supaya boleh dikongsi secara manual. Senarai, hantar semula atau batal " +
-      "jemputan tiada laluannya, jadi tidak disokong.",
+      "dipulangkan supaya boleh dikongsi secara manual. Untuk senarai atau batal jemputan, " +
+      "guna list_educator_invites dan revoke_educator_invite.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -2606,6 +2607,11 @@ export const TOOLS: ToolDef[] = [
       return inviteEducator(s.accessToken, args);
     },
   },
+
+  // Tool tambahan (kelas, pendidik bersama, pasukan, markah, Outcomes, board,
+  // Live Quiz, sijil, analitik, peserta) dalam fail berasingan supaya boleh
+  // diuji tanpa pangkalan data.
+  ...TOOLS_TAMBAHAN,
 ];
 
 /** Tools yang kelihatan kepada peranan tertentu, dengan skop diambil kira. */
