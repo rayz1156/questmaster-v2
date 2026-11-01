@@ -30,33 +30,33 @@ insert into public.qm_classes (id, owner_id, name) values
 -- Tiga Outcomes ujian (lajur ikut skema: code boleh null, created_by
 -- boleh null).
 insert into public.qm_learning_outcomes (id, class_id, code, label) values
-  ('00000000-0000-0000-0000-0000000350o1', '00000000-0000-0000-0000-0000000350c1', 'K1', 'Saya boleh membuat analisis keperluan'),
-  ('00000000-0000-0000-0000-0000000350o2', '00000000-0000-0000-0000-0000000350c1', 'K2', 'Saya boleh mengira Borich'),
-  ('00000000-0000-0000-0000-0000000350o3', '00000000-0000-0000-0000-0000000350c1', 'K3', 'Saya boleh membina laporan');
+  ('00000000-0000-0000-0000-0000000350d1', '00000000-0000-0000-0000-0000000350c1', 'K1', 'Saya boleh membuat analisis keperluan'),
+  ('00000000-0000-0000-0000-0000000350d2', '00000000-0000-0000-0000-0000000350c1', 'K2', 'Saya boleh mengira Borich'),
+  ('00000000-0000-0000-0000-0000000350d3', '00000000-0000-0000-0000-0000000350c1', 'K3', 'Saya boleh membina laporan');
 
 -- Satu LNA dengan tiga item.
 insert into public.qm_lna (id, class_id, title, created_by) values
-  ('00000000-0000-0000-0000-0000000350l1',
+  ('00000000-0000-0000-0000-0000000350f1',
    '00000000-0000-0000-0000-0000000350c1',
    'LNA Ujian KZ-035',
    '00000000-0000-0000-0000-0000000350e1');
 
 insert into public.qm_lna_items (lna_id, outcome_id, position) values
-  ('00000000-0000-0000-0000-0000000350l1', '00000000-0000-0000-0000-0000000350o1', 1),
-  ('00000000-0000-0000-0000-0000000350l1', '00000000-0000-0000-0000-0000000350o2', 2),
-  ('00000000-0000-0000-0000-0000000350l1', '00000000-0000-0000-0000-0000000350o3', 3);
+  ('00000000-0000-0000-0000-0000000350f1', '00000000-0000-0000-0000-0000000350d1', 1),
+  ('00000000-0000-0000-0000-0000000350f1', '00000000-0000-0000-0000-0000000350d2', 2),
+  ('00000000-0000-0000-0000-0000000350f1', '00000000-0000-0000-0000-0000000350d3', 3);
 
 -- Ujian 1: CHECK skala 1 hingga 5 pada qm_lna_responses. Nilai 0 dan 6
 -- ditolak pada kedua-dua lajur; 1 dan 5 diterima.
 do $u$
 declare
-  v_lna     uuid := '00000000-0000-0000-0000-0000000350l1';
+  v_lna     uuid := '00000000-0000-0000-0000-0000000350f1';
   v_p       uuid := '00000000-0000-0000-0000-0000000350a1';
-  v_o1      uuid := '00000000-0000-0000-0000-0000000350o1';
+  v_o1      uuid := '00000000-0000-0000-0000-0000000350d1';
   v_pusing  uuid;
 begin
   insert into public.qm_lna_rounds (id, lna_id, kind) values
-    ('00000000-0000-0000-0000-0000000350r1', v_lna, 'pre')
+    ('00000000-0000-0000-0000-0000000350b1', v_lna, 'pre')
     returning id into v_pusing;
 
   begin
@@ -98,7 +98,7 @@ end $u$;
 -- Ujian 2: CHECK kind dan status pada qm_lna_rounds.
 do $u$
 declare
-  v_lna  uuid := '00000000-0000-0000-0000-0000000350l1';
+  v_lna  uuid := '00000000-0000-0000-0000-0000000350f1';
   v_guru uuid := '00000000-0000-0000-0000-0000000350e1';
 begin
   begin
@@ -121,7 +121,7 @@ end $u$;
 -- Ujian 3: unique (lna_id, kind). Pusingan pra kedua ditolak.
 do $u$
 declare
-  v_lna uuid := '00000000-0000-0000-0000-0000000350l1';
+  v_lna uuid := '00000000-0000-0000-0000-0000000350f1';
 begin
   begin
     insert into public.qm_lna_rounds (lna_id, kind) values (v_lna, 'pre');
@@ -136,7 +136,7 @@ end $u$;
 do $u$
 declare
   v_kelas   uuid := '00000000-0000-0000-0000-0000000350c1';
-  v_lna     uuid := '00000000-0000-0000-0000-0000000350l1';
+  v_lna     uuid := '00000000-0000-0000-0000-0000000350f1';
   v_jawapan int;
   v_pusing  int;
   v_item    int;
