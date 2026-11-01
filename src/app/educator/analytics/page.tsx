@@ -3,6 +3,7 @@ import { useEffect, useState, useMemo } from "react";
 import ActivityStatsPanel from "@/components/analytics/ActivityStatsPanel";
 import GamificationPanel from "@/components/analytics/GamificationPanel";
 import MasteryPanel from "@/components/analytics/MasteryPanel";
+import LnaPanel from "@/components/analytics/LnaPanel";
 import Shell from "@/components/Shell";
 import Stat from "@/components/insights/Stat";
 import PanelInsights from "@/components/insights/PanelInsights";
@@ -199,6 +200,7 @@ export default function EducatorAnalyticsPage() {
               </div>
               <div className="lg:col-span-5 space-y-4">
                 <MasteryPanel classId={classId} />
+                <LnaPanel classId={classId} />
                 <GamificationPanel classId={classId} />
               </div>
             </div>

@@ -38,6 +38,10 @@ const PENERANGAN: Record<BahagianInsights, { label: string; huraian: string }> =
     label: "Progress by session",
     huraian: "One row per learner per ended Live Quiz session.",
   },
+  lna: {
+    label: "Learning Needs Analysis",
+    huraian: "One row per learner per outcome per LNA round, with mastery and confidence flags.",
+  },
 };
 
 export default function DialogEksport({

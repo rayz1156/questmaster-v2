@@ -1,0 +1,178 @@
+/**
+ * PATCH  /api/lna/[lnaId]: ubah tajuk dan/atau senarai item (guru sahaja).
+ * DELETE /api/lna/[lnaId]: padam LNA (guru sahaja).
+ *
+ * KZ-035. Senarai item hanya boleh diubah selagi tiada jawapan; selepas
+ * itu susunan dan keahlian dikunci supaya laporan pusingan terdahulu
+ * kekal bermakna. Padam bergantung pada on delete cascade (migrasi
+ * 0070): item, pusingan dan jawapan turut padam.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { bacaJsonKecil } from '@/lib/bilikAi';
+import { aksesLna, ralatLna, sahUuid } from '@/lib/lnaAkses';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const fetchCache = 'force-no-store';
+
+export async function PATCH(
+  req: NextRequest,
+  { params }: { params: { lnaId: string } },
+) {
+  const akses = await aksesLna(req, String(params.lnaId ?? ''));
+  if (akses.response) return akses.response;
+  if (akses.role !== 'teacher') {
+    return ralatLna(403, 'TEACHER_ONLY', 'Hanya guru boleh mengubah LNA.');
+  }
+  const supa = akses.supa!;
+  const lna = akses.lna!;
+
+  const hasil = await bacaJsonKecil(req);
+  if (!hasil.ok) return hasil.response;
+  const body = hasil.body;
+
+  const set: Record<string, unknown> = {};
+
+  if (body.title !== undefined) {
+    if (typeof body.title !== 'string') {
+      return NextResponse.json({ error: 'Tajuk LNA mesti teks.' }, { status: 400 });
+    }
+    const title = body.title.trim();
+    if (title.length < 1 || title.length > 120) {
+      return NextResponse.json(
+        { error: 'Tajuk LNA mesti 1 hingga 120 aksara.' },
+        { status: 400 },
+      );
+    }
+    set.title = title;
+  }
+
+  // Ganti senarai item: hanya jika belum ada jawapan dalam mana-mana
+  // pusingan LNA ini.
+  if (body.outcomeIds !== undefined) {
+    if (!Array.isArray(body.outcomeIds) || body.outcomeIds.length === 0) {
+      return NextResponse.json(
+        { error: 'outcomeIds mesti senarai tidak kosong.' },
+        { status: 400 },
+      );
+    }
+    const ids: string[] = [];
+    for (const x of body.outcomeIds) {
+      if (typeof x !== 'string' || !sahUuid(x)) {
+        return NextResponse.json(
+          { error: 'outcomeIds mengandungi id tidak sah.' },
+          { status: 400 },
+        );
+      }
+      ids.push(x);
+    }
+    const unik = Array.from(new Set(ids));
+    if (unik.length < 3 || unik.length > 15) {
+      return NextResponse.json(
+        { error: 'Jumlah item LNA mesti 3 hingga 15.' },
+        { status: 400 },
+      );
+    }
+    // Semua outcome mesti milik kelas LNA ini.
+    const { data: sah } = await supa
+      .from('qm_learning_outcomes')
+      .select('id')
+      .eq('class_id', lna.class_id)
+      .in('id', unik);
+    const idsSah = new Set(((sah ?? []) as { id: string }[]).map((r) => r.id));
+    for (const x of unik) {
+      if (!idsSah.has(x)) {
+        return NextResponse.json(
+          { error: 'Outcome tidak ditemui dalam kelas ini.' },
+          { status: 400 },
+        );
+      }
+    }
+    // Kunci item: tiada jawapan dalam mana-mana pusingan LNA ini.
+    const { data: pusingan } = await supa
+      .from('qm_lna_rounds')
+      .select('id')
+      .eq('lna_id', lna.id);
+    const idsPusingan = ((pusingan ?? []) as { id: string }[]).map((r) => r.id);
+    if (idsPusingan.length > 0) {
+      const { count } = await supa
+        .from('qm_lna_responses')
+        .select('round_id', { count: 'exact', head: true })
+        .in('round_id', idsPusingan);
+      if ((count ?? 0) > 0) {
+        return NextResponse.json(
+          { error: 'Item tidak boleh diubah selepas ada jawapan pelajar.' },
+          { status: 400 },
+        );
+      }
+    }
+
+    const { error: errPadam } = await supa
+      .from('qm_lna_items')
+      .delete()
+      .eq('lna_id', lna.id);
+    if (errPadam) {
+      console.error('[lna] ganti item gagal (padam):', errPadam.message);
+      return NextResponse.json({ error: 'Item LNA tidak dapat diubah.' }, { status: 500 });
+    }
+    const baris = unik.map((outcomeId, i) => ({
+      lna_id: lna.id,
+      outcome_id: outcomeId,
+      position: i + 1,
+    }));
+    const { error: errIsi } = await supa.from('qm_lna_items').insert(baris);
+    if (errIsi) {
+      console.error('[lna] ganti item gagal (isi):', errIsi.message);
+      return NextResponse.json({ error: 'Item LNA tidak dapat diubah.' }, { status: 500 });
+    }
+  }
+
+  if (Object.keys(set).length === 0 && body.outcomeIds === undefined) {
+    return NextResponse.json(
+      { error: 'Tiada medan untuk dikemas kini.' },
+      { status: 400 },
+    );
+  }
+
+  if (Object.keys(set).length > 0) {
+    set.updated_at = new Date().toISOString();
+    const { error } = await supa
+      .from('qm_lna')
+      .update(set)
+      .eq('id', lna.id);
+    if (error) {
+      console.error('[lna] kemas kini gagal:', error.message);
+      return NextResponse.json({ error: 'LNA tidak dapat dikemas kini.' }, { status: 500 });
+    }
+  }
+
+  const { data: terkini } = await supa
+    .from('qm_lna')
+    .select('id, class_id, title, created_by, created_at, updated_at')
+    .eq('id', lna.id)
+    .maybeSingle();
+  return NextResponse.json({ lna: terkini });
+}
+
+export async function DELETE(
+  req: NextRequest,
+  { params }: { params: { lnaId: string } },
+) {
+  const akses = await aksesLna(req, String(params.lnaId ?? ''));
+  if (akses.response) return akses.response;
+  if (akses.role !== 'teacher') {
+    return ralatLna(403, 'TEACHER_ONLY', 'Hanya guru boleh memadam LNA.');
+  }
+  const supa = akses.supa!;
+
+  // on delete cascade memadam item, pusingan dan jawapan bersama LNA.
+  const { error } = await supa
+    .from('qm_lna')
+    .delete()
+    .eq('id', akses.lna!.id);
+  if (error) {
+    console.error('[lna] padam gagal:', error.message);
+    return NextResponse.json({ error: 'LNA tidak dapat dipadam.' }, { status: 500 });
+  }
+  return NextResponse.json({ ok: true });
+}
