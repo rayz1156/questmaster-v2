@@ -90,7 +90,7 @@ function ConsentInner() {
   }
 
   const permissions = [
-    { scope: "kuizen:read", label: "Melihat kelas, hunt, board dan progres anda" },
+    { scope: "kuizen:read", label: "Melihat kelas, aktiviti, board dan progres anda" },
     { scope: "kuizen:write", label: "Mencipta dan mengemas kini kandungan bagi pihak anda" },
   ].filter((p) => scope.includes(p.scope));
 

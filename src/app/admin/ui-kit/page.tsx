@@ -257,7 +257,7 @@ export default function UiKitPage() {
         <Card>
           <div className="space-y-1">
             <TileRow title="Intro Quest" subtitle="12 challenges" value="1,240" valueSub="completions" index={2} />
-            <TileRow title="Science Hunt" subtitle="8 challenges" value="980" valueSub="completions" index={3} />
+            <TileRow title="Science Activity" subtitle="8 challenges" value="980" valueSub="completions" index={3} />
             <PersonRow name="Puan Rosnah" subtitle="Educator" value="5 classes" index={4} />
             <PersonRow name="Encik Faizal" subtitle="Educator" value="3 classes" index={5} />
           </div>
@@ -428,7 +428,7 @@ export default function UiKitPage() {
             menuItems={[{ label: "Open", icon: <Eye className="w-4 h-4" />, onSelect: () => {} }]}
           />
           <ProjectCard
-            title="Science Hunt"
+            title="Science Activity"
             subtitle="Class 4 Cekap"
             description="Sample activity due very soon."
             tasksDone={3}

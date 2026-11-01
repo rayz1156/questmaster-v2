@@ -131,8 +131,8 @@ export async function POST(req: NextRequest) {
       capabilities: { tools: { listChanged: false } },
       serverInfo: { name: "kuizen-mcp", version: "1.0.0" },
       instructions:
-        "Kuizen ialah platform pendidikan berasaskan kelas. Setiap kelas mengandungi hunt " +
-        "(aktiviti) dan board pembelajaran. Setiap hunt mengandungi challenge (soalan), dan " +
+        "Kuizen ialah platform pendidikan berasaskan kelas. Setiap kelas mengandungi aktiviti " +
+        "(nama teknikal dalam alat: hunt) dan board pembelajaran. Setiap aktiviti mengandungi challenge (soalan), dan " +
         "peserta menghantar jawapan kepada challenge. Kuizen turut menyediakan Live Quiz " +
         "(Kuiz Langsung) gaya Kahoot: educator mencipta kuiz Live Quiz dengan soalan aneka " +
         "pilihan (alat list_live_quizzes, create_live_quiz, add_live_questions, " +

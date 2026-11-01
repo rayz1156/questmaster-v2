@@ -137,7 +137,7 @@ export async function updateChallenge(
   if (rows.length !== 1) {
     throw new Error(
       "Kemas kini tidak berlaku (RLS menolak atau challenge sudah tiada). " +
-        "Hanya pemilik hunt atau admin boleh mengubah challenge."
+        "Hanya pemilik aktiviti atau admin boleh mengubah challenge."
     );
   }
   return rows[0];

@@ -240,7 +240,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "get_class",
     title: "Butiran kelas",
-    description: "Satu kelas beserta kiraan hunt, board, educator dan ahli.",
+    description: "Satu kelas beserta kiraan aktiviti, board, educator dan ahli.",
     roles: ALL,
     write: false,
     inputSchema: {
@@ -375,16 +375,16 @@ export const TOOLS: ToolDef[] = [
 
   {
     name: "list_hunts",
-    title: "Senarai hunt",
+    title: "Senarai aktiviti",
     description:
-      "Senaraikan hunt (quest) dalam sesuatu kelas. Hunt ialah aktiviti peringkat atas; soalan individu di dalamnya dipanggil challenge.",
+      "Senaraikan aktiviti dalam sesuatu kelas (nama teknikal dalam alat: hunt). Aktiviti ialah unit peringkat atas; soalan individu di dalamnya dipanggil challenge.",
     roles: ALL,
     write: false,
     inputSchema: {
       type: "object",
       properties: {
         class_id: { type: "string" },
-        status: { type: "string", description: "Tapis mengikut status hunt" },
+        status: { type: "string", description: "Tapis mengikut status aktiviti" },
         limit: { type: "number" },
       },
       required: ["class_id"],
@@ -397,14 +397,14 @@ export const TOOLS: ToolDef[] = [
         .order("created_at", { ascending: false })
         .limit(clampLimit(args?.limit));
       if (args.status) q = q.eq("status", args.status);
-      return unwrapList(await q, "Senarai hunt");
+      return unwrapList(await q, "Senarai aktiviti");
     },
   },
 
   {
     name: "create_hunt",
-    title: "Cipta hunt",
-    description: "Cipta hunt baharu dalam sesuatu kelas.",
+    title: "Cipta aktiviti",
+    description: "Cipta aktiviti baharu dalam sesuatu kelas.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -438,14 +438,14 @@ export const TOOLS: ToolDef[] = [
           })
           .select(COLUMNS.huntSummary)
           .single(),
-        "Cipta hunt"
+        "Cipta aktiviti"
       ),
   },
 
   {
     name: "update_hunt",
-    title: "Kemas kini hunt",
-    description: "Kemas kini medan pada hunt sedia ada. Hanya medan yang diberi akan diubah.",
+    title: "Kemas kini aktiviti",
+    description: "Kemas kini medan pada aktiviti sedia ada. Hanya medan yang diberi akan diubah.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -470,7 +470,7 @@ export const TOOLS: ToolDef[] = [
       if (Object.keys(patch).length === 0) throw new Error("Tiada medan untuk dikemas kini");
       return unwrapOne(
         await s.db.from(TABLES.hunts).update(patch).eq("id", hunt_id).select(COLUMNS.huntSummary).single(),
-        "Kemas kini hunt"
+        "Kemas kini aktiviti"
       );
     },
   },
@@ -479,7 +479,7 @@ export const TOOLS: ToolDef[] = [
     name: "list_challenges",
     title: "Senarai challenge",
     description:
-      "Senaraikan challenge dalam sesuatu hunt. Kunci jawapan hanya disertakan untuk educator dan admin; peserta tidak akan menerimanya.",
+      "Senaraikan challenge dalam sesuatu aktiviti. Kunci jawapan hanya disertakan untuk educator dan admin; peserta tidak akan menerimanya.",
     roles: ALL,
     write: false,
     inputSchema: {
@@ -502,7 +502,7 @@ export const TOOLS: ToolDef[] = [
   {
     name: "create_challenge",
     title: "Cipta challenge",
-    description: "Tambah challenge baharu pada hunt.",
+    description: "Tambah challenge baharu pada aktiviti.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -562,7 +562,7 @@ export const TOOLS: ToolDef[] = [
     name: "delete_challenge",
     title: "Padam challenge",
     description:
-      "Padam satu challenge daripada hunt. Memerlukan confirm: true. Penghantaran " +
+      "Padam satu challenge daripada aktiviti. Memerlukan confirm: true. Penghantaran " +
       "peserta yang dipautkan pada challenge itu turut terpadam.",
     roles: STAFF,
     write: true,
@@ -584,7 +584,7 @@ export const TOOLS: ToolDef[] = [
     name: "list_teams",
     title: "Senarai kumpulan",
     description:
-      "Kumpulan peringkat kelas (bukan kumpulan hunt lama) dengan ahli dan ketua. " +
+      "Kumpulan peringkat kelas (bukan kumpulan aktiviti lama) dengan ahli dan ketua. " +
       "Ahli diambil daripada qm_team_members beserta peranannya; ketua ialah ahli " +
       "dengan role 'leader'.",
     roles: STAFF,
@@ -1257,7 +1257,7 @@ export const TOOLS: ToolDef[] = [
     name: "class_progress_report",
     title: "Laporan progres kelas",
     description:
-      "Ringkasan agregat untuk sesuatu kelas: bilangan hunt dan challenge, penghantaran mengikut status, dan challenge yang belum ada penghantaran.",
+      "Ringkasan agregat untuk sesuatu kelas: bilangan aktiviti dan challenge, penghantaran mengikut status, dan challenge yang belum ada penghantaran.",
     roles: STAFF,
     write: false,
     inputSchema: {
@@ -1268,11 +1268,11 @@ export const TOOLS: ToolDef[] = [
     handler: async (args, s) => {
       const hunts = unwrapList(
         await s.db.from(TABLES.hunts).select("id, title, status").eq("class_id", args.class_id),
-        "Muat hunt"
+        "Muat aktiviti"
       ) as Array<{ id: string; title: string; status: string }>;
 
       if (hunts.length === 0) {
-        return { class_id: args.class_id, hunts: 0, note: "Kelas ini belum ada hunt" };
+        return { class_id: args.class_id, hunts: 0, note: "Kelas ini belum ada aktiviti" };
       }
 
       // Satu .in() dengan ratusan UUID menghasilkan URL yang ditolak dengan 414.
@@ -1322,7 +1322,7 @@ export const TOOLS: ToolDef[] = [
     name: "search",
     title: "Cari kandungan Kuizen",
     description:
-      "Cari merentasi kelas, hunt dan board mengikut teks. Pulangkan id berprefiks yang boleh dihantar kepada fetch.",
+      "Cari merentasi kelas, aktiviti dan board mengikut teks. Pulangkan id berprefiks yang boleh dihantar kepada fetch.",
     roles: ALL,
     write: false,
     inputSchema: {
@@ -1347,7 +1347,7 @@ export const TOOLS: ToolDef[] = [
           ...unwrapList(classes, "Cari kelas").map((r: any) => ({
             id: `class:${r.id}`, title: r.name, url: `/classes/${r.id}`,
           })),
-          ...unwrapList(hunts, "Cari hunt").map((r: any) => ({
+          ...unwrapList(hunts, "Cari aktiviti").map((r: any) => ({
             id: `hunt:${r.id}`, title: r.title, url: `/hunts/${r.id}`,
           })),
           ...unwrapList(boards, "Cari board").map((r: any) => ({
@@ -1368,7 +1368,7 @@ export const TOOLS: ToolDef[] = [
     inputSchema: {
       type: "object",
       properties: {
-        id: { type: "string", description: "Id berprefiks: class:<uuid>, hunt:<uuid> atau board:<uuid>" },
+        id: { type: "string", description: "Id berprefiks: class:<uuid>, hunt:<uuid> (aktiviti) atau board:<uuid>" },
       },
       required: ["id"],
     },
@@ -1381,7 +1381,7 @@ export const TOOLS: ToolDef[] = [
         null;
 
       if (!table || !id) {
-        throw new Error("Id tidak sah. Guna class:<uuid>, hunt:<uuid> atau board:<uuid>");
+        throw new Error("Id tidak sah. Guna class:<uuid>, hunt:<uuid> (aktiviti) atau board:<uuid>");
       }
 
       const row = unwrapOne<Record<string, unknown>>(
@@ -1843,9 +1843,9 @@ export const TOOLS: ToolDef[] = [
 
   {
     name: "get_hunt_results",
-    title: "Keputusan aktiviti (hunt)",
+    title: "Keputusan aktiviti",
     description:
-      "Keputusan satu aktiviti (hunt) kelas: bilangan hantaran setiap cabaran mengikut " +
+      "Keputusan satu aktiviti kelas: bilangan hantaran setiap cabaran mengikut " +
       "status (disahkan, tertunda, ditolak) dan markah setiap ahli kelas termasuk yang " +
       "belum menghantar (sifar). Guna ini untuk melihat siapa belum menyiapkan aktiviti.",
     roles: STAFF,
@@ -1854,7 +1854,7 @@ export const TOOLS: ToolDef[] = [
       type: "object",
       properties: {
         class_id: { type: "string", description: "UUID kelas" },
-        hunt_id: { type: "string", description: "UUID hunt; mesti milik kelas ini" },
+        hunt_id: { type: "string", description: "UUID aktiviti (hunt); mesti milik kelas ini" },
       },
       required: ["class_id", "hunt_id"],
     },

@@ -611,7 +611,7 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
   {
     name: "list_quest_completions",
     title: "Senarai quest selesai",
-    description: "Senarai pasukan yang sudah ditanda selesai bagi satu aktiviti (hunt), dengan mata yang diberi.",
+    description: "Senarai pasukan yang sudah ditanda selesai bagi satu aktiviti, dengan mata yang diberi.",
     roles: STAFF,
     write: false,
     inputSchema: { type: "object", properties: { hunt_id: { type: "string" } }, required: ["hunt_id"] },
@@ -707,7 +707,7 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
   {
     name: "delete_hunt",
     title: "Padam aktiviti",
-    description: "Padam aktiviti (hunt) secara kekal bersama cabaran dan hantarannya. Wajib confirm: true.",
+    description: "Padam aktiviti secara kekal bersama cabaran dan hantarannya. Wajib confirm: true.",
     roles: STAFF,
     write: true,
     inputSchema: {
