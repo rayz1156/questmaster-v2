@@ -14,6 +14,23 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
 import { bacaJsonKecil } from '@/lib/bilikAi';
 import { aksesRound, ralatLna, labelOutcome } from '@/lib/lnaAkses';
+import { senaraiMasteryDaripadaSummary } from '@/lib/lna';
+
+// Pembetulan CTO (kzsec #2): simpan hanya medan yang diperlukan enjin skor
+// (user_id, outcome_id, mastery_pct, scored), tanpa nama pelajar. Bentuk
+// kekal serasi dengan senaraiMasteryDaripadaSummary.
+function snapshotMinimum(ringkasan: unknown) {
+  const ikutPelajar = new Map<string, { outcome_id: string; mastery_pct: number | null; scored: number }[]>();
+  for (const m of senaraiMasteryDaripadaSummary(ringkasan)) {
+    const senarai = ikutPelajar.get(m.userId) ?? [];
+    senarai.push({ outcome_id: m.outcomeId, mastery_pct: m.masteryPct, scored: m.scored });
+    ikutPelajar.set(m.userId, senarai);
+  }
+  return {
+    disimpan_pada: new Date().toISOString(),
+    students: Array.from(ikutPelajar.entries()).map(([user_id, outcomes]) => ({ user_id, outcomes })),
+  };
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -135,7 +152,7 @@ export async function PATCH(
     .update({
       status: 'closed',
       closed_at: new Date().toISOString(),
-      mastery_snapshot: snapshot,
+      mastery_snapshot: snapshotMinimum(snapshot),
     })
     .eq('id', round.id)
     .select('id, lna_id, kind, status, opened_at, closed_at')

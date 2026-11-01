@@ -163,9 +163,11 @@ export async function aksesLna(
     return gagal(NextResponse.json({ error: 'LNA tidak ditemui.' }, { status: 404 }));
   }
 
+  // Pembetulan CTO (kzqa kriteria 8, kzsec #1): bukan ahli menerima 404
+  // generik yang sama, supaya kewujudan LNA kelas lain tidak terbongkar.
   const role = await perananKelas(supa, user.id, lna.class_id);
   if (!role) {
-    return gagal(ralatLna(403, 'NOT_CLASS_MEMBER', 'Anda bukan ahli kelas ini.'));
+    return gagal(NextResponse.json({ error: 'LNA tidak ditemui.' }, { status: 404 }));
   }
 
   return { user, supa, lna, role, response: null };
@@ -212,7 +214,7 @@ export async function aksesRound(
 
   const role = await perananKelas(supa, user.id, lna.class_id);
   if (!role) {
-    return gagal(ralatLna(403, 'NOT_CLASS_MEMBER', 'Anda bukan ahli kelas ini.'));
+    return gagal(NextResponse.json({ error: 'Pusingan tidak ditemui.' }, { status: 404 }));
   }
 
   return { user, supa, lna, round, role, response: null };

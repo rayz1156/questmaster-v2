@@ -65,8 +65,16 @@ export async function POST(
     if (typeof o.outcomeId !== 'string') {
       return NextResponse.json({ error: 'outcomeId mesti teks.' }, { status: 400 });
     }
-    const importance = Number(o.importance);
-    const currentLevel = Number(o.currentLevel);
+    // Pembetulan CTO (kzsec #3): mesti nombor JSON sebenar; boole,
+    // rentetan atau tatasusunan ditolak sebelum dipaksa.
+    if (typeof o.importance !== 'number' || typeof o.currentLevel !== 'number') {
+      return NextResponse.json(
+        { error: 'Kepentingan dan tahap semasa mesti integer 1 hingga 5.' },
+        { status: 400 },
+      );
+    }
+    const importance = o.importance;
+    const currentLevel = o.currentLevel;
     if (
       !Number.isInteger(importance) || importance < 1 || importance > 5
       || !Number.isInteger(currentLevel) || currentLevel < 1 || currentLevel > 5
