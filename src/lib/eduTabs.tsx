@@ -65,7 +65,7 @@ export const EDU_TABS: EduTab[] = [
   },
   {
     href: "/educator/ai-rooms",
-    label: "Bilik AI",
+    label: "AI Chatroom",
     group: "Teaching",
     icon: <Bot className="w-5 h-5" />,
   },

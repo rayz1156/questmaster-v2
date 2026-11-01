@@ -16,8 +16,15 @@ const nextConfig = {
   //
   // Alamat artikel kekal di bawah /panduan kerana ketiga tiganya sudah
   // dihantar ke Search Console dengan alamat itu.
+  //
+  // AI Chatroom (dahulu Bilik AI) berpindah dari /bilik ke /chatroom pada
+  // 2 Nov 2026. Pautan dan QR lama yang sudah dikongsi terus berfungsi.
   async redirects() {
-    return [{ source: "/panduan", destination: "/blog", permanent: true }];
+    return [
+      { source: "/panduan", destination: "/blog", permanent: true },
+      { source: "/bilik", destination: "/chatroom", permanent: true },
+      { source: "/bilik/:code", destination: "/chatroom/:code", permanent: true },
+    ];
   },
 
   async rewrites() {

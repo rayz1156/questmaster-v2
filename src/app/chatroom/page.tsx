@@ -1,6 +1,6 @@
 "use client";
 /**
- * /bilik: masuk Bilik AI dengan kod 6 aksara (KZ-033).
+ * /chatroom: masuk AI Chatroom dengan kod 6 aksara (KZ-033).
  *
  * Halaman ini umum (tiada Shell): log masuk disemak oleh API semasa
  * membaca bilik. Kod mesti 6 aksara daripada abjad bilik
@@ -21,10 +21,10 @@ export default function MasukBilik() {
   const masuk = (e: React.FormEvent) => {
     e.preventDefault();
     if (!REGEX_KOD.test(bersih)) {
-      setRalat("Kod bilik mesti 6 aksara; tiada 0, O, 1 atau I.");
+      setRalat("Kod chatroom mesti 6 aksara; tiada 0, O, 1 atau I.");
       return;
     }
-    router.push(`/bilik/${bersih}`);
+    router.push(`/chatroom/${bersih}`);
   };
 
   return (
@@ -36,8 +36,8 @@ export default function MasukBilik() {
               <Bot className="w-5 h-5" />
             </span>
             <div>
-              <h1 className="text-[18px] font-bold text-ink">Bilik AI</h1>
-              <p className="text-[13px] text-ink-faint">Masukkan kod bilik 6 aksara.</p>
+              <h1 className="text-[18px] font-bold text-ink">AI Chatroom</h1>
+              <p className="text-[13px] text-ink-faint">Masukkan kod chatroom 6 aksara.</p>
             </div>
           </div>
           <form onSubmit={masuk} className="grid gap-3">
@@ -53,7 +53,7 @@ export default function MasukBilik() {
               inputMode="text"
               autoComplete="off"
               spellCheck={false}
-              aria-label="Kod bilik"
+              aria-label="Kod chatroom"
               className="w-full h-11 rounded-xl border border-violet-200 bg-white px-4 text-center text-[18px] font-bold tracking-[0.35em] uppercase outline-none focus:border-violet-500"
             />
             {ralat ? <p className="text-[13px] text-red-600">{ralat}</p> : null}

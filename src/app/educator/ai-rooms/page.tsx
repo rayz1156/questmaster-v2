@@ -1,8 +1,8 @@
 "use client";
 /**
- * /educator/ai-rooms: pilihan kelas untuk Bilik AI (KZ-033).
+ * /educator/ai-rooms: pilihan kelas untuk AI Chatroom (KZ-033).
  *
- * Tab bar sisi "Bilik AI" (src/lib/eduTabs.tsx) menunjuk ke sini.
+ * Tab bar sisi "AI Chatroom" (src/lib/eduTabs.tsx) menunjuk ke sini.
  * Bilik itu sendiri sentiasa milik satu kelas, jadi halaman ini cuma
  * menyenaraikan kelas yang diajar dan menunjukkan bilik mana yang
  * sudah ada, kemudian pautan ke /educator/classes/[id]/ai-rooms.
@@ -43,8 +43,8 @@ export default function SenaraiKelasBilikAi() {
       <div className="max-w-4xl mx-auto">
         <PageHead
           crumb="Teaching"
-          name="Bilik AI"
-          description="Sembang kelas masa nyata dan tanya AI dalam bilik yang sama."
+          name="AI Chatroom"
+          description="Sembang kelas masa nyata dan tanya AI dalam chatroom yang sama."
         />
         <div className="mt-6">
           {err ? (
@@ -57,7 +57,7 @@ export default function SenaraiKelasBilikAi() {
               <EmptyState
                 icon={<Bot className="w-6 h-6" />}
                 title="Tiada kelas lagi"
-                text="Cipta kelas dahulu, kemudian buka bilik AI dalam kelas itu."
+                text="Cipta kelas dahulu, kemudian buka AI Chatroom dalam kelas itu."
               />
             </Card>
           ) : null}
@@ -65,7 +65,7 @@ export default function SenaraiKelasBilikAi() {
             <Card padat>
               <CardHead
                 title="Pilih kelas"
-                subtitle="Bilik AI wujud dalam satu kelas pada satu masa."
+                subtitle="AI Chatroom wujud dalam satu kelas pada satu masa."
                 className="px-6 pt-6 pb-4"
               />
               <div className="divide-y divide-hairline">

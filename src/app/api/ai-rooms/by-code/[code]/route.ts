@@ -1,6 +1,6 @@
 /**
  * GET /api/ai-rooms/by-code/[code]: maklumat bilik untuk halaman
- * /bilik/[code] (KZ-033).
+ * /chatroom/[code] (KZ-033).
  *
  * Kod mesti 6 aksara daripada abjad bilik (400 jika format salah,
  * 404 jika tiada bilik memakai kod itu). Kemudian semakan akses penuh
@@ -21,7 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const kod = String(params.code || '').trim().toUpperCase();
   if (!REGEX_KOD_BILIK.test(kod)) {
     return NextResponse.json(
-      { error: 'Kod bilik mesti 6 aksara daripada abjad kod bilik.' },
+      { error: 'Kod chatroom mesti 6 aksara daripada abjad kod chatroom.' },
       { status: 400 },
     );
   }
@@ -39,7 +39,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .eq('join_code', kod)
     .maybeSingle();
   if (!baris) {
-    return NextResponse.json({ error: 'Kod bilik tidak ditemui.' }, { status: 404 });
+    return NextResponse.json({ error: 'Kod chatroom tidak ditemui.' }, { status: 404 });
   }
 
   const akses = await aksesBilik(req, baris.id);

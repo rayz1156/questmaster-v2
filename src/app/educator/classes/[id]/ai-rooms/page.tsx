@@ -1,13 +1,13 @@
 "use client";
 /**
- * /educator/classes/[id]/ai-rooms: senarai dan cipta Bilik AI untuk satu
+ * /educator/classes/[id]/ai-rooms: senarai dan cipta AI Chatroom untuk satu
  * kelas (KZ-033 fasa 1).
  *
  * Guru (pemilik kelas atau ko-pendidik diterima) boleh mencipta,
  * menutup dan memadam bilik. Peserta kelas boleh melihat senarai
  * tetapi API menolak ciptaan mereka (laluan POST menyemak peranan di
  * pelayan). Setiap kad membawa kod masuk 6 aksara, pautan salin
- * (https://kuizen.fun/bilik/<KOD>) dan QR yang dijana di pelayar
+ * (https://kuizen.fun/chatroom/<KOD>) dan QR yang dijana di pelayar
  * dengan pakej qrcode (laluan QR kuiz langsung hanya melukis URL
  * /live/<code>, jadi ia tidak boleh diguna semula untuk /bilik).
  */
@@ -91,7 +91,7 @@ export default function HalamanBilikAiKelas() {
       const r = await baca(`/api/classes/${id}/ai-rooms`);
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "Senarai bilik tidak dapat dibaca."));
+        setErr(String(j?.error ?? "Senarai chatroom tidak dapat dibaca."));
         setSedia(true);
         return;
       }
@@ -109,7 +109,7 @@ export default function HalamanBilikAiKelas() {
         }
       }
     } catch {
-      setErr("Senarai bilik tidak dapat dibaca.");
+      setErr("Senarai chatroom tidak dapat dibaca.");
     } finally {
       setSedia(true);
     }
@@ -126,7 +126,7 @@ export default function HalamanBilikAiKelas() {
     setErr("");
     setMsg("");
     if (tajuk.trim().length < 1) {
-      setErr("Tajuk bilik mesti sekurang-kurangnya 1 aksara.");
+      setErr("Tajuk chatroom mesti sekurang-kurangnya 1 aksara.");
       return;
     }
     setBusy(true);
@@ -142,13 +142,13 @@ export default function HalamanBilikAiKelas() {
       });
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "Bilik tidak dapat dicipta."));
+        setErr(String(j?.error ?? "Chatroom tidak dapat dicipta."));
         return;
       }
       setTajuk("");
       setPenerangan("");
       const kod = String((j?.room as BilikUi | undefined)?.join_code ?? "");
-      setMsg("Bilik dicipta. Kod masuk: " + kod);
+      setMsg("Chatroom dicipta. Kod masuk: " + kod);
       await muat();
     } finally {
       setBusy(false);
@@ -157,7 +157,7 @@ export default function HalamanBilikAiKelas() {
 
   const paparQr = async (room: BilikUi) => {
     try {
-      const dataUrl = await QRCode.toDataURL(`https://kuizen.fun/bilik/${room.join_code}`, {
+      const dataUrl = await QRCode.toDataURL(`https://kuizen.fun/chatroom/${room.join_code}`, {
         errorCorrectionLevel: "M",
         margin: 2,
         width: 260,
@@ -171,8 +171,8 @@ export default function HalamanBilikAiKelas() {
 
   const salin = async (room: BilikUi) => {
     try {
-      await navigator.clipboard.writeText(`https://kuizen.fun/bilik/${room.join_code}`);
-      setMsg("Pautan bilik disalin ke papan keratan.");
+      await navigator.clipboard.writeText(`https://kuizen.fun/chatroom/${room.join_code}`);
+      setMsg("Pautan chatroom disalin ke papan keratan.");
       setErr("");
     } catch {
       setErr("Papan keratan tidak dapat digunakan oleh pelayar ini.");
@@ -188,7 +188,7 @@ export default function HalamanBilikAiKelas() {
     });
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "Bilik tidak dapat diubah."));
+      setErr(String(j?.error ?? "Chatroom tidak dapat diubah."));
       return;
     }
     setErr("");
@@ -198,7 +198,7 @@ export default function HalamanBilikAiKelas() {
   const padam = async (room: BilikUi) => {
     if (
       !(await confirm({
-        title: `Padam bilik "${room.title}"? Semua mesej dalam bilik ini akan hilang.`,
+        title: `Padam chatroom "${room.title}"? Semua mesej dalam chatroom ini akan hilang.`,
         tone: "danger",
       }))
     ) {
@@ -207,10 +207,10 @@ export default function HalamanBilikAiKelas() {
     const r = await baca(`/api/ai-rooms/${room.id}`, { method: "DELETE" });
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "Bilik tidak dapat dipadam."));
+      setErr(String(j?.error ?? "Chatroom tidak dapat dipadam."));
       return;
     }
-    setMsg("Bilik dipadam.");
+    setMsg("Chatroom dipadam.");
     setErr("");
     await muat();
   };
@@ -232,17 +232,17 @@ export default function HalamanBilikAiKelas() {
 
           <Card className="mb-6">
             <CardHead
-              title="Cipta bilik baharu"
-              subtitle="Setiap bilik ada kod masuk 6 aksara dan menjawab dengan satu model AI."
+              title="Cipta chatroom baharu"
+              subtitle="Setiap chatroom ada kod masuk 6 aksara dan menjawab dengan satu model AI."
             />
             <form onSubmit={cipta} className="mt-4 grid gap-4">
-              <Field label="Tajuk bilik" htmlFor="ai-room-title">
+              <Field label="Tajuk chatroom" htmlFor="ai-room-title">
                 <Input
                   id="ai-room-title"
                   value={tajuk}
                   maxLength={80}
                   onChange={(e) => setTajuk(e.target.value)}
-                  placeholder="cth. Bilik Soal Sains"
+                  placeholder="cth. Chatroom Soal Sains"
                 />
               </Field>
               <Field label="Penerangan (pilihan)" htmlFor="ai-room-desc">
@@ -252,7 +252,7 @@ export default function HalamanBilikAiKelas() {
                   maxLength={300}
                   rows={2}
                   onChange={(e) => setPenerangan(e.target.value)}
-                  placeholder="Untuk apa bilik ini"
+                  placeholder="Untuk apa chatroom ini"
                 />
               </Field>
               <Field
@@ -290,8 +290,8 @@ export default function HalamanBilikAiKelas() {
             <Card>
               <EmptyState
                 icon={<Bot className="w-6 h-6" />}
-                title="Belum ada bilik"
-                text="Cipta bilik pertama untuk kelas ini; ahli kelas akan masuk melalui kod 6 aksara."
+                title="Belum ada chatroom"
+                text="Cipta chatroom pertama untuk kelas ini; ahli kelas akan masuk melalui kod 6 aksara."
               />
             </Card>
           ) : null}
@@ -324,7 +324,7 @@ export default function HalamanBilikAiKelas() {
                 <span className="font-bold tracking-[0.2em] text-ink">{room.join_code}</span>
               </p>
               <div className="flex flex-wrap gap-2 mt-4">
-                <Button href={`/bilik/${room.join_code}`}>Buka bilik</Button>
+                <Button href={`/chatroom/${room.join_code}`}>Buka chatroom</Button>
                 <Button variant="outline" onClick={() => void salin(room)}>
                   <Copy className="w-4 h-4" /> Salin pautan
                 </Button>
@@ -332,7 +332,7 @@ export default function HalamanBilikAiKelas() {
                   <QrCode className="w-4 h-4" /> QR
                 </Button>
                 <Button variant="outline" onClick={() => void tutupBuka(room)}>
-                  {room.status === "open" ? "Tutup bilik" : "Buka semula"}
+                  {room.status === "open" ? "Tutup chatroom" : "Buka semula"}
                 </Button>
                 <Button variant="ghost" warna="red" onClick={() => void padam(room)}>
                   <Trash2 className="w-4 h-4" /> Padam
@@ -341,7 +341,7 @@ export default function HalamanBilikAiKelas() {
             </Card>
           ))}
 
-          <Modal open={!!qr} onClose={() => setQr(null)} title="QR bilik">
+          <Modal open={!!qr} onClose={() => setQr(null)} title="QR chatroom">
             {qr ? (
               <div className="text-center">
                 <p className="text-[14px] text-ink-muted mb-3">
@@ -352,7 +352,7 @@ export default function HalamanBilikAiKelas() {
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qr.dataUrl}
-                  alt={"QR bilik " + qr.bilik.join_code}
+                  alt={"QR chatroom " + qr.bilik.join_code}
                   className="mx-auto rounded-[4px]"
                   width={260}
                   height={260}

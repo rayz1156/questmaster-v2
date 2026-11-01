@@ -50,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('class_id', params.id)
     .order('created_at', { ascending: false });
   if (error) {
-    return NextResponse.json({ error: 'Senarai bilik tidak dapat dibaca.' }, { status: 500 });
+    return NextResponse.json({ error: 'Senarai chatroom tidak dapat dibaca.' }, { status: 500 });
   }
   return NextResponse.json({ rooms: data ?? [] });
 }
@@ -70,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     return NextResponse.json({ error: 'Kelas tidak ditemui.' }, { status: 404 });
   }
   if (!(await guruKelas(supa, params.id, user.id))) {
-    return ralatBilik(403, 'NOT_EDUCATOR', 'Hanya pendidik kelas boleh mencipta bilik.');
+    return ralatBilik(403, 'NOT_EDUCATOR', 'Hanya pendidik kelas boleh mencipta chatroom.');
   }
 
   const hasil = await bacaJsonKecil(req);

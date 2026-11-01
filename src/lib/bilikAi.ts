@@ -1,7 +1,7 @@
 /**
- * Jenis kongsi, penjana kod dan semakan akses untuk Bilik AI (KZ-033).
+ * Jenis kongsi, penjana kod dan semakan akses untuk AI Chatroom (KZ-033).
  *
- * Bilik AI hanya untuk pengguna log masuk yang:
+ * AI Chatroom hanya untuk pengguna log masuk yang:
  *  - pemilik kelas bilik, ATAU
  *  - ko-pendidik kelas yang sudah MENERIMA jemputan (qm_class_educators
  *    dengan accepted_at tidak null), maka role 'teacher', ATAU
@@ -52,11 +52,11 @@ export interface HasilAksesBilik {
   response: NextResponse | null;
 }
 
-/** Abjad kod bilik: tiada 0, O, 1, I, U yang mudah salah dengar. */
+/** Abjad kod chatroom: tiada 0, O, 1, I, U yang mudah salah dengar. */
 export const ABJAD_KOD_BILIK = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 export const REGEX_KOD_BILIK = /^[ABCDEFGHJKLMNPQRSTUVWXYZ23456789]{6}$/;
 
-/** Jana kod bilik 6 aksara daripada abjad di atas. */
+/** Jana kod chatroom 6 aksara daripada abjad di atas. */
 export function janaKodBilik(): string {
   let kod = '';
   for (let i = 0; i < 6; i += 1) {
@@ -65,11 +65,11 @@ export function janaKodBilik(): string {
   return kod;
 }
 
-/** Had saiz badan semua laluan tulis Bilik AI (tiket D). */
+/** Had saiz badan semua laluan tulis AI Chatroom (tiket D). */
 export const HAD_BADAN_BILIK = 16 * 1024;
 
 /**
- * Baca dan sahkan badan JSON kecil semua laluan tulis Bilik AI:
+ * Baca dan sahkan badan JSON kecil semua laluan tulis AI Chatroom:
  * badan terlalu besar 413, JSON rosak 400, badan kosong dibenarkan.
  */
 export async function bacaJsonKecil(
@@ -112,7 +112,7 @@ export async function bacaJsonKecil(
   };
 }
 
-/** Balasan ralat kebiasaan Bilik AI. */
+/** Balasan ralat kebiasaan AI Chatroom. */
 export function ralatBilik(status: number, code: string, error: string): NextResponse {
   return NextResponse.json({ error, code }, { status });
 }
@@ -225,7 +225,7 @@ export async function aksesBilik(
     .eq('id', roomId)
     .maybeSingle()) as { data: BilikRow | null };
   if (!bilik) {
-    return gagal(NextResponse.json({ error: 'Bilik tidak ditemui.' }, { status: 404 }));
+    return gagal(NextResponse.json({ error: 'Chatroom tidak ditemui.' }, { status: 404 }));
   }
 
   // Peranan dikira di pelayan daripada kelas pemilik bilik.
@@ -272,7 +272,7 @@ export async function aksesBilik(
     .upsert({ room_id: roomId, user_id: user.id, role }, { onConflict: 'room_id,user_id' });
   if (errAhli) {
     console.error('[bilik-ai] upsert ahli gagal:', errAhli.message);
-    return gagal(NextResponse.json({ error: 'Keahlian bilik tidak dapat disimpan.' }, { status: 500 }));
+    return gagal(NextResponse.json({ error: 'Keahlian chatroom tidak dapat disimpan.' }, { status: 500 }));
   }
 
   // Pembetulan CTO (kzsec #5): guru tidak pernah dibisukan. Bekas pelajar

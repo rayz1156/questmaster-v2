@@ -56,13 +56,13 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   const bilik = akses.bilik!;
 
   if (bilik.status !== 'open') {
-    return ralatBilik(409, 'ROOM_CLOSED', 'Bilik sudah ditutup.');
+    return ralatBilik(409, 'ROOM_CLOSED', 'Chatroom sudah ditutup.');
   }
   if (!bilik.ai_enabled) {
-    return ralatBilik(409, 'AI_DISABLED', 'AI dimatikan dalam bilik ini.');
+    return ralatBilik(409, 'AI_DISABLED', 'AI dimatikan dalam chatroom ini.');
   }
   if (akses.muted) {
-    return ralatBilik(403, 'MUTED', 'Anda dibisukan dalam bilik ini.');
+    return ralatBilik(403, 'MUTED', 'Anda dibisukan dalam chatroom ini.');
   }
   if (!dalamHad('bilik-ask:' + user.id, 3)) {
     return NextResponse.json(
@@ -116,7 +116,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   if (kodKuota === 'USER_CAP') {
     return NextResponse.json(
       {
-        error: 'Anda sudah mencapai had harian menanya AI dalam bilik ini.',
+        error: 'Anda sudah mencapai had harian menanya AI dalam chatroom ini.',
         code: 'USER_CAP',
       },
       { status: 429 },
@@ -124,7 +124,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   }
   if (kodKuota === 'ROOM_CAP') {
     return NextResponse.json(
-      { error: 'Bilik ini sudah mencapai had harian menanya AI.', code: 'ROOM_CAP' },
+      { error: 'Chatroom ini sudah mencapai had harian menanya AI.', code: 'ROOM_CAP' },
       { status: 429 },
     );
   }

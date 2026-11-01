@@ -162,10 +162,10 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   const bilik = akses.bilik!;
 
   if (bilik.status !== 'open') {
-    return ralatBilik(409, 'ROOM_CLOSED', 'Bilik sudah ditutup.');
+    return ralatBilik(409, 'ROOM_CLOSED', 'Chatroom sudah ditutup.');
   }
   if (akses.muted) {
-    return ralatBilik(403, 'MUTED', 'Anda dibisukan dalam bilik ini.');
+    return ralatBilik(403, 'MUTED', 'Anda dibisukan dalam chatroom ini.');
   }
   // Had per minit untuk mesej biasa (10 dalam tetingkap 60 saat).
   if (!dalamHad('bilik-msg:' + user.id, 10)) {

@@ -75,7 +75,7 @@ export default function ClassShell({
     { key: "people", label: "People", href: `/educator/classes/${classId}/people` },
     { key: "board", label: "Board", href: `/educator/classes/${classId}/board` },
     { key: "learning", label: "Learning Board", href: `/educator/classes/${classId}/learning-board` },
-    { key: "ai-rooms", label: "Bilik AI", href: `/educator/classes/${classId}/ai-rooms` },
+    { key: "ai-rooms", label: "AI Chatroom", href: `/educator/classes/${classId}/ai-rooms` },
     { key: "certificates", label: "Certificates", href: `/educator/classes/${classId}/certificates` },
     { key: "peer-review", label: "Peer review", href: `/educator/classes/${classId}/peer-review` },
   ];

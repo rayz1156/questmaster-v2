@@ -19,7 +19,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
   const akses = await aksesBilik(req, params.roomId);
   if (akses.response) return akses.response;
   if (akses.role !== 'teacher') {
-    return ralatBilik(403, 'TEACHER_ONLY', 'Hanya guru boleh mengubah tetapan bilik.');
+    return ralatBilik(403, 'TEACHER_ONLY', 'Hanya guru boleh mengubah tetapan chatroom.');
   }
   const supa = akses.supa!;
 
@@ -31,12 +31,12 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
 
   if (body.title !== undefined) {
     if (typeof body.title !== 'string') {
-      return NextResponse.json({ error: 'Tajuk bilik mesti teks.' }, { status: 400 });
+      return NextResponse.json({ error: 'Tajuk chatroom mesti teks.' }, { status: 400 });
     }
     const title = body.title.trim();
     if (title.length < 1 || title.length > 80) {
       return NextResponse.json(
-        { error: 'Tajuk bilik mesti 1 hingga 80 aksara.' },
+        { error: 'Tajuk chatroom mesti 1 hingga 80 aksara.' },
         { status: 400 },
       );
     }
@@ -50,13 +50,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
       const d = body.description.trim() || null;
       if (d && d.length > 300) {
         return NextResponse.json(
-          { error: 'Penerangan bilik maksimum 300 aksara.' },
+          { error: 'Penerangan chatroom maksimum 300 aksara.' },
           { status: 400 },
         );
       }
       set.description = d;
     } else {
-      return NextResponse.json({ error: 'Penerangan bilik mesti teks.' }, { status: 400 });
+      return NextResponse.json({ error: 'Penerangan chatroom mesti teks.' }, { status: 400 });
     }
   }
 
@@ -111,7 +111,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
   if (body.status !== undefined) {
     if (body.status !== 'open' && body.status !== 'closed') {
       return NextResponse.json(
-        { error: 'Status bilik mesti open atau closed.' },
+        { error: 'Status chatroom mesti open atau closed.' },
         { status: 400 },
       );
     }
@@ -133,7 +133,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
     .single();
   if (error || !data) {
     console.error('[bilik-ai] kemas kini bilik gagal:', error?.message);
-    return NextResponse.json({ error: 'Bilik tidak dapat dikemas kini.' }, { status: 500 });
+    return NextResponse.json({ error: 'Chatroom tidak dapat dikemas kini.' }, { status: 500 });
   }
   return NextResponse.json({ room: data });
 }
@@ -142,7 +142,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { roomId: s
   const akses = await aksesBilik(req, params.roomId);
   if (akses.response) return akses.response;
   if (akses.role !== 'teacher') {
-    return ralatBilik(403, 'TEACHER_ONLY', 'Hanya guru boleh memadam bilik.');
+    return ralatBilik(403, 'TEACHER_ONLY', 'Hanya guru boleh memadam chatroom.');
   }
   const supa = akses.supa!;
 
@@ -153,7 +153,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { roomId: s
     .eq('id', params.roomId);
   if (error) {
     console.error('[bilik-ai] padam bilik gagal:', error.message);
-    return NextResponse.json({ error: 'Bilik tidak dapat dipadam.' }, { status: 500 });
+    return NextResponse.json({ error: 'Chatroom tidak dapat dipadam.' }, { status: 500 });
   }
   return NextResponse.json({ ok: true });
 }

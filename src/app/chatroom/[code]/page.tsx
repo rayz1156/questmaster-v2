@@ -1,9 +1,9 @@
 "use client";
 /**
- * /bilik/[code]: Bilik AI yang dikongsi oleh guru dan pelajar (KZ-033).
+ * /chatroom/[code]: AI Chatroom yang dikongsi oleh guru dan pelajar (KZ-033).
  *
  * Perlu log masuk (localStorage 'qm-auth', Bearer pada setiap
- * panggilan); tanpa sesi, balik ke /login?next=/bilik/<kod>.
+ * panggilan); tanpa sesi, balik ke /login?next=/chatroom/<kod>.
  * Bukan ahli kelas: papar "Anda bukan ahli kelas ini."
  *
  * Kemas kini masa nyata dengan TINJAUAN setiap 2 saat (corak Kuiz
@@ -192,7 +192,7 @@ export default function HalamanBilik() {
         const ses = await supabase.auth.getSession();
         if (!hidup) return;
         if (!ses.data.session) {
-          router.replace(`/login?next=${encodeURIComponent(`/bilik/${kod}`)}`);
+          router.replace(`/login?next=${encodeURIComponent(`/chatroom/${kod}`)}`);
           return;
         }
         setUserId(ses.data.session.user.id);
@@ -206,11 +206,11 @@ export default function HalamanBilik() {
     };
   }, [kod, router]);
 
-  // Buka bilik dengan kod (semakan akses dilakukan oleh API).
+  // Buka chatroom dengan kod (semakan akses dilakukan oleh API).
   useEffect(() => {
     if (!userId || bilikIdRef.current) return;
     if (!REGEX_KOD.test(kod)) {
-      setRalatBlok("Kod bilik tidak sah.");
+      setRalatBlok("Kod chatroom tidak sah.");
       return;
     }
     let hidup = true;
@@ -223,14 +223,14 @@ export default function HalamanBilik() {
         if (!hidup) return;
         if (!r.ok || !j) {
           const kodRalat = String(j?.code ?? "");
-          if (r.status === 404) setRalatBlok("Kod bilik tidak ditemui.");
+          if (r.status === 404) setRalatBlok("Kod chatroom tidak ditemui.");
           else if (kodRalat === "NOT_CLASS_MEMBER") setRalatBlok("Anda bukan ahli kelas ini.");
-          else setRalatBlok(String(j?.error ?? "Bilik tidak dapat dibuka."));
+          else setRalatBlok(String(j?.error ?? "Chatroom tidak dapat dibuka."));
           return;
         }
         const room = j.room as BilikUi | undefined;
         if (!room) {
-          setRalatBlok("Bilik tidak dapat dibuka.");
+          setRalatBlok("Chatroom tidak dapat dibuka.");
           return;
         }
         setBilik(room);
@@ -245,7 +245,7 @@ export default function HalamanBilik() {
           if (rm.ok && jm) setModels((jm.models ?? []) as ModelUi[]);
         }
       } catch {
-        if (hidup) setRalatBlok("Bilik tidak dapat dibuka.");
+        if (hidup) setRalatBlok("Chatroom tidak dapat dibuka.");
       }
     };
     void buka();
@@ -431,7 +431,7 @@ export default function HalamanBilik() {
       });
       const j = (await r.json().catch(() => null)) as Record<string, unknown> | null;
       if (!r.ok) {
-        setNotis(String(j?.error ?? "Bilik tidak dapat diubah."));
+        setNotis(String(j?.error ?? "Chatroom tidak dapat diubah."));
         return;
       }
       const room = j?.room as Record<string, unknown> | undefined;
@@ -454,7 +454,7 @@ export default function HalamanBilik() {
         });
       }
     } catch {
-      setNotis("Bilik tidak dapat diubah.");
+      setNotis("Chatroom tidak dapat diubah.");
     }
   };
 
@@ -465,9 +465,9 @@ export default function HalamanBilik() {
         <div className="w-full max-w-sm bg-violet-50 border border-violet-200 rounded-xl p-6 text-center">
           <Bot className="w-8 h-8 mx-auto text-violet-500" />
           <p className="text-[16px] font-bold text-ink mt-3">{ralatBlok}</p>
-          <p className="text-[13px] text-ink-faint mt-1">Kod bilik: {kod}</p>
+          <p className="text-[13px] text-ink-faint mt-1">Kod chatroom: {kod}</p>
           <a
-            href="/bilik"
+            href="/chatroom"
             className="inline-block mt-4 text-[13px] font-medium text-violet-600 hover:underline"
           >
             Cuba kod lain
@@ -481,7 +481,7 @@ export default function HalamanBilik() {
   if (!bilik) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-[#f5f6fa]">
-        <p className="text-[14px] text-ink-faint">Membuka bilik...</p>
+        <p className="text-[14px] text-ink-faint">Membuka chatroom...</p>
       </div>
     );
   }
@@ -489,9 +489,9 @@ export default function HalamanBilik() {
   const sebabAi = !aiConfigured
     ? "AI belum disediakan oleh pentadbir."
     : !bilik.aiEnabled
-      ? "AI dimatikan dalam bilik ini."
+      ? "AI dimatikan dalam chatroom ini."
       : bilik.status !== "open"
-        ? "Bilik ditutup."
+        ? "Chatroom ditutup."
         : "";
   const aiBoleh = !sebabAi;
 
@@ -512,7 +512,7 @@ export default function HalamanBilik() {
             </div>
             {bilik.status !== "open" ? (
               <span className="text-[12px] font-bold text-amber-600 shrink-0">
-                Bilik ditutup
+                Chatroom ditutup
               </span>
             ) : null}
           </div>
@@ -538,11 +538,11 @@ export default function HalamanBilik() {
           <div className="mt-3">
             {mutedSaya ? (
               <p className="text-[13px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                Anda dibisukan oleh guru. Anda tidak boleh menulis dalam bilik ini.
+                Anda dibisukan oleh guru. Anda tidak boleh menulis dalam chatroom ini.
               </p>
             ) : bilik.status !== "open" ? (
               <p className="text-[13px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3">
-                Bilik ditutup oleh guru. Anda masih boleh membaca mesej.
+                Chatroom ditutup oleh guru. Anda masih boleh membaca mesej.
               </p>
             ) : (
               <>
@@ -624,7 +624,7 @@ export default function HalamanBilik() {
             </div>
 
             <div className="border-t border-hairline pt-4">
-              <p className="text-[13px] font-bold text-ink mb-2">Tetapan bilik</p>
+              <p className="text-[13px] font-bold text-ink mb-2">Tetapan chatroom</p>
               <label className="flex items-center justify-between gap-2 text-[13px] text-ink-muted mb-2">
                 <span>Dayakan Tanya AI</span>
                 <input
@@ -634,7 +634,7 @@ export default function HalamanBilik() {
                 />
               </label>
               <label className="flex items-center justify-between gap-2 text-[13px] text-ink-muted mb-2">
-                <span>Kongsi sejarah bilik dengan AI</span>
+                <span>Kongsi sejarah chatroom dengan AI</span>
                 <input
                   type="checkbox"
                   checked={bilik.contextEnabled}
@@ -664,7 +664,7 @@ export default function HalamanBilik() {
                 }
                 className="w-full py-2 rounded-xl text-[13px] font-medium border border-violet-200 text-violet-700 hover:bg-violet-100"
               >
-                {bilik.status === "open" ? "Tutup bilik" : "Buka semula bilik"}
+                {bilik.status === "open" ? "Tutup chatroom" : "Buka semula chatroom"}
               </button>
             </div>
           </div>

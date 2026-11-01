@@ -38,12 +38,12 @@ export async function POST(
     .eq('user_id', params.userId)
     .maybeSingle();
   if (!sasaran) {
-    return NextResponse.json({ error: 'Ahli tidak ditemui dalam bilik ini.' }, { status: 404 });
+    return NextResponse.json({ error: 'Ahli tidak ditemui dalam chatroom ini.' }, { status: 404 });
   }
   // Guru tidak boleh dibisukan oleh sesiapa pun.
   if (sasaran.role === 'teacher') {
     return NextResponse.json(
-      { error: 'Guru tidak boleh dibisukan dalam bilik ini.' },
+      { error: 'Guru tidak boleh dibisukan dalam chatroom ini.' },
       { status: 403 },
     );
   }
