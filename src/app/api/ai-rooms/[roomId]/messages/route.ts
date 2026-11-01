@@ -70,7 +70,9 @@ export async function GET(req: NextRequest, { params }: { params: { roomId: stri
 
   const afterRaw = req.nextUrl.searchParams.get('after') || '0';
   const after = Number.parseInt(afterRaw, 10);
-  const since = req.nextUrl.searchParams.get('since');
+  // Pembetulan CTO: terima hanya masa ISO yang sah (selain itu abaikan).
+  const sinceRaw = req.nextUrl.searchParams.get('since');
+  const since = sinceRaw && !Number.isNaN(Date.parse(sinceRaw)) ? new Date(sinceRaw).toISOString() : null;
 
   // Kehadiran: setiap tinjauan menandakan pengguna ini hidup.
   await supa
@@ -129,7 +131,10 @@ export async function GET(req: NextRequest, { params }: { params: { roomId: stri
   return NextResponse.json({
     messages: (baru ?? []).map((m) => bentuk(m, nama)),
     changed: ubah.map((m) => bentuk(m, nama)),
-    serverTime: new Date().toISOString(),
+    // Pembetulan CTO: undur 5 saat supaya kemas kini yang dikomit sejurus
+    // selepas bacaan ini (cap masa lebih awal) tidak tercicir. Klien
+    // menggantikan mesej mengikut id, jadi pertindihan selamat.
+    serverTime: new Date(Date.now() - 5_000).toISOString(),
     online: (onlineRows ?? []).map((o) => ({
       id: o.user_id,
       name: nama.get(o.user_id) ?? `User ${String(o.user_id).slice(0, 8)}`,

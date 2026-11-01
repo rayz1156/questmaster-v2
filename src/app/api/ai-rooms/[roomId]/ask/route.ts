@@ -216,8 +216,13 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   let tamat = false;
   let kemasDalam: Promise<void> | null = null;
 
-  const tulisMesej = async (set: Record<string, unknown>) => {
-    await supa.from('qm_ai_messages').update(set).eq('id', aiRow.id);
+  // Pembetulan CTO: tulisan hanya pada mesej yang belum dipadam, dan
+  // (kecuali teks laluan berhenti) hanya semasa masih queued/streaming,
+  // supaya status stopped daripada penanya/guru tidak ditimpa semula.
+  const tulisMesej = async (set: Record<string, unknown>, hanyaAktif = true) => {
+    let q = supa.from('qm_ai_messages').update(set).eq('id', aiRow.id).is('deleted_at', null);
+    if (hanyaAktif) q = q.in('ai_status', ['queued', 'streaming']);
+    await q;
   };
 
   // (e) kemas kini berkala: body + streaming paling kerap setiap 800 ms,
@@ -235,7 +240,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
       mahuBerhenti = true;
       pemutus.abort();
       if (teks.length > versiDisimpan) {
-        await tulisMesej({ body: teks, updated_at: new Date().toISOString() });
+        await tulisMesej({ body: teks, updated_at: new Date().toISOString() }, false);
         versiDisimpan = teks.length;
       }
       return;
@@ -251,9 +256,15 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   };
   const pemasaKemas = setInterval(() => {
     if (!kemasDalam) {
-      kemasDalam = kemasKini().catch(() => {
-        /* cuba lagi pada kitaran seterusnya */
-      });
+      // Pembetulan CTO: kosongkan selepas setiap kitaran; tanpa ini hanya
+      // satu kemas kini berlaku dan Berhenti tidak pernah dikesan.
+      kemasDalam = kemasKini()
+        .catch(() => {
+          /* cuba lagi pada kitaran seterusnya */
+        })
+        .finally(() => {
+          kemasDalam = null;
+        });
     }
   }, KEMAS_KINI_MS);
 
@@ -282,6 +293,11 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     clearInterval(pemasaKemas);
     clearTimeout(pemasaMati);
     if (kemasDalam) await kemasDalam;
+    if (mahuBerhenti) {
+      // Strim tamat tanpa melontar selepas abort: kekal stopped.
+      await tulisMesej({ body: teks, updated_at: new Date().toISOString() }, false);
+      return NextResponse.json({ aiMessageId: aiRow.id, status: 'stopped' });
+    }
     await tulisMesej({
       body: teks,
       ai_status: 'complete',
@@ -305,7 +321,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     if (mahuBerhenti) {
       // Dihentikan penanya/guru: kekal stopped dengan teks setakat ini.
       if (versiDisimpan < teks.length) {
-        await tulisMesej({ body: teks, updated_at: new Date().toISOString() });
+        await tulisMesej({ body: teks, updated_at: new Date().toISOString() }, false);
       }
       return NextResponse.json({ aiMessageId: aiRow.id, status: 'stopped' });
     }
