@@ -15,6 +15,7 @@ import { Award, Check, ClipboardList, Copy, EyeOff, Inbox, Minus, Pencil, Plus, 
 import Shell from "@/components/Shell";
 import ClassShell from "@/components/ClassShell";
 import { EDU_TABS } from "@/lib/eduTabs";
+import { PAPAR_PENILAIAN_RAKAN } from "@/lib/ciriPaparan";
 import { listClassEducators, getClass, listClassMembers, removeClassMember, listClassInvites, updateClass, endClass, reopenClass, addStudentScoreAdjustment, listStudentScoreAdjustments, deleteStudentScoreAdjustment, Klass, ClassInvite, StudentScoreAdjustment } from "@/lib/data";
 import EducatorsCard from "@/components/EducatorsCard";
 import InviteParticipantsModal from "@/components/InviteParticipantsModal";
@@ -449,7 +450,8 @@ export default function ClassDetail() {
         className={klass.name}
       />
 
-      {/* Pusingan penilaian rakan sebaya. */}
+      {/* Pusingan penilaian rakan sebaya (disembunyikan melalui ciriPaparan). */}
+      {PAPAR_PENILAIAN_RAKAN && (
       <Card className="mb-4">
         <div className="flex items-start gap-3">
           <span aria-hidden="true" className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ebe2ff] text-brand-purple shrink-0">
@@ -462,6 +464,7 @@ export default function ClassDetail() {
           <CardLink href={`/educator/classes/${klass.id}/peer-review`}>Open</CardLink>
         </div>
       </Card>
+      )}
 
       {/* Senarai ahli. */}
       <div id="member-list" className="mb-4">

@@ -9,8 +9,15 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, ChevronRight } from "lucide-react";
 import { pusinganTerbukaBelumHantar, type PusinganTerbuka } from "@/lib/peer-client";
+import { PAPAR_PENILAIAN_RAKAN } from "@/lib/ciriPaparan";
 
+// Pembalut supaya tiada panggilan API apabila ciri disembunyikan, tanpa
+// melanggar peraturan hook (tiada pulangan awal sebelum hook).
 export default function PeerReviewBanner() {
+  return PAPAR_PENILAIAN_RAKAN ? <SepandukPenilaianRakan /> : null;
+}
+
+function SepandukPenilaianRakan() {
   const [pusingan, setPusingan] = useState<PusinganTerbuka | null>(null);
 
   useEffect(() => {

@@ -29,6 +29,7 @@ import { useEffect, useState } from "react";
 import { Copy, Check, UserPlus } from "lucide-react";
 import { getClass, type Klass } from "@/lib/data";
 import { PageHead, Tabs } from "@/components/ui";
+import { PAPAR_PENILAIAN_RAKAN } from "@/lib/ciriPaparan";
 
 export type ClassTabKey =
   | "overview"
@@ -69,7 +70,7 @@ export default function ClassShell({
     return () => { alive = false; };
   }, [classId, klassProp]);
 
-  const tabs: { key: ClassTabKey; label: string; href: string }[] = [
+  const semuaTab: { key: ClassTabKey; label: string; href: string }[] = [
     { key: "overview", label: "Overview", href: `/educator/classes/${classId}` },
     { key: "people", label: "People", href: `/educator/classes/${classId}/people` },
     { key: "board", label: "Board", href: `/educator/classes/${classId}/board` },
@@ -78,6 +79,8 @@ export default function ClassShell({
     { key: "certificates", label: "Certificates", href: `/educator/classes/${classId}/certificates` },
     { key: "peer-review", label: "Peer review", href: `/educator/classes/${classId}/peer-review` },
   ];
+  // Tab Peer review disembunyikan bersama ciri (src/lib/ciriPaparan.ts).
+  const tabs = semuaTab.filter((t) => PAPAR_PENILAIAN_RAKAN || t.key !== "peer-review");
 
   const copyCode = async () => {
     if (!klass?.join_code) return;

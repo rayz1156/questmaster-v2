@@ -17,6 +17,7 @@ import { fileURLToPath } from 'node:url';
 import { HAD_PELAN, HARGA_PELAN, type Pelan } from '../src/lib/pelan';
 import { barisKad, formatRM, formatStoran } from '../src/lib/kadHarga';
 import { TEKS_LANDING } from '../src/lib/landing-copy';
+import { PAPAR_PENILAIAN_RAKAN } from '../src/lib/ciriPaparan';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
@@ -69,7 +70,10 @@ const JANGKA: Record<Exclude<Pelan, 'unlimited'>, Record<string, number | boolea
 for (const p of ['free', 'pro', 'institution'] as const) {
   const baris = barisKad(p);
   const h = HAD_PELAN[p];
-  check(`${p}: bilangan baris 14`, baris.length === 14, baris.length);
+  // 14 baris; 13 apabila penilaian rakan disembunyikan (src/lib/ciriPaparan.ts).
+  const jangkaBaris = PAPAR_PENILAIAN_RAKAN ? 14 : 13;
+  check(`${p}: bilangan baris ${jangkaBaris}`, baris.length === jangkaBaris, baris.length);
+  check(`${p}: baris penilaianRakan ikut suis`, baris.some((b) => b.kunci === 'penilaianRakan') === PAPAR_PENILAIAN_RAKAN);
   for (const b of baris) {
     const j = JANGKA[p][b.kunci];
     if (b.kunci === 'sijil') continue; // baris teks, disemak melalui landing-copy di bawah

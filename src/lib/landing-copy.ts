@@ -165,7 +165,7 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
       },
       {
         q: "Apakah beza pelan Percuma dan Pro?",
-        a: "Percuma memberi anda 3 kelas, 150 peserta setiap kelas, 60 peserta setiap sesi Live Quiz, 30 aktiviti, 5 papan dan 100 MB storan. Pro membuka 30 kelas tanpa had peserta, 300 peserta setiap sesi, aktiviti dan papan tanpa had, 1 GB storan, serta penilaian rakan, jambatan Google Form, laporan dan akses MCP.",
+        a: "Percuma memberi anda 3 kelas, 150 peserta setiap kelas, 60 peserta setiap sesi Live Quiz, 30 aktiviti, 5 papan dan 100 MB storan. Pro membuka 30 kelas tanpa had peserta, 300 peserta setiap sesi, aktiviti dan papan tanpa had, 1 GB storan, serta jambatan Google Form, laporan dan akses MCP.",
       },
       {
         q: "Apakah yang berlaku apabila had pelan saya dicapai?",
@@ -300,7 +300,7 @@ export const TEKS_LANDING: Record<Bahasa, TeksLanding> = {
       },
       {
         q: "What is the difference between Free and Pro?",
-        a: "Free gives you 3 classes, 150 participants per class, 60 players per live quiz session, 30 activities, 5 boards and 100 MB of storage. Pro opens up 30 classes with unlimited participants, 300 players per session, unlimited activities and boards, 1 GB of storage, plus peer evaluation, the Google Form bridge, reports and MCP access.",
+        a: "Free gives you 3 classes, 150 participants per class, 60 players per live quiz session, 30 activities, 5 boards and 100 MB of storage. Pro opens up 30 classes with unlimited participants, 300 players per session, unlimited activities and boards, 1 GB of storage, plus the Google Form bridge, reports and MCP access.",
       },
       {
         q: "What happens when I reach my plan limit?",

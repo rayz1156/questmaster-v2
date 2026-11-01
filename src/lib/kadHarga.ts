@@ -7,6 +7,7 @@
  * scripts/selftest-harga.ts menguji bahawa baris ini sepadan dengan HAD_PELAN.
  */
 import { HAD_PELAN, type Pelan } from './pelan';
+import { PAPAR_PENILAIAN_RAKAN } from './ciriPaparan';
 
 /** Format ringgit: 0 -> RM0, 228 -> RM228, 1500 -> RM1,500. */
 export function formatRM(n: number): string {
@@ -51,7 +52,7 @@ export type BarisKad = {
 export function barisKad(pelan: Pelan): BarisKad[] {
   const h = HAD_PELAN[pelan];
   const ciri = h.penilaianRakan; // Pro dan Institusi: ya; Percuma: tidak
-  return [
+  const semua: BarisKad[] = [
     { kunci: 'kelas', angka: String(h.kelas), termasuk: null },
     { kunci: 'pesertaSeKelas', angka: h.ahliSeKelas === null ? null : String(h.ahliSeKelas), termasuk: null },
     { kunci: 'pemainSeSesi', angka: String(h.pemainSesi), termasuk: null },
@@ -67,4 +68,6 @@ export function barisKad(pelan: Pelan): BarisKad[] {
     { kunci: 'aksesMcp', angka: null, termasuk: ciri },
     { kunci: 'adminInvois', angka: null, termasuk: pelan === 'institution' },
   ];
+  // Baris penilaian rakan disembunyikan bersama ciri (src/lib/ciriPaparan.ts).
+  return semua.filter((b) => PAPAR_PENILAIAN_RAKAN || b.kunci !== 'penilaianRakan');
 }
