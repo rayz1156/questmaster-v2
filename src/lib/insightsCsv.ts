@@ -22,7 +22,27 @@ export const NAMA_BAHAGIAN: Record<string, string> = {
   challenges: 'Challenges',
   teams: 'Teams',
   trend: 'Trend',
+  lna: 'LNA',
 };
+
+/**
+ * Satu baris bahagian LNA (KZ-035): jawapan seorang pelajar bagi satu
+ * outcome dalam satu pusingan, dengan penguasaan dan bendera
+ * keyakinan lawan penguasaan.
+ */
+export interface BarisLnaEksport {
+  /** Nama paparan pelajar. */
+  nama: string;
+  /** Label Outcome. */
+  outcome: string;
+  /** Pusingan: 'Pre' atau 'Post'. */
+  pusingan: string;
+  kepentingan: number;
+  tahapSemasa: number;
+  masteryPct: number | null;
+  /** Label bendera (BM) atau rentetan kosong. */
+  bendera: string;
+}
 
 /**
  * Asahkan parameter `sections`: pecahkan ikut koma, kecilkan huruf, buang
@@ -234,13 +254,46 @@ function barisTrend(data: InsightsKelas): string[] {
   return [tajuk, ...baris];
 }
 
+/** Baris bahagian LNA: satu baris per pelajar per outcome per pusingan. */
+function barisLna(senarai: readonly BarisLnaEksport[]): string[] {
+  const tajuk = 'Student,Outcome,Round,Importance,Current level,Mastery %,Flags';
+  // Susun ikut nama pelajar, pusingan (Pre sebelum Post), kemudian label.
+  const tertib = senarai.slice(0).sort((a, b) => {
+    if (a.nama !== b.nama) return a.nama < b.nama ? -1 : 1;
+    if (a.pusingan !== b.pusingan) {
+      return a.pusingan === 'Pre' ? -1 : 1;
+    }
+    return a.outcome < b.outcome ? -1 : a.outcome > b.outcome ? 1 : 0;
+  });
+  const baris = tertib.map((r) =>
+    [
+      teks(r.nama),
+      teks(r.outcome),
+      teks(r.pusingan),
+      nombor(r.kepentingan),
+      nombor(r.tahapSemasa),
+      peratus(r.masteryPct),
+      teks(r.bendera),
+    ].join(','),
+  );
+  return [tajuk, ...baris];
+}
+
 /**
  * Bina kandungan CSV penuh (BOM UTF-8, CRLF). Satu bahagian: baris tajuk
  * bahagian itu sahaja. Lebih satu bahagian: setiap bahagian didahului
  * baris `# <Section name>` dan dipisahkan satu baris kosong supaya Excel
  * boleh membuka fail tunggal tersebut.
+ *
+ * `lna` (KZ-035) datang daripada jadual qm_lna_*, bukan daripada JSON
+ * qm_insights_kelas (fungsi SQL itu tidak diubah); laluan eksport
+ * mengumpulkannya dan menghantar di sini.
  */
-export function binaCsvInsights(data: InsightsKelas, bahagian: readonly string[]): string {
+export function binaCsvInsights(
+  data: InsightsKelas,
+  bahagian: readonly string[],
+  lna: readonly BarisLnaEksport[] = [],
+): string {
   const bina: Record<string, () => string[]> = {
     students: () => barisStudents(data),
     attention: () => barisAttention(data),
@@ -248,6 +301,7 @@ export function binaCsvInsights(data: InsightsKelas, bahagian: readonly string[]
     challenges: () => barisChallenges(data),
     teams: () => barisTeams(data),
     trend: () => barisTrend(data),
+    lna: () => barisLna(lna),
   };
 
   const sah = bahagian.filter((b) => bina[b] != null);

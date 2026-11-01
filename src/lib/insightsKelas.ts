@@ -164,6 +164,7 @@ export const BAHAGIAN_INSIGHTS = [
   'challenges',
   'teams',
   'trend',
+  'lna',
 ] as const;
 
 export type BahagianInsights = (typeof BAHAGIAN_INSIGHTS)[number];
