@@ -94,7 +94,7 @@ create table if not exists public.qm_ai_messages (
   ),
   model_label text,
   deleted_at timestamptz,
-  deleted_by uuid,
+  deleted_by uuid references public.qm_profiles(id) on delete set null,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   -- Mesej AI mesti membawa ai_status; mesej bukan AI tidak boleh

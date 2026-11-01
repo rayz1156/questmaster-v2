@@ -527,7 +527,7 @@ export default function HalamanBilik() {
               <KadMesej
                 key={m.id}
                 m={m}
-                bolehBerhenti={role === "teacher" || !!userId && m.askedBy === userId}
+                bolehBerhenti={role === "teacher" || (!!userId && m.askedBy === userId)}
                 onBerhenti={(id) => void berhenti(id)}
               />
             ))}

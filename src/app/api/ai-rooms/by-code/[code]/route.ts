@@ -9,7 +9,7 @@
  * sendiri tidak pernah dedahkan).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getServiceSupabase } from '@/lib/supabase-route';
+import { getServiceSupabase, requireUser } from '@/lib/supabase-route';
 import { aksesBilik, REGEX_KOD_BILIK } from '@/lib/bilikAi';
 
 export const runtime = 'nodejs';
@@ -24,6 +24,11 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
       { status: 400 },
     );
   }
+
+  // Pembetulan CTO (kzsec #1): log masuk dahulu, supaya pemanggil tanpa
+  // sesi tidak dapat membezakan kod wujud (401) dengan kod tiada (404).
+  const auth = await requireUser(req);
+  if (auth.response) return auth.response;
 
   // Cari bilik dengan kod ini sebelum semakan akses (404 jika tiada).
   const cari = getServiceSupabase();

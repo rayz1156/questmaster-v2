@@ -269,6 +269,18 @@ export async function aksesBilik(
     return gagal(NextResponse.json({ error: 'Keahlian bilik tidak dapat disimpan.' }, { status: 500 }));
   }
 
+  // Pembetulan CTO (kzsec #5): guru tidak pernah dibisukan. Bekas pelajar
+  // yang dibisukan lalu menjadi ko-pendidik jika tidak kekal terbisu dan
+  // laluan mute tidak membenarkan guru dinyahbisukan.
+  if (role === 'teacher') {
+    await supa
+      .from('qm_ai_room_members')
+      .update({ muted: false })
+      .eq('room_id', roomId)
+      .eq('user_id', user.id)
+      .eq('muted', true);
+  }
+
   const { data: ahliBilik } = await supa
     .from('qm_ai_room_members')
     .select('muted')
