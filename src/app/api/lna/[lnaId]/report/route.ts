@@ -11,7 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
 import { namaPaparanProfil } from '@/lib/bilikAi';
-import { aksesLna, ralatLna, type RoundRow } from '@/lib/lnaAkses';
+import { aksesLna, ralatLna, labelOutcome, type RoundRow } from '@/lib/lnaAkses';
 import {
   binaLaporanLna,
   binaPerbandinganLna,
@@ -51,10 +51,10 @@ export async function GET(
   }
   const items: ItemLna[] = ((itemsData ?? []) as unknown as {
     outcome_id: string;
-    qm_learning_outcomes: { label: string | null }[] | null;
+    qm_learning_outcomes: unknown;
   }[]).map((i) => ({
     outcomeId: i.outcome_id,
-    label: (i.qm_learning_outcomes?.[0]?.label ?? '') as string,
+    label: labelOutcome(i.qm_learning_outcomes),
   }));
 
   // Semua jawapan LNA ini melalui pusingannya.

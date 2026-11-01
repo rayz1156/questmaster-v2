@@ -13,7 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
 import { bacaJsonKecil } from '@/lib/bilikAi';
-import { aksesRound, ralatLna } from '@/lib/lnaAkses';
+import { aksesRound, ralatLna, labelOutcome } from '@/lib/lnaAkses';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,11 +64,11 @@ export async function GET(
     items: ((items ?? []) as unknown as {
       outcome_id: string;
       position: number;
-      qm_learning_outcomes: { label: string | null }[] | null;
+      qm_learning_outcomes: unknown;
     }[]).map((i) => ({
       outcomeId: i.outcome_id,
       position: i.position,
-      label: (i.qm_learning_outcomes?.[0]?.label ?? '') as string,
+      label: labelOutcome(i.qm_learning_outcomes),
     })),
     myResponses: (mine ?? []).map((m: {
       outcome_id: string;

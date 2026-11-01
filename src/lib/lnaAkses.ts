@@ -69,6 +69,20 @@ export function sahUuid(x: string | null | undefined): boolean {
   return UUID_RE.test(String(x ?? ''));
 }
 
+/**
+ * Label Outcome daripada embed PostgREST `qm_learning_outcomes(label)`.
+ * Pembetulan CTO: qm_lna_items.outcome_id ialah FK banyak-ke-satu, jadi
+ * PostgREST memulangkan OBJEK, bukan tatasusunan; `?.[0]` sentiasa
+ * menghasilkan label kosong. Terima kedua-dua bentuk supaya selamat.
+ */
+export function labelOutcome(embed: unknown): string {
+  const o = Array.isArray(embed) ? embed[0] : embed;
+  if (o && typeof o === 'object' && typeof (o as { label?: unknown }).label === 'string') {
+    return (o as { label: string }).label;
+  }
+  return '';
+}
+
 /** Balasan ralat kebiasaan LNA. */
 export function ralatLna(status: number, code: string, error: string): NextResponse {
   return NextResponse.json({ error, code }, { status });
