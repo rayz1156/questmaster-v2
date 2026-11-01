@@ -324,6 +324,10 @@ export default function HalamanBilik() {
     return () => {
       clearInterval(t);
     };
+    // bilik?.id, bukan bilik: kemas kini keadaan bilik daripada tinjauan
+    // tidak boleh melancarkan semula pemuatan awal dan menetapkan semula
+    // pemasa; hanya bilik lain yang memulakan kitaran baharu.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, bilik?.id, tinjau]);
 
   // Tatal ke bawah hanya jika pengguna sudah di bawah.

@@ -347,6 +347,9 @@ export default function HalamanBilikAiKelas() {
                 <p className="text-[14px] text-ink-muted mb-3">
                   Imbas untuk masuk {qr.bilik.title} ({qr.bilik.join_code}).
                 </p>
+                {/* QR data URL tidak boleh dioptimumkan next/image;
+                    img biasa, corak QR sedia ada dalam repo. */}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qr.dataUrl}
                   alt={"QR bilik " + qr.bilik.join_code}
