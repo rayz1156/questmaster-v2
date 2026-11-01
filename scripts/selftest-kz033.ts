@@ -13,6 +13,7 @@ import { PenghuraiSse } from '../src/lib/ai/sse';
 import {
   dapatkanPenyedia,
   buatPenyediaOpenAiSerasi,
+  penyediaSedia,
 } from '../src/lib/ai/penyedia';
 import { janaKodBilik, ABJAD_KOD_BILIK, REGEX_KOD_BILIK } from '../src/lib/bilikAi';
 
@@ -262,6 +263,30 @@ async function main(): Promise<void> {
     delete process.env.OPENROUTER_API_KEY;
   } else {
     process.env.OPENROUTER_API_KEY = kunciAsal;
+  }
+
+  /* ===== Bahagian 6: penyedia qwen dan penyediaSedia (KZ-034) ===== */
+
+  const dashAsal = process.env.DASHSCOPE_API_KEY;
+  delete process.env.DASHSCOPE_API_KEY;
+  delete process.env.OPENROUTER_API_KEY;
+  check('qwen tanpa kunci: null', dapatkanPenyedia('qwen') === null);
+  check('penyediaSedia qwen tanpa kunci: palsu', penyediaSedia('qwen') === false);
+  check('penyediaSedia openrouter tanpa kunci: palsu',
+    penyediaSedia('openrouter') === false);
+  check('penyediaSedia penyedia tidak dikenali: palsu', penyediaSedia('openai') === false);
+
+  process.env.DASHSCOPE_API_KEY = 'kunci-ujian-tempatan';
+  const penyediaQwen = dapatkanPenyedia('qwen');
+  check('qwen dengan kunci: penyedia wujud',
+    !!penyediaQwen && typeof penyediaQwen.streamChat === 'function');
+  check('penyediaSedia qwen dengan kunci: benar', penyediaSedia('qwen') === true);
+  check('penyediaSedia openrouter masih ikut kunci sendiri',
+    penyediaSedia('openrouter') === false);
+  if (dashAsal === undefined) {
+    delete process.env.DASHSCOPE_API_KEY;
+  } else {
+    process.env.DASHSCOPE_API_KEY = dashAsal;
   }
 
   console.log('\n' + pass + ' lulus, ' + fail + ' gagal');

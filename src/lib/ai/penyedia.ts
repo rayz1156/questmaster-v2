@@ -76,11 +76,18 @@ function *peristiwaChat(data: string): Generator<PeristiwaStrim> {
  * Adapter OpenAI-serasi: POST {baseUrl}/chat/completions dengan
  * stream: true dan stream_options include_usage supaya jumlah token
  * dilaporkan pada peristiwa terakhir.
+ *
+ * `badanTambahan` (KZ-034) digabungkan ke badan JSON SEBELUM medan
+ * standard, jadi medan standard sentiasa menang: badanTambahan tidak
+ * boleh menimpa model, messages, max_tokens, stream atau stream_options
+ * (kriteria penerimaan 6 tiket KZ-034).
  */
 export function buatPenyediaOpenAiSerasi(konfig: {
   baseUrl: string;
   apiKey: string;
   headers?: Record<string, string>;
+  /** Medan tambahan penyedia, cth { enable_thinking: false } untuk Qwen. */
+  badanTambahan?: Record<string, unknown>;
 }): PenyediaAi {
   return {
     async *streamChat(o) {
@@ -96,6 +103,9 @@ export function buatPenyediaOpenAiSerasi(konfig: {
             ...(konfig.headers ?? {}),
           },
           body: JSON.stringify({
+            // badanTambahan dahulu: medan standard di bawah sentiasa
+            // menimpanya, jadi medan keselamatan tidak boleh diubah.
+            ...(konfig.badanTambahan ?? {}),
             model: o.model,
             messages: o.messages,
             max_tokens: o.maxTokens,
@@ -147,12 +157,37 @@ export function buatPenyediaOpenAiSerasi(konfig: {
 }
 
 /**
- * Dapatkan penyedia mengikut nama. Fasa 1 hanya 'openrouter':
- * kunci daripada process.env.OPENROUTER_API_KEY. Tiada kunci:
- * pulangkan null (laluan ask membalas 503 AI_NOT_CONFIGURED).
- * Penyedia lain memulangkan null juga (belum dibina, fasa kemudian).
+ * Adakah kunci env penyedia itu wujud di pelayan (KZ-034). Kunci itu
+ * sendiri tidak pernah dilog atau dipulangkan. Digunakan oleh laluan
+ * by-code untuk `aiConfigured` mengikut penyedia model bilik.
+ */
+export function penyediaSedia(provider: string): boolean {
+  if (provider === 'qwen') return !!process.env.DASHSCOPE_API_KEY;
+  if (provider === 'openrouter') return !!process.env.OPENROUTER_API_KEY;
+  return false;
+}
+
+/**
+ * Dapatkan penyedia mengikut nama. 'qwen' (KZ-034): Alibaba Model
+ * Studio antarabangsa (Singapura), titik akhir OpenAI-serasi, kunci
+ * DASHSCOPE_API_KEY. `enable_thinking: false` dimatikan mod berfikir
+ * supaya token berfikir tidak dicaj dan tidak menghabiskan max_tokens
+ * (sama seperti Bicarra, llm_catalog.py:122). Tiada kunci: pulangkan
+ * null (laluan ask membalas 503 AI_NOT_CONFIGURED).
+ * 'openrouter' kekal seperti sedia ada (dimatikan pada peringkat data,
+ * migrasi 0069, tetapi kodnya dikekalkan). Penyedia lain memulangkan
+ * null juga.
  */
 export function dapatkanPenyedia(provider: string): PenyediaAi | null {
+  if (provider === 'qwen') {
+    const kunci = process.env.DASHSCOPE_API_KEY;
+    if (!kunci) return null;
+    return buatPenyediaOpenAiSerasi({
+      baseUrl: 'https://dashscope-intl.aliyuncs.com/compatible-mode/v1',
+      apiKey: kunci,
+      badanTambahan: { enable_thinking: false },
+    });
+  }
   if (provider === 'openrouter') {
     const kunci = process.env.OPENROUTER_API_KEY;
     if (!kunci) return null;

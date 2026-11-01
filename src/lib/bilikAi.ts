@@ -162,32 +162,38 @@ export async function namaPaparanProfil(
 export async function modelUntukBilik(
   supa: SupabaseClient,
   modelId: string | null,
-): Promise<{ id: string; model_id: string; label: string } | null> {
+): Promise<{ id: string; model_id: string; label: string; provider: string } | null> {
   if (modelId) {
     const { data } = await supa
       .from('qm_ai_models')
-      .select('id, model_id, label')
+      .select('id, model_id, label, provider')
       .eq('id', modelId)
       .eq('enabled', true)
       .maybeSingle();
-    if (data) return data as { id: string; model_id: string; label: string };
+    if (data) {
+      return data as { id: string; model_id: string; label: string; provider: string };
+    }
   }
   const { data: lalai } = await supa
     .from('qm_ai_models')
-    .select('id, model_id, label')
+    .select('id, model_id, label, provider')
     .eq('enabled', true)
     .eq('is_default', true)
     .limit(1)
     .maybeSingle();
-  if (lalai) return lalai as { id: string; model_id: string; label: string };
+  if (lalai) {
+    return lalai as { id: string; model_id: string; label: string; provider: string };
+  }
   const { data: pertama } = await supa
     .from('qm_ai_models')
-    .select('id, model_id, label')
+    .select('id, model_id, label, provider')
     .eq('enabled', true)
     .order('sort_order', { ascending: true })
     .limit(1)
     .maybeSingle();
-  return (pertama as { id: string; model_id: string; label: string } | null) ?? null;
+  return (
+    (pertama as { id: string; model_id: string; label: string; provider: string } | null) ?? null
+  );
 }
 
 /**

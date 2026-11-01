@@ -81,17 +81,19 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     );
   }
 
-  // (b) penyedia mesti sedia sebelum sebarang baris dicipta.
-  const penyedia = dapatkanPenyedia('openrouter');
-  if (!penyedia) {
+  // (b) penyedia mesti sedia sebelum sebarang baris dicipta. Model
+  // dicari DAHULU (KZ-034), kemudian penyedia dipilih mengikut lajur
+  // provider baris qm_ai_models, bukan ditulis keras lagi.
+  const model = await modelUntukBilik(supa, bilik.model_id);
+  if (!model) {
+    // Tiada model didayakan: AI memang tidak dapat digunakan.
     return NextResponse.json(
       { error: 'AI belum disediakan oleh pentadbir', code: 'AI_NOT_CONFIGURED' },
       { status: 503 },
     );
   }
-  const model = await modelUntukBilik(supa, bilik.model_id);
-  if (!model) {
-    // Tiada model didayakan: AI memang tidak dapat digunakan.
+  const penyedia = dapatkanPenyedia(model.provider);
+  if (!penyedia) {
     return NextResponse.json(
       { error: 'AI belum disediakan oleh pentadbir', code: 'AI_NOT_CONFIGURED' },
       { status: 503 },

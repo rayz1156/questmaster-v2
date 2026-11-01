@@ -10,7 +10,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, requireUser } from '@/lib/supabase-route';
-import { aksesBilik, REGEX_KOD_BILIK } from '@/lib/bilikAi';
+import { aksesBilik, REGEX_KOD_BILIK, modelUntukBilik } from '@/lib/bilikAi';
+import { penyediaSedia } from '@/lib/ai/penyedia';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,15 +47,11 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
   const bilik = akses.bilik!;
   const supa = akses.supa!;
-  let modelLabel: string | null = null;
-  if (bilik.model_id) {
-    const { data: model } = await supa
-      .from('qm_ai_models')
-      .select('label')
-      .eq('id', bilik.model_id)
-      .maybeSingle();
-    modelLabel = model?.label ?? null;
-  }
+  // KZ-034: gunakan modelUntukBilik, bukan bacaan terus model_id, supaya
+  // bilik yang modelnya dimatikan jatuh ke model lalai yang didayakan
+  // (bilik lama OpenRouter dijawab oleh Qwen tanpa ralat).
+  const model = await modelUntukBilik(supa, bilik.model_id);
+  const modelLabel = model?.label ?? null;
 
   return NextResponse.json({
     room: {
@@ -74,7 +71,8 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     },
     role: akses.role,
     muted: akses.muted,
-    // Adakah pelayan ada kunci penyedia; kunci itu sendiri tidak dibalas.
-    aiConfigured: !!process.env.OPENROUTER_API_KEY,
+    // KZ-034: aiConfigured mengikut penyedia model bilik, bukan ditulis
+    // keras lagi. Kunci itu sendiri tidak dibalas.
+    aiConfigured: !!model && penyediaSedia(model.provider),
   });
 }
