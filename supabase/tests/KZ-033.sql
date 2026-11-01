@@ -31,7 +31,7 @@ insert into public.qm_classes (id, owner_id, name) values
 
 -- Bilik ujian dengan kod 6 aksara daripada abjad betul (tiada 0, O, 1, I).
 insert into public.qm_ai_rooms (id, class_id, created_by, title, join_code) values
-  ('00000000-0000-0000-0000-0000000330r1',
+  ('00000000-0000-0000-0000-0000000330b1',
    '00000000-0000-0000-0000-0000000330c1',
    '00000000-0000-0000-0000-0000000330e1',
    'Bilik ujian KZ-033', 'AB3CD4');
@@ -78,7 +78,7 @@ end $u$;
 -- Ujian 2: CHECK ai_status ikut author_kind.
 do $u$
 declare
-  v_bilik uuid := '00000000-0000-0000-0000-0000000330r1';
+  v_bilik uuid := '00000000-0000-0000-0000-0000000330b1';
   v_guru  uuid := '00000000-0000-0000-0000-0000000330e1';
 begin
   -- Mesej AI tanpa ai_status mesti ditolak.
@@ -118,7 +118,7 @@ end $u$;
 -- had kecil: pengguna 2 sehari, bilik 3 sehari, dua pengguna.
 do $u$
 declare
-  v_bilik  uuid := '00000000-0000-0000-0000-0000000330r1';
+  v_bilik  uuid := '00000000-0000-0000-0000-0000000330b1';
   v_guru   uuid := '00000000-0000-0000-0000-0000000330e1';
   v_p1     uuid := '00000000-0000-0000-0000-0000000330a1';
   v_p2     uuid := '00000000-0000-0000-0000-0000000330a2';
@@ -153,9 +153,9 @@ begin
   if v_jumlah <> 3 then raise exception 'UJIAN 3 GAGAL: jumlah bilik % (jangka 3)', v_jumlah; end if;
   -- Bilik lain tidak terjejas oleh had bilik ini.
   insert into public.qm_ai_rooms (id, class_id, created_by, title, join_code) values
-    ('00000000-0000-0000-0000-0000000330r2',
+    ('00000000-0000-0000-0000-0000000330b2',
      '00000000-0000-0000-0000-0000000330c1', v_guru, 'Bilik kedua KZ-033', 'AB3CD5');
-  v_hasil := public.qm_ai_reserve_ask(v_guru, '00000000-0000-0000-0000-0000000330r2', 2, 3);
+  v_hasil := public.qm_ai_reserve_ask(v_guru, '00000000-0000-0000-0000-0000000330b2', 2, 3);
   if v_hasil <> 'OK' then raise exception 'UJIAN 3 GAGAL: bilik lain dapat %', v_hasil; end if;
   raise notice 'Ujian 3: kuota pengguna dan bilik dikuatkuasakan (betul)';
 end $u$;
@@ -163,7 +163,7 @@ end $u$;
 -- Ujian 4: qm_ai_add_tokens menambah token pada baris hari ini.
 do $u$
 declare
-  v_bilik uuid := '00000000-0000-0000-0000-0000000330r1';
+  v_bilik uuid := '00000000-0000-0000-0000-0000000330b1';
   v_p1    uuid := '00000000-0000-0000-0000-0000000330a1';
   v_pt    bigint;
   v_ct    bigint;
@@ -218,6 +218,6 @@ begin
   raise notice 'Ujian 5: kebenaran terkunci pada service_role (betul)';
 end $u$;
 
-raise notice 'KZ-033: SEMUA UJIAN LULUS';
+do $$ begin raise notice 'KZ-033: SEMUA UJIAN LULUS'; end $$;
 
 rollback;
