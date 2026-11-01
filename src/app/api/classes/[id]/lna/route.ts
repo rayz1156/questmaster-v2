@@ -25,6 +25,9 @@ interface RoundRingkas {
   id: string;
   kind: string;
   status: string;
+  opened_at?: string;
+  closed_at?: string | null;
+  qm_lna_responses?: { user_id: string }[];
 }
 
 interface LnaRingkas {
@@ -55,7 +58,9 @@ export async function GET(
 
   const { data, error } = await svc
     .from('qm_lna')
-    .select('id, title, created_at, qm_lna_rounds(id, kind, status)')
+    .select(
+      'id, title, created_at, qm_lna_rounds(id, kind, status, opened_at, closed_at, qm_lna_responses(user_id))',
+    )
     .eq('class_id', classId)
     .order('created_at', { ascending: true });
   if (error) {
@@ -70,7 +75,25 @@ export async function GET(
     : semua.filter((l) =>
         (l.qm_lna_rounds ?? []).some((r) => r.status === 'open'));
 
-  return NextResponse.json({ role, lna: senarai });
+  // Bentuk paparan: kiraan responden setiap pusingan (pelajar berbeza).
+  const bentuk = senarai.map((l) => ({
+    id: l.id,
+    title: l.title,
+    createdAt: l.created_at,
+    rounds: (l.qm_lna_rounds ?? []).map((r) => {
+      const pengguna = new Set((r.qm_lna_responses ?? []).map((x) => x.user_id));
+      return {
+        id: r.id,
+        kind: r.kind,
+        status: r.status,
+        openedAt: r.opened_at ?? null,
+        closedAt: r.closed_at ?? null,
+        responden: pengguna.size,
+      };
+    }),
+  }));
+
+  return NextResponse.json({ role, lna: bentuk });
 }
 
 export async function POST(
