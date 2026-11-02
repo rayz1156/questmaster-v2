@@ -45,6 +45,20 @@ interface Soalan {
 }
 interface Kuiz { id: string; title: string; description: string | null; streak_bonus?: boolean }
 
+/** Baris Outcome yang dipulangkan laluan outcomes kuiz (KZ-037). */
+interface OutcomeBaris {
+  id: string;
+  code: string | null;
+  label: string;
+  tagged: boolean;
+}
+
+/** Bentuk balasan GET/PUT laluan outcomes kuiz (KZ-037). */
+interface OutcomeSet {
+  classId: string | null;
+  outcomes: OutcomeBaris[];
+}
+
 /**Permintaan dengan token Bearer pendidik. */
 async function authedFetch(url: string, init?: RequestInit) {
   const { data: { session } } = await supabase.auth.getSession();
@@ -114,6 +128,12 @@ export default function EditorKuizLangsung() {
   const [csvErrors, setCsvErrors] = useState<{ row: number; message: string }[]>([]);
   const csvInputRef = useRef<HTMLInputElement | null>(null);
 
+  // KZ-037: kad Outcome yang dinilai (tag kuiz kepada Outcome kelas).
+  const [outcomeSet, setOutcomeSet] = useState<OutcomeSet | null>(null);
+  const [outcomePilih, setOutcomePilih] = useState<string[]>([]);
+  const [outcomeBusy, setOutcomeBusy] = useState(false);
+  const [outcomeMsg, setOutcomeMsg] = useState<{ ok: boolean; text: string } | null>(null);
+
   const reload = async () => {
     try {
       const json = await authedFetch("/api/live/quizzes/" + quizId);
@@ -127,6 +147,19 @@ export default function EditorKuizLangsung() {
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (quizId) reload(); }, [quizId]);
+
+  // KZ-037: muat senarai Outcome kelas kuiz dan tag semasa kuiz ini.
+  const muatOutcome = async () => {
+    try {
+      const json = (await authedFetch(`/api/live/quizzes/${quizId}/outcomes`)) as OutcomeSet;
+      setOutcomeSet(json);
+      setOutcomePilih((json.outcomes || []).filter((o) => o.tagged).map((o) => o.id));
+    } catch (e) {
+      setOutcomeMsg({ ok: false, text: mesejRalat(e, "The Outcomes could not be loaded.") });
+    }
+  };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => { if (quizId) muatOutcome(); }, [quizId]);
 
   const onTambah = async () => {
     setErr(null);
@@ -279,6 +312,25 @@ export default function EditorKuizLangsung() {
     }
   };
 
+  // KZ-037: simpan set Outcome yang dinilai kuiz ini (ganti seluruh set).
+  const onSimpanOutcome = async () => {
+    setOutcomeMsg(null);
+    setOutcomeBusy(true);
+    try {
+      const json = (await authedFetch(`/api/live/quizzes/${quizId}/outcomes`, {
+        method: "PUT",
+        body: JSON.stringify({ outcomeIds: outcomePilih }),
+      })) as OutcomeSet;
+      setOutcomeSet(json);
+      setOutcomePilih((json.outcomes || []).filter((o) => o.tagged).map((o) => o.id));
+      setOutcomeMsg({ ok: true, text: "Outcome disimpan." });
+    } catch (e) {
+      setOutcomeMsg({ ok: false, text: mesejRalat(e, "The Outcomes could not be saved.") });
+    } finally {
+      setOutcomeBusy(false);
+    }
+  };
+
   const onMulaSesi = async () => {
     setErr(null);
     if (soalan.length === 0) { setErr("The quiz needs at least one question."); return; }
@@ -418,6 +470,54 @@ export default function EditorKuizLangsung() {
           third, rising to +500. A wrong answer, a skipped question or running out of time resets
           the streak. The setting is fixed when a session starts, so changing it mid-game is safe.
         </p>
+      </Card>
+
+      {/* KZ-037: kad Outcome yang dinilai; guru memilih Outcome bagi seluruh kuiz. */}
+      <Card className="mb-4">
+        <CardHead title="Outcome yang dinilai" />
+        {outcomeSet === null ? (
+          <p className="text-[12px] text-ink-faint mt-3">Loading…</p>
+        ) : outcomeSet.classId === null ? (
+          <p className="text-[12px] text-ink-faint mt-3">
+            Kongsi kuiz ini dengan kelas untuk memilih Outcome.
+          </p>
+        ) : outcomeSet.outcomes.length === 0 ? (
+          <p className="text-[12px] text-ink-faint mt-3">
+            Kelas ini tiada Outcome lagi.{" "}
+            <Link href="/educator/outcomes" className="text-brand-purple font-semibold">
+              Cipta Outcome dahulu
+            </Link>
+          </p>
+        ) : (
+          <>
+            <div className="mt-3 space-y-1">
+              {outcomeSet.outcomes.map((o) => (
+                <CheckRadio
+                  key={o.id}
+                  label={(o.code ? o.code + ". " : "") + o.label}
+                  checked={outcomePilih.includes(o.id)}
+                  onChange={(e) => {
+                    setOutcomePilih((s) =>
+                      e.target.checked ? [...s, o.id] : s.filter((x) => x !== o.id),
+                    );
+                  }}
+                />
+              ))}
+            </div>
+            <p className="text-[12px] text-ink-faint mt-2">
+              Jawapan betul dan salah pelajar yang log masuk dikira dalam penguasaan Outcome
+              (analitik dan LNA). Pemain tetamu tidak dikira.
+            </p>
+            <div className="flex items-center justify-end mt-3">
+              <Button disabled={outcomeBusy} onClick={onSimpanOutcome}>
+                {outcomeBusy ? "Menyimpan…" : "Simpan Outcome"}
+              </Button>
+            </div>
+          </>
+        )}
+        {outcomeMsg && (
+          <Alert tone={outcomeMsg.ok ? "success" : "danger"} className="mt-3">{outcomeMsg.text}</Alert>
+        )}
       </Card>
 
       <div className="flex items-center justify-between mb-2 gap-2">
