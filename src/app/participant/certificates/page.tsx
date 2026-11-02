@@ -32,6 +32,8 @@ import {
 } from "@/components/ui";
 import { authHeader } from "@/lib/peer-client";
 import { statusSijil } from "@/lib/sijil/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL } from "@/lib/i18n";
 
 type Sijil = {
   id: string;
@@ -45,6 +47,7 @@ type Sijil = {
 type KelasNama = { class_id: string; class_name: string };
 
 export default function CertificatesPage() {
+  const { t, bahasa } = useBahasa();
   const [loading, setLoading] = useState(true);
   const [sijil, setSijil] = useState<Sijil[]>([]);
   const [perluNama, setPerluNama] = useState<KelasNama[]>([]);
@@ -95,7 +98,7 @@ export default function CertificatesPage() {
   const sahkanNama = async () => {
     const nama = namaPaparan.trim();
     if (!nama) {
-      setMsg("Enter the name to print on your certificates.");
+      setMsg(t("participant.enterNameMessage"));
       return;
     }
     const { data: { session } } = await supabase.auth.getSession();
@@ -118,7 +121,7 @@ export default function CertificatesPage() {
   const muatTurun = async (s: Sijil) => {
     const res = await fetch(`/api/certificates/${s.id}/download`, { headers: await authHeader() });
     if (!res.ok) {
-      setMsg("Download is not ready yet. Please try again later.");
+      setMsg(t("participant.downloadNotReady"));
       return;
     }
     const blob = await res.blob();
@@ -133,7 +136,7 @@ export default function CertificatesPage() {
   if (loading) {
     return (
       <ParticipantShell>
-        <p className="text-[14px] text-ink-faint">Loading...</p>
+        <p className="text-[14px] text-ink-faint">{t("common.loadingDots")}</p>
       </ParticipantShell>
     );
   }
@@ -141,8 +144,8 @@ export default function CertificatesPage() {
   return (
     <ParticipantShell>
       <PageHead
-        title="My certificates"
-        description="Certificates issued to you by your educators."
+        title={t("participant.myCertificates")}
+        description={t("participant.issuedByEducators")}
       />
 
       {msg && <Alert tone="info" className="mb-4">{msg}</Alert>}
@@ -151,28 +154,22 @@ export default function CertificatesPage() {
       {!namaDisahkan && perluNama.length > 0 && (
         <Card className="mb-7">
           <CardHead
-            title="Confirm the name to print on your certificates"
-            subtitle={
-              <>
-                Your educator will issue certificates for{" "}
-                {perluNama.map((k) => k.class_name).join(", ")}. Confirm how your name
-                should appear before it is printed.
-              </>
-            }
+            title={t("participant.confirmNameToPrint")}
+            subtitle={t("participant.educatorWillIssue", { senarai: perluNama.map((k) => k.class_name).join(", ") })}
           />
           <div className="mt-4 flex gap-2 flex-wrap">
             <div className="min-w-[220px] flex-1 max-w-sm">
-              <Field label="Name on certificate" htmlFor="nama-sijil">
+              <Field label={t("participant.nameOnCertificate")} htmlFor="nama-sijil">
                 <Input
                   id="nama-sijil"
                   value={namaPaparan}
                   onChange={(e) => setNamaPaparan(e.target.value)}
-                  placeholder="Name on certificate"
+                  placeholder={t("participant.nameOnCertificate")}
                 />
               </Field>
             </div>
             <Button onClick={sahkanNama} className="mt-[30px]">
-              <ShieldCheck className="w-4 h-4" /> Confirm
+              <ShieldCheck className="w-4 h-4" /> {t("common.confirm")}
             </Button>
           </div>
         </Card>
@@ -182,8 +179,8 @@ export default function CertificatesPage() {
         <div className="bg-white rounded-[4px] shadow-card">
           <EmptyState
             icon={<Award className="w-6 h-6" />}
-            title="No certificates yet."
-            text="Your educator will issue them when you qualify."
+            title={t("participant.noCertificatesYet")}
+            text={t("participant.issuedWhenQualified")}
           />
         </div>
       ) : (
@@ -197,7 +194,7 @@ export default function CertificatesPage() {
                     title={s.program_snapshot}
                     subtitle={
                       <>
-                        {s.name_snapshot} · {new Date(s.issued_at).toLocaleDateString()} ·{" "}
+                        {s.name_snapshot} · {new Date(s.issued_at).toLocaleDateString(LOKAL[bahasa])} ·{" "}
                         <span className="font-mono">{s.code}</span>
                       </>
                     }
@@ -218,14 +215,14 @@ export default function CertificatesPage() {
                       onClick={() => muatTurun(s)}
                       disabled={!!s.revoked_at}
                     >
-                      <Download className="w-3.5 h-3.5" /> Download
+                      <Download className="w-3.5 h-3.5" /> {t("common.download")}
                     </Button>
                     <Link
                       href={`/sijil/${s.code}`}
                       target="_blank"
                       className="inline-flex items-center justify-center gap-2 rounded-[4px] border border-hairline bg-white h-8 px-3 text-[12px] font-bold tracking-[0.26px] text-ink-muted hover:bg-canvas transition"
                     >
-                      Verify
+                      {t("common.verify")}
                     </Link>
                   </div>
                 </CardSection>
