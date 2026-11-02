@@ -4,6 +4,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import { pautanDalamanSelamat } from '@/lib/pautan';
 import Logo from '@/components/Logo';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 type Role = 'participant' | 'educator' | 'admin' | 'superadmin';
 
@@ -16,7 +17,10 @@ function destFor(role: string): string {
 function CallbackInner() {
   const router = useRouter();
   const sp = useSearchParams();
-  const [msg, setMsg] = useState('Signing you in…');
+  const { t } = useBahasa();
+  // Null bermaksud "belum ada mesej": skrin menunjukkan teks mengikut bahasa
+  // semasa sehingga mesej sebenar (ralat pembekal) diterima.
+  const [msg, setMsg] = useState<string | null>(null);
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
@@ -47,7 +51,7 @@ function CallbackInner() {
       if (!alive) return;
       if (!session) {
         setFailed(true);
-        setMsg('That sign-in link did not complete. Please try signing in again.');
+        setMsg(t('auth.linkDidNotComplete'));
         setTimeout(() => router.replace('/login'), 2500);
         return;
       }
@@ -117,11 +121,11 @@ function CallbackInner() {
       <div className="flex-1 flex items-center justify-center px-6 py-10">
         <div className="w-full max-w-[380px] text-center">
           <h1 className="text-[28px] leading-tight font-semibold tracking-tight text-ink">
-            {failed ? 'We could not finish that.' : 'One moment.'}
+            {failed ? t('auth.couldNotFinish') : t('auth.oneMoment')}
           </h1>
-          <p className="text-[15px] text-ink-muted mt-2">{msg}</p>
+          <p className="text-[15px] text-ink-muted mt-2">{msg ?? t('auth.signingYouIn')}</p>
           {failed && (
-            <a href="/login" className="btn-primary mt-6">Back to sign in</a>
+            <a href="/login" className="btn-primary mt-6">{t('common.backToSignIn')}</a>
           )}
         </div>
       </div>
