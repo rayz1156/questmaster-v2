@@ -212,8 +212,9 @@ export const en = {
     joinButton: 'Join',
     joinedReloading: 'Joined! Reloading…',
     codeNotFound: 'Code not found. Please check the code with your educator.',
-    classEndedBanner:
-      'This class has ended. You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.',
+    classEndedLead: 'This class has ended.',
+    classEndedRest:
+      'You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.',
     joinFirstClass: 'Join your first class',
     myProgress: 'My Progress',
     totalPoints: 'Total points',
@@ -222,6 +223,7 @@ export const en = {
     classScoresAria: 'Class scores',
     liveNow: 'Live now',
     liveQuizFallback: 'Live Quiz',
+    liveBadge: 'LIVE',
     classmatesIn: '{n} classmates in',
     joinNow: 'Join now',
     alsoLive: 'Also live: {tajuk} · {kod}',
@@ -370,6 +372,7 @@ export const en = {
     endedOn: 'Ended {tarikh}',
     ended: 'Ended',
     open: 'Open',
+    unitMata: 'pts',
     // Ayat kedudukan papan pemuka (src/lib/papanPemukaPeserta.tsx).
     leadingSentence: 'in class. You are leading. Keep it up.',
     overtakeSentence: 'in class. {mata} pts to overtake {nama} for #{kedudukan}.',

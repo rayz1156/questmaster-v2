@@ -198,8 +198,9 @@ export const ms: Kamus = {
     joinButton: 'Sertai',
     joinedReloading: 'Berjaya sertai! Memuat semula…',
     codeNotFound: 'Kod tidak ditemui. Sila semak kod bersama pendidik anda.',
-    classEndedBanner:
-      'Kelas ini telah tamat. Anda masih boleh menyemak Papan Pengenalan, Papan Pembelajaran, Aktiviti dan kedudukan akhir. Hantaran baharu ditutup.',
+    classEndedLead: 'Kelas ini telah tamat.',
+    classEndedRest:
+      'Anda masih boleh menyemak Papan Pengenalan, Papan Pembelajaran, Aktiviti dan kedudukan akhir. Hantaran baharu ditutup.',
     joinFirstClass: 'Sertai kelas pertama anda',
     myProgress: 'Kemajuan Saya',
     totalPoints: 'Jumlah mata',
@@ -208,6 +209,7 @@ export const ms: Kamus = {
     classScoresAria: 'Markah kelas',
     liveNow: 'Langsung sekarang',
     liveQuizFallback: 'Kuiz Langsung',
+    liveBadge: 'LANGSUNG',
     classmatesIn: '{n} rakan sekelas masuk',
     joinNow: 'Sertai sekarang',
     alsoLive: 'Juga langsung: {tajuk} · {kod}',
@@ -348,6 +350,7 @@ export const ms: Kamus = {
     endedOn: 'Tamat {tarikh}',
     ended: 'Tamat',
     open: 'Buka',
+    unitMata: 'mata',
     leadingSentence: 'dalam kelas. Anda sedang mendahului. Teruskan.',
     overtakeSentence: 'dalam kelas. {mata} mata untuk mengatasi {nama} bagi #{kedudukan}.',
     classmatesAlreadyIn: '{n} rakan sekelas sudah masuk.',

@@ -54,6 +54,8 @@ import {
   warnaIndeks,
 } from "@/lib/papanPemukaPeserta";
 import { supabase } from "@/lib/supabaseClient";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, terjemah, type Bahasa } from "@/lib/i18n";
 
 /** Satu sesi kuiz langsung daripada /api/participant/live-now. */
 type SesiLive = {
@@ -81,16 +83,17 @@ type BarisAktivitiUi = {
   href: string;
 };
 
-/** Tarikh ringkas "24 Oct" untuk lajur tarikh. */
-function tarikhRingkas(iso: string | null | undefined): string {
+/** Tarikh ringkas "24 Oct" untuk lajur tarikh, ikut lokal bahasa. */
+function tarikhRingkas(iso: string | null | undefined, lokal: string): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
-  return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+  return d.toLocaleDateString(lokal, { day: "numeric", month: "short" });
 }
 
 export default function Page() {
   const { user } = useSession("participant");
+  const { t, bahasa } = useBahasa();
   const [hunts, setHunts] = useState<Hunt[]>([]);
   const [classes, setClasses] = useState<Klass[]>([]);
   const [aktiviti, setAktiviti] = useState<AktivitiKelas[]>([]);
@@ -121,11 +124,11 @@ export default function Page() {
     try {
       // Kod dinormalisasi supaya jarak, sengkang dan huruf O/I/L diterima.
       await joinClassByCode(normalizeClassCode(joinCode));
-      setJoinOk("Joined! Reloading…");
+      setJoinOk(t("participant.joinedReloading"));
       setTimeout(() => { window.location.reload(); }, 700);
     } catch (err: unknown) {
       const msg = String((err as { message?: string })?.message || "Failed");
-      setJoinErr(/Invalid class code/i.test(msg) ? "Code not found. Please check the code with your educator." : msg);
+      setJoinErr(/Invalid class code/i.test(msg) ? t("participant.codeNotFound") : msg);
     } finally {
       setJoinBusy(false);
     }
@@ -265,8 +268,8 @@ export default function Page() {
   const barisAtas: { nama: string; skor: number; kedudukan: number } | null = useMemo(() => {
     if (myRank <= 1) return null;
     const senarai: Array<{ id: string; nama: string; skor: number }> = modIndividu
-      ? indivScores.map((s) => ({ id: s.user_id, nama: s.display_name || "Student", skor: Number(s.total_score) || 0 }))
-      : scores.map((s) => ({ id: s.team_id, nama: s.team_name || "Team", skor: Number(s.total_score) || 0 }));
+      ? indivScores.map((s) => ({ id: s.user_id, nama: s.display_name || terjemah(bahasa, "common.student"), skor: Number(s.total_score) || 0 }))
+      : scores.map((s) => ({ id: s.team_id, nama: s.team_name || terjemah(bahasa, "participant.teamLabel"), skor: Number(s.total_score) || 0 }));
     // Baris tepat di atas saya: markah TERENDAH yang masih melebihi markah saya (kzsec M1).
     const atas = senarai.reduce<(typeof senarai)[number] | null>((terbaik, r) => (r.skor > totalPoints && (!terbaik || r.skor < terbaik.skor) ? r : terbaik), null);
     if (!atas) return null;
@@ -275,8 +278,8 @@ export default function Page() {
       skor: atas.skor,
       kedudukan: kedudukanSaya(senarai, (r) => r.id, (r) => r.skor, atas.id),
     };
-  }, [myRank, modIndividu, indivScores, scores, totalPoints]);
-  const ayatJarak = ayatKedudukan(myRank, totalPoints, barisAtas);
+  }, [myRank, modIndividu, indivScores, scores, totalPoints, bahasa]);
+  const ayatJarak = ayatKedudukan(myRank, totalPoints, barisAtas, bahasa);
 
   // Peta nama kelas dan indeks kelas (untuk warna petak inisial stabil).
   const namaKelas = useMemo(() => {
@@ -294,12 +297,12 @@ export default function Page() {
   // Semua quest merentas kelas, dibahagi penapis Active / Ended.
   const semuaTab = useMemo(() => bahagiAktiviti(hunts), [hunts]);
   const barisAktif: BarisAktivitiUi[] = useMemo(
-    () => kawalBarisAktiviti(semuaTab.aktif, false, namaKelas, indeksKelas),
-    [semuaTab, namaKelas, indeksKelas]
+    () => kawalBarisAktiviti(semuaTab.aktif, false, namaKelas, indeksKelas, bahasa),
+    [semuaTab, namaKelas, indeksKelas, bahasa]
   );
   const barisTamat: BarisAktivitiUi[] = useMemo(
-    () => kawalBarisAktiviti(semuaTab.tamat, true, namaKelas, indeksKelas),
-    [semuaTab, namaKelas, indeksKelas]
+    () => kawalBarisAktiviti(semuaTab.tamat, true, namaKelas, indeksKelas, bahasa),
+    [semuaTab, namaKelas, indeksKelas, bahasa]
   );
   const barisPapar = tabAktiviti === "Active" ? barisAktif : barisTamat;
 
@@ -310,10 +313,10 @@ export default function Page() {
     return {
       id: pilihan.id,
       title: pilihan.title,
-      kelasNama: namaKelas.get(pilihan.class_id ?? "") || "Class",
-      labelTarikh: labelTarikhQuest(pilihan.end_at, false).label,
+      kelasNama: namaKelas.get(pilihan.class_id ?? "") || terjemah(bahasa, "common.class"),
+      labelTarikh: labelTarikhQuest(pilihan.end_at, false, new Date(), bahasa).label,
     };
-  }, [semuaTab, namaKelas]);
+  }, [semuaTab, namaKelas, bahasa]);
 
   // Sesi LIVE: yang terkini jadi wira, yang lain pautan "Also live".
   const sesiSusun = useMemo(() => {
@@ -328,19 +331,19 @@ export default function Page() {
   const barisPasukan: BarisSkor[] = useMemo(
     () => scores.map((r) => ({
       id: r.team_id,
-      label: r.team_name || "Team " + String(r.team_id).slice(0, 8),
+      label: r.team_name || terjemah(bahasa, "participant.teamLabel") + " " + String(r.team_id).slice(0, 8),
       skor: Number(r.total_score) || 0,
     })),
-    [scores]
+    [scores, bahasa]
   );
   const barisIndividu: BarisSkor[] = useMemo(
     // Papar nama paparan sahaja; tiada emel dan tiada id pengguna lain.
     () => indivScores.map((r) => ({
       id: r.user_id,
-      label: r.display_name || "Student",
+      label: r.display_name || terjemah(bahasa, "common.student"),
       skor: Number(r.total_score) || 0,
     })),
-    [indivScores]
+    [indivScores, bahasa]
   );
 
   // Mod papan lalai mengikut scoring_mode kelas aktif.
@@ -369,22 +372,22 @@ export default function Page() {
         {/* Kepala blok: tajuk, keterangan, pemilih kelas, butang kanan. */}
         <div className="flex flex-wrap items-end justify-between gap-4">
           <div className="min-w-0">
-            <h1 className="page-title">Dashboard</h1>
-            <p className="page-subtitle">Welcome back, {name || "student"}.</p>
+            <h1 className="page-title">{t("participant.dashboard")}</h1>
+            <p className="page-subtitle">{t("participant.welcomeBackName", { nama: name || t("common.student") })}</p>
             {classes.length > 1 && (
               <select
                 value={activeClassId}
                 onChange={e => setActiveClassId(e.target.value)}
-                aria-label="Active class"
+                aria-label={t("participant.activeClass")}
                 className="input mt-3 w-auto"
               >
                 {/* Pemilih mengasingkan kelas aktif dan kelas tamat (V2-005). */}
-                <optgroup label="Active">
+                <optgroup label={t("participant.groupActive")}>
                   {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "aktif"), aktiviti).map((c: KelasUntukStatus) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
                 </optgroup>
-                <optgroup label="Ended">
+                <optgroup label={t("participant.groupEnded")}>
                   {susunKelas(classes.filter((c: KelasUntukStatus) => statusKelas(c) === "tamat"), aktiviti).map((c: KelasUntukStatus) => (
                     <option key={c.id} value={c.id}>{c.name}</option>
                   ))}
@@ -394,17 +397,17 @@ export default function Page() {
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <button type="button" onClick={() => setBorangJoin(v => !v)} className="btn-secondary">
-              <CopyPlus className="w-4 h-4" /> Enter class code
+              <CopyPlus className="w-4 h-4" /> {t("participant.enterClassCode")}
             </button>
-            <Link href="/live" className="btn-primary">Join live quiz</Link>
+            <Link href="/live" className="btn-primary">{t("participant.joinLiveQuiz")}</Link>
           </div>
         </div>
 
         {/* Borang kod kelas, dibuka butang "Enter class code". */}
         {borangJoin && (
           <section className="card">
-            <h2 className="section-title">Enter class code</h2>
-            <p className="mt-1 text-[13px] text-ink-faint">Enter the class code your educator gave you.</p>
+            <h2 className="section-title">{t("participant.enterClassCode")}</h2>
+            <p className="mt-1 text-[13px] text-ink-faint">{t("participant.enterClassCodeDesc")}</p>
             <form onSubmit={onJoinClass} className="mt-4 flex flex-wrap items-center gap-2">
               <input
                 type="text"
@@ -412,13 +415,13 @@ export default function Page() {
                 autoComplete="off"
                 value={joinCode}
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
-                placeholder="e.g. AB12CD"
+                placeholder={t("participant.classCodePlaceholder")}
                 maxLength={16}
-                aria-label="Class code"
+                aria-label={t("participant.classCode")}
                 className="input w-[180px]"
               />
               <button type="submit" disabled={joinBusy || !joinCode.trim()} className="btn-primary">
-                {joinBusy ? "Joining…" : "Join"}
+                {joinBusy ? t("participant.joining") : t("participant.joinButton")}
               </button>
             </form>
             {joinErr && <p className="mt-2 text-sm text-kz-down">{joinErr}</p>}
@@ -429,7 +432,7 @@ export default function Page() {
         {/* Banner sedia ada: kelas tamat, nama sijil, semakan rakan, LNA. */}
         {activeClass?.ended_at && (
           <div data-class-banner="ended" className="card border-l-4 border-l-kz-warn p-4 text-sm text-ink-muted">
-            <span className="font-bold text-ink">This class has ended.</span> You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.
+            <span className="font-bold text-ink">{t("participant.classEndedLead")}</span> {t("participant.classEndedRest")}
           </div>
         )}
         <CertificateNameBanner />
@@ -439,9 +442,9 @@ export default function Page() {
         {dataReady && classes.length === 0 ? (
           // Keadaan kosong: peserta tanpa kelas.
           <section className="card">
-            <h2 className="section-title">Join your first class</h2>
+            <h2 className="section-title">{t("participant.joinFirstClass")}</h2>
             <p className="mt-1 text-sm text-ink-muted">
-              Enter the class code your educator gave you.
+              {t("participant.enterClassCodeDesc")}
             </p>
             <form onSubmit={onJoinClass} className="mt-4 flex flex-wrap items-center gap-2">
               <input
@@ -450,14 +453,14 @@ export default function Page() {
                 autoComplete="off"
                 value={joinCode}
                 onChange={e => { setJoinCode(e.target.value.toUpperCase()); setJoinErr(null); }}
-                placeholder="e.g. AB12CD"
+                placeholder={t("participant.classCodePlaceholder")}
                 maxLength={16}
                 required
-                aria-label="Class code"
+                aria-label={t("participant.classCode")}
                 className="input w-[180px]"
               />
               <button type="submit" disabled={joinBusy || !joinCode.trim()} className="btn-primary">
-                {joinBusy ? "Joining…" : "Join"}
+                {joinBusy ? t("participant.joining") : t("participant.joinButton")}
               </button>
             </form>
             {joinErr && <p className="mt-2 text-sm text-kz-down">{joinErr}</p>}
@@ -468,23 +471,23 @@ export default function Page() {
 
             {/* Kad lebar penuh: My Progress + carta bar markah kelas. */}
             {dataReady && (
-              <section className="card" aria-label="My progress">
+              <section className="card" aria-label={t("participant.myProgressAria")}>
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0">
-                    <h2 className="section-title">My Progress</h2>
+                    <h2 className="section-title">{t("participant.myProgress")}</h2>
                     <p className="text-[13px] text-ink-faint">{activeClass?.name || ""}</p>
                   </div>
                 </div>
 
                 <div className="mt-5 flex flex-wrap items-start gap-x-14 gap-y-4">
                   <div>
-                    <div className="amount">{totalPoints.toLocaleString()}</div>
-                    <div className="mt-1 text-[13px] text-ink-faint">Total points</div>
+                    <div className="amount">{totalPoints.toLocaleString(LOKAL[bahasa])}</div>
+                    <div className="mt-1 text-[13px] text-ink-faint">{t("participant.totalPoints")}</div>
                   </div>
                   {!papanSorok && (
                     <div>
                       <div className="amount">{myRank > 0 ? `#${myRank}` : "-"}</div>
-                      <div className="mt-1 text-[13px] text-ink-faint">Class rank</div>
+                      <div className="mt-1 text-[13px] text-ink-faint">{t("participant.classRank")}</div>
                     </div>
                   )}
                   {ayatJarak && !papanSorok && (
@@ -496,11 +499,11 @@ export default function Page() {
 
                 {/* Carta bar mudah (div sahaja): 12 teratas kelas, bar saya biru. */}
                 {carta.length > 0 && !papanSorok && (
-                  <div className="mt-6 flex h-[120px] items-end gap-1.5" role="img" aria-label="Class scores">
+                  <div className="mt-6 flex h-[120px] items-end gap-1.5" role="img" aria-label={t("participant.classScoresAria")}>
                     {carta.map((b) => (
                       <div
                         key={b.baris.id}
-                        title={`${b.label}: ${b.skor.toLocaleString()} pts`}
+                        title={`${b.label}: ${b.skor.toLocaleString(LOKAL[bahasa])} ${t("papan.unitMata")}`}
                         className="min-h-[2px] flex-1 rounded-t-[2px]"
                         style={{
                           height: `${Math.max(b.nisbah * 100, 1)}%`,
@@ -516,24 +519,24 @@ export default function Page() {
             {/* Baris dua kad: Live now dan Next up. */}
             {dataReady && (
               <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
-                <section className="card" aria-label="Live now">
+                <section className="card" aria-label={t("participant.liveNow")}>
                   <div className="flex items-center gap-2">
                     {sesiHero && (
                       <span className="inline-flex items-center gap-1.5 text-[13px] font-bold text-kz-down">
                         <span className="h-1.5 w-1.5 rounded-full bg-kz-down motion-safe:animate-pulse-dot" />
-                        LIVE
+                        {t("participant.liveBadge")}
                       </span>
                     )}
-                    <h2 className="section-title">Live now</h2>
+                    <h2 className="section-title">{t("participant.liveNow")}</h2>
                   </div>
                   {sesiHero ? (
                     <>
-                      <p className="mt-4 text-[15px] font-bold text-ink">{sesiHero.title || "Live Quiz"}</p>
+                      <p className="mt-4 text-[15px] font-bold text-ink">{sesiHero.title || t("participant.liveQuizFallback")}</p>
                       <p className="text-[13px] text-ink-faint">
-                        {sesiHero.class_name || "Class"} · {sesiHero.player_count} classmates in
+                        {sesiHero.class_name || t("common.class")} · {t("participant.classmatesIn", { n: sesiHero.player_count })}
                       </p>
                       <Link href={`/live/${encodeURIComponent(sesiHero.code)}`} className="btn-primary mt-4">
-                        Join now
+                        {t("participant.joinNow")}
                       </Link>
                       {sesiSusun.length > 1 && (
                         <div className="mt-3 flex flex-col gap-1">
@@ -543,19 +546,19 @@ export default function Page() {
                               href={`/live/${encodeURIComponent(s.code)}`}
                               className="text-[13px] text-brand-purple hover:underline"
                             >
-                              Also live: {s.title || "Live Quiz"} · {s.code}
+                              {t("participant.alsoLive", { tajuk: s.title || t("participant.liveQuizFallback"), kod: s.code })}
                             </Link>
                           ))}
                         </div>
                       )}
                     </>
                   ) : (
-                    <p className="mt-4 text-sm text-ink-faint">No live quiz right now.</p>
+                    <p className="mt-4 text-sm text-ink-faint">{t("participant.noLiveQuiz")}</p>
                   )}
                 </section>
 
-                <section className="card" aria-label="Next up">
-                  <h2 className="section-title">Next up</h2>
+                <section className="card" aria-label={t("participant.nextUp")}>
+                  <h2 className="section-title">{t("participant.nextUp")}</h2>
                   {aktivitiSeterusnya ? (
                     <>
                       <p className="mt-4 text-[15px] font-bold text-ink">{aktivitiSeterusnya.title}</p>
@@ -567,11 +570,11 @@ export default function Page() {
                         href={`/participant/activities?hunt=${encodeURIComponent(aktivitiSeterusnya.id)}`}
                         className="mt-4 inline-flex text-[13px] font-bold text-brand-purple hover:underline"
                       >
-                        Continue
+                        {t("participant.continueLabel")}
                       </Link>
                     </>
                   ) : (
-                    <p className="mt-4 text-sm text-ink-faint">{"You're all caught up."}</p>
+                    <p className="mt-4 text-sm text-ink-faint">{t("participant.allCaughtUp")}</p>
                   )}
                 </section>
               </div>
@@ -580,22 +583,22 @@ export default function Page() {
             {/* Baris dua kad: My Activities dan Leaderboard. */}
             {dataReady && (
               <div className={`grid grid-cols-1 gap-6 ${papanSorok ? "" : "xl:grid-cols-2"}`}>
-                <section className="card p-0" aria-label="My activities">
+                <section className="card p-0" aria-label={t("participant.myActivities")}>
                   <div className="flex flex-wrap items-center justify-between gap-2 px-6 pb-3 pt-5">
-                    <h2 className="section-title">My Activities</h2>
-                    <div className="flex gap-1" role="tablist" aria-label="Activity status">
-                      {(["Active", "Ended"] as const).map((t) => (
+                    <h2 className="section-title">{t("participant.myActivities")}</h2>
+                    <div className="flex gap-1" role="tablist" aria-label={t("participant.activityStatusAria")}>
+                      {(["Active", "Ended"] as const).map((tab) => (
                         <button
-                          key={t}
+                          key={tab}
                           type="button"
                           role="tab"
-                          aria-selected={tabAktiviti === t}
-                          onClick={() => setTabAktiviti(t)}
+                          aria-selected={tabAktiviti === tab}
+                          onClick={() => setTabAktiviti(tab)}
                           className={`rounded-md px-2.5 py-1 text-[12px] font-bold transition ${
-                            tabAktiviti === t ? "bg-kz-menu-active text-brand-purple" : "text-ink-faint hover:text-ink"
+                            tabAktiviti === tab ? "bg-kz-menu-active text-brand-purple" : "text-ink-faint hover:text-ink"
                           }`}
                         >
-                          {t}
+                          {tab === "Active" ? t("participant.tabActive") : t("participant.tabEnded")}
                         </button>
                       ))}
                     </div>
@@ -603,7 +606,7 @@ export default function Page() {
                   <div>
                     {barisPapar.length === 0 ? (
                       <p className="px-6 pb-5 pt-2 text-sm text-ink-faint">
-                        {tabAktiviti === "Active" ? "No active activities right now." : "No ended activities yet."}
+                        {tabAktiviti === "Active" ? t("participant.noActiveActivities") : t("participant.noEndedActivities")}
                       </p>
                     ) : (
                       barisPapar.map((q) => {
@@ -633,10 +636,10 @@ export default function Page() {
                   </div>
                 </section>
 
-                {!papanSorok && (<section className="card" aria-label="Leaderboard">
+                {!papanSorok && (<section className="card" aria-label={t("participant.leaderboard")}>
                   <div className="flex flex-wrap items-center justify-between gap-2">
-                    <h2 className="section-title">Leaderboard</h2>
-                    <div className="flex gap-1" role="tablist" aria-label="Leaderboard mode">
+                    <h2 className="section-title">{t("participant.leaderboard")}</h2>
+                    <div className="flex gap-1" role="tablist" aria-label={t("participant.leaderboardModeAria")}>
                       {(["Teams", "Individuals"] as const).map((m) => (
                         <button
                           key={m}
@@ -648,14 +651,14 @@ export default function Page() {
                             modPapan === m ? "bg-kz-menu-active text-brand-purple" : "text-ink-faint hover:text-ink"
                           }`}
                         >
-                          {m}
+                          {m === "Teams" ? t("participant.teams") : t("participant.individuals")}
                         </button>
                       ))}
                     </div>
                   </div>
                   <ul className="mt-3 flex flex-col gap-0.5">
                     {potongan.atas.length === 0 && (
-                      <li className="py-3 text-sm text-ink-faint">No scores yet.</li>
+                      <li className="py-3 text-sm text-ink-faint">{t("participant.noScoresYet")}</li>
                     )}
                     {potongan.atas.map((p) => (
                       <BarisPapanKunci key={p.baris.id} p={p} modPasukan={modPapan === "Teams"} indeks={p.kedudukan} />
@@ -666,7 +669,7 @@ export default function Page() {
                     )}
                   </ul>
                   <Link href="/participant/leaderboard" className="mt-4 inline-flex text-[13px] font-bold text-brand-purple hover:underline">
-                    View All
+                    {t("participant.viewAll")}
                   </Link>
                 </section>)}
               </div>
@@ -674,11 +677,11 @@ export default function Page() {
 
             {/* Kad Your class: Intro Board dan Learning Board. */}
             {dataReady && (
-              <section className="card p-0" aria-label="Your class">
-                <h2 className="section-title px-6 pb-3 pt-5">Your class</h2>
+              <section className="card p-0" aria-label={t("participant.yourClass")}>
+                <h2 className="section-title px-6 pb-3 pt-5">{t("participant.yourClass")}</h2>
                 {[
-                  { hrefSuffix: "/board", label: "Intro Board", ikon: ClipboardList },
-                  { hrefSuffix: "/learning-board", label: "Learning Board", ikon: BookOpen },
+                  { hrefSuffix: "/board", label: t("nav.introBoard"), ikon: ClipboardList },
+                  { hrefSuffix: "/learning-board", label: t("nav.learningBoard"), ikon: BookOpen },
                 ].map((p) => {
                   const aktif = !!activeClassId;
                   const href = aktif
@@ -706,7 +709,7 @@ export default function Page() {
             {/* Kaki: sertai kelas lain dan tinggalkan kelas semasa. */}
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-kz-line pt-4">
               <Link href="/participant/join" className="text-[13px] font-bold text-brand-purple hover:underline">
-                Join another class
+                {t("participant.joinAnotherClass")}
               </Link>
               {activeClassId && (
                 <button
@@ -714,7 +717,7 @@ export default function Page() {
                   onClick={async () => {
                     const target = classes.find((c) => c.id === activeClassId);
                     if (!target) return;
-                    if (!confirm(`Leave "${target.name}"? You will lose access to its activities and rankings.`)) return;
+                    if (!confirm(t("participant.leaveConfirm", { nama: target.name }))) return;
                     try {
                       await leaveClassAsStudent(activeClassId);
                       const remaining = classes.filter((c) => c.id !== activeClassId);
@@ -724,12 +727,12 @@ export default function Page() {
                       const lalai = urutanBaki.find(k => statusKelas(k) === "aktif") ?? urutanBaki[0];
                       setActiveClassId(lalai ? lalai.id : "");
                     } catch (err: unknown) {
-                      alert((err as { message?: string })?.message || "Failed to leave class");
+                      alert((err as { message?: string })?.message || t("participant.failedToLeaveClass"));
                     }
                   }}
                   className="text-[13px] font-bold text-kz-down hover:underline"
                 >
-                  Leave this class
+                  {t("participant.leaveThisClass")}
                 </button>
               )}
             </div>
@@ -750,8 +753,11 @@ function BarisPapanKunci({
   modPasukan: boolean;
   indeks: number;
 }) {
+  const { t, bahasa } = useBahasa();
   const warna = warnaIndeks(indeks - 1);
-  const sub = p.saya ? (modPasukan ? "Your team" : "You") : modPasukan ? "Team" : "";
+  const sub = p.saya
+    ? (modPasukan ? t("participant.yourTeam") : t("participant.you"))
+    : modPasukan ? t("participant.teamLabel") : "";
   return (
     <li className={`flex items-center gap-3 rounded-md px-2 py-2 ${p.saya ? "bg-canvas" : ""}`}>
       <span
@@ -765,7 +771,7 @@ function BarisPapanKunci({
         <div className="truncate text-[14px] font-medium text-ink">{p.baris.label}</div>
         {sub && <div className="text-xs text-ink-faint">{sub}</div>}
       </div>
-      <span className="shrink-0 text-[14px] font-bold text-ink">{p.baris.skor.toLocaleString()}</span>
+      <span className="shrink-0 text-[14px] font-bold text-ink">{p.baris.skor.toLocaleString(LOKAL[bahasa])}</span>
     </li>
   );
 }
@@ -775,16 +781,19 @@ function kawalBarisAktiviti(
   senarai: Hunt[],
   tamat: boolean,
   namaKelas: Map<string, string>,
-  indeksKelas: Map<string, number>
+  indeksKelas: Map<string, number>,
+  bahasa: Bahasa
 ): BarisAktivitiUi[] {
   return senarai.map((h) => {
-    const label = labelTarikhQuest(h.end_at, tamat);
+    const label = labelTarikhQuest(h.end_at, tamat, new Date(), bahasa);
     return {
       id: h.id,
       tajuk: h.title,
-      kelasNama: namaKelas.get(h.class_id ?? "") || "Class",
+      kelasNama: namaKelas.get(h.class_id ?? "") || terjemah(bahasa, "common.class"),
       indeksKelas: indeksKelas.get(h.class_id ?? "") ?? 0,
-      labelTarikh: label.label || (tamat ? "Ended" : tarikhRingkas(h.end_at) || "Open"),
+      labelTarikh: label.label || (tamat
+        ? terjemah(bahasa, "papan.ended")
+        : tarikhRingkas(h.end_at, LOKAL[bahasa]) || terjemah(bahasa, "papan.open")),
       segera: label.segera,
       tamat,
       href: `/participant/activities?hunt=${encodeURIComponent(h.id)}`,
