@@ -3,6 +3,8 @@
 // akses ke akaun Kuizen mereka.
 //
 // Nota Next.js: pengguna useSearchParams() MESTI dibalut dalam <Suspense>.
+// Semua teks UI melalui useBahasa() (KZ-040); nama klien dan parameter URL
+// ialah kandungan luar dan tidak diterjemah.
 
 "use client";
 
@@ -13,11 +15,13 @@ import { useSearchParams } from "next/navigation";
 // pada kunci storan yang sama: dua GoTrueClient akan berlumba memutarkan
 // refresh token yang sama.
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 function ConsentInner() {
   const params = useSearchParams();
+  const { t } = useBahasa();
 
-  const clientName = params.get("client_name") ?? "Aplikasi luar";
+  const clientName = params.get("client_name") ?? t("oauth.defaultClientName");
   const scope = params.get("scope") ?? "kuizen:read kuizen:write";
 
   const [email, setEmail] = useState("");
@@ -57,7 +61,7 @@ function ConsentInner() {
     const { data } = await supabase.auth.getSession();
     if (!data.session) {
       setBusy(false);
-      setStatus({ kind: "error", text: "Sesi tamat. Sila log masuk semula." });
+      setStatus({ kind: "error", text: t("oauth.sessionExpired") });
       setSessionEmail(null);
       return;
     }
@@ -83,15 +87,15 @@ function ConsentInner() {
     const json = await res.json();
     if (!res.ok) {
       setBusy(false);
-      setStatus({ kind: "error", text: json.error ?? "Permintaan gagal" });
+      setStatus({ kind: "error", text: json.error ?? t("oauth.requestFailed") });
       return;
     }
     window.location.href = json.redirect_to;
   }
 
   const permissions = [
-    { scope: "kuizen:read", label: "Melihat kelas, aktiviti, board dan progres anda" },
-    { scope: "kuizen:write", label: "Mencipta dan mengemas kini kandungan bagi pihak anda" },
+    { scope: "kuizen:read", label: t("oauth.permRead") },
+    { scope: "kuizen:write", label: t("oauth.permWrite") },
   ].filter((p) => scope.includes(p.scope));
 
   return (
@@ -102,18 +106,16 @@ function ConsentInner() {
             K
           </div>
           <h1 className="text-xl font-semibold text-slate-900">
-            Benarkan {clientName} mengakses Kuizen?
+            {t("oauth.allowTitle", { nama: clientName })}
           </h1>
           <p className="mt-1 text-sm text-slate-500">
-            Nama di atas dilaporkan oleh aplikasi itu sendiri. Sambungan ini akan
-            bertindak sebagai anda, dan hanya boleh melihat perkara yang anda sendiri
-            boleh lihat.
+            {t("oauth.reportedName")}
           </p>
         </div>
 
         <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50 p-4">
           <p className="mb-2 text-xs font-semibold uppercase tracking-wide text-violet-800">
-            Kebenaran diminta
+            {t("oauth.permissionsTitle")}
           </p>
           <ul className="space-y-1.5">
             {permissions.map((p) => (
@@ -140,7 +142,7 @@ function ConsentInner() {
         {sessionEmail ? (
           <>
             <p className="mb-4 text-sm text-slate-600">
-              Log masuk sebagai <span className="font-medium text-slate-900">{sessionEmail}</span>
+              {t("oauth.signedInAs", { emel: sessionEmail })}
             </p>
             <div className="flex gap-3">
               <button
@@ -148,14 +150,14 @@ function ConsentInner() {
                 disabled={busy}
                 className="flex-1 rounded-xl border border-slate-300 px-4 py-2.5 text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-50"
               >
-                Tolak
+                {t("oauth.deny")}
               </button>
               <button
                 onClick={() => submit("approve")}
                 disabled={busy}
                 className="flex-1 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-95 disabled:opacity-50"
               >
-                {busy ? "Memproses..." : "Benarkan"}
+                {busy ? t("oauth.processing") : t("oauth.allow")}
               </button>
             </div>
           </>
@@ -166,7 +168,7 @@ function ConsentInner() {
               required
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              placeholder="Emel"
+              placeholder={t("oauth.emailPlaceholder")}
               className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
             />
             <input
@@ -174,7 +176,7 @@ function ConsentInner() {
               required
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              placeholder="Kata laluan"
+              placeholder={t("oauth.passwordPlaceholder")}
               className="w-full rounded-xl border border-slate-300 px-3.5 py-2.5 text-sm outline-none focus:border-violet-500 focus:ring-2 focus:ring-violet-200"
             />
             <button
@@ -182,7 +184,7 @@ function ConsentInner() {
               disabled={busy}
               className="w-full rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2.5 text-sm font-medium text-white hover:opacity-95 disabled:opacity-50"
             >
-              {busy ? "Log masuk..." : "Log masuk untuk teruskan"}
+              {busy ? t("oauth.signingIn") : t("oauth.signInToContinue")}
             </button>
           </form>
         )}
@@ -192,9 +194,10 @@ function ConsentInner() {
 }
 
 export default function ConsentPage() {
+  const { t } = useBahasa();
   return (
     <Suspense
-      fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">Memuatkan...</div>}
+      fallback={<div className="flex min-h-screen items-center justify-center text-slate-500">{t("common.loadingDots")}</div>}
     >
       <ConsentInner />
     </Suspense>
