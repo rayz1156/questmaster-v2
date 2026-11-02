@@ -38,8 +38,6 @@ alter table public.qm_lna_items alter column id set not null;
 
 alter table public.qm_lna_items add column if not exists label text;
 
--- Item bebas tidak merujuk Outcome: outcome_id jadi nullable.
-alter table public.qm_lna_items alter column outcome_id drop not null;
 
 -- ============================================================
 -- 2. CHECK pada qm_lna_items: label 1 hingga 200 aksara (jika ada)
@@ -68,7 +66,24 @@ end $blok$;
 --    PK baharu (id), kekal unique (lna_id, outcome_id) dan indeks
 --    susunan (lna_id, position).
 -- ============================================================
-alter table public.qm_lna_items drop constraint if exists qm_lna_items_pkey;
+-- Pembetulan CTO (kzqa KZ-038): buang PK lama HANYA jika ia masih
+-- mengandungi outcome_id; pada larian kedua PK ialah (id) dan FK
+-- qm_lna_responses_item_fk bergantung padanya.
+do $blok$
+begin
+  if exists (
+    select 1 from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+    where c.conrelid = 'public.qm_lna_items'::regclass and c.contype = 'p'
+      and a.attname = 'outcome_id'
+  ) then
+    alter table public.qm_lna_items drop constraint qm_lna_items_pkey;
+  end if;
+end $blok$;
+
+-- Item bebas tidak merujuk Outcome: outcome_id jadi nullable. Mesti
+-- SELEPAS PK lama dibuang (lajur PK tidak boleh nullable).
+alter table public.qm_lna_items alter column outcome_id drop not null;
 do $blok$
 begin
   if not exists (
@@ -137,15 +152,26 @@ begin
   end if;
 end $blok$;
 
--- outcome_id jawapan jadi nullable: null bagi item bebas, kekal
--- diisi (dan kekal FK on delete cascade) bagi item Outcome.
-alter table public.qm_lna_responses alter column outcome_id drop not null;
 
 -- ============================================================
 -- 5. Kunci qm_lna_responses: buang PK lama (round_id, user_id,
 --    outcome_id), PK baharu (round_id, user_id, item_id).
 -- ============================================================
-alter table public.qm_lna_responses drop constraint if exists qm_lna_responses_pkey;
+do $blok$
+begin
+  if exists (
+    select 1 from pg_constraint c
+    join pg_attribute a on a.attrelid = c.conrelid and a.attnum = any(c.conkey)
+    where c.conrelid = 'public.qm_lna_responses'::regclass and c.contype = 'p'
+      and a.attname = 'outcome_id'
+  ) then
+    alter table public.qm_lna_responses drop constraint qm_lna_responses_pkey;
+  end if;
+end $blok$;
+
+-- outcome_id jawapan jadi nullable: null bagi item bebas, kekal
+-- diisi (dan kekal FK on delete cascade) bagi item Outcome.
+alter table public.qm_lna_responses alter column outcome_id drop not null;
 do $blok$
 begin
   if not exists (
