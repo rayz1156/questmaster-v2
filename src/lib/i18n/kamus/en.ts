@@ -170,6 +170,11 @@ export const en = {
     registerTitle: 'Create an educator account',
     registerDescription:
       'Create a Kuizen educator account to build interactive class quizzes, run live sessions and track progress.',
+    // Rangka halaman auth (src/components/ui/AuthSplit.tsx).
+    tagline: 'Your next great class starts here.',
+    ilustrasiAria: 'Stacked quiz cards illustration',
+    privacy: 'Privacy',
+    terms: 'Terms',
   },
   oauth: {
     // Skrin kebenaran MCP (src/app/oauth/consent/page.tsx).

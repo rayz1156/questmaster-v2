@@ -1,6 +1,8 @@
+'use client';
 import type { ReactNode } from "react";
 import Link from "next/link";
 import Logo from "@/components/Logo";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /**
  * Rangka halaman auth (KZ-021, KZ-DS-v3 bahagian 2: AuthSplit).
@@ -14,23 +16,32 @@ import Logo from "@/components/Logo";
  * pending-approval) menghantar borang mereka sebagai children; logik
  * borang, Google login, pautan dan teks sedia ada tidak berubah.
  */
-export default function AuthSplit({ children }: { children: ReactNode }) {
+export default function AuthSplit({
+  children,
+  penjuru,
+}: {
+  children: ReactNode;
+  /** Elemen penjuru atas kanan bar logo (contoh: PemilihBahasa). */
+  penjuru?: ReactNode;
+}) {
+  const { t } = useBahasa();
   return (
     <div className="min-h-screen flex flex-col lg:flex-row bg-white">
       {/* ===== Panel kiri (45%, putih) ===== */}
       <div className="flex min-h-screen w-full flex-col lg:w-[45%]">
-        <div className="px-8 pt-7">
+        <div className="flex items-center justify-between px-8 pt-7">
           <Logo size={30} />
+          {penjuru}
         </div>
         <div className="flex flex-1 items-center justify-center px-6 py-10">{children}</div>
         <div className="pb-8 text-center text-xs text-ink-faint tracking-wide space-y-2">
           <div>UPSI &nbsp;·&nbsp; AFK &nbsp;·&nbsp; Veltrix</div>
           <div className="space-x-4">
             <Link href="/privacy" className="hover:text-ink-muted">
-              Privacy
+              {t('auth.privacy')}
             </Link>
             <Link href="/terms" className="hover:text-ink-muted">
-              Terms
+              {t('auth.terms')}
             </Link>
           </div>
         </div>
@@ -42,7 +53,7 @@ export default function AuthSplit({ children }: { children: ReactNode }) {
           <IlustrasiKadKuiz />
           <h2 className="mt-8 text-[32px] font-bold tracking-tight text-ink">Kuizen</h2>
           <p className="mt-2 text-[16px] text-ink-muted">
-            Your next great class starts here.
+            {t('auth.tagline')}
           </p>
         </div>
       </div>
@@ -55,12 +66,13 @@ export default function AuthSplit({ children }: { children: ReactNode }) {
  * Kuizen (#854fff, #ebe2ff), tiada aset pihak ketiga.
  */
 function IlustrasiKadKuiz() {
+  const { t } = useBahasa();
   return (
     <svg
       viewBox="0 0 320 240"
       className="w-full max-w-[320px] mx-auto"
       role="img"
-      aria-label="Stacked quiz cards illustration"
+      aria-label={t('auth.ilustrasiAria')}
     >
       {/* Kad belakang (kiri, condong) */}
       <g transform="rotate(-8 160 120)">

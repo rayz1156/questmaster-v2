@@ -158,6 +158,11 @@ export const ms: Kamus = {
     registerTitle: 'Cipta akaun pendidik',
     registerDescription:
       'Cipta akaun pendidik Kuizen untuk membina kuiz kelas interaktif, menjalankan sesi langsung dan menjejak kemajuan.',
+    // Rangka halaman auth (src/components/ui/AuthSplit.tsx).
+    tagline: 'Kelas hebat anda seterusnya bermula di sini.',
+    ilustrasiAria: 'Ilustrasi kad kuiz bertindan',
+    privacy: 'Privasi',
+    terms: 'Terma',
   },
   oauth: {
     defaultClientName: 'Aplikasi luar',
