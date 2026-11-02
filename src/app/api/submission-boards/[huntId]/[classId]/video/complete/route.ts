@@ -1,40 +1,21 @@
-import { NextRequest, NextResponse } from 'next/server';
-import { requireClassMember } from '@/lib/supabase-route';
-import { getBunnyVideo } from '@/lib/bunny';
+import { NextResponse } from 'next/server';
 
 export const dynamic = 'force-dynamic';
+export const runtime = 'nodejs';
 
 /**
- * Finalizes a Bunny submission-board upload (educator/class-owner only).
- * Body: { videoGuid, durationSeconds? }
- * Response: { videoProvider: 'bunny', videoProviderId, videoThumbnailUrl, videoDurationSeconds }
- * The client passes these straight into POST /items.
+ * POST /api/submission-boards/[huntId]/[classId]/video/complete
+ *
+ * KZ-039: muat naik video terus dibuang. Laluan ini hanya pernah memuktamadkan
+ * muat naik Bunny (tiada cabang YouTube di sini: klien YouTube papan hantaran
+ * menghantar terus ke /items dengan provider youtube), jadi keseluruhan laluan
+ * menjadi batu nisan 410.
+ *
+ * Balasan dihantar sebelum sebarang kerja: tiada panggilan Bunny/Adilo.
  */
-export async function POST(req: NextRequest, { params }: { params: { huntId: string; classId: string } }) {
-  const auth = await requireClassMember(req, params.classId);
-  if (auth.response) return auth.response;
-  if (auth.klass!.owner_id !== auth.user!.id) {
-    return NextResponse.json({ error: 'Video upload requires educator permission.' }, { status: 403 });
-  }
-
-  const body = await req.json().catch(() => ({}));
-  const videoGuid = String(body?.videoGuid || '').trim();
-  if (!videoGuid) {
-    return NextResponse.json({ error: 'videoGuid required' }, { status: 400 });
-  }
-
-  let thumbnailUrl: string | null = null;
-  let realDuration: number | null = null;
-  try {
-    const info = await getBunnyVideo(videoGuid);
-    thumbnailUrl = info.thumbnailUrl ?? null;
-    if (typeof info.durationSeconds === 'number' && info.durationSeconds > 0) realDuration = info.durationSeconds;
-  } catch { /* still processing */ }
-
-  return NextResponse.json({
-    videoProvider: 'bunny',
-    videoProviderId: videoGuid,
-    videoThumbnailUrl: thumbnailUrl,
-    videoDurationSeconds: realDuration ?? (typeof body?.durationSeconds === 'number' ? body.durationSeconds : null),
-  });
+export async function POST() {
+  return NextResponse.json(
+    { error: 'Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.' },
+    { status: 410 },
+  );
 }

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { fileluUpload, fileluDelete } from '@/lib/filelu';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
+import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,11 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   if (!(file instanceof File)) return NextResponse.json({ error: 'file field missing' }, { status: 400 });
   if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
   const mime = file.type || 'application/octet-stream';
+  // KZ-039: fail video tidak dibenarkan walau MIME dipalsukan sebagai imej;
+  // sambungan nama fail turut disemak oleh failVideo.
+  if (failVideo(file.name, file.type)) {
+    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+  }
   if (!mime.startsWith('image/')) return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
 
   // Kuota disemak SEBELUM bait dihantar dan SEBELUM injap 15MB (tiket

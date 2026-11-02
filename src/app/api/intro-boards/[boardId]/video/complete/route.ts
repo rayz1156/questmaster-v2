@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
-import { getBunnyVideo } from '@/lib/bunny';
 import { parseYouTubeId, youtubeThumbnail } from '@/lib/video-embed';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -8,11 +7,10 @@ export const maxDuration = 60;
 
 /**
  * POST /api/intro-boards/[boardId]/video/complete
- * Two modes:
- *  - provider='bunny'  : { videoGuid, filename?, durationSeconds?, displayName, description? }
- *                        (educator/class-owner only; finalizes a TUS upload)
+ * KZ-039: hanya satu modus yang tinggal:
  *  - provider='youtube': { youtubeUrl, displayName, description? }
  *                        (any class member; stores the YouTube video id)
+ * Cabang bunny (muat naik terus) dibuang; provider lain ditolak dengan 410.
  * Upserts the qm_intro_posts row (one per board+author) with media_type='video'.
  */
 export async function POST(req: NextRequest, { params }: { params: { boardId: string } }) {
@@ -43,29 +41,20 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
 
   let providerId: string;
   let thumbnailUrl: string | null = null;
-  let realDuration: number | null = null;
 
-  if (provider === 'youtube') {
-    const ytId = parseYouTubeId(String(body?.youtubeUrl || ''));
-    if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
-    providerId = ytId;
-    thumbnailUrl = youtubeThumbnail(ytId);
-  } else {
-    if (!isOwner) {
-      return NextResponse.json(
-        { error: 'Video upload requires educator permission. Please share a YouTube link instead.' },
-        { status: 403 },
-      );
-    }
-    const videoGuid = String(body?.videoGuid || '').trim();
-    if (!videoGuid) return NextResponse.json({ error: 'videoGuid required' }, { status: 400 });
-    providerId = videoGuid;
-    try {
-      const info = await getBunnyVideo(videoGuid);
-      thumbnailUrl = info.thumbnailUrl ?? null;
-      realDuration = typeof info.durationSeconds === 'number' && info.durationSeconds > 0 ? info.durationSeconds : null;
-    } catch { /* Bunny may still be processing; keep nulls */ }
+  if (provider !== 'youtube') {
+    // KZ-039: muat naik terus (bunny) dibuang. Hanya pautan YouTube diterima,
+    // dan ia boleh digunakan oleh ahli kelas biasa, bukan pemilik sahaja.
+    return NextResponse.json(
+      { error: 'Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.' },
+      { status: 410 },
+    );
   }
+
+  const ytId = parseYouTubeId(String(body?.youtubeUrl || ''));
+  if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
+  providerId = ytId;
+  thumbnailUrl = youtubeThumbnail(ytId);
 
   const clientDuration = typeof body?.durationSeconds === 'number' ? body.durationSeconds : null;
   const row: any = {
@@ -81,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
     video_adilo_file_id: null,
     video_adilo_project_id: null,
     video_thumbnail_url: thumbnailUrl,
-    video_duration_seconds: realDuration ?? clientDuration,
+    video_duration_seconds: clientDuration,
   };
 
   const { data, error } = await admin

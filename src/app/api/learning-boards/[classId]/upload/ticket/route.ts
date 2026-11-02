@@ -3,6 +3,7 @@ import { requireClassMember } from '@/lib/supabase-route';
 import { assertCapability } from '@/lib/capabilities';
 import { admin } from '@/lib/mcp/db';
 import { s5PresignPut, s5ObjectKey } from '@/lib/s5';
+import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,6 +35,13 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const mimeType =
     typeof body.mimeType === 'string' && body.mimeType ? body.mimeType : 'application/octet-stream';
   const declaredSize = typeof body.size === 'number' && body.size > 0 ? Math.floor(body.size) : null;
+
+  // KZ-039: tiket muat naik tidak dikeluarkan untuk fail video. MIME dan
+  // sambungan kedua-duanya disemak supaya video dengan MIME octet-stream
+  // tidak lalu.
+  if (failVideo(fileName, mimeType)) {
+    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+  }
 
   // Laluan objek SENTIASA dijana oleh pelayan. Menerima laluan daripada klien
   // membenarkan penulisan silang penyewa.
