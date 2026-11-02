@@ -276,6 +276,8 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
       namaKelas: kelas?.name ?? '',
       soalan,
       namaPenanya,
+      // KZ-036: penerangan bilik menjadi topik dalam arahan sistem.
+      penerangan: bilik.description,
       sejarah,
       konteksHidup: bilik.context_enabled,
       tetingkap: bilik.context_window,
