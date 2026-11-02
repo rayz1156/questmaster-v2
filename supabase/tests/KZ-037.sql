@@ -467,6 +467,47 @@ begin
   end;
 end $u$;
 
+-- Ujian 12 (CTO, kzqa): Outcome yang ditag kepada DUA kuiz dan SATU
+-- cabaran: tagged_challenges mesti 1 (bukan didarab), tagged_live_quizzes 2.
+insert into public.qm_live_quiz_outcomes (quiz_id, outcome_id) values
+  ('00000000-0000-0000-0000-0000000370f2', '00000000-0000-0000-0000-0000000370d1');
+do $u$
+declare
+  v_hasil jsonb;
+  v_baris jsonb;
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', '00000000-0000-0000-0000-0000000370e1', 'role', 'authenticated')::text, true);
+  v_hasil := public.qm_mastery_summary('00000000-0000-0000-0000-0000000370c1');
+  select e into v_baris from jsonb_array_elements(v_hasil->'outcomes') e
+    where e->>'outcome_id' = '00000000-0000-0000-0000-0000000370d1';
+  if (v_baris->>'tagged_challenges')::int <> 1 or (v_baris->>'tagged_live_quizzes')::int <> 2 then
+    raise exception 'UJIAN 12 GAGAL: tagged_challenges=% tagged_live_quizzes=% (jangka 1 dan 2)',
+      v_baris->>'tagged_challenges', v_baris->>'tagged_live_quizzes';
+  end if;
+  raise notice 'Ujian 12: dua kuiz + satu cabaran tidak didarab (betul)';
+end $u$;
+
+-- Ujian 13 (CTO, kzsec): ko-pendidik yang BELUM menerima jemputan
+-- ditolak; selepas menerima, dibenarkan.
+insert into public.qm_class_educators (class_id, educator_id, role, accepted_at) values
+  ('00000000-0000-0000-0000-0000000370c1', '00000000-0000-0000-0000-0000000370e2', 'co_creator', null);
+do $u$
+begin
+  perform set_config('request.jwt.claims',
+    json_build_object('sub', '00000000-0000-0000-0000-0000000370e2', 'role', 'authenticated')::text, true);
+  begin
+    perform public.qm_mastery_summary('00000000-0000-0000-0000-0000000370c1');
+    raise exception 'UJIAN 13 GAGAL: ko-pendidik belum terima diberi akses';
+  exception when others then
+    if sqlerrm <> 'Forbidden' then raise; end if;
+  end;
+  update public.qm_class_educators set accepted_at = now()
+    where class_id = '00000000-0000-0000-0000-0000000370c1' and educator_id = '00000000-0000-0000-0000-0000000370e2';
+  perform public.qm_mastery_summary('00000000-0000-0000-0000-0000000370c1');
+  raise notice 'Ujian 13: ko-pendidik belum terima ditolak, sudah terima dibenarkan (betul)';
+end $u$;
+
 -- Gulung semula semua data ujian.
 rollback;
 

@@ -131,7 +131,9 @@ begin
     SELECT 1 FROM qm_classes c
     WHERE c.id = p_class_id
       AND (c.owner_id = v_uid
-           OR EXISTS (SELECT 1 FROM qm_class_educators ce WHERE ce.class_id = c.id AND ce.educator_id = v_uid))
+           OR EXISTS (SELECT 1 FROM qm_class_educators ce WHERE ce.class_id = c.id AND ce.educator_id = v_uid
+                       -- Pembetulan CTO (kzsec): ko-pendidik mesti sudah menerima jemputan.
+                       AND ce.accepted_at IS NOT NULL))
   ) INTO v_authorised;
   IF NOT v_authorised THEN
     RAISE EXCEPTION 'Forbidden';
@@ -166,7 +168,7 @@ begin
     WHERE q.class_id = p_class_id
   ),
   outcome_counts AS (
-    SELECT o.id AS outcome_id, COUNT(oc.challenge_id)::int AS tagged_challenges,
+    SELECT o.id AS outcome_id, COUNT(DISTINCT oc.challenge_id)::int AS tagged_challenges  -- Pembetulan CTO (kzqa): elak dabaran dua LEFT JOIN,
            COUNT(DISTINCT live_oq.quiz_id)::int AS tagged_live_quizzes
     FROM outcomes o
     LEFT JOIN oc ON oc.outcome_id = o.id
