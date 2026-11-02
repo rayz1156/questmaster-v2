@@ -6,6 +6,7 @@ import { fetchRemoteToDisk, checkRateLimit, readTmp, UploadGuardError, imejRaste
 import { normMime } from '@/lib/sajianSelamat';
 import { s5ObjectKey, s5PutStream, s5FileCode } from '@/lib/s5';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
+import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -51,9 +52,11 @@ const ALLOWED_MIME_PREFIXES = [
   'audio/',
   'video/',
 ];
-// Video TIDAK disekat secara keras di sini (V2-002b-baiki): ia diteruskan ke
-// qm_reserve_upload supaya pelan unlimited (kunci video = true) boleh memuat
-// naik video, manakala pelan lain ditolak oleh fungsi pangkalan data.
+// KZ-039: 'video/' SENGAJA kekal dalam senarai ini. Laluan source_url
+// menghidu MIME daripada bait di dalam upload-guard, dan tanpa entri ini
+// upload-guard akan memintas dengan mesejnya sendiri sebelum kita dapat
+// memulangkan mesej khusus sekatan video. failVideo() di bawah yang
+// menolak fail video dengan 400 di kedua-dua laluan.
 
 function extOf(name: string): string {
   const i = name.lastIndexOf('.');
@@ -81,6 +84,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : '';
     if (!sourceUrl) {
       return NextResponse.json({ error: 'sourceUrl required for JSON requests' }, { status: 400 });
+    }
+
+    // KZ-039: fail video ditolak sebelum pengambilan supaya fail besar tidak
+    // diambil hanya untuk ditolak selepas itu. Ini semakan awal nama fail dan
+    // MIME yang diisytihar; MIME sebenar yang dihidu daripada bait disemak
+    // semula selepas pengambilan di bawah.
+    if (failVideo(String(body.fileName || fileNameFromUrl(sourceUrl)), String(body.mimeType || ''))) {
+      return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
     }
 
     const rate = checkRateLimit(owner.user!.id);
@@ -142,6 +153,11 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
 
       const fileName =
         (typeof body.fileName === 'string' && body.fileName.trim()) || fileNameFromUrl(remote.finalUrl);
+      // KZ-039: semakan kedua dengan MIME sebenar yang dihidu daripada bait,
+      // kerana pelayan jauh boleh mengisytihar apa sahaja pada header.
+      if (failVideo(fileName, mimeSebenar)) {
+        return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+      }
       const key = s5ObjectKey(fileName);
       await s5PutStream(key, readTmp(remote.tmpPath), remote.bytes, mimeSebenar);
       const fileCode = s5FileCode(key);
@@ -217,6 +233,13 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   }
 
   const mime = (file.type || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+  // KZ-039: failVideo SEBELUM semakan prefix supaya mesej khusus sekatan video
+  // yang dipulangkan, bukan 415 "Unsupported file type" (video/ masih ada
+  // dalam senarai prefix untuk kepentingan laluan source_url, lihat komentar
+  // ALLOWED_MIME_PREFIXES di atas).
+  if (failVideo(file.name, file.type)) {
+    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+  }
   const isAllowed = ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p));
   if (!isAllowed) {
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });

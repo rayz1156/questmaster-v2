@@ -45,6 +45,7 @@ import {
 } from "./peer-tools";
 import { inviteEducator } from "./invite-tools";
 import { TOOLS_TAMBAHAN } from "./tambahan-tools";
+import { failVideo, MESEJ_SEKAT_VIDEO } from "../sekatVideo";
 import {
   createCertificateTemplate,
   updateCertificateTemplate,
@@ -151,7 +152,7 @@ async function countBy(
 const MAX_BASE64_CHARS = 16 * 1024;
 const TOKEN_PER_BASE64_CHAR = 4.02;
 
-const CARD_TYPES = ["text", "link", "image", "file", "chatbot", "youtube"];
+const CARD_TYPES = ["text", "link", "image", "file", "youtube"];
 
 /**
  * Route board dikunci pada class_id, bukan board_id. Tool MCP menerima
@@ -785,7 +786,6 @@ export const TOOLS: ToolDef[] = [
         file_code: { type: "string", description: "Kod daripada upload_board_file, untuk card_type file atau image" },
         file_url: { type: "string", description: "Alternatif kepada file_code" },
         file_name: { type: "string" },
-        chatbot_url: { type: "string", description: "Wajib untuk card_type chatbot" },
         insert_index: { type: "number", description: "Sisip pada kedudukan ini; jika ditinggalkan, kad diletak di hujung" },
       },
       required: ["board_id", "column_id", "title"],
@@ -828,9 +828,6 @@ export const TOOLS: ToolDef[] = [
         body.fileUrl = fileUrl;
         if (args.file_code) body.fileluFileCode = args.file_code;
         if (args.file_name) body.fileName = args.file_name;
-      } else if (cardType === "chatbot") {
-        if (!args.chatbot_url) throw new Error("card_type chatbot memerlukan chatbot_url");
-        body.chatbotUrl = args.chatbot_url;
       }
 
       const res = await callApi<{ card: Record<string, unknown> }>(
@@ -961,6 +958,13 @@ export const TOOLS: ToolDef[] = [
       if (!args.class_id && !args.board_id) throw new Error("Berikan class_id atau board_id");
       const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
 
+      // KZ-039: fail video tidak diterima oleh mana-mana laluan muat naik.
+      // Semakan di sini memberi sebab yang jelas kepada klien MCP sebelum
+      // perjalanan rangkaian; route turut menyemak (pertahanan berlapis).
+      if (failVideo(String(args.file_name ?? ""), typeof args.mime_type === "string" ? args.mime_type : null)) {
+        throw new Error(MESEJ_SEKAT_VIDEO);
+      }
+
       const hasB64 = typeof args.content_base64 === "string" && args.content_base64.length > 0;
       const hasUrl = typeof args.source_url === "string" && args.source_url.length > 0;
 
@@ -1032,6 +1036,11 @@ export const TOOLS: ToolDef[] = [
     handler: async (args, s) => {
       if (!args.class_id && !args.board_id) throw new Error("Berikan class_id atau board_id");
       const classId = args.class_id ?? (await classIdForBoard(args.board_id, s));
+      // KZ-039: tiket muat naik tidak dikeluarkan untuk fail video; route
+      // upload/ticket turut menyemak. Semakan di sini gagal lebih pantas.
+      if (failVideo(String(args.file_name ?? ""), typeof args.mime_type === "string" ? args.mime_type : null)) {
+        throw new Error(MESEJ_SEKAT_VIDEO);
+      }
       const res = await callApi<any>(s.accessToken, `/api/learning-boards/${classId}/upload/ticket`, {
         method: "POST",
         body: {

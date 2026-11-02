@@ -4,19 +4,16 @@ import { assertCapability } from '@/lib/capabilities';
 import { fileluUpload, fileluShareUrl, fileluDelete } from '@/lib/filelu';
 import { imejRasterSebenar, checkRateLimit } from '@/lib/upload-guard';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
+import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Had tetap 150MB digugurkan (tiket V2-002b): had sebenar kini datang
-// daripada pelan berkesan pemilik kelas melalui qm_reserve_upload.
-// Video DITERUSKAN ke qm_reserve_upload (V2-002b-baiki): pelan dengan
-// kunci video = true dibenarkan, yang lain ditolak oleh fungsi pangkalan
-// data, bukan oleh senarai ini.
+// KZ-039: 'video/' dibuang daripada senarau; failVideo di bawah menolak fail
+// video dengan mesej khusus sebelum senarai ini dicapai lagi.
 const ALLOWED_MIME_PREFIXES = [
   'image/',
   'audio/',
-  'video/',
   'application/pdf',
   'application/msword',
   'application/vnd.openxmlformats',
@@ -62,6 +59,13 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   if (!(file instanceof File)) return NextResponse.json({ error: 'file field missing' }, { status: 400 });
   if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
   const mime = (file.type || 'application/octet-stream').split(';')[0].trim().toLowerCase();
+  // KZ-039: fail video ditolak di semua laluan muat naik. failVideo menyemak
+  // MIME dan sambungan nama fail, kerana MIME boleh dipalsukan sebagai
+  // octet-stream. Diletakkan sebelum senarai prefix supaya mesej khusus
+  // sekatan video yang dipulangkan.
+  if (failVideo(file.name, file.type)) {
+    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+  }
   if (!ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p))) {
     return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
   }

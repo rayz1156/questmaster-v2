@@ -7,7 +7,6 @@ import {
   deleteIntroPost,
 } from "@/lib/boards";
 import { supabase } from "@/lib/supabase";
-import { uploadToBunny } from "@/lib/bunny-upload";
 import { parseYouTubeId } from "@/lib/video-embed";
 // VideoLightbox not used here - intro videos use IntroVideoLightbox below
 import ImageLightbox from "@/components/learning-board/ImageLightbox";
@@ -152,7 +151,6 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
         <IntroUploadModal
           boardId={board.id}
           existing={mine}
-          canManage={canManage}
           onClose={() => setShowModal(false)}
           onSaved={async () => { setShowModal(false); await reload(); }}
         />
@@ -217,23 +215,18 @@ export function IntroVideoLightbox({ boardId, fileId, title, onClose }: { boardI
   );
 }
 
-function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
+function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
   boardId: string;
   existing: IntroPost | null;
-  canManage: boolean;
   onClose: () => void;
   onSaved: () => void;
 }) {
   const initialMedia: 'image' | 'video' = ((existing as any)?.media_type === 'video') ? 'video' : 'image';
   const [mediaType, setMediaType] = useState<'image' | 'video'>(initialMedia);
   const fileInput = useRef<HTMLInputElement | null>(null);
-  const videoInput = useRef<HTMLInputElement | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(initialMedia === 'image' ? (existing?.image_url || null) : null);
-  const [videoFile, setVideoFile] = useState<File | null>(null);
   const [ytUrl, setYtUrl] = useState('');
-  const [videoProgress, setVideoProgress] = useState(0);
-  const [videoStage, setVideoStage] = useState<'idle' | 'init' | 'uploading' | 'finalizing' | 'done' | 'error'>('idle');
   const [name, setName] = useState(existing?.display_name || "");
   const [desc, setDesc] = useState(existing?.description || "");
   const [busy, setBusy] = useState(false);
@@ -247,16 +240,6 @@ function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
       r.readAsDataURL(f);
     }
   };
-
-  const probeDuration = (f: File): Promise<number | undefined> => new Promise(resolve => {
-    try {
-      const v = document.createElement('video');
-      v.preload = 'metadata';
-      v.onloadedmetadata = () => { resolve(Math.round(v.duration || 0) || undefined); URL.revokeObjectURL(v.src); };
-      v.onerror = () => resolve(undefined);
-      v.src = URL.createObjectURL(f);
-    } catch { resolve(undefined); }
-  });
 
   const submitImage = async () => {
     setErr(null);
@@ -296,56 +279,22 @@ function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
   const submitVideo = async () => {
     setErr(null);
     if (!name.trim()) { setErr("Please enter your name."); return; }
-    if (!canManage) {
-      const raw = ytUrl.trim();
-      if (!raw) { setErr("Please paste a YouTube link."); return; }
-      if (!parseYouTubeId(raw)) { setErr("That doesn't look like a valid YouTube link."); return; }
-      setBusy(true); setVideoStage('finalizing');
-      try {
-        const compRes = await authedFetch(`/api/intro-boards/${boardId}/video/complete`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ provider: 'youtube', youtubeUrl: raw, displayName: name, description: desc }),
-        });
-        const compData = await compRes.json();
-        if (!compRes.ok) throw new Error(compData.error || 'Save failed');
-        setVideoStage('done');
-        onSaved();
-      } catch (e: any) { setVideoStage('error'); setErr(e.message || String(e)); }
-      finally { setBusy(false); }
-      return;
-    }
-    if (!videoFile) { setErr("Please choose a video file."); return; }
-    setBusy(true); setVideoStage('init'); setVideoProgress(0);
+    // KZ-039: muat naik video terus dibuang. Video intro hanya melalui
+    // pautan YouTube, dan laluan ini terbuka untuk semua ahli kelas.
+    const raw = ytUrl.trim();
+    if (!raw) { setErr("Please paste a YouTube link."); return; }
+    if (!parseYouTubeId(raw)) { setErr("That doesn't look like a valid YouTube link."); return; }
+    setBusy(true);
     try {
-      const dur = await probeDuration(videoFile);
-      // 1) start (mints the Bunny video + presigned TUS auth)
-      const startRes = await authedFetch(`/api/intro-boards/${boardId}/video/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filename: videoFile.name, mimeType: videoFile.type || 'video/mp4', sizeBytes: videoFile.size, durationSeconds: dur }),
-      });
-      const startData = await startRes.json();
-      if (!startRes.ok) throw new Error(startData.error || 'Upload init failed');
-      // 2) resumable direct upload to Bunny
-      setVideoStage('uploading');
-      await uploadToBunny(videoFile, startData.tus, { onProgress: (pct) => setVideoProgress(pct) });
-      // 3) complete
-      setVideoStage('finalizing');
       const compRes = await authedFetch(`/api/intro-boards/${boardId}/video/complete`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          provider: 'bunny', videoGuid: startData.videoGuid,
-          filename: videoFile.name, durationSeconds: dur,
-          displayName: name, description: desc,
-        }),
+        body: JSON.stringify({ provider: 'youtube', youtubeUrl: raw, displayName: name, description: desc }),
       });
       const compData = await compRes.json();
-      if (!compRes.ok) throw new Error(compData.error || 'Finalize failed');
-      setVideoStage('done');
+      if (!compRes.ok) throw new Error(compData.error || 'Save failed');
       onSaved();
-    } catch (e: any) { setVideoStage('error'); setErr(e.message || String(e)); }
+    } catch (e: any) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
   };
 
@@ -393,7 +342,7 @@ function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
             </div>
           )}
 
-          {mediaType === 'video' && !canManage && (
+          {mediaType === 'video' && (
             <div className="space-y-2">
               <input
                 value={ytUrl}
@@ -401,42 +350,8 @@ function IntroUploadModal({ boardId, existing, canManage, onClose, onSaved }: {
                 placeholder="https://www.youtube.com/watch?v=..."
                 className="w-full px-3 py-2 border rounded-lg"
               />
-              <p className="text-xs text-gray-500">Direct video upload requires educator permission. Upload your intro to YouTube (unlisted is fine) and paste the link here, it will play right on the board.</p>
-            </div>
-          )}
-
-          {mediaType === 'video' && canManage && (
-            <div className="space-y-2">
-              <div
-                onClick={() => videoInput.current?.click()}
-                onDragOver={e => e.preventDefault()}
-                onDrop={e => { e.preventDefault(); const f = e.dataTransfer.files?.[0] || null; if (f) setVideoFile(f); }}
-                className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:border-indigo-400 transition"
-              >
-                {videoFile ? (
-                  <div className="py-3 text-gray-700">
-                    <VideoIcon className="w-8 h-8 mx-auto mb-1 text-indigo-500" />
-                    <p className="text-sm font-medium truncate">{videoFile.name}</p>
-                    <p className="text-xs text-gray-500">{(videoFile.size / (1024*1024)).toFixed(1)} MB</p>
-                  </div>
-                ) : (
-                  <div className="py-6 text-gray-500">
-                    <Upload className="w-8 h-8 mx-auto mb-1" />
-                    <p className="text-sm">Click or drop a video here</p>
-                    <p className="text-xs">MP4/MOV/WebM · Streamed via Bunny</p>
-                  </div>
-                )}
-                <input ref={videoInput} type="file" accept="video/*" className="hidden"
-                  onChange={e => setVideoFile(e.target.files?.[0] || null)} />
-              </div>
-              {videoStage !== 'idle' && videoStage !== 'done' && videoStage !== 'error' && (
-                <div>
-                  <div className="text-xs text-gray-600 capitalize">{videoStage}… {videoProgress > 0 && `${videoProgress}%`}</div>
-                  <div className="w-full bg-gray-200 rounded h-1.5 overflow-hidden">
-                    <div className="bg-indigo-500 h-full transition-all" style={{ width: `${videoProgress}%` }} />
-                  </div>
-                </div>
-              )}
+              {/* KZ-039: muat naik terus dibuang; video hanya melalui pautan YouTube. */}
+              <p className="text-xs text-gray-500">Video mesti dikongsi melalui pautan YouTube (unlisted is fine). It will play right on the board.</p>
             </div>
           )}
 

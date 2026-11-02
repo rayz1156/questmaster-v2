@@ -21,7 +21,21 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
 
   const body = await req.json().catch(() => ({}));
   const itemType: string = body.itemType;
-  if (!['text', 'image', 'video', 'link', 'file', 'chatbot'].includes(itemType)) {
+  if (itemType === 'chatbot') {
+    // KZ-039: pilihan chatbot dibuang daripada semua papan.
+    return NextResponse.json({ error: 'Item chatbot tidak lagi disokong.' }, { status: 400 });
+  }
+  if (itemType === 'video') {
+    // KZ-039: item video HANYA melalui pautan YouTube. Provider lain
+    // (bunny/adilo) ialah muat naik terus dan ditolak; URL YouTube disahkan
+    // oleh parseYouTubeId dalam cabang di bawah.
+    if (body.videoProvider !== 'youtube') {
+      return NextResponse.json(
+        { error: 'Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.' },
+        { status: 400 },
+      );
+    }
+  } else if (!['text', 'image', 'link', 'file'].includes(itemType)) {
     return NextResponse.json({ error: 'Invalid itemType' }, { status: 400 });
   }
 
@@ -34,12 +48,6 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     title: typeof body.title === 'string' ? body.title : null,
     description: typeof body.description === 'string' ? body.description : null,
   };
-  if (itemType === 'chatbot') {
-    if (!body.chatbotUrl || typeof body.chatbotUrl !== 'string') return NextResponse.json({ error: 'chatbotUrl required' }, { status: 400 });
-    try { const u = new URL(body.chatbotUrl); if (u.protocol !== 'https:') return NextResponse.json({ error: 'chatbotUrl must be https' }, { status: 400 }); } catch { return NextResponse.json({ error: 'chatbotUrl invalid' }, { status: 400 }); }
-    insert.chatbot_url = body.chatbotUrl;
-    insert.chatbot_provider = typeof body.chatbotProvider === 'string' ? body.chatbotProvider : null;
-  }
 
   if (itemType === 'link') {
     if (!body.linkUrl) return NextResponse.json({ error: 'linkUrl required' }, { status: 400 });
@@ -64,30 +72,15 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     insert.file_extension = body.fileExtension ?? null;
     if (typeof body.fileluFileCode === 'string') insert.filelu_file_code = body.fileluFileCode;
   } else if (itemType === 'video') {
-    const provider = typeof body.videoProvider === 'string' ? body.videoProvider : (body.adiloFileId ? 'adilo' : null);
-    if (provider === 'bunny') {
-      if (!body.videoProviderId) return NextResponse.json({ error: 'videoProviderId required' }, { status: 400 });
-      insert.video_provider = 'bunny';
-      insert.video_provider_id = String(body.videoProviderId);
-      insert.video_thumbnail_url = body.videoThumbnailUrl ?? null;
-      insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
-    } else if (provider === 'youtube') {
-      const ytId = parseYouTubeId(String(body.youtubeUrl || body.videoProviderId || ''));
-      if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
-      insert.video_provider = 'youtube';
-      insert.video_provider_id = ytId;
-      insert.video_thumbnail_url = youtubeThumbnail(ytId);
-      insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
-    } else if (provider === 'adilo') {
-      insert.video_provider = 'adilo';
-      insert.video_provider_id = String(body.adiloFileId);
-      insert.adilo_file_id = body.adiloFileId;
-      insert.adilo_project_id = body.adiloProjectId ?? board.adilo_project_id ?? null;
-      insert.video_thumbnail_url = body.videoThumbnailUrl ?? null;
-      insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
-    } else {
-      return NextResponse.json({ error: 'videoProvider required' }, { status: 400 });
-    }
+    // KZ-039: hanya YouTube. Provider bunny/adilo sudah ditolak di atas,
+    // dan URL mesti lulus parseYouTubeId supaya cabang ini tidak boleh
+    // dipakai untuk menyimpan URL bukan YouTube sebagai video.
+    const ytId = parseYouTubeId(String(body.youtubeUrl || body.videoProviderId || ''));
+    if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
+    insert.video_provider = 'youtube';
+    insert.video_provider_id = ytId;
+    insert.video_thumbnail_url = youtubeThumbnail(ytId);
+    insert.video_duration_seconds = typeof body.videoDurationSeconds === 'number' ? body.videoDurationSeconds : null;
   }
 
   const { data, error } = await supa.from('qm_submission_board_items').insert(insert).select('*').single();

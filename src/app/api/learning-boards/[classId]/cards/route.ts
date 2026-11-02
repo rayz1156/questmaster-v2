@@ -7,8 +7,8 @@ export const dynamic = 'force-dynamic';
 /**
  * POST /api/learning-boards/[classId]/cards
  * Body: { columnId, cardType, ...payload }
- * Used for non-video card types (link, image, text). Video cards are created
- * by the upload/complete route which has the Adilo file metadata.
+ * KZ-039: kad video hanya melalui cardType 'youtube' (pautan luar); muat naik
+ * terus dan kad chatbot tidak lagi disokong.
  */
 export async function POST(req: NextRequest, { params }: { params: { classId: string } }) {
   const owner = await requireClassMember(req, params.classId);
@@ -17,8 +17,12 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const body = await req.json().catch(() => ({}));
   const { columnId, cardType } = body;
   if (!columnId || !cardType) return NextResponse.json({ error: 'columnId and cardType required' }, { status: 400 });
-  if (!['link', 'image', 'text', 'file', 'chatbot', 'youtube'].includes(cardType)) {
-    return NextResponse.json({ error: 'Use upload/complete for uploaded video cards' }, { status: 400 });
+  if (cardType === 'chatbot') {
+    return NextResponse.json({ error: 'Kad chatbot tidak lagi disokong.' }, { status: 400 });
+  }
+  if (!['link', 'image', 'text', 'file', 'youtube'].includes(cardType)) {
+    // 'video' turut ditolak di sini: kad video hanya melalui pautan YouTube.
+    return NextResponse.json({ error: 'cardType must be one of link, image, text, file, youtube' }, { status: 400 });
   }
   const { data: col } = await admin.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
   if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
@@ -75,12 +79,6 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     insert.file_size_bytes = typeof body.fileSizeBytes === 'number' ? body.fileSizeBytes : null;
     insert.file_extension = body.fileExtension ?? null;
     if (typeof body.fileluFileCode === 'string') insert.filelu_file_code = body.fileluFileCode;
-  }
-  if (cardType === 'chatbot') {
-    if (!body.chatbotUrl || typeof body.chatbotUrl !== 'string') return NextResponse.json({ error: 'chatbotUrl required' }, { status: 400 });
-    if (!body.chatbotUrl.startsWith('/embeds/')) { try { const u = new URL(body.chatbotUrl); if (u.protocol !== 'https:') return NextResponse.json({ error: 'chatbotUrl must be https' }, { status: 400 }); } catch { return NextResponse.json({ error: 'chatbotUrl invalid' }, { status: 400 }); } }
-    insert.chatbot_url = body.chatbotUrl;
-    insert.chatbot_provider = typeof body.chatbotProvider === 'string' ? body.chatbotProvider : null;
   }
   if (cardType === 'youtube') {
     const ytId = parseYouTubeId(String(body.youtubeUrl || ''));

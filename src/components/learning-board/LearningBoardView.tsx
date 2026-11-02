@@ -4,7 +4,6 @@ import { formatDuration, hostnameFromUrl, type LearningCard, type LearningCardTy
 import VideoLightbox from './VideoLightbox';
 import ImageLightbox from './ImageLightbox';
 import { supabase } from '@/lib/supabase';
-import { uploadToBunny } from '@/lib/bunny-upload';
 import { useCapabilities } from '@/lib/useCapabilities';
 import { showPrompt, showConfirm } from '@/components/ui/promptModal';
 import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data';
@@ -948,7 +947,9 @@ function AddCardModal({
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
         <div className="flex flex-wrap gap-1 mb-5 bg-white p-1 rounded-lg">
-          {(['link', 'qr', 'text', 'file', 'image', 'youtube', 'video', 'chatbot'] as Array<LearningCardType | 'qr' | 'youtube'>).map((t) => (
+          {/* KZ-039: tab 'video' (muat naik terus) dan 'chatbot' dibuang;
+              kad video hanya melalui tab 'youtube' (pautan luar). */}
+          {(['link', 'qr', 'text', 'file', 'image', 'youtube'] as Array<LearningCardType | 'qr' | 'youtube'>).map((t) => (
             <button
               key={t}
               onClick={() => setTab(t)}
@@ -957,9 +958,6 @@ function AddCardModal({
           ))}
         </div>
         {tab === 'youtube' && <YouTubeForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
-        {tab === 'video' && (caps.canUploadVideos
-          ? <VideoForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />
-          : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">Video upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or use the <button type="button" className="underline font-semibold" onClick={() => setTab('youtube')}>YouTube</button> tab instead.</div>)}
         {tab === 'link'  && <LinkForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
           {tab === 'qr'    && <QRForm    classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
@@ -967,121 +965,7 @@ function AddCardModal({
           ? <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />
           : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">File upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or use a Link instead.</div>)}
         {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
-      {tab === 'chatbot' && <ChatbotForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       </div>
-    </div>
-  );
-}
-
-function VideoForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
-  const [file, setFile] = useState<File | null>(null);
-  const [title, setTitle] = useState('');
-  const [description, setDescription] = useState('');
-  const [progress, setProgress] = useState(0);
-  const [stage, setStage] = useState<'idle' | 'init' | 'uploading' | 'finalizing' | 'done' | 'error'>('idle');
-  const [errMsg, setErrMsg] = useState<string | null>(null);
-  const probeDuration = (f: File): Promise<number | undefined> =>
-    new Promise((resolve) => {
-      try {
-        const v = document.createElement('video');
-        v.preload = 'metadata';
-        v.onloadedmetadata = () => resolve(Math.round(v.duration || 0));
-        v.onerror = () => resolve(undefined);
-        v.src = URL.createObjectURL(f);
-      } catch { resolve(undefined); }
-    });
-
-  const upload = async () => {
-    if (!file) return;
-    setErrMsg(null);
-    setStage('init');
-    setProgress(0);
-    const durationSeconds = await probeDuration(file);
-
-    let initData: any;
-    try {
-      const initRes = await authedFetch(`/api/learning-boards/${classId}/upload/start`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          columnId,
-          filename: file.name,
-          mimeType: file.type || 'video/mp4',
-          sizeBytes: file.size,
-          durationSeconds,
-          insertIndex,
-        }),
-      });
-      initData = await initRes.json();
-      if (!initRes.ok) throw new Error(initData.error || 'Init failed');
-    } catch (e: any) {
-      setStage('error'); setErrMsg(e.message); return;
-    }
-
-    setStage('uploading');
-    try {
-      await uploadToBunny(file, initData.tus, { onProgress: (pct) => setProgress(pct) });
-    } catch (e: any) {
-      setStage('error'); setErrMsg(e.message); return;
-    }
-
-    setStage('finalizing');
-    try {
-      const r = await authedFetch(`/api/learning-boards/${classId}/upload/complete`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          columnId,
-          videoGuid: initData.videoGuid,
-          filename: file.name,
-          durationSeconds,
-          title: title || file.name,
-          description,
-          insertIndex,
-        }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Finalize failed');
-      setStage('done');
-      onCreated();
-    } catch (e: any) {
-      setStage('error'); setErrMsg(e.message);
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <input
-        type="file"
-        accept="video/*"
-        onChange={(e) => setFile(e.target.files?.[0] || null)}
-        className="block w-full text-sm text-gray-600 file:mr-3 file:py-2 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500"
-      />
-      <input
-        value={title} onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title (optional)"
-        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
-      />
-      <textarea
-        value={description} onChange={(e) => setDescription(e.target.value)}
-        placeholder="Description (optional)"
-        rows={2}
-        className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
-      />
-      {stage !== 'idle' && stage !== 'done' && stage !== 'error' && (
-        <div>
-          <div className="text-xs text-gray-600 mb-1 capitalize">{stage}… {progress > 0 && `${progress}%`}</div>
-          <div className="w-full bg-white rounded-full h-1.5 overflow-hidden">
-            <div className="bg-indigo-500 h-full transition-all" style={{ width: `${progress}%` }} />
-          </div>
-        </div>
-      )}
-      {errMsg && <div className="text-red-400 text-xs">{errMsg}</div>}
-      <button
-        onClick={upload}
-        disabled={!file || (stage !== 'idle' && stage !== 'error')}
-        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium rounded-md py-2 text-sm"
-      >Upload video</button>
     </div>
   );
 }
@@ -1111,6 +995,8 @@ function YouTubeForm({ classId, columnId, insertIndex, onCreated }: { classId: s
       <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..."
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
       <p className="text-xs text-gray-500">Paste a YouTube link or its embed code (unlisted is fine). It will play right on the board.</p>
+      {/* KZ-039: muat naik video terus dibuang; ini satu-satunya jalan untuk video. */}
+      <p className="text-xs text-gray-500">Video mesti dikongsi melalui pautan YouTube.</p>
       <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
       <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2}
@@ -1988,46 +1874,6 @@ function ChatbotCardBody({ url, title }: { url: string; title: string | null }) 
           </div>
         </div>
       )}
-    </div>
-  );
-}
-
-function ChatbotForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
-  const [title, setTitle] = useState('');
-  const [url, setUrl] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-  const submit = async () => {
-    if (!url) { setErr('Enter the assistant embed URL'); return; }
-    let finalUrl = url.trim();
-    if (/landrr/i.test(finalUrl) && !/^https?:\/\//i.test(finalUrl)) {
-      const m = finalUrl.match(/source\s*[:=]\s*['\"]([A-Za-z0-9+/=_-]+)['\"]/);
-      if (m && m[1]) { finalUrl = '/embeds/landrr-chat.html?source=' + encodeURIComponent(m[1]); }
-      else { setErr('Could not find the chatbot token in that embed code.'); return; }
-    }
-    let valid = false;
-    if (finalUrl.startsWith('/embeds/')) { valid = true; }
-    else { try { valid = new URL(finalUrl).protocol === 'https:'; } catch { valid = false; } }
-    if (!valid) { setErr('Paste an https:// iframe URL or a chatbot script embed (e.g. Landrr).'); return; }
-    setBusy(true); setErr(null);
-    try {
-      const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ columnId, cardType: 'chatbot', title: title || null, chatbotUrl: finalUrl, insertIndex }),
-      });
-      const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
-      onCreated();
-    } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
-  };
-  return (
-    <div className="space-y-3">
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
-      <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Assistant embed URL (https://...)" className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
-      <p className="text-xs text-gray-500">Paste the embed URL from any chatbot platform (the src URL from its iframe embed code).</p>
-      {err && <div className="text-red-400 text-xs">{err}</div>}
-      <button onClick={submit} disabled={busy} className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm">{busy ? 'Adding...' : 'Add assistant'}</button>
     </div>
   );
 }

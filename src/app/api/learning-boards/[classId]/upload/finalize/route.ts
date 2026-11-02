@@ -4,6 +4,7 @@ import { admin } from '@/lib/mcp/db';
 import { s5HeadObject, s5FileCode, s5DeleteObject } from '@/lib/s5';
 import { fileluShareUrl } from '@/lib/filelu';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
+import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -76,6 +77,14 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
 
   const fileCode = s5FileCode(t.object_key);
   const mime = head.contentType || t.mime_type || 'application/octet-stream';
+
+  // Pembetulan CTO (kzsec KZ-039 #1): tiket hanya menyemak nama dan MIME
+  // yang diisytihar klien; semak semula MIME sebenar daripada storan supaya
+  // video tidak boleh diseludup melalui URL pratertanda.
+  if (failVideo(String(t.file_name ?? ''), mime)) {
+    try { await s5DeleteObject(t.object_key); } catch {}
+    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+  }
 
   // Kuota disemak dengan saiz SEBENAR yang diterima di storan (head.size),
   // bukan saiz yang diisytihar klien (tiket V2-002b, risiko kzsec).
