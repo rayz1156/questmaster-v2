@@ -32,6 +32,7 @@ import {
   type Klass,
 } from "@/lib/data";
 import { supabase } from "@/lib/supabaseClient";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import {
   Alert,
   Badge,
@@ -47,10 +48,11 @@ import {
 
 /** Lencana status aktiviti ikut status sebenar (Active/Draft/Archived). */
 function LencanaStatus({ status }: { status?: string | null }) {
+  const { t } = useBahasa();
   const s = String(status || "draft").toLowerCase();
-  if (s === "active") return <Badge variant="dot" warna="green">Active</Badge>;
-  if (s === "archived") return <Badge variant="dim" warna="gray">Archived</Badge>;
-  return <Badge variant="dim" warna="yellow">Draft</Badge>;
+  if (s === "active") return <Badge variant="dot" warna="green">{t("participant.statusActive")}</Badge>;
+  if (s === "archived") return <Badge variant="dim" warna="gray">{t("participant.statusArchived")}</Badge>;
+  return <Badge variant="dim" warna="yellow">{t("participant.statusDraft")}</Badge>;
 }
 
 /** Sisa hari sehingga end_at; undefined bila tiada tarikh (tiada lencana masa). */
@@ -62,6 +64,7 @@ function sisaHari(endAt?: string | null): number | undefined {
 
 function Inner() {
   const { user } = useSession("participant");
+  const { t } = useBahasa();
   const router = useRouter();
   const sp = useSearchParams();
   const huntId = sp.get("hunt") || "";
@@ -130,17 +133,17 @@ function Inner() {
         description={h.description || undefined}
         badges={
           <>
-            <Badge variant="dim" warna="purple">{h.points ?? 0} pts</Badge>
+            <Badge variant="dim" warna="purple">{t("participant.ptsBadge", { n: h.points ?? 0 })}</Badge>
             <LencanaStatus status={h.status} />
           </>
         }
         daysLeft={sisaHari(h.end_at)}
         done={siapSaya || undefined}
         menuItems={[
-          { label: "Open activity", icon: <Eye className="w-4 h-4" />, onSelect: () => { router.push(`/participant/activities?hunt=${h.id}`); } },
-          { label: "Open submission board", icon: <ClipboardList className="w-4 h-4" />, onSelect: () => { router.push(`/participant/activities/${h.id}/submissions`); } },
+          { label: t("participant.openActivity"), icon: <Eye className="w-4 h-4" />, onSelect: () => { router.push(`/participant/activities?hunt=${h.id}`); } },
+          { label: t("participant.openSubmissionBoard"), icon: <ClipboardList className="w-4 h-4" />, onSelect: () => { router.push(`/participant/activities/${h.id}/submissions`); } },
         ]}
-        menuLabel="Activity actions"
+        menuLabel={t("ui.activityActions")}
         href={`/participant/activities?hunt=${h.id}`}
       />
     );
@@ -149,8 +152,8 @@ function Inner() {
   return (
     <ParticipantShell>
       <PageHead
-        title="What is on your plate."
-        description="Complete activities to earn points for your team."
+        title={t("participant.activitiesTitle")}
+        description={t("participant.activitiesDesc")}
       />
 
       {classes.length > 0 && (
@@ -158,23 +161,23 @@ function Inner() {
           <Select
             value={filterClass}
             onChange={e => setFilterClass(e.target.value)}
-            aria-label="Filter by class"
+            aria-label={t("participant.filterByClassAria")}
             className="w-auto min-w-[220px]"
           >
-            <option value="">All classes</option>
+            <option value="">{t("participant.allClasses")}</option>
             {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
           </Select>
         </div>
       )}
 
       {busy && hunts.length === 0 ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-muted">{t("common.loading")}</p>
       ) : filteredHunts.length === 0 ? (
         <div className="bg-white rounded-[4px] shadow-card">
           <EmptyState
             icon={<ListChecks className="w-6 h-6" />}
-            title="No activities yet"
-            text="They appear here once your educator creates them in your classes."
+            title={t("participant.noActivitiesYet")}
+            text={t("participant.noActivitiesText")}
           />
         </div>
       ) : (
@@ -192,7 +195,7 @@ function Inner() {
               right={
                 <span className="text-right">
                   <span className="block text-[24px] leading-none text-ink tabular-nums">{active.points ?? 0}</span>
-                  <span className="block text-[12px] text-ink-faint mt-1">points</span>
+                  <span className="block text-[12px] text-ink-faint mt-1">{t("participant.pointsLabel")}</span>
                 </span>
               }
             />
@@ -206,7 +209,7 @@ function Inner() {
 
           {active.instructions && (
             <CardSection>
-              <div className="text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint mb-2">Instructions</div>
+              <div className="text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint mb-2">{t("participant.instructions")}</div>
               <p className="text-[14px] text-ink whitespace-pre-wrap leading-[1.65]">{active.instructions}</p>
             </CardSection>
           )}
@@ -221,7 +224,7 @@ function Inner() {
                 className="flex items-center gap-4 px-6 py-4 hover:bg-canvas transition"
               >
                 <span className="flex-1 min-w-0">
-                  <span className="block text-[15px] font-medium text-ink">Submission link</span>
+                  <span className="block text-[15px] font-medium text-ink">{t("participant.submissionLink")}</span>
                   <span className="block text-[13px] text-ink-faint mt-0.5 truncate">{active.submission_link_label || active.submission_link}</span>
                 </span>
                 <ExternalLink className="w-4 h-4 text-ink-faint shrink-0" />
@@ -233,8 +236,8 @@ function Inner() {
               className="flex items-center gap-4 border-t border-kz-line px-6 py-4 hover:bg-canvas transition"
             >
               <span className="flex-1 min-w-0">
-                <span className="block text-[15px] font-medium text-ink">Submission board</span>
-                <span className="block text-[13px] text-ink-faint mt-0.5">Share your work and see what your classmates posted.</span>
+                <span className="block text-[15px] font-medium text-ink">{t("participant.submissionBoard")}</span>
+                <span className="block text-[13px] text-ink-faint mt-0.5">{t("participant.submissionBoardDesc")}</span>
               </span>
               <ClipboardList className="w-4 h-4 text-ink-faint shrink-0" />
             </Link>
@@ -248,7 +251,7 @@ function Inner() {
                 className="flex items-center gap-4 border-t border-kz-line px-6 py-4 hover:bg-canvas transition"
               >
                 <span className="flex-1 min-w-0">
-                  <span className="block text-[15px] font-medium text-ink">Resource {i + 1}</span>
+                  <span className="block text-[15px] font-medium text-ink">{t("participant.resource", { n: i + 1 })}</span>
                   <span className="block text-[13px] text-ink-faint mt-0.5 truncate">{lnk}</span>
                 </span>
                 <ExternalLink className="w-4 h-4 text-ink-faint shrink-0" />
@@ -259,11 +262,11 @@ function Inner() {
           <CardSection baris>
             {myDone ? (
               <Alert tone="success" icon={<CheckCircle2 className="w-4 h-4" />}>
-                Your team has been awarded {active.points ?? 0} points for this activity.
+                {t("participant.awardedPoints", { mata: active.points ?? 0 })}
               </Alert>
             ) : (
               <Alert tone="info" icon={<Info className="w-4 h-4" />}>
-                Your team has not been marked complete yet. Your educator ticks the team once the activity is done.
+                {t("participant.notMarkedComplete")}
               </Alert>
             )}
           </CardSection>
@@ -274,5 +277,6 @@ function Inner() {
 }
 
 export default function Page() {
-  return <Suspense fallback={<div className="p-4 text-sm text-slate-500">Loading...</div>}><Inner /></Suspense>;
+  const { t } = useBahasa();
+  return <Suspense fallback={<div className="p-4 text-sm text-slate-500">{t("common.loadingDots")}</div>}><Inner /></Suspense>;
 }

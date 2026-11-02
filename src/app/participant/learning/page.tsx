@@ -13,6 +13,7 @@ import Link from 'next/link';
 import { ArrowRight, BookOpen, GraduationCap } from 'lucide-react';
 import { listEnrolledClasses } from '@/lib/data';
 import { useSession } from '@/lib/session';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 import {
   Card,
   CardHead,
@@ -24,6 +25,7 @@ import {
 
 export default function ParticipantLearningHome() {
   const { user } = useSession('participant');
+  const { t } = useBahasa();
   const router = useRouter();
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
   const [loading, setLoading] = useState(true);
@@ -48,26 +50,26 @@ export default function ParticipantLearningHome() {
   return (
     <ParticipantShell>
       <PageHead
-        title="Pick a class."
-        description="Each class keeps its own Learning Board."
+        title={t("participant.pickClass")}
+        description={t("participant.eachClassKeepsBoard")}
       />
 
       {loading ? (
-        <p className="text-[14px] text-ink-muted">Loading…</p>
+        <p className="text-[14px] text-ink-muted">{t("common.loading")}</p>
       ) : classes.length === 0 ? (
         <div className="bg-white rounded-[4px] shadow-card">
           <EmptyState
             icon={<BookOpen className="w-6 h-6" />}
-            title="You have not joined any class yet."
-            actionLabel="Join a class"
+            title={t("participant.notJoinedAnyClass")}
+            actionLabel={t("participant.joinClass")}
             href="/participant/join"
           />
         </div>
       ) : (
         <Card padat className="max-w-2xl">
           <CardHead
-            title="Your classes"
-            subtitle="Open the Learning Board of any of your classes."
+            title={t("participant.yourClasses")}
+            subtitle={t("participant.openLearningBoardOf")}
             right={<GraduationCap className="w-5 h-5 text-ink-faint" aria-hidden="true" />}
           />
           <div className="border-t border-kz-line">
@@ -76,7 +78,7 @@ export default function ParticipantLearningHome() {
                 <Link href={`/participant/classes/${c.id}/learning-board`}>
                   <TileRow
                     title={c.name}
-                    subtitle="Open the Learning Board"
+                    subtitle={t("participant.openTheLearningBoard")}
                     value={<ArrowRight className="w-4 h-4 text-ink-faint" aria-hidden="true" />}
                     index={i}
                   />
