@@ -29,6 +29,7 @@ import {
   PageHead,
   Textarea,
 } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 type Rakan = { id: string; name: string };
 
@@ -42,23 +43,25 @@ type BorangData = {
   total_to_evaluate: number;
 };
 
+// Kriteria penilaian: label diterjemah masa render melalui kunci kamus.
 const KRITERIA = [
-  { kod: "k1", label: "Attendance and punctuality" },
-  { kod: "k2", label: "Sharing responsibility" },
-  { kod: "k3", label: "Active participation" },
-  { kod: "k4", label: "Communication" },
-  { kod: "k5", label: "Respect and support" },
+  { kod: "k1", kunci: "participant.criterionAttendance" },
+  { kod: "k2", kunci: "participant.criterionResponsibility" },
+  { kod: "k3", kunci: "participant.criterionParticipation" },
+  { kod: "k4", kunci: "participant.criterionCommunication" },
+  { kod: "k5", kunci: "participant.criterionRespect" },
 ] as const;
 
 const SKALA = [
-  { nilai: 0, label: "Never" },
-  { nilai: 1, label: "Sometimes" },
-  { nilai: 2, label: "Always" },
-];
+  { nilai: 0, kunci: "participant.never" },
+  { nilai: 1, kunci: "participant.sometimes" },
+  { nilai: 2, kunci: "participant.always" },
+] as const;
 
 type Jawapan = Record<string, { k1: number; k2: number; k3: number; k4: number; k5: number }>;
 
 export default function PeerReviewFormPage() {
+  const { t } = useBahasa();
   const { roundId } = useParams<{ roundId: string }>();
   const router = useRouter();
   const { user, loading: authLoading } = useSession("participant");
@@ -77,7 +80,7 @@ export default function PeerReviewFormPage() {
       try {
         const res = await peerApi(`/api/peer-rounds/${roundId}/form`);
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "This evaluation round could not be found.");
+        if (!res.ok) throw new Error(json.error || t("participant.roundNotFound"));
         setBorang(json);
         // Mula: semua kriteria belum dipilih (0 bermaksud Never, bukan belum).
         const awal: Jawapan = {};
@@ -86,7 +89,7 @@ export default function PeerReviewFormPage() {
         }
         setJawapan(awal);
       } catch (e) {
-        setRalat((e as { message?: string })?.message || "Something went wrong.");
+        setRalat((e as { message?: string })?.message || t("participant.somethingWentWrong"));
       } finally {
         setLoading(false);
       }
@@ -128,10 +131,10 @@ export default function PeerReviewFormPage() {
         body: JSON.stringify({ ratings }),
       });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to submit.");
+      if (!res.ok) throw new Error(json.error || t("participant.failedToSubmit"));
       setSelesai(true);
     } catch (e) {
-      setRalat((e as { message?: string })?.message || "Failed to submit.");
+      setRalat((e as { message?: string })?.message || t("participant.failedToSubmit"));
     } finally {
       setBusy(false);
     }
@@ -144,9 +147,9 @@ export default function PeerReviewFormPage() {
         <div className="max-w-xl">
           <EmptyState
             icon={<CheckCircle2 className="w-6 h-6" />}
-            title="Thank you, your evaluations are in."
-            text="They are confidential: your teammates will never see scores or who rated them. Only your educator sees the raw data."
-            actionLabel="Back to home"
+            title={t("participant.thankYouTitle")}
+            text={t("participant.thankYouText")}
+            actionLabel={t("participant.backToHomeAction")}
             onAction={() => router.push("/participant/home")}
           />
         </div>
@@ -159,33 +162,33 @@ export default function PeerReviewFormPage() {
   return (
     <ParticipantShell>
       {loading ? (
-        <p className="text-[14px] text-ink-muted">Loading the form...</p>
+        <p className="text-[14px] text-ink-muted">{t("participant.loadingForm")}</p>
       ) : ralat && !borang ? (
         <Alert tone="danger">{ralat}</Alert>
       ) : !borang?.in_team ? (
         <Alert tone="info">
-          You are not in a group for this evaluation round. Join a team on the Teams page first.
+          {t("participant.notInGroup")}
         </Alert>
       ) : borang.submitted ? (
         <Alert tone="info">
-          You have already submitted your evaluations for this round. Thank you.
+          {t("participant.alreadySubmitted")}
         </Alert>
       ) : tutup ? (
         <Alert tone="warning">
-          This evaluation round is closed.
+          {t("participant.roundClosed")}
         </Alert>
       ) : (
         <>
           <PageHead
-            crumb="Peer review"
+            crumb={t("participant.peerReviewCrumb")}
             name={borang.round.name}
-            description={`${rakanSelesai} of ${jumlahRakan} teammates done`}
+            description={t("participant.teammatesDone", { selesai: rakanSelesai, jumlah: jumlahRakan })}
           />
 
           {/* Ayat kerahsiaan: bukan hiasan. Pelajar menilai dengan jujur
               hanya apabila mereka percaya penilaian sulit. */}
           <Alert tone="info" icon={<Lock className="h-4 w-4" />} className="mb-6">
-            This evaluation is confidential. Your teammates will never see the scores you give or who gave them, and only your educator sees the raw data.
+            {t("participant.confidentiality")}
           </Alert>
 
           <div className="space-y-4">
@@ -194,11 +197,11 @@ export default function PeerReviewFormPage() {
               const perlu = perluJustifikasi(j);
               return (
                 <Card key={r.id}>
-                  <CardHead title={r.name || "Teammate"} />
+                  <CardHead title={r.name || t("participant.teammate")} />
                   <div className="mt-4 space-y-3">
                     {KRITERIA.map((k) => (
                       <div key={k.kod} className="flex flex-wrap items-center justify-between gap-2">
-                        <div className="text-[14px] text-ink-muted min-w-0 flex-1">{k.label}</div>
+                        <div className="text-[14px] text-ink-muted min-w-0 flex-1">{t(k.kunci)}</div>
                         <div className="flex gap-1.5">
                           {SKALA.map((s) => {
                             const aktif = j[k.kod] === s.nilai;
@@ -209,9 +212,9 @@ export default function PeerReviewFormPage() {
                                 size="sm"
                                 warna="purple"
                                 onClick={() => pilih(r.id, k.kod, s.nilai)}
-                                ariaLabel={`${k.label}: ${s.label}`}
+                                ariaLabel={`${t(k.kunci)}: ${t(s.kunci)}`}
                               >
-                                {s.label}
+                                {t(s.kunci)}
                               </Button>
                             );
                           })}
@@ -222,13 +225,13 @@ export default function PeerReviewFormPage() {
                   {/* Justifikasi muncul secara automatik bila ada kriteria 0 atau 1. */}
                   {perlu && (
                     <div className="mt-4">
-                      <Field label="Why the low scores? (required, at least 10 characters)" htmlFor={`justifikasi-${r.id}`}>
+                      <Field label={t("participant.lowScoresQuestion")} htmlFor={`justifikasi-${r.id}`}>
                         <Textarea
                           id={`justifikasi-${r.id}`}
                           value={justifikasi[r.id] ?? ""}
                           onChange={(e) => setJustifikasi((s) => ({ ...s, [r.id]: e.target.value }))}
                           rows={2}
-                          placeholder="Explain so your educator understands the context."
+                          placeholder={t("participant.lowScoresPlaceholder")}
                         />
                       </Field>
                     </div>
@@ -241,18 +244,18 @@ export default function PeerReviewFormPage() {
           {ralat && <Alert tone="danger" className="mt-4">{ralat}</Alert>}
 
           <div className="mt-6 flex items-center justify-end gap-3">
-            <Button variant="ghost" href="/participant/teams">Cancel</Button>
+            <Button variant="ghost" href="/participant/teams">{t("common.cancel")}</Button>
             <Button
               onClick={hantar}
               disabled={busy || !semuaLengkap || jumlahRakan === 0}
             >
               <ClipboardList className="h-4 w-4" />
-              {busy ? "Submitting..." : "Submit all evaluations"}
+              {busy ? t("participant.submitting") : t("participant.submitAll")}
             </Button>
           </div>
           {!semuaLengkap && (
             <p className="mt-2 text-right text-xs text-gray-500">
-              Pick a rating for every teammate; a justification of at least 10 characters is required whenever any criterion is Never or Sometimes.
+              {t("participant.submitHint")}
             </p>
           )}
         </>

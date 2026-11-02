@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { previewClassByCode, joinClassByCode, normalizeClassCode, type ClassPreview } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 export const dynamic = "force-dynamic";
 
@@ -12,6 +13,7 @@ export const dynamic = "force-dynamic";
  * huruf O/I/L; semua dinormalisasi sebelum RPC dipanggil.
  */
 export default function JoinByCodePage({ params }: { params: { kod: string } }) {
+  const { t } = useBahasa();
   const router = useRouter();
   const kod = params?.kod || "";
 
@@ -41,7 +43,7 @@ export default function JoinByCodePage({ params }: { params: { kod: string } }) 
         setState("preview");
       }
     } catch (e) {
-      setErr(String((e as Error)?.message || "Something went wrong. Please try again."));
+      setErr(String((e as Error)?.message || t("sertai.somethingWentWrong")));
     } finally {
       setBusy(false);
     }
@@ -68,11 +70,11 @@ export default function JoinByCodePage({ params }: { params: { kod: string } }) 
     setBusy(true); setErr(null);
     try {
       await joinClassByCode(activeCode || normalizeClassCode(kod));
-      setOk("You have joined " + preview.class_name + "!");
+      setOk(t("sertai.youHaveJoined", { kelas: preview.class_name }));
       setTimeout(() => router.replace("/participant/home"), 700);
     } catch (e) {
-      const msg = String((e as Error)?.message || "Failed");
-      setErr(/Invalid class code/i.test(msg) ? "Code not found. Please check the code with your educator." : msg);
+      const msg = String((e as Error)?.message || t("participant.failedGeneric"));
+      setErr(/Invalid class code/i.test(msg) ? t("participant.codeNotFound") : msg);
     } finally { setBusy(false); }
   };
 
@@ -83,26 +85,26 @@ export default function JoinByCodePage({ params }: { params: { kod: string } }) 
   return (
     <div className="min-h-screen bg-canvas flex items-center justify-center p-4">
       <div className="card w-full max-w-sm space-y-3">
-        <h1 className="section-title">Join a class</h1>
+        <h1 className="section-title">{t("sertai.joinClassTitle")}</h1>
 
-        {state === "loading" && <p className="text-sm text-ink-muted">Loading…</p>}
+        {state === "loading" && <p className="text-sm text-ink-muted">{t("common.loading")}</p>}
 
         {state === "member" && (
           <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm text-violet-800">
-            You are already a member of this class. Taking you to your home page…
+            {t("sertai.alreadyMember")}
           </div>
         )}
 
         {state === "ended" && (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-            This class has ended and is no longer accepting new members.
+            {t("sertai.classEndedNoNewMembers")}
           </div>
         )}
 
         {state === "missing" && (
           <>
             <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm text-violet-800">
-              Code not found. Please check the code with your educator.
+              {t("participant.codeNotFound")}
             </div>
             <form
               onSubmit={(e) => { e.preventDefault(); if (manualCode.trim()) loadPreview(normalizeClassCode(manualCode.trim())); }}
@@ -110,13 +112,13 @@ export default function JoinByCodePage({ params }: { params: { kod: string } }) 
             >
               <input
                 className="input text-center font-mono text-lg uppercase tracking-[0.2em]"
-                placeholder="ABCD1234"
+                placeholder={t("common.codeExample")}
                 value={manualCode}
                 onChange={(e) => setManualCode(e.target.value.toUpperCase())}
                 maxLength={16}
                 required
               />
-              <button disabled={busy} className="btn-primary w-full py-2">{busy ? "Checking…" : "Check code"}</button>
+              <button disabled={busy} className="btn-primary w-full py-2">{busy ? t("sertai.checking") : t("sertai.checkCode")}</button>
             </form>
           </>
         )}
@@ -128,15 +130,15 @@ export default function JoinByCodePage({ params }: { params: { kod: string } }) 
               style={preview.class_color ? { borderLeft: `6px solid ${preview.class_color}` } : undefined}
             >
               <div className="flex-1">
-                <div className="font-semibold text-gray-900">Join {preview.class_name}?</div>
-                <div className="text-xs text-gray-500 mt-0.5">by {preview.educator_name}</div>
+                <div className="font-semibold text-gray-900">{t("sertai.joinQuestion", { nama: preview.class_name })}</div>
+                <div className="text-xs text-gray-500 mt-0.5">{t("sertai.byEducator", { pendidik: preview.educator_name })}</div>
               </div>
             </div>
             <button disabled={busy} onClick={onJoin} className="w-full py-2.5 rounded-xl text-white text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-95 disabled:opacity-50">
-              {busy ? "Joining…" : "Join class"}
+              {busy ? t("participant.joining") : t("participant.joinClassButton")}
             </button>
             <button disabled={busy} onClick={() => router.replace("/participant/home")} className="w-full py-2 rounded-xl border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-50">
-              Not now
+              {t("common.notNow")}
             </button>
           </>
         )}
