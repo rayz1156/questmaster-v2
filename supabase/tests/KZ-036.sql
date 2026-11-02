@@ -19,7 +19,7 @@ declare
   v_lalai boolean;
   v_sort int;
 begin
-  select count(*), max(label), max(enabled), max(is_default), max(sort_order)
+  select count(*), max(label), bool_or(enabled), bool_or(is_default), max(sort_order)
     into v_count, v_label, v_hidup, v_lalai, v_sort
     from public.qm_ai_models
     where provider = 'qwen' and model_id = 'qwen3.7-plus';
@@ -102,7 +102,7 @@ declare
   v_sort int;
   v_hidup boolean;
 begin
-  select max(label), max(sort_order), max(enabled)
+  select max(label), max(sort_order), bool_or(enabled)
     into v_label, v_sort, v_hidup
     from public.qm_ai_models
     where provider = 'qwen' and model_id = 'qwen3.7-flash';
