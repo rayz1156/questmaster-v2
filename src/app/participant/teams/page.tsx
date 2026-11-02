@@ -48,6 +48,7 @@ import {
   PersonRow,
   Select,
 } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /** Ahli pasukan seperti yang dikembalikan listTeamMembers. */
 type Ahli = { user_id: string; profile?: { display_name?: string | null } | null };
@@ -61,6 +62,7 @@ type Kumpulan = {
 };
 
 function Inner() {
+  const { t } = useBahasa();
   const { session, loading: authLoading } = useSession();
   const [classes, setClasses] = useState<Klass[]>([]);
   const confirm = useConfirm();
@@ -140,7 +142,7 @@ function Inner() {
 
   const myTeam = useMemo(() => {
     if (!uid) return null;
-    return teams.find((t) => (membersByTeam[t.id] || []).some((m) => m.user_id === uid)) || null;
+    return teams.find((tm) => (membersByTeam[tm.id] || []).some((m) => m.user_id === uid)) || null;
   }, [teams, membersByTeam, uid]);
 
   async function handleJoinByCode(e: React.FormEvent) {
@@ -150,14 +152,14 @@ function Inner() {
     setJoinMsg(null);
     try {
       await joinTeamByCode(code.trim().toUpperCase());
-      setJoinMsg({ type: "ok", text: "Joined team successfully!" });
+      setJoinMsg({ type: "ok", text: t("participant.joinedTeamSuccess") });
       setCode("");
       if (activeClassId) {
         const ts = await listTeamsByClass(activeClassId);
         setTeams(ts as Kumpulan[]);
       }
     } catch (err: unknown) {
-      setJoinMsg({ type: "err", text: (err as { message?: string })?.message || "Failed to join team" });
+      setJoinMsg({ type: "err", text: (err as { message?: string })?.message || t("participant.failedToJoinTeam") });
     } finally {
       setJoinBusy(false);
     }
@@ -175,12 +177,12 @@ function Inner() {
       }
       setExpandedTeam(team.id);
     } catch (err: unknown) {
-      alert((err as { message?: string })?.message || "Failed to join");
+      alert((err as { message?: string })?.message || t("participant.failedToJoin"));
     }
   }
 
   async function handleLeave(team: Kumpulan) {
-    if (!(await confirm({ title: "Leave this team?", tone: 'danger' }))) return;
+    if (!(await confirm({ title: t("participant.leaveThisTeam"), tone: 'danger' }))) return;
     try {
       await leaveTeam(team.id);
       setMembersByTeam((p) => {
@@ -193,15 +195,15 @@ function Inner() {
         setTeams(ts as Kumpulan[]);
       }
     } catch (err: unknown) {
-      alert((err as { message?: string })?.message || "Failed");
+      alert((err as { message?: string })?.message || t("participant.failedGeneric"));
     }
   }
 
   return (
     <ParticipantShell>
       <PageHead
-        title="Better together."
-        description="Join a team to collaborate and earn points together."
+        title={t("participant.betterTogether")}
+        description={t("participant.joinTeamToCollaborate")}
       />
 
       <div className="mb-5">
@@ -209,10 +211,10 @@ function Inner() {
           value={activeClassId}
           onChange={(e) => setActiveClassId(e.target.value)}
           disabled={classes.length === 0}
-          aria-label="Select class"
+          aria-label={t("participant.selectClass")}
           className="w-auto min-w-[220px]"
         >
-          {classes.length === 0 && <option>No enrolled classes</option>}
+          {classes.length === 0 && <option>{t("participant.noEnrolledClasses")}</option>}
           {classes.map((c) => (
             <option key={c.id} value={c.id}>{c.name}</option>
           ))}
@@ -224,21 +226,21 @@ function Inner() {
       <div className="mt-6 grid grid-cols-1 gap-7 xl:grid-cols-2">
         {/* Borang kod pasukan */}
         <Card>
-          <Field label="Join a team by code" htmlFor="kod-pasukan">
+          <Field label={t("participant.joinTeamByCode")} htmlFor="kod-pasukan">
             <form onSubmit={handleJoinByCode} className="flex flex-wrap items-start gap-2">
               <div className="w-[220px]">
                 <Input
                   id="kod-pasukan"
                   value={code}
                   onChange={(e) => setCode(e.target.value)}
-                  placeholder="Team code"
+                  placeholder={t("participant.teamCode")}
                   autoCapitalize="characters"
                   autoComplete="off"
                   className="font-mono uppercase tracking-[0.2em]"
                 />
               </div>
               <Button type="submit" disabled={joinBusy || !code.trim()}>
-                {joinBusy ? "Joining…" : "Join"}
+                {joinBusy ? t("participant.joining") : t("common.join")}
               </Button>
             </form>
           </Field>
@@ -252,11 +254,11 @@ function Inner() {
         {introBoardId && (
           <Card className="flex flex-col justify-center">
             <CardHead
-              title="Class intro board"
-              subtitle="See how your classmates introduced themselves."
+              title={t("participant.classIntroBoard")}
+              subtitle={t("participant.seeHowClassmates")}
               right={
                 <Button variant="outline" href={`/participant/classes/${activeClassId}/board`}>
-                  Open Intro Board <ExternalLink className="w-4 h-4" />
+                  {t("participant.openIntroBoard")} <ExternalLink className="w-4 h-4" />
                 </Button>
               }
             />
@@ -267,7 +269,7 @@ function Inner() {
       {/* Available teams */}
       <section className="mt-8">
         <div className="section-title mb-3">
-          Teams in this class{teams.length > 0 ? ` (${teams.length})` : ""}
+          {t("participant.teamsInThisClass")}{teams.length > 0 ? ` (${teams.length})` : ""}
         </div>
 
         {loading ? (
@@ -280,49 +282,49 @@ function Inner() {
           <div className="bg-white rounded-[4px] shadow-card">
             <EmptyState
               icon={<Users className="w-6 h-6" />}
-              title="No teams in this class yet."
+              title={t("participant.noTeamsInClassYet")}
             />
           </div>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-7">
-            {teams.map((t) => {
-              const members = membersByTeam[t.id] || [];
-              const count = countMap[t.id] ?? members.length ?? 0;
-              const maxM = t.max_members ?? 5;
+            {teams.map((tm) => {
+              const members = membersByTeam[tm.id] || [];
+              const count = countMap[tm.id] ?? members.length ?? 0;
+              const maxM = tm.max_members ?? 5;
               const isMine = members.some((m) => m.user_id === uid);
               const isFull = count >= maxM;
               const hasMyTeam = !!myTeam;
-              const isExp = expandedTeam === t.id;
+              const isExp = expandedTeam === tm.id;
               return (
                 <Card
-                  key={t.id}
+                  key={tm.id}
                   padat
                   className={`flex flex-col overflow-hidden ${isMine ? "ring-1 ring-brand-purple" : ""}`}
                 >
                   <button
                     type="button"
-                    onClick={() => setExpandedTeam(isExp ? null : t.id)}
+                    onClick={() => setExpandedTeam(isExp ? null : tm.id)}
                     aria-expanded={isExp}
                     className="w-full text-left px-6 pt-6 pb-4 hover:bg-canvas transition"
                   >
                     <span className="flex items-start justify-between gap-2">
                       <span className="min-w-0 flex-1">
-                        {renamingId === t.id ? (
+                        {renamingId === tm.id ? (
                           <form
                             onSubmit={async (e) => {
                               e.preventDefault();
                               e.stopPropagation();
                               if (!renameVal.trim()) return;
                               try {
-                                await renameTeam(t.id, renameVal.trim());
+                                await renameTeam(tm.id, renameVal.trim());
                                 setTeams((ts) =>
                                   ts.map((x) =>
-                                    x.id === t.id ? { ...x, name: renameVal.trim() } : x
+                                    x.id === tm.id ? { ...x, name: renameVal.trim() } : x
                                   )
                                 );
                                 setRenamingId(null);
                               } catch (err: unknown) {
-                                alert((err as { message?: string })?.message || "Failed");
+                                alert((err as { message?: string })?.message || t("participant.failedGeneric"));
                               }
                             }}
                             className="flex items-center gap-1"
@@ -354,17 +356,17 @@ function Inner() {
                           </form>
                         ) : (
                           <span className="flex items-center gap-1.5">
-                            <span className="text-[16.8px] font-bold tracking-[-0.17px] text-ink truncate">{t.name}</span>
+                            <span className="text-[16.8px] font-bold tracking-[-0.17px] text-ink truncate">{tm.name}</span>
                             {isMine && (
                               <button
                                 type="button"
                                 onClick={(e) => {
                                   e.stopPropagation();
-                                  setRenamingId(t.id);
-                                  setRenameVal(t.name);
+                                  setRenamingId(tm.id);
+                                  setRenameVal(tm.name);
                                 }}
                                 className="text-gray-300 hover:text-brand-purple"
-                                title="Rename team"
+                                title={t("participant.renameTeam")}
                               >
                                 <Pencil className="w-3 h-3" />
                               </button>
@@ -372,11 +374,11 @@ function Inner() {
                           </span>
                         )}
                         <span className="block text-[13px] text-ink-faint mt-0.5 tabular-nums">
-                          {count}/{maxM} members
+                          {t("participant.membersCount", { count, max: maxM })}
                         </span>
                       </span>
                       <span className="flex shrink-0 flex-col items-end gap-2">
-                        {isMine && <Badge variant="dim" warna="purple">Your team</Badge>}
+                        {isMine && <Badge variant="dim" warna="purple">{t("participant.yourTeam")}</Badge>}
                         <ChevronRight
                           className={`w-5 h-5 text-ink-faint transition ${isExp ? "rotate-90 text-brand-purple" : ""}`}
                         />
@@ -390,21 +392,21 @@ function Inner() {
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleLeave(t)}
+                        onClick={() => handleLeave(tm)}
                       >
-                        <LogOut className="w-3.5 h-3.5" /> Leave team
+                        <LogOut className="w-3.5 h-3.5" /> {t("participant.leaveTeam")}
                       </Button>
                     ) : hasMyTeam ? (
-                      <span className="text-xs text-ink-faint">Already in a team</span>
+                      <span className="text-xs text-ink-faint">{t("participant.alreadyInTeam")}</span>
                     ) : isFull ? (
-                      <span className="text-xs text-ink-faint">Team full</span>
+                      <span className="text-xs text-ink-faint">{t("participant.teamFull")}</span>
                     ) : (
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => handleJoinTeam(t)}
+                        onClick={() => handleJoinTeam(tm)}
                       >
-                        Join this team
+                        {t("participant.joinThisTeam")}
                       </Button>
                     )}
                   </div>
@@ -412,16 +414,16 @@ function Inner() {
                   {/* Expanded members */}
                   {isExp && (
                     <CardSection baris className="mt-auto">
-                      <div className="eyebrow mb-2">Members</div>
+                      <div className="eyebrow mb-2">{t("common.members")}</div>
                       {members.length === 0 ? (
-                        <p className="text-sm text-ink-faint">No members yet.</p>
+                        <p className="text-sm text-ink-faint">{t("participant.noMembersYet")}</p>
                       ) : (
                         <div className="space-y-0.5">
                           {members.map((m, i) => (
                             <PersonRow
                               key={m.user_id}
-                              name={m.profile?.display_name || "User " + String(m.user_id).slice(0, 8)}
-                              subtitle={m.user_id === uid ? "You" : undefined}
+                              name={m.profile?.display_name || t("common.user", { id: String(m.user_id).slice(0, 8) })}
+                              subtitle={m.user_id === uid ? t("participant.you") : undefined}
                               index={i}
                             />
                           ))}
@@ -440,8 +442,9 @@ function Inner() {
 }
 
 export default function ParticipantTeams() {
+  const { t } = useBahasa();
   return (
-    <Suspense fallback={<p className="p-6 text-gray-400">Loading…</p>}>
+    <Suspense fallback={<p className="p-6 text-gray-400">{t("common.loading")}</p>}>
       <Inner />
     </Suspense>
   );

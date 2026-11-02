@@ -40,6 +40,7 @@ export const en = {
     you: 'You',
     members: 'Members',
     user: 'User {id}',
+    codeExample: 'ABCD1234',
   },
   nav: {
     // Shell dan AdminShell.
@@ -341,13 +342,18 @@ export const en = {
     teamFull: 'Team full',
     joinThisTeam: 'Join this team',
     noMembersYet: 'No members yet.',
+    noTeamsInClassYet: 'No teams in this class yet.',
+    leaveTeam: 'Leave team',
+    failedGeneric: 'Failed',
     // Sertai kelas (src/app/participant/join/page.tsx).
     backToHome: 'Back to Home',
     joinClassTitle: 'Join a class',
+    joinClassButton: 'Join class',
     enterCodeGiven: 'Enter the class code given by your educator.',
     joinedRedirecting: 'Joined! Redirecting…',
     // Sertai pasukan (src/app/participant/join-team/page.tsx).
     joinTeamTitle: 'Join a team',
+    joinTeamButton: 'Join team',
     enterTeamCodeGiven:
       "Enter the team code given by your educator. You must already be enrolled in the team's class.",
     teamLabelShort: 'Team',
