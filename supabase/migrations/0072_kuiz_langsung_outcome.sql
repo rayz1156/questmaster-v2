@@ -168,7 +168,7 @@ begin
     WHERE q.class_id = p_class_id
   ),
   outcome_counts AS (
-    SELECT o.id AS outcome_id, COUNT(DISTINCT oc.challenge_id)::int AS tagged_challenges  -- Pembetulan CTO (kzqa): elak dabaran dua LEFT JOIN,
+    SELECT o.id AS outcome_id, COUNT(DISTINCT oc.challenge_id)::int AS tagged_challenges,  -- Pembetulan CTO (kzqa): elak dabaran dua LEFT JOIN
            COUNT(DISTINCT live_oq.quiz_id)::int AS tagged_live_quizzes
     FROM outcomes o
     LEFT JOIN oc ON oc.outcome_id = o.id
