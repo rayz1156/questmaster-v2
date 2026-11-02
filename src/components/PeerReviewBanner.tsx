@@ -10,6 +10,8 @@ import Link from "next/link";
 import { ClipboardList, ChevronRight } from "lucide-react";
 import { pusinganTerbukaBelumHantar, type PusinganTerbuka } from "@/lib/peer-client";
 import { PAPAR_PENILAIAN_RAKAN } from "@/lib/ciriPaparan";
+import { LOKAL } from "@/lib/i18n";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 // Pembalut supaya tiada panggilan API apabila ciri disembunyikan, tanpa
 // melanggar peraturan hook (tiada pulangan awal sebelum hook).
@@ -18,6 +20,7 @@ export default function PeerReviewBanner() {
 }
 
 function SepandukPenilaianRakan() {
+  const { t, bahasa } = useBahasa();
   const [pusingan, setPusingan] = useState<PusinganTerbuka | null>(null);
 
   useEffect(() => {
@@ -33,7 +36,7 @@ function SepandukPenilaianRakan() {
   if (!pusingan) return null;
   const tutup = (() => {
     try {
-      return new Date(pusingan.closes_at).toLocaleDateString(undefined, {
+      return new Date(pusingan.closes_at).toLocaleDateString(LOKAL[bahasa], {
         month: "short",
         day: "numeric",
       });
@@ -51,11 +54,11 @@ function SepandukPenilaianRakan() {
         <ClipboardList className="h-5 w-5 text-violet-600" />
       </div>
       <span className="min-w-0 flex-1">
-        <span className="font-semibold">Peer review is open: {pusingan.name}.</span>{" "}
-        <span className="text-gray-600">Rate your teammates confidentially before {tutup}.</span>
+        <span className="font-semibold">{t("banner.peerOpen", { nama: pusingan.name })}</span>{" "}
+        <span className="text-gray-600">{t("banner.peerDesc", { tarikh: tutup })}</span>
       </span>
       <span className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-medium text-white">
-        Open form <ChevronRight className="h-3.5 w-3.5" />
+        {t("banner.openForm")} <ChevronRight className="h-3.5 w-3.5" />
       </span>
     </Link>
   );

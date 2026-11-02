@@ -9,17 +9,19 @@ import { useParams } from 'next/navigation';
 import { ArrowLeft } from 'lucide-react';
 import LearningBoardView from '@/components/learning-board/LearningBoardView';
 import { Card, PageHead } from '@/components/ui';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 
 export default function ParticipantLearningBoardPage() {
   const params = useParams<{ id: string }>();
   const classId = params.id;
+  const { t } = useBahasa();
   return (
     <ParticipantShell>
       <PageHead
-        title="Learning board"
+        title={t("papanKelas.learningBoard")}
         secondaryActions={[
-          { label: 'Back', icon: <ArrowLeft className="w-4 h-4" />, href: '/participant/home' },
+          { label: t('common.back'), icon: <ArrowLeft className="w-4 h-4" />, href: '/participant/home' },
         ]}
       />
       <Card padat>

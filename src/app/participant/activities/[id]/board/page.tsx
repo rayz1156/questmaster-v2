@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import { Board, getBoardForHunt } from "@/lib/boards";
 import QuestBoardView from "@/components/boards/QuestBoardView";
 import { Alert, Card, PageHead } from "@/components/ui";
@@ -17,6 +18,7 @@ import { Alert, Card, PageHead } from "@/components/ui";
 export default function PartActivityBoardPage() {
   const params = useParams<{ id: string }>();
   const huntId = params.id;
+  const { t } = useBahasa();
   const [board, setBoard] = useState<Board | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -37,14 +39,14 @@ export default function PartActivityBoardPage() {
   return (
     <ParticipantShell>
       <PageHead
-        title="Activity board"
+        title={t("papanKelas.activityBoard")}
         secondaryActions={[
-          { label: "Back to Activities", icon: <ArrowLeft className="w-4 h-4" />, href: "/participant/activities" },
+          { label: t("common.backToActivities"), icon: <ArrowLeft className="w-4 h-4" />, href: "/participant/activities" },
         ]}
       />
-      {loading && <p className="text-[14px] text-ink-muted">Memuatkan…</p>}
+      {loading && <p className="text-[14px] text-ink-muted">{t("common.loading")}</p>}
       {err && <Alert tone="danger">{err}</Alert>}
-      {!loading && !board && <p className="text-[14px] text-ink-muted">Board hantaran belum dicipta untuk aktiviti ini.</p>}
+      {!loading && !board && <p className="text-[14px] text-ink-muted">{t("papanKelas.submissionBoardMissing")}</p>}
       {board && (
         <Card padat>
           <QuestBoardView board={board} canManage={false} currentUserId={userId} />

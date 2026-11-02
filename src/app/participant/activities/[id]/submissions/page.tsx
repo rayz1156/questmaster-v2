@@ -13,6 +13,7 @@ import SubmissionBoardView from '@/components/submission-board/SubmissionBoardVi
 import { supabase } from '@/lib/supabase';
 import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem } from '@/lib/submission-boards';
 import { Alert, Card, PageHead } from '@/components/ui';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 
 /** Wrap fetch() to attach the Supabase access token. */
@@ -28,6 +29,7 @@ async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Pr
 export default function ParticipantSubmissionsPage() {
   const params = useParams<{ id: string }>();
   const huntId = params.id;
+  const { t } = useBahasa();
   const [classId, setClassId] = useState<string | null>(null);
   const [data, setData] = useState<{ board: SubmissionBoard | null; items: SubmissionBoardItem[]; columns: SubmissionBoardColumn[]; myRole: 'educator' | 'student' | 'admin'; myId: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -37,10 +39,10 @@ export default function ParticipantSubmissionsPage() {
       try {
         // Find the class this hunt belongs to (hunts.class_id), then load the board.
         const { data: hunt } = await supabase.from('qm_hunts').select('class_id').eq('id', huntId).maybeSingle();
-        if (!hunt) throw new Error('Activity not found');
+        if (!hunt) throw new Error(t('papanKelas.activityNotFound'));
         setClassId(hunt.class_id);
         const r = await authedFetch(`/api/submission-boards/${huntId}/${hunt.class_id}`, { cache: 'no-store' });
-        if (!r.ok) throw new Error((await r.json()).error || 'Failed to load');
+        if (!r.ok) throw new Error((await r.json()).error || t('papanKelas.failedToLoad'));
         const j = await r.json();
         setData({ board: j.board, items: j.items || [], columns: j.columns || [], myRole: j.myRole || 'student', myId: j.myId });
       } catch (e) { setErr((e as { message?: string })?.message || String(e)); }
@@ -50,13 +52,13 @@ export default function ParticipantSubmissionsPage() {
   return (
     <ParticipantShell>
       <PageHead
-        title="My Submissions"
+        title={t("papanKelas.mySubmissions")}
         secondaryActions={[
-          { label: 'Back', icon: <ArrowLeft className="w-4 h-4" />, href: '/participant/home' },
+          { label: t('common.back'), icon: <ArrowLeft className="w-4 h-4" />, href: '/participant/home' },
         ]}
       />
       {err && <Alert tone="danger" className="mb-4">{err}</Alert>}
-      {!data && !err && <p className="text-[14px] text-ink-muted">Loading...</p>}
+      {!data && !err && <p className="text-[14px] text-ink-muted">{t("common.loadingDots")}</p>}
       {data && classId && (
         <Card padat>
           <SubmissionBoardView

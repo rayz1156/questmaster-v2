@@ -12,6 +12,7 @@
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 interface ItemRound {
   // KZ-038: kunci item ialah itemId (id qm_lna_items).
@@ -38,9 +39,8 @@ interface Nilai {
   currentLevel: number | null;
 }
 
-const NOTIS = "Guru anda akan nampak jawapan anda.";
-
 export default function HalamanJawabLna() {
+  const { t } = useBahasa();
   const params = useParams<{ roundId: string }>();
   const roundId = String(params.roundId || "");
   const router = useRouter();
@@ -76,7 +76,7 @@ export default function HalamanJawabLna() {
         const j = await r.json().catch(() => ({}) as Record<string, unknown>);
         if (cancelled) return;
         if (!r.ok) {
-          setErr(String(j?.error ?? "Pusingan tidak dapat dibaca."));
+          setErr(String(j?.error ?? t("lna.roundNotReadable")));
           setKeadaan("ralat");
           return;
         }
@@ -96,7 +96,7 @@ export default function HalamanJawabLna() {
         setKeadaan("sedia");
       } catch {
         if (!cancelled) {
-          setErr("Pusingan tidak dapat dibaca.");
+          setErr(t("lna.roundNotReadable"));
           setKeadaan("ralat");
         }
       }
@@ -130,12 +130,12 @@ export default function HalamanJawabLna() {
       });
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "Jawapan tidak dapat dihantar."));
+        setErr(String(j?.error ?? t("lna.answersNotSubmitted")));
         return;
       }
-      setOk("Jawapan dihantar. Anda boleh mengubahnya selagi pusingan dibuka.");
+      setOk(t("lna.answersSubmitted"));
     } catch {
-      setErr("Jawapan tidak dapat dihantar.");
+      setErr(t("lna.answersNotSubmitted"));
     } finally {
       setBusy(false);
     }
@@ -188,25 +188,25 @@ export default function HalamanJawabLna() {
       <div className="max-w-md mx-auto px-4 py-8 space-y-4">
         <div>
           <p className="text-[12px] font-semibold uppercase tracking-wide text-violet-700">
-            Learning Needs Analysis
+            {t("lna.eyebrow")}
           </p>
           <h1 className="text-[20px] font-bold text-ink mt-0.5">
-            {maklumat?.title ?? "Analisis Keperluan Pembelajaran"}
+            {maklumat?.title ?? t("lna.titleFallback")}
           </h1>
           {maklumat ? (
             <p className="text-[13px] text-ink-faint mt-0.5">
-              Pusingan {maklumat.kind === "pre" ? "PRA" : "PASCA"}
+              {maklumat.kind === "pre" ? t("lna.roundPre") : t("lna.roundPost")}
             </p>
           ) : null}
         </div>
 
         {/* Notis tetap: jawapan ini bukan tanpa nama. */}
         <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm text-violet-800">
-          {NOTIS}
+          {t("lna.notice")}
         </div>
 
         {keadaan === "muat" ? (
-          <p className="text-sm text-ink-muted">Memuat…</p>
+          <p className="text-sm text-ink-muted">{t("common.loading")}</p>
         ) : null}
 
         {err ? (
@@ -223,13 +223,13 @@ export default function HalamanJawabLna() {
 
         {maklumat?.status === "closed" ? (
           <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-800">
-            Pusingan ini sudah ditutup. Jawapan tidak lagi boleh diubah.
+            {t("lna.roundClosed")}
           </div>
         ) : null}
 
         {keadaan === "sedia" && items.length === 0 ? (
           <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 text-sm text-violet-800">
-            LNA ini belum ada item. Hubungi guru anda.
+            {t("lna.noItems")}
           </div>
         ) : null}
 
@@ -241,12 +241,12 @@ export default function HalamanJawabLna() {
             <BarisButang
               itemId={it.itemId}
               medan="importance"
-              label="Sepenting mana untuk saya"
+              label={t("lna.importance")}
             />
             <BarisButang
               itemId={it.itemId}
               medan="currentLevel"
-              label="Seyakin mana saya sekarang"
+              label={t("lna.confidence")}
             />
           </div>
         ))}
@@ -258,7 +258,7 @@ export default function HalamanJawabLna() {
             onClick={() => void hantar()}
             className="w-full py-2.5 rounded-xl text-white text-sm font-medium bg-gradient-to-r from-violet-600 to-indigo-600 hover:opacity-95 disabled:opacity-50"
           >
-            {busy ? "Menghantar…" : "Hantar jawapan"}
+            {busy ? t("lna.submitting") : t("lna.submitAnswers")}
           </button>
         ) : null}
       </div>

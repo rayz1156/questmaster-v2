@@ -414,7 +414,7 @@ export default function Shell({
               </Link>
 
               {/* Pemilih bahasa (KZ-040): di bar atas, berdekatan Help. */}
-              <PemilihBahasa className="hidden sm:inline-flex" />
+              <PemilihBahasa />
 
               <div className="relative" ref={menuRef}>
                 <button

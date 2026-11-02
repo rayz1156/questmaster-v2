@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ClipboardList, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 interface LnaTerbuka {
   roundId: string;
@@ -52,6 +53,7 @@ async function cariLnaBelumDijawab(classIds: string[]): Promise<LnaTerbuka | nul
 }
 
 export default function LnaBanner({ classIds }: { classIds: string[] }) {
+  const { t } = useBahasa();
   const [lna, setLna] = useState<LnaTerbuka | null>(null);
   const kunci = classIds.join(",");
 
@@ -80,11 +82,11 @@ export default function LnaBanner({ classIds }: { classIds: string[] }) {
         <ClipboardList className="h-5 w-5 text-violet-600" />
       </div>
       <span className="min-w-0 flex-1">
-        <span className="font-semibold">LNA dibuka: {lna.title}.</span>{" "}
-        <span className="text-gray-600">Nilai kepentingan dan keyakinan anda supaya guru tahu apa yang perlu diajar.</span>
+        <span className="font-semibold">{t("banner.lnaOpen", { tajuk: lna.title })}</span>{" "}
+        <span className="text-gray-600">{t("banner.lnaDesc")}</span>
       </span>
       <span className="inline-flex shrink-0 items-center gap-1 rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-4 py-2 text-xs font-medium text-white">
-        Jawab <ChevronRight className="h-3.5 w-3.5" />
+        {t("banner.answer")} <ChevronRight className="h-3.5 w-3.5" />
       </span>
     </Link>
   );

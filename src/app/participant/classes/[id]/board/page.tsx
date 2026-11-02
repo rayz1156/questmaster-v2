@@ -9,6 +9,7 @@ import { useEffect, useState } from "react";
 import { useParams } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import { Board, getBoardForClass } from "@/lib/boards";
 import IntroBoardView from "@/components/boards/IntroBoardView";
 import { Alert, Card, PageHead } from "@/components/ui";
@@ -17,6 +18,7 @@ import { Alert, Card, PageHead } from "@/components/ui";
 export default function PartClassBoardPage() {
   const params = useParams<{ id: string }>();
   const classId = params.id;
+  const { t } = useBahasa();
   const [board, setBoard] = useState<Board | null>(null);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -37,14 +39,14 @@ export default function PartClassBoardPage() {
   return (
     <ParticipantShell>
       <PageHead
-        title="Intro board"
+        title={t("papanKelas.introBoard")}
         secondaryActions={[
-          { label: "Back", icon: <ArrowLeft className="w-4 h-4" />, href: "/participant/home" },
+          { label: t("common.back"), icon: <ArrowLeft className="w-4 h-4" />, href: "/participant/home" },
         ]}
       />
-      {loading && <p className="text-[14px] text-ink-muted">Memuatkan…</p>}
+      {loading && <p className="text-[14px] text-ink-muted">{t("common.loading")}</p>}
       {err && <Alert tone="danger">{err}</Alert>}
-      {!loading && !board && <p className="text-[14px] text-ink-muted">Board pengenalan belum dicipta untuk kelas ini.</p>}
+      {!loading && !board && <p className="text-[14px] text-ink-muted">{t("papanKelas.introBoardMissing")}</p>}
       {board && (
         <Card padat>
           <IntroBoardView board={board} canManage={false} currentUserId={userId} />

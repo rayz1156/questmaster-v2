@@ -35,7 +35,10 @@ function ResetInner(){
       }catch(e){setErr(e instanceof Error? e.message : t('auth.validationFailed'));}
     })();
     return ()=>{if(unsub)unsub.unsubscribe();};
-  },[params,t]);
+    // Sengaja tanpa `t`: tukar bahasa memanggil router.refresh() dan tidak boleh
+    // mengesahkan semula token yang sudah digunakan (kzsec R1).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  },[params]);
   async function submit(e: React.FormEvent){ e.preventDefault(); setBusy(true); setErr('');
     const { error } = await supabase.auth.updateUser({ password });
     setBusy(false); if (error){ setErr(error.message); return; } setDone(true);

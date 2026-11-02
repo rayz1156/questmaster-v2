@@ -450,7 +450,7 @@ export default function AdminShell({
             </form>
 
             {/* Pemilih bahasa (KZ-040): di bar atas, berdekatan carian. */}
-            <PemilihBahasa className="hidden sm:inline-flex shrink-0" />
+            <PemilihBahasa className="shrink-0" />
 
             {/* Menu akaun */}
             <div className="relative shrink-0" ref={menuRef}>

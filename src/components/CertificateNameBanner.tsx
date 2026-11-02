@@ -10,8 +10,10 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Award } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 export default function CertificateNameBanner() {
+  const { t } = useBahasa();
   const [tunjuk, setTunjuk] = useState(false);
 
   useEffect(() => {
@@ -42,10 +44,10 @@ export default function CertificateNameBanner() {
     <div className="mb-6 rounded-xl border border-violet-200 bg-violet-50 px-4 py-3 flex items-center justify-between gap-4 flex-wrap">
       <span className="text-sm text-slate-700 flex items-center gap-2">
         <Award className="w-4 h-4 text-brand-purple" />
-        Confirm the name to print on your certificates
+        {t("banner.confirmNameToPrint")}
       </span>
       <Link href="/participant/certificates" className="btn-quiet text-brand-purple">
-        Confirm name
+        {t("banner.confirmName")}
       </Link>
     </div>
   );
