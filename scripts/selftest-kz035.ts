@@ -225,8 +225,8 @@ check('seri: semua berkongsi kedudukan 1',
   laporanSeri.outcomes.every(
     (o) => o.kedudukanBorich === 1 && o.kedudukanRdm === 1),
   laporanSeri.outcomes.map((o) => [o.kedudukanBorich, o.kedudukanRdm]));
-check('seri: varians sifar memberikan rho 0 dan kaedah tidak sepakat',
-  laporanSeri.spearmanRho === 0 && laporanSeri.kaedahSepakat === false,
+check('seri: varians sifar memberikan rho null dan kaedah tidak dinilai',
+  laporanSeri.spearmanRho === null && laporanSeri.kaedahSepakat === null,
   { rho: laporanSeri.spearmanRho, sepakat: laporanSeri.kaedahSepakat });
 
 /* ===== Bahagian 5: outcome tanpa mastery sama sekali ===== */

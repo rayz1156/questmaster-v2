@@ -20,7 +20,7 @@
  *  - Spearman rho antara kedudukan Borich (MWDS menurun) dan kedudukan
  *    RDM (RDS menaik), dikira sebagai Pearson atas purata kedudukan
  *    (tahan seri). kaedahSepakat = rho >= 0.6; null jika kurang 3
- *    outcome ada data.
+ *    outcome ada data atau satu kedudukan sama untuk semua outcome.
  *  - Bendera keyakinan lawan penguasaan memerlukan mastery sebenar
  *    (qm_mastery_summary) dan syarat scored >= 2 supaya satu-satu
  *    penghantaran tidak menipu bendera.
@@ -241,9 +241,10 @@ function pearson(x: number[], y: number[]): number | null {
     vx += (x[i] - mx) * (x[i] - mx);
     vy += (y[i] - my) * (y[i] - my);
   }
-  // Varians sifar (semua nilai sama) bermakna tiada persetujuan boleh
-  // diukur; pulangkan 0, bukan NaN.
-  if (vx === 0 || vy === 0) return 0;
+  // Varians sifar (semua kedudukan sama) bermakna korelasi tidak boleh
+  // dikira; pulangkan null supaya laporan tidak mendakwa kaedah tidak
+  // sepakat.
+  if (vx === 0 || vy === 0) return null;
   return cov / Math.sqrt(vx * vy);
 }
 

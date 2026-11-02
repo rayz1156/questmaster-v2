@@ -641,6 +641,14 @@ export default function HalamanLnaKelas() {
                       Kaedah tidak sepakat, semak secara manual.
                     </Alert>
                   ) : null}
+                  {laporanAktif.kaedahSepakat === null &&
+                  laporanAktif.bilanganResponden > 0 &&
+                  laporanAktif.outcomes.length >= 3 ? (
+                    <p className="mt-3 text-[12px] text-ink-faint">
+                      Borich dan RDM tidak dapat dibandingkan kerana
+                      kedudukan sama untuk semua item.
+                    </p>
+                  ) : null}
 
                   {/* Jadual keutamaan. */}
                   <div className="mt-4 overflow-x-auto">
@@ -764,7 +772,13 @@ export default function HalamanLnaKelas() {
                     <p className="text-[14px] font-semibold text-ink mb-2">
                       Keyakinan lawan penguasaan
                     </p>
-                    {laporanAktif.bendera.length === 0 ? (
+                    {laporanAktif.bendera.length === 0 &&
+                    laporanAktif.outcomes.every((o) => o.avgMasteryPct == null) ? (
+                      <p className="text-[13px] text-ink-faint">
+                        Bendera memerlukan data penguasaan. Tag kuiz atau
+                        aktiviti kepada Outcome kelas ini dahulu.
+                      </p>
+                    ) : laporanAktif.bendera.length === 0 ? (
                       <p className="text-[13px] text-ink-faint">
                         Tiada bendera. Pelajar yang yakin memang menguasai,
                         dan yang kurang yakin memang belum menguasai.

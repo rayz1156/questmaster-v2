@@ -20,6 +20,7 @@ import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BookOpen, ClipboardList, CopyPlus } from "lucide-react";
 import ParticipantShell from "@/components/ParticipantShell";
 import PeerReviewBanner from "@/components/PeerReviewBanner";
+import LnaBanner from "@/components/LnaBanner";
 import CertificateNameBanner from "@/components/CertificateNameBanner";
 import {
   listQuestsForParticipant,
@@ -425,7 +426,7 @@ export default function Page() {
           </section>
         )}
 
-        {/* Banner sedia ada: kelas tamat, nama sijil, semakan rakan. */}
+        {/* Banner sedia ada: kelas tamat, nama sijil, semakan rakan, LNA. */}
         {activeClass?.ended_at && (
           <div data-class-banner="ended" className="card border-l-4 border-l-kz-warn p-4 text-sm text-ink-muted">
             <span className="font-bold text-ink">This class has ended.</span> You can still review the Intro Board, Learning Board, Activities and the final ranking. New submissions are closed.
@@ -433,6 +434,7 @@ export default function Page() {
         )}
         <CertificateNameBanner />
         <PeerReviewBanner />
+        <LnaBanner classIds={classes.map((k) => k.id)} />
 
         {dataReady && classes.length === 0 ? (
           // Keadaan kosong: peserta tanpa kelas.
