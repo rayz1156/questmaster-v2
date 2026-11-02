@@ -51,7 +51,7 @@ const JANGKA: Record<Exclude<Pelan, 'unlimited'>, Record<string, number | boolea
     kelas: 3, pesertaSeKelas: 150, pemainSeSesi: 60,
     aktiviti: 30, papan: 5, pasukan: true,
     storan: 100, saizFail: 10, penilaianRakan: false,
-    googleForm: false, laporan: false, aksesMcp: false, adminInvois: false,
+    googleForm: false, laporan: false, aksesMcp: true, adminInvois: false,
   },
   pro: {
     kelas: 30, pesertaSeKelas: null, pemainSeSesi: 300,

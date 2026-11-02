@@ -53,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (confirm) {
     if (participantIds && participantIds.length > MAX_ID_PERMINTAAN) {
       return NextResponse.json(
-        { error: 'Too many participants in one request.' },
+        { error: 'Too many students in one request.' },
         { status: 400 },
       );
     }

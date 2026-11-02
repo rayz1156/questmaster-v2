@@ -94,7 +94,7 @@ check(
 );
 check(
   'terjemahBilangan: ms tanpa jamak nahu',
-  terjemahBilangan('ms', 'kelas.studentOne', 'kelas.studentOther', 3, { n: 3 }) === '3 peserta',
+  terjemahBilangan('ms', 'kelas.studentOne', 'kelas.studentOther', 3, { n: 3 }) === '3 pelajar',
   terjemahBilangan('ms', 'kelas.studentOne', 'kelas.studentOther', 3, { n: 3 })
 );
 check(

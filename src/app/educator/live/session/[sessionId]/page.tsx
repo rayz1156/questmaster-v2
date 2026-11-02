@@ -275,7 +275,7 @@ export default function PanelHosSesi() {
               </Button>
               <span className="flex items-center gap-2 text-sm text-gray-600">
                 <Users className="w-5 h-5 text-indigo-600" />
-                <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} participants
+                <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} students
               </span>
             </div>
           </div>
@@ -359,7 +359,7 @@ export default function PanelHosSesi() {
       ) : session.status === "lobby" ? (
         <Card className="mb-4">
           <CardHead title="Waiting in the lobby…" />
-          <p className="text-sm text-gray-500 mt-2">Participants appear here as they join. Press &quot;Start quiz&quot; when you are ready.</p>
+          <p className="text-sm text-gray-500 mt-2">Students appear here as they join. Press &quot;Start quiz&quot; when you are ready.</p>
         </Card>
       ) : currentQuestion && (
         <Card className="mb-4">
@@ -399,12 +399,12 @@ export default function PanelHosSesi() {
           <CardHead
             title={
               <span className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-600" /> Participants ({playerCount})
+                <Users className="w-4 h-4 text-indigo-600" /> Students ({playerCount})
               </span>
             }
           />
           {players.length === 0 ? (
-            <p className="text-sm text-gray-500 mt-2">No participants yet.</p>
+            <p className="text-sm text-gray-500 mt-2">No students yet.</p>
           ) : (
             <ol className="text-sm space-y-1 mt-2">
               {players.map((p, i) => (

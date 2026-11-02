@@ -65,7 +65,7 @@ export function barisKad(pelan: Pelan): BarisKad[] {
     { kunci: 'penilaianRakan', angka: null, termasuk: ciri },
     { kunci: 'googleForm', angka: null, termasuk: ciri },
     { kunci: 'laporan', angka: null, termasuk: ciri },
-    { kunci: 'aksesMcp', angka: null, termasuk: ciri },
+    { kunci: 'aksesMcp', angka: null, termasuk: true }, // MCP untuk semua pelan, termasuk Percuma
     { kunci: 'adminInvois', angka: null, termasuk: pelan === 'institution' },
   ];
   // Baris penilaian rakan disembunyikan bersama ciri (src/lib/ciriPaparan.ts).

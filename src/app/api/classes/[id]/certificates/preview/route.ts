@@ -87,7 +87,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // Normalkan layout (V2-015) sebelum PDF dijana.
   const layout = normaliseSusunAtur(template.layout);
   const bait = await janaPdfSijil({
-    nama: 'Sample Participant',
+    nama: 'Sample Student',
     program: kelas?.name ?? 'Sample Program',
     tarikh: new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }),
     pengeluar: 'Sample Educator',

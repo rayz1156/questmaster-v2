@@ -34,7 +34,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 /** Kod contoh: tidak akan pernah wujud dalam qm_certificates kerana kod
  *  sebenar tidak mengandungi angka sifar (abjad 0042). */
 const KOD_CONTOH = 'CONTOH0000';
-const NAMA_LALAI = 'Nama Peserta Contoh';
+const NAMA_LALAI = 'Nama Pelajar Contoh';
 
 /** Umur URL bertandatangan untuk contoh PDF. */
 const SAAT_URL = 600;

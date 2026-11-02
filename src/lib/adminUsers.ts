@@ -21,7 +21,7 @@ export const HARI_TAMAT_PELAN = 14;
 export const TAB_PENGGUNA: { key: TabPengguna; label: string }[] = [
   { key: 'all', label: 'All' },
   { key: 'educators', label: 'Educators' },
-  { key: 'participants', label: 'Participants' },
+  { key: 'participants', label: 'Students' },
   { key: 'admins', label: 'Admins' },
   { key: 'pending', label: 'Pending approval' },
   { key: 'suspended', label: 'Suspended' },

@@ -120,7 +120,7 @@ function labelPeranan(role: string) {
   if (role === "superadmin") return "Owner";
   if (role === "admin") return "Admin";
   if (role === "educator") return "Educator";
-  return "Participant";
+  return "Student";
 }
 
 /** Butang tindakan menegak dalam kad "Account actions", nilai v3 (KZ-DS-v3). */
@@ -199,7 +199,7 @@ export default function Page({ params }: { params: { id: string } }) {
               (baris || []).map((c: KelasMentah) => ({
                 id: c.id,
                 nama: c.name,
-                peranan: "Participant",
+                peranan: "Student",
                 status: c.is_archived ? "Archived" : c.ended_at ? "Ended" : "Active",
                 // Normalisasi rentetan kosong: fmt() memaparkan "Never".
                 tarikh: c.joined_at || "",
@@ -610,7 +610,7 @@ export default function Page({ params }: { params: { id: string } }) {
                       aria-label="Role"
                       className="w-40"
                     >
-                      <option value="participant">Participant</option>
+                      <option value="participant">Student</option>
                       <option value="educator">Educator</option>
                       <option value="admin">Admin</option>
                     </Select>

@@ -65,7 +65,7 @@ function labelPeranan(role: string) {
   if (role === "superadmin") return "Owner";
   if (role === "admin") return "Admin";
   if (role === "educator") return "Educator";
-  return "Participant";
+  return "Student";
 }
 
 function SenaraiPengguna({

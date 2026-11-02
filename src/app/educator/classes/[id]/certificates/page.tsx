@@ -596,7 +596,7 @@ export default function CertificatesPage() {
     if (ids.length === 0) return;
     const ok = await confirm({
       title: "Issue certificates",
-      description: `Issue certificates to ${ids.length} participant${ids.length === 1 ? "" : "s"}? This cannot be undone except by revoking.`,
+      description: `Issue certificates to ${ids.length} student${ids.length === 1 ? "" : "s"}? This cannot be undone except by revoking.`,
       confirmLabel: "Issue",
     });
     if (!ok) return;
@@ -672,7 +672,7 @@ export default function CertificatesPage() {
   const emelPukal = async () => {
     const ok = await confirm({
       title: "Email certificates",
-      description: "Send certificate emails to participants who have not received one yet? The certificate PDF will be attached.",
+      description: "Send certificate emails to students who have not received one yet? The certificate PDF will be attached.",
       confirmLabel: "Send",
     });
     if (!ok) return;
@@ -684,7 +684,7 @@ export default function CertificatesPage() {
     if (bilanganPilihEmel === 0) return;
     const ok = await confirm({
       title: "Email selected certificates",
-      description: `Send certificate emails to ${bilanganPilihEmel} selected participant${bilanganPilihEmel === 1 ? "" : "s"}? Anyone already emailed will receive it again. The certificate PDF will be attached.`,
+      description: `Send certificate emails to ${bilanganPilihEmel} selected student${bilanganPilihEmel === 1 ? "" : "s"}? Anyone already emailed will receive it again. The certificate PDF will be attached.`,
       confirmLabel: "Send",
     });
     if (!ok) return;
@@ -1073,7 +1073,7 @@ export default function CertificatesPage() {
           ref={kepalaTickRef}
           type="checkbox"
           className="h-4 w-4 accent-brand-purple"
-          title="Select all eligible participants"
+          title="Select all eligible students"
           disabled={barisBolehPilih.length === 0 || issueBusy}
           checked={semuaBolehPilihTicked}
           onChange={(e) => {
@@ -1890,7 +1890,7 @@ export default function CertificatesPage() {
                 <Plus className="w-4 h-4" />
                 {kemajuan
                   ? `Issuing ${kemajuan.semasa} of ${kemajuan.jumlah}...`
-                  : `Issue to ${bilanganTick} participant${bilanganTick === 1 ? "" : "s"}`}
+                  : `Issue to ${bilanganTick} student${bilanganTick === 1 ? "" : "s"}`}
               </Button>
             </div>
           )}

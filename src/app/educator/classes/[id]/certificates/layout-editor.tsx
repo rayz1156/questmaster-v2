@@ -367,7 +367,7 @@ export default function LayoutEditor({
               touchAction: "none",
             }}
           >
-            Participant Name
+            Student Name
           </div>
 
           {/* Kotak QR */}

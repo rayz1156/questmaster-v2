@@ -93,7 +93,7 @@ export default function ActivityStatsPanel({ classId }: { classId: string | null
                 <th className="text-right py-2 pr-3">Submissions</th>
                 <th className="text-right py-2 pr-3">Approved</th>
                 <th className="text-right py-2 pr-3">Pending</th>
-                <th className="text-right py-2 pr-3">Participants</th>
+                <th className="text-right py-2 pr-3">Students</th>
                 <th className="text-left py-2 pr-3 w-48">Completion</th>
                 <th className="text-right py-2">Points</th>
               </tr>

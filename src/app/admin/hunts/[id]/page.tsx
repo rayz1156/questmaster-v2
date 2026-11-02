@@ -389,7 +389,7 @@ export default function Page({ params }: { params: { id: string } }) {
   const lajurSub: DataColumn<Submission>[] = [
     {
       key: "peserta",
-      header: "Participant",
+      header: "Student",
       render: (s) => (
         <span className="block truncate max-w-[160px] text-[13px] font-bold text-ink">
           {namaProfil(s.user_id)}

@@ -33,7 +33,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** Kod contoh: tidak akan wujud dalam qm_certificates (abjad 0042 tiada sifar). */
 const KOD_CONTOH = 'CONTOH0000';
-const NAMA_LALAI = 'Nama Peserta Contoh';
+const NAMA_LALAI = 'Nama Pelajar Contoh';
 const SAAT_URL = 600;
 
 const LAJUR_ITEM =

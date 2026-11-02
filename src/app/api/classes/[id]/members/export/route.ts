@@ -157,7 +157,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     month: '2-digit',
     day: '2-digit',
   }).format(new Date());
-  const namaFail = `kuizen-${slugFail(String(klass.name ?? ''))}-participants-${tarikhFail.replace(/-/g, '')}.csv`;
+  const namaFail = `kuizen-${slugFail(String(klass.name ?? ''))}-students-${tarikhFail.replace(/-/g, '')}.csv`;
 
   return new Response(csv, {
     status: 200,

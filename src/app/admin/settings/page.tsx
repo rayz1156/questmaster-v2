@@ -32,7 +32,7 @@ import {
 const KEENAN = [
   { label: "View everything", owner: true, admin: true },
   { label: "Manage users and classes", owner: true, admin: true },
-  { label: "Suspend participants and educators", owner: true, admin: true },
+  { label: "Suspend students and educators", owner: true, admin: true },
   { label: "Suspend admins", owner: true, admin: false },
   { label: "Change points and override reviews with a reason", owner: true, admin: true },
   { label: "Edit or delete audit entries", owner: false, admin: false },

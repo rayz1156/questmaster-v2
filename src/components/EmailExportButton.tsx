@@ -154,12 +154,12 @@ export default function EmailExportButton({ classId }: { classId: string }) {
               </button>
             </div>
 
-            {!pratonton && !ralat && <p className="text-sm text-ink-muted">Counting participants...</p>}
+            {!pratonton && !ralat && <p className="text-sm text-ink-muted">Counting students...</p>}
 
             {pratonton && (
               <div className="text-sm text-ink space-y-2">
                 <p>
-                  {pratonton.withEmail} participant{pratonton.withEmail === 1 ? "" : "s"} will be added to
+                  {pratonton.withEmail} student{pratonton.withEmail === 1 ? "" : "s"} will be added to
                   Encharge with tag{pratonton.tags.length > 1 ? "s" : ""} {pratonton.tags.join(", ")}.
                 </p>
                 {pratonton.withoutEmail > 0 && (
@@ -168,7 +168,7 @@ export default function EmailExportButton({ classId }: { classId: string }) {
                   </p>
                 )}
                 {pratonton.withEmail === 0 && (
-                  <p className="text-ink-muted">Nothing to send: no participants have an email address.</p>
+                  <p className="text-ink-muted">Nothing to send: no students have an email address.</p>
                 )}
               </div>
             )}
@@ -181,7 +181,7 @@ export default function EmailExportButton({ classId }: { classId: string }) {
                   checked={setuju}
                   onChange={(e) => setSetuju(e.target.checked)}
                 />
-                <span>I confirm these participants agreed to receive emails from me</span>
+                <span>I confirm these students agreed to receive emails from me</span>
               </label>
             )}
 
@@ -216,7 +216,7 @@ export default function EmailExportButton({ classId }: { classId: string }) {
                 >
                   {hantarBusy
                     ? "Sending..."
-                    : `Send ${pratonton.withEmail} participant${pratonton.withEmail === 1 ? "" : "s"}`}
+                    : `Send ${pratonton.withEmail} student${pratonton.withEmail === 1 ? "" : "s"}`}
                 </button>
               )}
             </div>

@@ -142,7 +142,7 @@ export default function EmailIntegrationCard() {
         <div className="flex items-start gap-2 text-sm text-ink-muted">
           <Lock className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
-            Send your class participants to your email marketing tool. This is part of the Pro plan.
+            Send your students to your email marketing tool. This is part of the Pro plan.
           </span>
         </div>
       )}

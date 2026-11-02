@@ -394,11 +394,11 @@ export default function ClassDetail() {
                 : <Trophy className="w-5 h-5" />}
             </span>
             <div className="flex-1 min-w-0">
-              <h3 className="text-[16.8px] font-bold text-ink">Participant leaderboard</h3>
+              <h3 className="text-[16.8px] font-bold text-ink">Student leaderboard</h3>
               <p className="text-[13px] text-ink-faint mt-0.5">
                 {klass.leaderboard_visible === false
-                  ? "Hidden. Participants do not see the Ranking tab for this class."
-                  : "Visible. Participants can see this class ranking."}
+                  ? "Hidden. Students do not see the Ranking tab for this class."
+                  : "Visible. Students can see this class ranking."}
               </p>
             </div>
           </div>
@@ -412,7 +412,7 @@ export default function ClassDetail() {
               try {
                 await updateClass(klass.id, { leaderboard_visible: next });
                 await reload();
-                setMsg(next ? "Leaderboard is now visible to participants" : "Leaderboard is now hidden from participants");
+                setMsg(next ? "Leaderboard is now visible to students" : "Leaderboard is now hidden from students");
               } catch (err: unknown) {
                 setMsg(err instanceof Error ? err.message : "Failed to update leaderboard visibility");
               } finally { setBusy(false); }
@@ -426,7 +426,7 @@ export default function ClassDetail() {
       {/* Jemputan peserta: kod kelas + modal QR. */}
       <Card className="mb-4">
         <CardHead
-          title="Invite participants"
+          title="Invite students"
           subtitle="Share this class code with your students to join."
         />
         <div className="mt-4 flex flex-wrap items-stretch gap-3">
@@ -438,7 +438,7 @@ export default function ClassDetail() {
             <Copy className="w-4 h-4" /> Copy
           </Button>
           <Button onClick={() => setInviteOpen(true)}>
-            <UserPlus className="w-4 h-4" /> Invite participants
+            <UserPlus className="w-4 h-4" /> Invite students
           </Button>
         </div>
       </Card>
@@ -515,7 +515,7 @@ export default function ClassDetail() {
               icon={<Users className="w-6 h-6" />}
               title="No members found"
               text={members.length === 0
-                ? "No members yet. Share the class code above to invite participants."
+                ? "No members yet. Share the class code above to invite students."
                 : "No members match your search."}
             />
           }

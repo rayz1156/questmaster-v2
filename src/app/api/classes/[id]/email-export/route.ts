@@ -163,7 +163,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   if (total > HAD_PESERTA) {
     return NextResponse.json(
-      { error: `Too many participants. The limit is ${HAD_PESERTA}.` },
+      { error: `Too many students. The limit is ${HAD_PESERTA}.` },
       { status: 400 },
     );
   }

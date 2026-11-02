@@ -147,7 +147,7 @@ export default function ClassPeoplePage() {
             const url = URL.createObjectURL(blob);
             const a = document.createElement("a");
             a.href = url;
-            a.download = m ? m[1] : "kuizen-participants.csv";
+            a.download = m ? m[1] : "kuizen-students.csv";
             document.body.appendChild(a);
             a.click();
             a.remove();

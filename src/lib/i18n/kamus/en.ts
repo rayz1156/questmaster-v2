@@ -125,7 +125,7 @@ export const en = {
     namePlaceholder: 'Jane Doe',
     newPasswordPlaceholder: 'At least 8 characters',
     iAmA: 'I am a',
-    participant: 'Participant',
+    participant: 'Student',
     educator: 'Educator',
     educatorNote: 'Educator accounts are approved by an admin before you can create classes.',
     participantNote: 'Join classes with a code from your educator.',
@@ -137,7 +137,7 @@ export const en = {
     openingGoogle: 'Opening Google…',
     couldNotReachGoogle: 'Could not reach Google. Try again.',
     emailTakenEducator:
-      'This email is already registered as a participant. Contact the administrator to upgrade your account.',
+      'This email is already registered as a student. Contact the administrator to upgrade your account.',
     emailTakenParticipant: 'This email is already registered. Please log in.',
     // Lupa kata laluan (src/app/forgot-password/page.tsx).
     forgotTitle: 'Forgot password?',
