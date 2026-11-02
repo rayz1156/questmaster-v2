@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
-import { perananKelas, sahUuid } from '@/lib/lnaAkses';
+import { perananKelas } from '@/lib/lnaAkses';
+import { sahUuid, sahOutcomeIds } from '@/lib/live-outcomes';
 import { bacaJsonKecil } from '@/lib/bilikAi';
 
 export const runtime = 'nodejs';
@@ -9,9 +10,6 @@ export const dynamic = 'force-dynamic';
 // Tag dibaca semula selepas guru menyimpan; jangan biarkan cache route
 // handler membekukan keadaan (corak semua laluan /api/live/**).
 export const fetchCache = 'force-no-store';
-
-/** Had Outcome yang boleh ditag pada satu kuiz (KZ-037). */
-const HAD_OUTCOME_KUIZ = 15;
 
 /** Baris qm_live_quizzes yang dibaca di sini (tiada correct_key). */
 interface KuizRingkas {
@@ -163,27 +161,16 @@ export async function PUT(req: NextRequest, { params }: { params: { quizId: stri
   const badan = await bacaJsonKecil(req);
   if (!badan.ok) return badan.response;
 
-  const idsMentah: unknown = badan.body.outcomeIds;
-  if (!Array.isArray(idsMentah)) {
+  // sahOutcomeIds menyemak tatasusunan, had 15, format UUID setiap
+  // unsur, dan membuang pendua (upsert tidak boleh melanggar PK
+  // (quiz_id, outcome_id)). Nilai null bermakna badan tidak sah.
+  const ids = sahOutcomeIds(badan.body.outcomeIds);
+  if (!ids) {
     return NextResponse.json(
-      { error: 'outcomeIds must be a list of Outcome IDs.' },
+      { error: 'outcomeIds must be a list of at most 15 valid Outcome IDs.' },
       { status: 400 },
     );
   }
-  if (idsMentah.length > HAD_OUTCOME_KUIZ) {
-    return NextResponse.json(
-      { error: `Too many Outcomes. The limit is ${HAD_OUTCOME_KUIZ}.` },
-      { status: 400 },
-    );
-  }
-  if (!idsMentah.every((x) => typeof x === 'string' && sahUuid(x))) {
-    return NextResponse.json(
-      { error: 'outcomeIds must contain valid Outcome IDs.' },
-      { status: 400 },
-    );
-  }
-  // Buang pendua supaya upsert tidak melanggar PK (quiz_id, outcome_id).
-  const ids = Array.from(new Set(idsMentah as string[]));
 
   if (ids.length > 0) {
     // Semua Outcome mesti milik kelas kuiz; Outcome kelas lain,
