@@ -45,7 +45,7 @@ export function BahasaProvider({
     (b: Bahasa) => {
       const bersih = sahBahasa(b);
       if (typeof document !== 'undefined') {
-        document.cookie = `${NAMA_KUKI}=${bersih}; path=/; max-age=${TAHUN_SAAT}; SameSite=Lax`;
+        document.cookie = `${NAMA_KUKI}=${bersih}; path=/; max-age=${TAHUN_SAAT}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
       }
       if (typeof window !== 'undefined') {
         try {

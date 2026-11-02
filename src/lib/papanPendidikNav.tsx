@@ -19,6 +19,7 @@ import { usePathname } from "next/navigation";
 import { ClipboardList, LayoutGrid } from "lucide-react";
 import { listMyClasses } from "@/lib/data";
 import { statusKelas, susunKelas } from "@/lib/kelasStatus";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import {
   KUNCI_KELAS_PENDIDIK,
   kelasDariLaluanPendidik,
@@ -40,6 +41,7 @@ const RUMAH_PENDIDIK = "/educator/classes";
 
 export function useTabPapanPendidik<T extends TabAsas>(tabs: T[]): T[] {
   const pathname = usePathname();
+  const { t } = useBahasa();
   const menuPendidik = tabs.some((t) => t.href === RUMAH_PENDIDIK);
   const [urutan, setUrutan] = useState<KelasRingkas[]>([]);
   const [simpanan, setSimpanan] = useState<string | null>(null);
@@ -89,11 +91,12 @@ export function useTabPapanPendidik<T extends TabAsas>(tabs: T[]): T[] {
     if (!classId) return tabs;
     const p = pautanPapanKelasPendidik(classId);
     const rumah = tabs.find((t) => t.href === RUMAH_PENDIDIK);
+    // KZ-040: label papan diterjemah mengikut bahasa semasa.
     const papan = [
-      { href: p.intro, label: "Intro Board", group: rumah?.group, icon: <ClipboardList className="w-5 h-5" /> },
-      { href: p.learning, label: "Learning Board", group: rumah?.group, icon: <LayoutGrid className="w-5 h-5" /> },
+      { href: p.intro, label: t("nav.introBoard"), group: rumah?.group, icon: <ClipboardList className="w-5 h-5" /> },
+      { href: p.learning, label: t("nav.learningBoard"), group: rumah?.group, icon: <LayoutGrid className="w-5 h-5" /> },
     ] as T[];
     const i = tabs.findIndex((t) => t.href === RUMAH_PENDIDIK);
     return [...tabs.slice(0, i + 1), ...papan, ...tabs.slice(i + 1)];
-  }, [menuPendidik, urutan, simpanan, pathname, tabs]);
+  }, [menuPendidik, urutan, simpanan, pathname, tabs, t]);
 }

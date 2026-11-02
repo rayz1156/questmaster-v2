@@ -50,6 +50,7 @@ export const ms: Kamus = {
     closeMenu: 'Tutup menu',
     mainNav: 'Utama',
     dialogMenu: 'Menu',
+    submenu: 'submenu',
     tukarBahasa: 'Tukar bahasa',
     search: 'Cari dalam Kuizen',
     adminWorkspace: 'Ruang kerja pentadbir',
@@ -417,6 +418,14 @@ export const ms: Kamus = {
   sijil: {
     active: 'Aktif',
     revoked: 'Dibatalkan',
+  },
+  meta: {
+    // Metadata akar (src/app/layout.tsx generateMetadata).
+    title: 'Kuizen: Platform Kuiz Interaktif dan Gamifikasi Bilik Darjah',
+    description:
+      'Platform kuiz interaktif dan gamifikasi pembelajaran untuk pendidik. Cipta kuiz bilik darjah, jalankan sesi PdPc langsung, lihat markah serta merta.',
+    ogDescription: 'Cipta kuiz bilik darjah interaktif dan jalankan sesi PdPc langsung.',
+    twitterDescription: 'Platform kuiz interaktif dan gamifikasi bilik darjah.',
   },
   sertai: {
     joinClassTitle: 'Sertai kelas',

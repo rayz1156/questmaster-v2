@@ -53,6 +53,7 @@ export const en = {
     closeMenu: 'Close menu',
     mainNav: 'Main',
     dialogMenu: 'Menu',
+    submenu: 'submenu',
     tukarBahasa: 'Switch language',
     search: 'Search Kuizen',
     adminWorkspace: 'Admin workspace',
@@ -450,6 +451,14 @@ export const en = {
     // Status sijil (src/lib/sijil/ui.tsx statusSijil).
     active: 'Active',
     revoked: 'Revoked',
+  },
+  meta: {
+    // Metadata akar (src/app/layout.tsx generateMetadata).
+    title: 'Kuizen: Interactive Quiz and Classroom Gamification Platform',
+    description:
+      'Interactive quiz and gamified learning platform for educators. Create classroom quizzes, run live sessions, and see scores instantly.',
+    ogDescription: 'Create interactive classroom quizzes and run live teaching sessions.',
+    twitterDescription: 'Interactive quiz and classroom gamification platform.',
   },
   sertai: {
     // Sertai melalui pautan pendek (src/app/j/[kod]/page.tsx).

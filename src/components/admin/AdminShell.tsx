@@ -31,6 +31,8 @@ import { getSession, clearSession } from '@/lib/session';
 import { LogoMark } from '@/components/Logo';
 import { initials } from '@/components/admin/ui';
 import { adminTabs } from '@/lib/adminTabs';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
+import PemilihBahasa from '@/components/PemilihBahasa';
 import type { Profile, User } from '@/lib/types';
 import { getMyProfile, adminListAllSubmissions } from '@/lib/data';
 import { supabase } from '@/lib/supabaseClient';
@@ -40,13 +42,19 @@ export interface CrumbAdmin {
   href?: string;
 }
 
+/** Satu item nav admin yang sudah diterjemah mengikut bahasa semasa (KZ-040). */
+type TabAdminDiterjemah = (typeof adminTabs)[number] & { group?: string };
+
 /**
  * Bar sisi admin (KZ-021): item daripada `adminTabs` (@/lib/adminTabs),
  * dikumpulkan mengikut medan `group` mengikut KZ-DS-v3 bahagian 3
  * (Overview / Management / Security / System). `lencana` merujuk kiraan
  * yang dimuat sekali dan dipaparkan sebagai gelembung ungu.
+ *
+ * KZ-040: label dan kumpulan diterjemah dalam AdminShell melalui `kunci` /
+ * `kunciGroup` pada setiap item; `label`/`group` English pada pemalar
+ * kekal sebagai fallback.
  */
-const NAV = adminTabs;
 
 export default function AdminShell({
   title,
@@ -61,6 +69,13 @@ export default function AdminShell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  const { t: tr } = useBahasa();
+  // KZ-040: nav admin diterjemah mengikut bahasa semasa (kunci/kunciGroup).
+  const NAV: TabAdminDiterjemah[] = adminTabs.map((x) => ({
+    ...x,
+    label: tr(x.kunci),
+    group: x.kunciGroup ? tr(x.kunciGroup) : undefined,
+  }));
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -227,7 +242,7 @@ export default function AdminShell({
   }
 
   const binaIsi = (padat: boolean) => (
-    <nav aria-label="Admin" className={`flex flex-col gap-0.5 ${padat ? 'px-2 pt-2' : 'px-3'} pb-6`}>
+    <nav aria-label={tr('nav.adminNav')} className={`flex flex-col gap-0.5 ${padat ? 'px-2 pt-2' : 'px-3'} pb-6`}>
       {blok.map((k, i) => (
         <div key={k.label ?? `blok-${i}`}>
           {k.label && !padat && (
@@ -280,8 +295,8 @@ export default function AdminShell({
       <div className="mx-3 my-2 h-px bg-hairline" />
       <Link
         href="/help"
-        aria-label={padat ? 'Help' : undefined}
-        title={padat ? 'Help' : undefined}
+        aria-label={padat ? tr('nav.help') : undefined}
+        title={padat ? tr('nav.help') : undefined}
         className={`flex items-center rounded-md transition ${
           padat
             ? `mx-auto h-11 w-11 justify-center ${
@@ -298,7 +313,7 @@ export default function AdminShell({
         >
           <HelpCircle className="w-5 h-5" />
         </span>
-        {!padat && <span>Help</span>}
+        {!padat && <span>{tr('nav.help')}</span>}
       </Link>
     </nav>
   );
@@ -345,9 +360,9 @@ export default function AdminShell({
           <button
             type="button"
             onClick={togolKecil}
-            aria-label={kecil ? 'Expand sidebar' : 'Collapse sidebar'}
+            aria-label={kecil ? tr('nav.expandSidebar') : tr('nav.collapseSidebar')}
             aria-expanded={!kecil}
-            title={kecil ? 'Expand sidebar' : 'Collapse sidebar'}
+            title={kecil ? tr('nav.expandSidebar') : tr('nav.collapseSidebar')}
             className={`${kecil ? '' : 'ml-auto'} flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-faint transition hover:bg-canvas hover:text-ink`}
           >
             {kecil ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
@@ -356,7 +371,7 @@ export default function AdminShell({
         {!kecil && (
           <div className="px-6 pt-5 pb-2">
             <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
-              Admin workspace
+              {tr('nav.adminWorkspace')}
             </span>
           </div>
         )}
@@ -365,7 +380,7 @@ export default function AdminShell({
 
       {/* ===== Laci bar sisi pada skrin kecil ===== */}
       {laciOpen && (
-        <div className="xl:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="xl:hidden fixed inset-0 z-50" role="dialog" aria-modal="true" aria-label={tr('nav.dialogMenu')}>
           <div className="absolute inset-0 bg-black/50" onClick={() => setLaciOpen(false)} aria-hidden="true" />
           <aside className="absolute left-0 top-0 bottom-0 w-[290px] max-w-[85vw] bg-white shadow-raised flex flex-col">
             <div className="px-6 h-[65px] flex items-center justify-between shrink-0">
@@ -373,13 +388,13 @@ export default function AdminShell({
                 <LogoMark size={28} />
                 <span className="text-[20px] font-bold tracking-tight text-ink">Kuizen</span>
               </span>
-              <button type="button" onClick={() => setLaciOpen(false)} aria-label="Close menu">
+              <button type="button" onClick={() => setLaciOpen(false)} aria-label={tr('nav.closeMenu')}>
                 <X className="w-5 h-5 text-ink-muted" />
               </button>
             </div>
             <div className="px-6 pt-5 pb-2">
               <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-ink-faint">
-                Admin workspace
+                {tr('nav.adminWorkspace')}
               </span>
             </div>
             <div className="min-h-0 flex-1 overflow-y-auto">{binaIsi(false)}</div>
@@ -395,7 +410,7 @@ export default function AdminShell({
             <button
               type="button"
               onClick={() => setLaciOpen(true)}
-              aria-label="Open menu"
+              aria-label={tr('nav.openMenu')}
               className="xl:hidden shrink-0 flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:text-ink"
             >
               <MenuIcon className="w-5 h-5" />
@@ -428,11 +443,14 @@ export default function AdminShell({
                 ref={carianRef}
                 value={carian}
                 onChange={(e) => setCarian(e.target.value)}
-                placeholder="Search Kuizen"
-                aria-label="Search Kuizen"
+                placeholder={tr('nav.search')}
+                aria-label={tr('nav.search')}
                 className="w-full h-9 pl-9 pr-3 rounded-xl bg-[#F4F4F6] border border-transparent text-sm text-ink placeholder:text-ink-faint focus:outline-none focus:bg-white focus:border-brand-purple/40"
               />
             </form>
+
+            {/* Pemilih bahasa (KZ-040): di bar atas, berdekatan carian. */}
+            <PemilihBahasa className="hidden sm:inline-flex shrink-0" />
 
             {/* Menu akaun */}
             <div className="relative shrink-0" ref={menuRef}>
@@ -465,13 +483,13 @@ export default function AdminShell({
                     href="/educator/profile"
                     className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                   >
-                    <UserIcon className="w-4 h-4 text-ink-faint" /> Account settings
+                    <UserIcon className="w-4 h-4 text-ink-faint" /> {tr('nav.accountSettings')}
                   </Link>
                   <Link
                     href="/educator/classes"
                     className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                   >
-                    <GraduationCap className="w-4 h-4 text-ink-faint" /> Back to educator view
+                    <GraduationCap className="w-4 h-4 text-ink-faint" /> {tr('nav.backToEducatorView')}
                   </Link>
                   <div className="h-px bg-hairline my-1" />
                   <button
@@ -479,7 +497,7 @@ export default function AdminShell({
                     onClick={onLogout}
                     className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                   >
-                    <LogOut className="w-4 h-4 text-ink-faint" /> Sign out
+                    <LogOut className="w-4 h-4 text-ink-faint" /> {tr('nav.signOut')}
                   </button>
                 </div>
               )}

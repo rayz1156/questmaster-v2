@@ -30,6 +30,9 @@ import { Copy, Check, UserPlus } from "lucide-react";
 import { getClass, type Klass } from "@/lib/data";
 import { PageHead, Tabs } from "@/components/ui";
 import { PAPAR_PENILAIAN_RAKAN } from "@/lib/ciriPaparan";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { terjemahBilangan } from "@/lib/i18n";
+import type { KunciKamus } from "@/lib/i18n";
 
 export type ClassTabKey =
   | "overview"
@@ -59,6 +62,7 @@ export default function ClassShell({
   klass?: Klass | null;
   children: React.ReactNode;
 }) {
+  const { t, bahasa } = useBahasa();
   const [klass, setKlass] = useState<Klass | null>(klassProp ?? null);
   const [copied, setCopied] = useState(false);
 
@@ -71,15 +75,15 @@ export default function ClassShell({
     return () => { alive = false; };
   }, [classId, klassProp]);
 
-  const semuaTab: { key: ClassTabKey; label: string; href: string }[] = [
-    { key: "overview", label: "Overview", href: `/educator/classes/${classId}` },
-    { key: "people", label: "People", href: `/educator/classes/${classId}/people` },
-    { key: "board", label: "Board", href: `/educator/classes/${classId}/board` },
-    { key: "learning", label: "Learning Board", href: `/educator/classes/${classId}/learning-board` },
-    { key: "ai-rooms", label: "AI Chatroom", href: `/educator/classes/${classId}/ai-rooms` },
-    { key: "lna", label: "LNA", href: `/educator/classes/${classId}/lna` },
-    { key: "certificates", label: "Certificates", href: `/educator/classes/${classId}/certificates` },
-    { key: "peer-review", label: "Peer review", href: `/educator/classes/${classId}/peer-review` },
+  const semuaTab: { key: ClassTabKey; label: string; kunci: KunciKamus; href: string }[] = [
+    { key: "overview", label: t("kelas.overview"), kunci: "kelas.overview", href: `/educator/classes/${classId}` },
+    { key: "people", label: t("kelas.people"), kunci: "kelas.people", href: `/educator/classes/${classId}/people` },
+    { key: "board", label: t("kelas.board"), kunci: "kelas.board", href: `/educator/classes/${classId}/board` },
+    { key: "learning", label: t("kelas.learningBoard"), kunci: "kelas.learningBoard", href: `/educator/classes/${classId}/learning-board` },
+    { key: "ai-rooms", label: t("kelas.aiChatroom"), kunci: "kelas.aiChatroom", href: `/educator/classes/${classId}/ai-rooms` },
+    { key: "lna", label: t("kelas.lna"), kunci: "kelas.lna", href: `/educator/classes/${classId}/lna` },
+    { key: "certificates", label: t("kelas.certificates"), kunci: "kelas.certificates", href: `/educator/classes/${classId}/certificates` },
+    { key: "peer-review", label: t("kelas.peerReview"), kunci: "kelas.peerReview", href: `/educator/classes/${classId}/peer-review` },
   ];
   // Tab Peer review disembunyikan bersama ciri (src/lib/ciriPaparan.ts).
   const tabs = semuaTab.filter((t) => PAPAR_PENILAIAN_RAKAN || t.key !== "peer-review");
@@ -96,10 +100,18 @@ export default function ClassShell({
   const studentCount = (klass as unknown as { member_count?: number } | null)?.member_count;
 
   // Keterangan ringkas sedia ada: penerangan kelas dan bilangan pelajar.
+  // KZ-040: bilangan peserta ikut jamak bahasa semasa (student/students,
+  // BM tanpa jamak nahu).
   const huraian = [
     klass?.description || null,
     typeof studentCount === "number"
-      ? `${studentCount} ${studentCount === 1 ? "student" : "students"}`
+      ? terjemahBilangan(
+          bahasa,
+          "kelas.studentOne",
+          "kelas.studentOther",
+          studentCount,
+          { n: studentCount }
+        )
       : null,
   ]
     .filter((x) => x != null)
@@ -108,14 +120,14 @@ export default function ClassShell({
   return (
     <div>
       <PageHead
-        crumb="Classes"
-        name={klass?.name || "Class"}
+        crumb={t("kelas.crumb")}
+        name={klass?.name || t("kelas.nameFallback")}
         description={huraian || undefined}
         secondaryActions={
           klass?.join_code
             ? [
                 {
-                  label: copied ? "Class code copied" : `Class code ${klass.join_code}`,
+                  label: copied ? t("kelas.codeCopied") : t("kelas.classCodeOf", { kod: klass.join_code }),
                   icon: copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />,
                   onSelect: copyCode,
                 },
@@ -123,7 +135,7 @@ export default function ClassShell({
             : []
         }
         primaryAction={{
-          label: "Invite people",
+          label: t("kelas.invitePeople"),
           icon: <UserPlus className="w-4 h-4" />,
           href: `/educator/classes/${classId}`,
         }}

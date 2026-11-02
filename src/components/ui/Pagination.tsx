@@ -1,6 +1,7 @@
-"use client";
+'use client';
 
 import { senaraiMukaSurat } from "@/lib/uiKit";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /**
  * Penomboran kit UI (KZ-021): kotak 36px sempadan #e5e9f2,
@@ -21,6 +22,7 @@ export default function Pagination({
   onHalaman: (h: number) => void;
   className?: string;
 }) {
+  const { t } = useBahasa();
   const jum = Math.max(1, Math.floor(jumlah) || 1);
   const senarai = senaraiMukaSurat(halaman, jum);
   const boleh = (h: number) => h >= 1 && h <= jum;
@@ -37,9 +39,9 @@ export default function Pagination({
         className={kotak}
         disabled={!boleh(halaman - 1)}
         onClick={() => onHalaman(halaman - 1)}
-        aria-label="Previous page"
+        aria-label={t('ui.previousPage')}
       >
-        Prev
+        {t('ui.prev')}
       </button>
       {senarai.map((m, i) =>
         m === null ? (
@@ -63,9 +65,9 @@ export default function Pagination({
         className={kotak}
         disabled={!boleh(halaman + 1)}
         onClick={() => onHalaman(halaman + 1)}
-        aria-label="Next page"
+        aria-label={t('ui.nextPage')}
       >
-        Next
+        {t('ui.next')}
       </button>
     </nav>
   );
@@ -73,13 +75,14 @@ export default function Pagination({
 
 /** Label "PAGE 1 OF 12" gaya KZ-DS-v3 (nombor dalam kotak pilih). */
 export function PageOf({ halaman, jumlah }: { halaman: number; jumlah: number }) {
+  const { t } = useBahasa();
   return (
     <span className="text-[11px] uppercase tracking-[1.4px] text-ink-faint flex items-center gap-1.5">
-      Page
+      {t('ui.pageOf')}
       <span className="inline-flex h-7 items-center rounded-[4px] border border-kz-line bg-white px-2 text-[11px] font-bold text-ink">
         {halaman}
       </span>
-      of {jumlah}
+      {t('ui.pageOfJoin')} {jumlah}
     </span>
   );
 }

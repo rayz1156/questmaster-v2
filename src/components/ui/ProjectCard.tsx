@@ -1,3 +1,5 @@
+'use client';
+
 import type { ReactNode } from "react";
 import Link from "next/link";
 import { CheckSquare } from "lucide-react";
@@ -8,6 +10,7 @@ import ProgressBar from "./ProgressBar";
 import Dropdown, { type DropdownItem } from "./Dropdown";
 import { MoreHorizontal } from "lucide-react";
 import { labelMasa } from "@/lib/uiKit";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /**
  * Kad projek kit UI (KZ-021, untuk aktiviti/quest): petak inisial 40px +
@@ -32,7 +35,7 @@ export default function ProjectCard({
   done,
   badges,
   menuItems,
-  menuLabel = "Project actions",
+  menuLabel,
   href,
   className = "",
 }: {
@@ -55,6 +58,9 @@ export default function ProjectCard({
   href?: string;
   className?: string;
 }) {
+  // KZ-040: label default dan label masa diterjemah mengikut bahasa semasa.
+  const { t, bahasa } = useBahasa();
+  const menuLabelAkhir = menuLabel ?? t("ui.projectActions");
   const pct =
     typeof progress === "number"
       ? progress
@@ -63,7 +69,7 @@ export default function ProjectCard({
         : 0;
   const masa =
     typeof daysLeft === "number" || done
-      ? labelMasa(typeof daysLeft === "number" ? daysLeft : 0, !!done)
+      ? labelMasa(typeof daysLeft === "number" ? daysLeft : 0, !!done, bahasa)
       : null;
 
   return (
@@ -87,14 +93,14 @@ export default function ProjectCard({
         {menuItems && (
           <Dropdown
             items={menuItems}
-            label={menuLabel}
+            label={menuLabelAkhir}
             trigger={({ open, toggle }) => (
               <button
                 type="button"
                 onClick={toggle}
                 aria-haspopup="menu"
                 aria-expanded={open}
-                aria-label={menuLabel}
+                aria-label={menuLabelAkhir}
                 className="shrink-0 inline-flex h-9 w-9 items-center justify-center rounded-[4px] text-ink-faint hover:bg-[#ebeef2] hover:text-ink transition"
               >
                 <MoreHorizontal className="h-4 w-4" />
@@ -113,11 +119,11 @@ export default function ProjectCard({
           <div className="flex items-center justify-between text-[13px]">
             <span className="flex items-center gap-1.5 text-ink-faint">
               <CheckSquare className="w-4 h-4" aria-hidden="true" />
-              {tasksTotal != null ? `${tasksDone ?? 0} / ${tasksTotal} Tasks` : `${pct}%`}
+              {tasksTotal != null ? t("ui.tasksCount", { siap: tasksDone ?? 0, jumlah: tasksTotal }) : `${pct}%`}
             </span>
             <span className="text-ink-muted font-medium">{pct}%</span>
           </div>
-          <ProgressBar value={pct} max={100} label={`${title} progress`} />
+          <ProgressBar value={pct} max={100} label={t("ui.progressAria", { tajuk: title })} />
         </>
       )}
 

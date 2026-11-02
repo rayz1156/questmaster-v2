@@ -8,6 +8,7 @@
  */
 
 import type { Hunt } from "./types";
+import { terjemah, type Bahasa } from "./i18n";
 
 /**
  * Inisial nama untuk avatar: huruf pertama dua perkataan pertama.
@@ -129,17 +130,21 @@ export function kiraBila<T>(baris: T[] | null | undefined, predikat: (r: T) => b
 }
 
 /**
- * Label tarikh baris maklumat kad aktiviti: pendidik boleh set
+ * Keterangan tarikh baris maklumat kad aktiviti: pendidik boleh set
  * `start_at` / `end_at` (lihat `src/lib/types.ts:3`). Memulangkan
  * rentetan ringkas untuk kad; kosong jika kedua-dua tarikh tiada.
+ *
+ * KZ-040: `bahasa` pilihan dan lalai 'en' supaya ujian sedia ada
+ * (scripts/selftest-kz018.ts) terus lulus tanpa diubah.
  */
 export function peneranganTarikh(
   mula: string | null | undefined,
-  tamat: string | null | undefined
+  tamat: string | null | undefined,
+  bahasa: Bahasa = "en"
 ): string {
-  if (mula && tamat) return `Schedule: ${mula} to ${tamat}`;
-  if (tamat) return `Due: ${tamat}`;
-  if (mula) return `Starts: ${mula}`;
+  if (mula && tamat) return terjemah(bahasa, "papan.scheduleFrom", { mula, tamat });
+  if (tamat) return terjemah(bahasa, "papan.dueAt", { tamat });
+  if (mula) return terjemah(bahasa, "papan.startsAt", { mula });
   return "";
 }
 
@@ -184,19 +189,25 @@ export type LabelTarikh = { label: string; segera: boolean };
  * "Ended 8 Oct" untuk yang tamat; "" jika tiada tarikh.
  * `segera` benar jika tarikh akhir dalam <= 1 hari atau telah lepas
  * (butang label dipapar MERAH #b91c1c tebal).
+ *
+ * KZ-040: `bahasa` pilihan dan lalai 'en' supaya ujian sedia ada
+ * (scripts/selftest-kz018b.ts) terus lulus tanpa diubah.
  */
 export function labelTarikhQuest(
   tamatPada: string | null | undefined,
   sudahTamat: boolean,
-  kini: Date = new Date()
+  kini: Date = new Date(),
+  bahasa: Bahasa = "en"
 ): LabelTarikh {
   const formatTarikh = (iso: string) => {
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return "";
-    return d.toLocaleDateString("en-GB", { day: "numeric", month: "short" });
+    return d.toLocaleDateString(bahasa === "ms" ? "ms-MY" : "en-GB", { day: "numeric", month: "short" });
   };
   if (sudahTamat) {
-    const teks = tamatPada ? `Ended ${formatTarikh(tamatPada)}` : "Ended";
+    const teks = tamatPada
+      ? terjemah(bahasa, "papan.endedOn", { tarikh: formatTarikh(tamatPada) })
+      : terjemah(bahasa, "papan.ended");
     return { label: teks, segera: false };
   }
   if (!tamatPada) return { label: "", segera: false };
@@ -205,11 +216,11 @@ export function labelTarikhQuest(
   const hari = Math.floor((tarikh.getTime() - kini.getTime()) / 86_400_000);
   if (hari <= 1) {
     // Hari ini, esok atau telah lepas: segera (merah).
-    if (hari <= 0) return { label: "Due today", segera: true };
-    return { label: "Due tomorrow", segera: true };
+    if (hari <= 0) return { label: terjemah(bahasa, "papan.dueToday"), segera: true };
+    return { label: terjemah(bahasa, "papan.dueTomorrow"), segera: true };
   }
-  if (hari <= 7) return { label: `Due in ${hari} days`, segera: false };
-  return { label: `Due ${formatTarikh(tamatPada)}`, segera: false };
+  if (hari <= 7) return { label: terjemah(bahasa, "papan.dueInDays", { n: hari }), segera: false };
+  return { label: terjemah(bahasa, "papan.dueOn", { tarikh: formatTarikh(tamatPada) }), segera: false };
 }
 
 /**
@@ -224,23 +235,38 @@ export function labelTarikhQuest(
 export function ayatKedudukan(
   kedudukan: number,
   skorSaya: number,
-  barisAtas: { nama: string; skor: number; kedudukan: number } | null
+  barisAtas: { nama: string; skor: number; kedudukan: number } | null,
+  bahasa: Bahasa = "en"
 ): string | null {
   if (kedudukan <= 0) return null;
-  if (kedudukan === 1) return "in class. You are leading. Keep it up.";
+  if (kedudukan === 1) return terjemah(bahasa, "papan.leadingSentence");
   if (!barisAtas) return null;
   const gap = Math.max(1, (barisAtas.skor || 0) - (skorSaya || 0));
-  return `in class. ${gap} pts to overtake ${barisAtas.nama} for #${barisAtas.kedudukan}.`;
+  return terjemah(bahasa, "papan.overtakeSentence", {
+    mata: gap,
+    nama: barisAtas.nama,
+    kedudukan: barisAtas.kedudukan,
+  });
 }
 
 /**
  * Ayat kecil kad LIVE (KZ-018b): "{class name} · {n} classmates already
  * in." ditambah " Your team is waiting." jika peserta ada pasukan.
+ *
+ * KZ-040: `bahasa` pilihan dan lalai 'en' supaya ujian sedia ada
+ * (scripts/selftest-kz018b.ts) terus lulus tanpa diubah.
  */
-export function ayatKadLive(namaKelas: string, bilPemain: number, adaPasukan: boolean): string {
-  // Teks tepat ikut tiket: "{class name} · {n} classmates already in."
-  const asas = `${namaKelas} · ${Math.max(0, bilPemain)} classmates already in.`;
-  return adaPasukan ? `${asas} Your team is waiting.` : asas;
+export function ayatKadLive(
+  namaKelas: string,
+  bilPemain: number,
+  adaPasukan: boolean,
+  bahasa: Bahasa = "en"
+): string {
+  // Teks tepat ikut kunci kamus: "{kelas} · {n} rakan sekelas sudah masuk."
+  const asas = `${namaKelas} · ${terjemah(bahasa, "papan.classmatesAlreadyIn", {
+    n: Math.max(0, bilPemain),
+  })}`;
+  return adaPasukan ? `${asas} ${terjemah(bahasa, "papan.yourTeamWaiting")}` : asas;
 }
 
 /**

@@ -16,6 +16,7 @@ export { inisial, warnaIndeks } from "./papanPemukaPeserta";
 export type { PasanganWarna } from "./papanPemukaPeserta";
 
 import { warnaIndeks } from "./papanPemukaPeserta";
+import { terjemah, type Bahasa } from "./i18n";
 
 /* ============================================================
  * Penomboran halaman (DataTable / Pagination)
@@ -152,14 +153,21 @@ export type WarnaMasa = "green" | "yellow" | "red" | "gray";
  * Label baki masa ProjectCard (KZ-DS-v3 bahagian ProjectCard):
  * "Due Tomorrow" merah, "N Days Left" kuning, "Done" hijau, lain-lain
  * kelabu. `segera` tidak dipakai di sini; warna diambil terus.
+ *
+ * KZ-040: `bahasa` pilihan dan lalai 'en' supaya ujian sedia ada
+ * (scripts/selftest-kz021.ts) terus lulus tanpa diubah.
  */
-export function labelMasa(hariSisa: number, siap: boolean): { label: string; warna: WarnaMasa } {
-  if (siap) return { label: "Done", warna: "green" };
-  if (hariSisa < 0) return { label: "Overdue", warna: "red" };
-  if (hariSisa === 0) return { label: "Due Today", warna: "red" };
-  if (hariSisa === 1) return { label: "Due Tomorrow", warna: "red" };
-  if (hariSisa <= 7) return { label: `${hariSisa} Days Left`, warna: "yellow" };
-  return { label: `${hariSisa} Days Left`, warna: "gray" };
+export function labelMasa(
+  hariSisa: number,
+  siap: boolean,
+  bahasa: Bahasa = "en"
+): { label: string; warna: WarnaMasa } {
+  if (siap) return { label: terjemah(bahasa, "ui.done"), warna: "green" };
+  if (hariSisa < 0) return { label: terjemah(bahasa, "ui.overdue"), warna: "red" };
+  if (hariSisa === 0) return { label: terjemah(bahasa, "ui.dueToday"), warna: "red" };
+  if (hariSisa === 1) return { label: terjemah(bahasa, "ui.dueTomorrow"), warna: "red" };
+  if (hariSisa <= 7) return { label: terjemah(bahasa, "ui.daysLeft", { n: hariSisa }), warna: "yellow" };
+  return { label: terjemah(bahasa, "ui.daysLeft", { n: hariSisa }), warna: "gray" };
 }
 
 /** Pasangan latar/teks untuk InitialTile dan Avatar ikut indeks baris. */

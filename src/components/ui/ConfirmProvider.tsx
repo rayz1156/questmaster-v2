@@ -2,6 +2,7 @@
 
 import React, { createContext, useCallback, useContext, useState } from 'react';
 import { ConfirmDialog } from './PromptDialog';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 export type ConfirmOptions = {
   title: string;
@@ -17,6 +18,8 @@ const Ctx = createContext<((opts: ConfirmOptions) => Promise<boolean>) | null>(n
 
 export function ConfirmProvider({ children }: { children: React.ReactNode }) {
   const [pending, setPending] = useState<Pending | null>(null);
+  // KZ-040: butang lalai dialog diterjemah mengikut bahasa semasa.
+  const { t } = useBahasa();
 
   const confirm = useCallback((opts: ConfirmOptions) => {
     return new Promise<boolean>((resolve) => {
@@ -38,8 +41,8 @@ export function ConfirmProvider({ children }: { children: React.ReactNode }) {
         open={!!pending}
         title={pending?.title ?? ''}
         description={pending?.description}
-        confirmLabel={pending?.confirmLabel ?? 'Confirm'}
-        cancelLabel={pending?.cancelLabel ?? 'Cancel'}
+        confirmLabel={pending?.confirmLabel ?? t('common.confirm')}
+        cancelLabel={pending?.cancelLabel ?? t('common.cancel')}
         tone={pending?.tone ?? 'default'}
         onConfirm={() => close(true)}
         onCancel={() => close(false)}

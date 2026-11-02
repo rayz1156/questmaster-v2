@@ -6,6 +6,9 @@ import RegisterSW from "@/components/pwa/RegisterSW";
 import AnalyticsTracker from "@/components/AnalyticsTracker";
 import BicarraChat from "@/components/BicarraChat";
 import { ConfirmProvider } from '@/components/ui/ConfirmProvider';
+import { bahasaPelayan } from '@/lib/i18n/pelayan';
+import { terjemah } from '@/lib/i18n';
+import { BahasaProvider } from '@/lib/i18n/BahasaProvider';
 
 // DM Sans: satu muka taip untuk seluruh aplikasi (KZ-020). Fon berubah-ubah
 // (variable), jadi tiada `weight` diberi: berat dijana melalui `font-weight`
@@ -22,38 +25,43 @@ const playfair = Playfair_Display({
   display: "swap",
 });
 
-export const metadata: Metadata = {
-  metadataBase: new URL("https://kuizen.fun"),
-  title: {
-    default: "Kuizen: Platform Kuiz Interaktif dan Gamifikasi Bilik Darjah",
-    template: "%s | Kuizen",
-  },
-  description:
-    "Platform kuiz interaktif dan gamifikasi pembelajaran untuk pendidik. Cipta kuiz bilik darjah, jalankan sesi PdPc langsung, lihat markah serta merta.",
-  applicationName: "Kuizen",
-  manifest: "/manifest.json",
-  openGraph: {
-    title: "Kuizen: Platform Kuiz Interaktif dan Gamifikasi Bilik Darjah",
-    description: "Cipta kuiz bilik darjah interaktif dan jalankan sesi PdPc langsung.",
-    url: "https://kuizen.fun",
-    siteName: "Kuizen",
-    images: [{ url: "/icons/icon-512.png", width: 512, height: 512 }],
-    type: "website",
-  },
-  twitter: { card: "summary", title: "Kuizen", description: "Platform kuiz interaktif dan gamifikasi bilik darjah.", images: ["/icons/icon-512.png"] },
-  appleWebApp: {
-    capable: true,
-    title: "Kuizen",
-    statusBarStyle: "default",
-  },
-  icons: {
-    icon: [
-      { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
-      { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
-    ],
-    apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
-  },
-};
+// Metadata akar ikut bahasa pengguna (KZ-040): bahasa dibaca daripada kuki
+// kz_lang melalui bahasaPelayan. Halaman pemasaran/SEO dikecualikan dan
+// kekal dengan teks khusus bahasa masing-masing.
+export function generateMetadata(): Metadata {
+  const bahasa = bahasaPelayan();
+  return {
+    metadataBase: new URL("https://kuizen.fun"),
+    title: {
+      default: terjemah(bahasa, "meta.title"),
+      template: "%s | Kuizen",
+    },
+    description: terjemah(bahasa, "meta.description"),
+    applicationName: "Kuizen",
+    manifest: "/manifest.json",
+    openGraph: {
+      title: terjemah(bahasa, "meta.title"),
+      description: terjemah(bahasa, "meta.ogDescription"),
+      url: "https://kuizen.fun",
+      siteName: "Kuizen",
+      images: [{ url: "/icons/icon-512.png", width: 512, height: 512 }],
+      type: "website",
+    },
+    twitter: { card: "summary", title: "Kuizen", description: terjemah(bahasa, "meta.twitterDescription"), images: ["/icons/icon-512.png"] },
+    appleWebApp: {
+      capable: true,
+      title: "Kuizen",
+      statusBarStyle: "default",
+    },
+    icons: {
+      icon: [
+        { url: "/icons/icon-192.png", sizes: "192x192", type: "image/png" },
+        { url: "/icons/icon-512.png", sizes: "512x512", type: "image/png" },
+      ],
+      apple: [{ url: "/icons/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
+    },
+  };
+}
 
 export const viewport: Viewport = {
   themeColor: "#854fff",
@@ -62,8 +70,11 @@ export const viewport: Viewport = {
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
+  // Bahasa awal dibaca di pelayan supaya HTML pertama (termasuk lang) sudah
+  // betul tanpa kelipan English selepas hidrat (KZ-040).
+  const bahasa = bahasaPelayan();
   return (
-    <html lang="en" className={playfair.variable}>
+    <html lang={bahasa} className={playfair.variable}>
       <head>
         {/* VisitorTracking. Skrip vendor memanggil init_tracer selepas ia
             dimuatkan, jadi definisi mesti wujud sebelum itu. Skrip luar
@@ -85,7 +96,9 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         />
       </head>
       <body className={dmSans.className}>
-        <ConfirmProvider>{children}</ConfirmProvider>
+        <BahasaProvider bahasaAwal={bahasa}>
+          <ConfirmProvider>{children}</ConfirmProvider>
+        </BahasaProvider>
         <InstallPrompt />
         <AnalyticsTracker />
         <BicarraChat />

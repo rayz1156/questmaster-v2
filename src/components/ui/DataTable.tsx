@@ -1,10 +1,11 @@
-"use client";
+'use client';
 
 import { Fragment, type ReactNode } from "react";
 import { MoreHorizontal } from "lucide-react";
 import { jumlahMukaSurat, potongHalaman } from "@/lib/uiKit";
 import Dropdown, { type DropdownItem } from "./Dropdown";
 import Pagination, { PageOf } from "./Pagination";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /**
  * Jadual data kit UI (KZ-021, gaya "Courses"/"Students"/"Users").
@@ -82,6 +83,9 @@ export default function DataTable<T>({
   onRowClick,
   renderRowExtra,
 }: DataTableProps<T>) {
+  // KZ-040: teks lalai jadual diterjemah mengikut bahasa semasa.
+  const { t } = useBahasa();
+  const menuLabelAkhir = menuLabel ?? t("ui.rowActions");
   const jumlah = jumlahMukaSurat(rows.length, saizHalaman);
   const hal = Math.min(Math.max(1, halaman), jumlah);
   const barisHalaman = onHalaman ? potongHalaman(rows, hal, saizHalaman) : rows;
@@ -106,7 +110,7 @@ export default function DataTable<T>({
                 <th scope="col" className="w-10 px-3 py-2">
                   <input
                     type="checkbox"
-                    aria-label="Select all rows"
+                    aria-label={t("ui.selectAllRows")}
                     className="h-4 w-4 accent-brand-purple"
                     checked={semuaDipilih}
                     onChange={(e) => onToggleAll?.(e.target.checked)}
@@ -135,7 +139,7 @@ export default function DataTable<T>({
                   className="py-10"
                 >
                   {empty ?? (
-                    <p className="text-center text-[14px] text-ink-faint">No records found.</p>
+                    <p className="text-center text-[14px] text-ink-faint">{t("ui.noRecordsFound")}</p>
                   )}
                 </td>
               </tr>
@@ -157,7 +161,7 @@ export default function DataTable<T>({
                     <td className="px-3 py-2 align-middle">
                       <input
                         type="checkbox"
-                        aria-label={`Select row ${i + 1}`}
+                        aria-label={t("ui.selectRow", { n: i + 1 })}
                         className="h-4 w-4 accent-brand-purple"
                         checked={!!dipilih}
                         onChange={() => onToggleSelect?.(id)}
@@ -179,7 +183,7 @@ export default function DataTable<T>({
                     <td className="px-2 py-2 align-middle text-right">
                       <Dropdown
                         items={menuItems(r)}
-                        label={menuLabel}
+                        label={menuLabelAkhir}
                         trigger={({ open, toggle }) => (
                           <button
                             type="button"
@@ -189,7 +193,7 @@ export default function DataTable<T>({
                             }}
                             aria-haspopup="menu"
                             aria-expanded={open}
-                            aria-label={menuLabel}
+                            aria-label={menuLabelAkhir}
                             className="inline-flex h-9 w-9 items-center justify-center rounded-[4px] text-ink-faint hover:bg-[#ebeef2] hover:text-ink transition"
                           >
                             <MoreHorizontal className="h-4 w-4" />

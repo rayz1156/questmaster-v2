@@ -23,6 +23,8 @@ import { useBarSisiKecil } from "@/lib/barSisi";
 import { useTabPapanPendidik } from "@/lib/papanPendidikNav";
 import { getSession, clearSession } from "@/lib/session";
 import { LogoMark } from "@/components/Logo";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import PemilihBahasa from "@/components/PemilihBahasa";
 import type { User, Profile } from "@/lib/types";
 import { getMyProfile } from "@/lib/data";
 
@@ -94,6 +96,9 @@ export default function Shell({
 }) {
   const router = useRouter();
   const pathname = usePathname();
+  // `t` sudah dipakai sebagai nama parameter Tab di bawah, jadi fungsi
+  // terjemah diberi nama `tr` dalam fail ini sahaja.
+  const { t: tr } = useBahasa();
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
@@ -269,7 +274,7 @@ export default function Shell({
                 )
               }
               aria-expanded={subTerbukaFn(t)}
-              aria-label={`${t.label} submenu`}
+              aria-label={`${t.label} ${tr('nav.submenu')}`}
               className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-faint hover:text-ink"
             >
               <ChevronDown
@@ -303,12 +308,12 @@ export default function Shell({
   };
 
   const binaMenu = (padat: boolean) => (
-    <nav aria-label="Main" className={`flex flex-col gap-0.5 ${padat ? "px-2 pt-2" : "px-3"} pb-6`}>
+    <nav aria-label={tr('nav.mainNav')} className={`flex flex-col gap-0.5 ${padat ? 'px-2 pt-2' : 'px-3'} pb-6`}>
       {/* Tajuk "Menu" lama hanya dipaparkan bila tiada kumpulan, supaya
           pemanggil lama mendapat rupa yang sama seperti sebelum ini. */}
       {!adaKumpulan && !padat && (
         <div className="px-3 pb-2 pt-4 text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint">
-          Menu
+          {tr('nav.menu')}
         </div>
       )}
       {blokMenu.map((k, i) => (
@@ -343,9 +348,9 @@ export default function Shell({
           <button
             type="button"
             onClick={togolKecil}
-            aria-label={kecil ? "Expand sidebar" : "Collapse sidebar"}
+            aria-label={kecil ? tr('nav.expandSidebar') : tr('nav.collapseSidebar')}
             aria-expanded={!kecil}
-            title={kecil ? "Expand sidebar" : "Collapse sidebar"}
+            title={kecil ? tr('nav.expandSidebar') : tr('nav.collapseSidebar')}
             className={`${kecil ? "" : "ml-auto"} flex h-9 w-9 shrink-0 items-center justify-center rounded-md text-ink-faint transition hover:bg-canvas hover:text-ink`}
           >
             {kecil ? <PanelLeftOpen className="h-5 w-5" /> : <PanelLeftClose className="h-5 w-5" />}
@@ -356,7 +361,7 @@ export default function Shell({
 
       {/* ===== Laci telefon/tablet: lapisan gelap lutsinar + panel ===== */}
       {drawerOpen && (
-        <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true" aria-label="Menu">
+        <div className="fixed inset-0 z-50 xl:hidden" role="dialog" aria-modal="true" aria-label={tr('nav.dialogMenu')}>
           <div
             className="absolute inset-0 bg-black/50"
             onClick={() => setDrawerOpen(false)}
@@ -370,7 +375,7 @@ export default function Shell({
               <button
                 type="button"
                 onClick={() => setDrawerOpen(false)}
-                aria-label="Close menu"
+                aria-label={tr('nav.closeMenu')}
                 className="ml-auto flex h-9 w-9 items-center justify-center rounded-md text-ink-faint hover:text-ink"
               >
                 <X className="h-5 w-5" />
@@ -388,7 +393,7 @@ export default function Shell({
             <button
               type="button"
               onClick={() => setDrawerOpen(true)}
-              aria-label="Open menu"
+              aria-label={tr('nav.openMenu')}
               className="xl:hidden flex h-9 w-9 items-center justify-center rounded-md text-ink-muted hover:text-ink"
             >
               <Menu className="h-5 w-5" />
@@ -405,8 +410,11 @@ export default function Shell({
                   active("/help") ? "text-brand-purple" : "text-ink-faint hover:text-ink"
                 }`}
               >
-                <HelpCircle className="w-5 h-5" /> Help
+                <HelpCircle className="w-5 h-5" /> {tr('nav.help')}
               </Link>
+
+              {/* Pemilih bahasa (KZ-040): di bar atas, berdekatan Help. */}
+              <PemilihBahasa className="hidden sm:inline-flex" />
 
               <div className="relative" ref={menuRef}>
                 <button
@@ -443,20 +451,20 @@ export default function Shell({
                       href="/educator/profile"
                       className="flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                     >
-                      <UserIcon className="w-4 h-4 text-ink-faint" /> Account settings
+                      <UserIcon className="w-4 h-4 text-ink-faint" /> {tr('nav.accountSettings')}
                     </Link>
                     <Link
                       href="/help"
                       className="sm:hidden flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                     >
-                      <HelpCircle className="w-4 h-4 text-ink-faint" /> Help
+                      <HelpCircle className="w-4 h-4 text-ink-faint" /> {tr('nav.help')}
                     </Link>
                     <div className="h-px bg-hairline my-1" />
                     <button
                       onClick={onLogout}
                       className="w-full flex items-center gap-2.5 px-3.5 py-2.5 text-sm text-ink hover:bg-canvas transition"
                     >
-                      <LogOut className="w-4 h-4 text-ink-faint" /> Sign out
+                      <LogOut className="w-4 h-4 text-ink-faint" /> {tr('nav.signOut')}
                     </button>
                   </div>
                 )}
