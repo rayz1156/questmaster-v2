@@ -20,10 +20,13 @@ import { supabase, setRememberMe } from '@/lib/supabase';
 import { pautanDalamanSelamat } from '@/lib/pautan';
 import GoogleButton from '@/components/GoogleButton';
 import AuthSplit from '@/components/ui/AuthSplit';
+import PemilihBahasa from '@/components/PemilihBahasa';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { t } = useBahasa();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -55,7 +58,7 @@ function LoginInner() {
     const { data, error } = await supabase.auth.signInWithPassword(creds);
     if (error || !data.user) {
       setBusy(false);
-      const m = error?.message || 'Sign-in failed';
+      const m = error?.message || t('auth.signInFailed');
       setErr(m);
       setNeedsVerify(/confirm|verif/i.test(m));
       return;
@@ -81,29 +84,29 @@ function LoginInner() {
   }
 
   async function resendVerification() {
-    if (!email) { setResendMsg('Please enter your email above first.'); return; }
+    if (!email) { setResendMsg(t('auth.enterEmailFirst')); return; }
     setResending(true); setResendMsg('');
     const redirectTo = `${window.location.origin}/auth/callback`;
     const { error } = await supabase.auth.resend({ type: 'signup', email, options: { emailRedirectTo: redirectTo } });
     setResending(false);
     setResendMsg(error
-      ? (error.message || 'Could not resend. Try again later.')
-      : 'Verification email sent. Please check your inbox, and your spam folder.');
+      ? (error.message || t('auth.couldNotResend'))
+      : t('auth.verificationSent'));
   }
 
   return (
-    <AuthSplit>
+    <AuthSplit penjuru={<PemilihBahasa />}>
       <div className="w-full max-w-[380px]">
         <div className="text-center mb-8">
-          <h1 className="text-[20px] font-bold tracking-tight text-ink">Welcome back.</h1>
-          <p className="text-[14px] text-ink-muted mt-1">Your next great class starts here.</p>
+          <h1 className="text-[20px] font-bold tracking-tight text-ink">{t('auth.welcomeBack')}</h1>
+          <p className="text-[14px] text-ink-muted mt-1">{t('auth.loginSubtitle')}</p>
         </div>
 
         <div className="bg-white rounded-[4px] border border-hairline p-6 shadow-card">
             <GoogleButton next={searchParams?.get('next') || undefined} className="mb-5 empty:hidden" />
 
             <form onSubmit={signIn}>
-            <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="email">Email</label>
+            <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="email">{t('auth.email')}</label>
             <input
               id="email"
               value={email}
@@ -112,10 +115,10 @@ function LoginInner() {
               required
               autoComplete="email"
               className="input mb-4"
-              placeholder="you@example.com"
+              placeholder={t('auth.emailPlaceholder')}
             />
 
-            <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="password">Password</label>
+            <label className="block text-sm font-medium text-ink mb-1.5" htmlFor="password">{t('auth.password')}</label>
             <div className="relative mb-4">
               <input
                 id="password"
@@ -125,12 +128,12 @@ function LoginInner() {
                 required
                 autoComplete="current-password"
                 className="input pr-11"
-                placeholder="Enter your password"
+                placeholder={t('auth.passwordPlaceholder')}
               />
               <button
                 type="button"
                 onClick={() => setShow((v) => !v)}
-                aria-label={show ? 'Hide password' : 'Show password'}
+                aria-label={show ? t('auth.hidePassword') : t('auth.showPassword')}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-ink-faint hover:text-ink transition"
               >
                 {show ? <EyeOff className="w-[18px] h-[18px]" /> : <Eye className="w-[18px] h-[18px]" />}
@@ -144,7 +147,7 @@ function LoginInner() {
                 onChange={(e) => setRemember(e.target.checked)}
                 className="w-4 h-4 rounded accent-[#7057D9]"
               />
-              Remember me
+              {t('auth.rememberMe')}
             </label>
 
             {err && <p className="text-sm text-red-600 mb-3">{err}</p>}
@@ -157,24 +160,24 @@ function LoginInner() {
                   disabled={resending}
                   className="text-brand-purple font-medium disabled:opacity-50"
                 >
-                  {resending ? 'Sending…' : 'Resend verification email'}
+                  {resending ? t('auth.sending') : t('auth.resendVerification')}
                 </button>
                 {resendMsg && <p className="text-ink-muted mt-1">{resendMsg}</p>}
               </div>
             )}
 
             <button disabled={busy} className="btn-primary w-full py-3">
-              {busy ? 'Signing in…' : 'Sign in'}
+              {busy ? t('auth.signingIn') : t('auth.signInButton')}
             </button>
 
             </form>
 
             <div className="mt-5 flex items-center justify-between text-sm">
               <Link href="/forgot-password" className="text-brand-purple font-medium hover:underline">
-                Forgot password?
+                {t('auth.forgotPassword')}
               </Link>
               <Link href="/register" className="text-brand-purple font-medium hover:underline">
-                Create an account
+                {t('auth.createAccount')}
               </Link>
             </div>
         </div>
@@ -199,14 +202,15 @@ export default function LoginPage() {
  * JavaScript berjalan.
  */
 function LoginShell() {
+  const { t } = useBahasa();
   return (
-    <AuthSplit>
+    <AuthSplit penjuru={<PemilihBahasa />}>
       <div className="w-full max-w-[380px] text-center">
         <h1 className="text-[20px] font-bold tracking-tight text-ink">
-          Welcome back.
+          {t('auth.welcomeBack')}
         </h1>
         <p className="text-[14px] text-ink-muted mt-1">
-          Your next great class starts here.
+          {t('auth.loginSubtitle')}
         </p>
       </div>
     </AuthSplit>
