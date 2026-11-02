@@ -12,7 +12,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
-import { ClipboardList, Copy, Plus, QrCode, Trash2 } from "lucide-react";
+import { ClipboardList, Copy, Plus, QrCode, Sparkles, Trash2 } from "lucide-react";
 import QRCode from "qrcode";
 import Shell from "@/components/Shell";
 import ClassShell from "@/components/ClassShell";
@@ -118,6 +118,13 @@ export default function HalamanLnaKelas() {
   const [salinDari, setSalinDari] = useState("");
   const [busy, setBusy] = useState(false);
 
+  // Cadangan item oleh AI (KZ-036).
+  const [aiSedia, setAiSedia] = useState(false);
+  const [aiTerbuka, setAiTerbuka] = useState(false);
+  const [aiTeks, setAiTeks] = useState("");
+  const [aiBusy, setAiBusy] = useState(false);
+  const [aiAmaran, setAiAmaran] = useState<string[]>([]);
+
   // QR modal.
   const [qr, setQr] = useState<{ pautan: string; dataUrl: string } | null>(null);
 
@@ -159,6 +166,23 @@ export default function HalamanLnaKelas() {
       )
       .catch(() => {});
   }, [muat]);
+
+  // KZ-036: sama ada penyedia AI sedia. Butang "Cadang dengan AI" hanya
+  // dipaparkan bila laluan suggest memulangkan available: true.
+  useEffect(() => {
+    let hidup = true;
+    baca(`/api/classes/${id}/lna/suggest`)
+      .then(async (r) => {
+        if (!r.ok) return false;
+        const j = await r.json().catch(() => null);
+        if (hidup) setAiSedia(!!j?.available);
+        return true;
+      })
+      .catch(() => false);
+    return () => {
+      hidup = false;
+    };
+  }, [id]);
 
   const barisBaharu = teksBaharu
     .split("\n")
@@ -213,6 +237,44 @@ export default function HalamanLnaKelas() {
       await muat();
     } finally {
       setBusy(false);
+    }
+  };
+
+  // KZ-036: jana cadangan item LNA daripada teks sinopsis/CLO. Hasil
+  // mengisi textarea "Taip baharu" sahaja; guru menyemak dan menekan
+  // "Cipta LNA" sendiri (tiada LNA dicipta di sini).
+  const janaAi = async () => {
+    setErr("");
+    setMsg("");
+    const teks = aiTeks.trim();
+    if (teks.length < 30 || teks.length > 4000) {
+      setErr("Teks mesti 30 hingga 4,000 aksara.");
+      return;
+    }
+    setAiBusy(true);
+    try {
+      const r = await baca(`/api/classes/${id}/lna/suggest`, {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ text: teks }),
+      });
+      const j = await r.json().catch(() => ({}) as Record<string, unknown>);
+      if (!r.ok) {
+        setErr(String(j?.error ?? "Cadangan AI tidak dapat dijana."));
+        return;
+      }
+      const items = ((j?.items ?? []) as unknown[]).filter(
+        (x): x is string => typeof x === "string",
+      );
+      setTeksBaharu(items.join("\n"));
+      setAiAmaran(
+        ((j?.amaran ?? []) as unknown[]).filter((x): x is string => typeof x === "string"),
+      );
+      setMsg("Cadangan dijana. Semak, sunting atau buang item sebelum Cipta LNA.");
+    } catch {
+      setErr("Cadangan AI tidak dapat dijana.");
+    } finally {
+      setAiBusy(false);
     }
   };
 
@@ -399,19 +461,72 @@ export default function HalamanLnaKelas() {
               ) : null}
 
               {cara === "taip" ? (
-                <Field
-                  label="Satu Outcome setiap baris"
-                  htmlFor="lna-baris"
-                  note="Setiap baris mencipta Outcome baharu dalam kelas ini (1 hingga 200 aksara)."
-                >
-                  <Textarea
-                    id="lna-baris"
-                    value={teksBaharu}
-                    rows={5}
-                    onChange={(e) => setTeksBaharu(e.target.value)}
-                    placeholder={"Saya boleh ...\nSaya boleh ..."}
-                  />
-                </Field>
+                <div className="grid gap-2">
+                  {aiSedia ? (
+                    <div>
+                      <button
+                        type="button"
+                        onClick={() => setAiTerbuka((b) => !b)}
+                        className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2 border border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
+                      >
+                        <Sparkles className="w-4 h-4" />
+                        Cadang dengan AI
+                      </button>
+                    </div>
+                  ) : null}
+
+                  {aiSedia && aiTerbuka ? (
+                    <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 grid gap-2">
+                      <Field
+                        label="Tampal sinopsis kursus atau senarai CLO"
+                        htmlFor="lna-ai-teks"
+                      >
+                        <Textarea
+                          id="lna-ai-teks"
+                          value={aiTeks}
+                          rows={6}
+                          maxLength={4000}
+                          onChange={(e) => setAiTeks(e.target.value)}
+                          placeholder="Cth. sinopsis kursus, senarai hasil pembelajaran kursus (CLO)..."
+                        />
+                      </Field>
+                      <p className="text-[13px] text-ink-faint">
+                        Jangan tampal nama atau data pelajar. Teks ini dihantar
+                        kepada Alibaba Cloud (Qwen) untuk dijana.
+                      </p>
+                      <div>
+                        <button
+                          type="button"
+                          onClick={janaAi}
+                          disabled={aiBusy}
+                          className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50"
+                        >
+                          {aiBusy ? "Menjana cadangan..." : "Jana cadangan"}
+                        </button>
+                      </div>
+                    </div>
+                  ) : null}
+
+                  <Field
+                    label="Satu Outcome setiap baris"
+                    htmlFor="lna-baris"
+                    note="Setiap baris mencipta Outcome baharu dalam kelas ini (1 hingga 200 aksara)."
+                  >
+                    <Textarea
+                      id="lna-baris"
+                      value={teksBaharu}
+                      rows={5}
+                      onChange={(e) => setTeksBaharu(e.target.value)}
+                      placeholder={"Saya boleh ...\nSaya boleh ..."}
+                    />
+                  </Field>
+
+                  {aiAmaran.length > 0 ? (
+                    <p className="text-[13px] text-yellow-700">
+                      {aiAmaran.join(" ")}
+                    </p>
+                  ) : null}
+                </div>
               ) : null}
 
               {cara === "salin" ? (
