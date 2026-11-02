@@ -151,7 +151,7 @@ export default function LnaPanel({ classId }: { classId: string | null }) {
             ) : (
               <ol className="space-y-1.5">
                 {keutamaan.map((o, i) => (
-                  <li key={o.outcomeId} className="flex items-start gap-2 text-[13px] text-gray-800">
+                  <li key={o.itemId} className="flex items-start gap-2 text-[13px] text-gray-800">
                     <span className="inline-flex items-center justify-center w-5 h-5 rounded-md bg-purple-100 text-purple-700 text-[11px] font-bold shrink-0 mt-0.5">
                       {i + 1}
                     </span>

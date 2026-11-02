@@ -4,16 +4,18 @@
  *
  * Perlu log masuk: tanpa sesi, balik ke /login?next=/lna/<roundId>.
  * Notis tetap sebelum menjawab: "Guru anda akan nampak jawapan anda."
- * Bagi setiap item (Outcome) dua baris butang 1 hingga 5: kepentingan
- * ("Sepenting mana untuk saya") dan keyakinan ("Seyakin mana saya
- * sekarang"). Jawapan boleh dikemas kini selagi pusingan dibuka.
+ * Bagi setiap item (Outcome atau bebas, KZ-038) dua baris butang 1
+ * hingga 5: kepentingan ("Sepenting mana untuk saya") dan keyakinan
+ * ("Seyakin mana saya sekarang"). Jawapan boleh dikemas kini selagi
+ * pusingan dibuka; kunci item ialah itemId (id qm_lna_items).
  */
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 interface ItemRound {
-  outcomeId: string;
+  // KZ-038: kunci item ialah itemId (id qm_lna_items).
+  itemId: string;
   position: number;
   label: string;
 }
@@ -26,7 +28,7 @@ interface MaklumatRound {
 }
 
 interface JawapanSendiri {
-  outcomeId: string;
+  itemId: string;
   importance: number;
   currentLevel: number;
 }
@@ -85,10 +87,10 @@ export default function HalamanJawabLna() {
         setItems(itemsUi);
         const mulai: Record<string, Nilai> = {};
         for (const it of itemsUi) {
-          mulai[it.outcomeId] = { importance: null, currentLevel: null };
+          mulai[it.itemId] = { importance: null, currentLevel: null };
         }
         for (const m of mine) {
-          mulai[m.outcomeId] = { importance: m.importance, currentLevel: m.currentLevel };
+          mulai[m.itemId] = { importance: m.importance, currentLevel: m.currentLevel };
         }
         setNilai(mulai);
         setKeadaan("sedia");
@@ -104,7 +106,7 @@ export default function HalamanJawabLna() {
   }, [roundId]);
 
   const lengkap = items.length > 0 && items.every((it) => {
-    const n = nilai[it.outcomeId];
+    const n = nilai[it.itemId];
     return n && n.importance != null && n.currentLevel != null;
   });
 
@@ -120,9 +122,9 @@ export default function HalamanJawabLna() {
         headers: { "content-type": "application/json", ...h },
         body: JSON.stringify({
           answers: items.map((it) => ({
-            outcomeId: it.outcomeId,
-            importance: nilai[it.outcomeId]!.importance,
-            currentLevel: nilai[it.outcomeId]!.currentLevel,
+            itemId: it.itemId,
+            importance: nilai[it.itemId]!.importance,
+            currentLevel: nilai[it.itemId]!.currentLevel,
           })),
         }),
       });
@@ -140,15 +142,15 @@ export default function HalamanJawabLna() {
   };
 
   const BarisButang = ({
-    outcomeId,
+    itemId,
     medan,
     label,
   }: {
-    outcomeId: string;
+    itemId: string;
     medan: "importance" | "currentLevel";
     label: string;
   }) => {
-    const semasa = (nilai[outcomeId] ?? {} as Nilai)[medan] ?? null;
+    const semasa = (nilai[itemId] ?? {} as Nilai)[medan] ?? null;
     return (
       <div>
         <p className="text-[13px] text-ink-muted mb-1.5">{label}</p>
@@ -163,7 +165,7 @@ export default function HalamanJawabLna() {
                 onClick={() =>
                   setNilai((n) => ({
                     ...n,
-                    [outcomeId]: { ...n[outcomeId], [medan]: v } as Nilai,
+                    [itemId]: { ...n[itemId], [medan]: v } as Nilai,
                   }))
                 }
                 className={`h-11 flex-1 rounded-lg text-[15px] font-bold transition ${
@@ -232,17 +234,17 @@ export default function HalamanJawabLna() {
         ) : null}
 
         {items.map((it, idx) => (
-          <div key={it.outcomeId} className="card space-y-3">
+          <div key={it.itemId} className="card space-y-3">
             <p className="text-[15px] font-semibold text-ink">
               {idx + 1}. {it.label}
             </p>
             <BarisButang
-              outcomeId={it.outcomeId}
+              itemId={it.itemId}
               medan="importance"
               label="Sepenting mana untuk saya"
             />
             <BarisButang
-              outcomeId={it.outcomeId}
+              itemId={it.itemId}
               medan="currentLevel"
               label="Seyakin mana saya sekarang"
             />

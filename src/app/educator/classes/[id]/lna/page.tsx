@@ -9,6 +9,12 @@
  * /lna/<roundId>), menutup pusingan (snapshot penguasaan disimpan oleh
  * API) dan membaca laporan keutamaan (MWDS, RDS, kuadran IPA, bendera
  * keyakinan lawan penguasaan, delta pra/pasca).
+ *
+ * KZ-038: item bebas tanpa Outcome. Mod "Taip baharu" memilih sama ada
+ * baris menjadi Outcome kelas atau item LNA sahaja; mod "Outcomes
+ * sedia ada" menerima item tambahan bukan Outcome. Laporan menandakan
+ * item bebas dan tidak mengira penguasaan, bendera serta delta
+ * penguasaan bagi item tersebut.
  */
 import { useCallback, useEffect, useState } from "react";
 import { useParams } from "next/navigation";
@@ -117,6 +123,9 @@ export default function HalamanLnaKelas() {
   const [teksBaharu, setTeksBaharu] = useState("");
   const [salinDari, setSalinDari] = useState("");
   const [busy, setBusy] = useState(false);
+  // KZ-038: item bebas, tanpa Outcome.
+  const [taipJenis, setTaipJenis] = useState<"outcome" | "bebas">("outcome");
+  const [teksTambahan, setTeksTambahan] = useState("");
 
   // Cadangan item oleh AI (KZ-036).
   const [aiSedia, setAiSedia] = useState(false);
@@ -189,15 +198,27 @@ export default function HalamanLnaKelas() {
     .map((b) => b.trim())
     .filter((b) => b.length > 0);
 
-  const jumlahPilihan = terpilih.size + barisBaharu.length + (salinDari ? 1 : 0);
+  // Item tambahan bukan Outcome dalam mod "Outcomes sedia ada" (KZ-038).
+  const barisTambahan = teksTambahan
+    .split("\n")
+    .map((b) => b.trim())
+    .filter((b) => b.length > 0);
+
+  const jumlahPilihan =
+    terpilih.size + barisBaharu.length + (salinDari ? 1 : 0)
+    + barisTambahan.length;
 
   // Amaran lembut bagi label yang mengandungi "dan"/"and" (panduan
-  // menulis satu kemahiran bagi setiap item).
+  // menulis satu kemahiran bagi setiap item). Terpakai juga pada item
+  // bebas (KZ-038).
   const labelBerat: string[] = [];
   for (const o of outcomes) {
     if (terpilih.has(o.id) && adaDan(o.label)) labelBerat.push(o.label);
   }
   for (const b of barisBaharu) {
+    if (adaDan(b)) labelBerat.push(b);
+  }
+  for (const b of barisTambahan) {
     if (adaDan(b)) labelBerat.push(b);
   }
 
@@ -215,9 +236,18 @@ export default function HalamanLnaKelas() {
     }
     setBusy(true);
     try {
+      // KZ-038: baris yang ditaip menjadi Outcome baharu (lalai) atau
+      // item bebas ikut pilihan radio; item tambahan dalam mod
+      // "Outcomes sedia ada" sentiasa item bebas.
+      const bebas: string[] = [];
       const badan: Record<string, unknown> = { title: tajuk.trim() };
       if (terpilih.size > 0) badan.outcomeIds = Array.from(terpilih);
-      if (barisBaharu.length > 0) badan.newOutcomes = barisBaharu;
+      if (barisBaharu.length > 0) {
+        if (taipJenis === "bebas") bebas.push(...barisBaharu);
+        else badan.newOutcomes = barisBaharu;
+      }
+      if (barisTambahan.length > 0) bebas.push(...barisTambahan);
+      if (bebas.length > 0) badan.freeItems = bebas;
       if (salinDari) badan.copyFromClassId = salinDari;
       const r = await baca(`/api/classes/${id}/lna`, {
         method: "POST",
@@ -232,6 +262,7 @@ export default function HalamanLnaKelas() {
       setTajuk("");
       setTerpilih(new Set());
       setTeksBaharu("");
+      setTeksTambahan("");
       setSalinDari("");
       setMsg("LNA dicipta. Buka pusingan PRA apabila sedia.");
       await muat();
@@ -373,6 +404,11 @@ export default function HalamanLnaKelas() {
   const laporanAktif =
     laporan == null ? null : pusinganPapar === "pra" ? laporan.pra : laporan.pasca;
 
+  // KZ-038: nota bendera penguasaan hanya mengira item Outcome; jika
+  // SEMUA item bebas, papar mesej khusus.
+  const itemOutcome = laporanAktif?.outcomes.filter((o) => o.kind === "outcome") ?? [];
+  const semuaBebas = laporanAktif != null && itemOutcome.length === 0;
+
   return (
     <Shell tabs={EDU_TABS}>
       <ClassShell classId={id} current="lna">
@@ -427,36 +463,53 @@ export default function HalamanLnaKelas() {
               </div>
 
               {cara === "sedia" ? (
-                <div className="grid gap-1.5">
-                  {outcomes.length === 0 ? (
-                    <p className="text-[13px] text-ink-faint">
-                      Kelas ini belum ada Outcomes. Guna &quot;Taip baharu&quot;
-                      untuk menciptanya sekali gus.
-                    </p>
-                  ) : (
-                    outcomes.map((o) => (
-                      <label
-                        key={o.id}
-                        className="flex items-start gap-2 text-[14px] text-ink"
-                      >
-                        <input
-                          type="checkbox"
-                          className="mt-1"
-                          checked={terpilih.has(o.id)}
-                          onChange={(e) => {
-                            const baharu = new Set(terpilih);
-                            if (e.target.checked) baharu.add(o.id);
-                            else baharu.delete(o.id);
-                            setTerpilih(baharu);
-                          }}
-                        />
-                        <span>
-                          {o.code ? `${o.code} · ` : ""}
-                          {o.label}
-                        </span>
-                      </label>
-                    ))
-                  )}
+                <div className="grid gap-3">
+                  <div className="grid gap-1.5">
+                    {outcomes.length === 0 ? (
+                      <p className="text-[13px] text-ink-faint">
+                        Kelas ini belum ada Outcomes. Guna &quot;Taip baharu&quot;
+                        untuk menciptanya sekali gus.
+                      </p>
+                    ) : (
+                      outcomes.map((o) => (
+                        <label
+                          key={o.id}
+                          className="flex items-start gap-2 text-[14px] text-ink"
+                        >
+                          <input
+                            type="checkbox"
+                            className="mt-1"
+                            checked={terpilih.has(o.id)}
+                            onChange={(e) => {
+                              const baharu = new Set(terpilih);
+                              if (e.target.checked) baharu.add(o.id);
+                              else baharu.delete(o.id);
+                              setTerpilih(baharu);
+                            }}
+                          />
+                          <span>
+                            {o.code ? `${o.code} · ` : ""}
+                            {o.label}
+                          </span>
+                        </label>
+                      ))
+                    )}
+                  </div>
+
+                  {/* KZ-038: item tambahan bukan Outcome, satu baris satu item. */}
+                  <Field
+                    label="Item tambahan bukan Outcome (satu baris satu item)"
+                    htmlFor="lna-tambahan"
+                    note="Item tambahan tidak dinilai melalui kuiz atau aktiviti; ia dikira dalam analisis keperluan sahaja (1 hingga 200 aksara setiap satu)."
+                  >
+                    <Textarea
+                      id="lna-tambahan"
+                      value={teksTambahan}
+                      rows={3}
+                      onChange={(e) => setTeksTambahan(e.target.value)}
+                      placeholder={"cth. Kemahiran insaniah\ncth. Keperluan alat makmal"}
+                    />
+                  </Field>
                 </div>
               ) : null}
 
@@ -507,10 +560,42 @@ export default function HalamanLnaKelas() {
                     </div>
                   ) : null}
 
+                  {/* KZ-038: pilihan jenis item yang ditaip. Cadangan AI
+                      terus mengisi kotak teks yang sama. */}
+                  <div className="grid gap-1.5">
+                    <label className="flex items-start gap-2 text-[14px] text-ink">
+                      <input
+                        type="radio"
+                        name="lna-taip-jenis"
+                        className="mt-1"
+                        checked={taipJenis === "outcome"}
+                        onChange={() => setTaipJenis("outcome")}
+                      />
+                      <span>
+                        Cipta sebagai Outcome kelas (boleh dinilai melalui
+                        kuiz dan aktiviti)
+                      </span>
+                    </label>
+                    <label className="flex items-start gap-2 text-[14px] text-ink">
+                      <input
+                        type="radio"
+                        name="lna-taip-jenis"
+                        className="mt-1"
+                        checked={taipJenis === "bebas"}
+                        onChange={() => setTaipJenis("bebas")}
+                      />
+                      <span>
+                        Item LNA sahaja (tidak dikira dalam penguasaan)
+                      </span>
+                    </label>
+                  </div>
+
                   <Field
-                    label="Satu Outcome setiap baris"
+                    label={taipJenis === "outcome" ? "Satu Outcome setiap baris" : "Satu item setiap baris"}
                     htmlFor="lna-baris"
-                    note="Setiap baris mencipta Outcome baharu dalam kelas ini (1 hingga 200 aksara)."
+                    note={taipJenis === "outcome"
+                      ? "Setiap baris mencipta Outcome baharu dalam kelas ini (1 hingga 200 aksara)."
+                      : "Setiap baris menjadi item LNA bebas tanpa Outcome; ia tidak dinilai melalui kuiz atau aktiviti (1 hingga 200 aksara)."}
                   >
                     <Textarea
                       id="lna-baris"
@@ -770,7 +855,7 @@ export default function HalamanLnaKelas() {
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="text-left text-ink-faint border-b border-hairline">
-                          <th className="py-2 pr-3">Outcome</th>
+                          <th className="py-2 pr-3">Item</th>
                           <th className="py-2 pr-3">meanI</th>
                           <th className="py-2 pr-3">meanC</th>
                           <th className="py-2 pr-3">MWDS</th>
@@ -783,8 +868,18 @@ export default function HalamanLnaKelas() {
                       </thead>
                       <tbody>
                         {laporanAktif.outcomes.map((o) => (
-                          <tr key={o.outcomeId} className="border-b border-hairline">
-                            <td className="py-2 pr-3 text-ink">{o.label}</td>
+                          <tr key={o.itemId} className="border-b border-hairline">
+                            <td className="py-2 pr-3 text-ink">
+                              {o.label}
+                              {o.kind === "bebas" ? (
+                                <span
+                                  title="Item bukan Outcome tidak dinilai melalui aktiviti"
+                                  className="ml-1.5 inline-block rounded-md bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 align-middle"
+                                >
+                                  Bukan Outcome
+                                </span>
+                              ) : null}
+                            </td>
                             <td className="py-2 pr-3">{o.meanI ?? "-"}</td>
                             <td className="py-2 pr-3">{o.meanC ?? "-"}</td>
                             <td className="py-2 pr-3 font-semibold">{o.mwds ?? "-"}</td>
@@ -792,7 +887,14 @@ export default function HalamanLnaKelas() {
                             <td className="py-2 pr-3">{o.rds ?? "-"}</td>
                             <td className="py-2 pr-3">{o.kedudukanRdm ?? "-"}</td>
                             <td className="py-2 pr-3">
-                              {o.avgMasteryPct != null ? `${o.avgMasteryPct}%` : "-"}
+                              {o.kind === "bebas" ? (
+                                <span
+                                  title="Item bukan Outcome tidak dinilai melalui aktiviti"
+                                  className="text-ink-faint"
+                                >
+                                  Tiada
+                                </span>
+                              ) : o.avgMasteryPct != null ? `${o.avgMasteryPct}%` : "-"}
                             </td>
                             <td className="py-2 pr-3">
                               {o.kuadran ? LABEL_KUADRAN[o.kuadran] : "-"}
@@ -842,7 +944,7 @@ export default function HalamanLnaKelas() {
                         const cy = 90 - ((o.meanC - 1) / 4) * 80;
                         return (
                           <circle
-                            key={o.outcomeId}
+                            key={o.itemId}
                             cx={cx}
                             cy={cy}
                             r="2.6"
@@ -864,7 +966,7 @@ export default function HalamanLnaKelas() {
                         const cy = 90 - ((o.meanC - 1) / 4) * 80;
                         return (
                           <text
-                            key={`t-${o.outcomeId}`}
+                            key={`t-${o.itemId}`}
                             x={cx + 3.4}
                             y={cy + 1.4}
                             fontSize="3.6"
@@ -887,8 +989,13 @@ export default function HalamanLnaKelas() {
                     <p className="text-[14px] font-semibold text-ink mb-2">
                       Keyakinan lawan penguasaan
                     </p>
-                    {laporanAktif.bendera.length === 0 &&
-                    laporanAktif.outcomes.every((o) => o.avgMasteryPct == null) ? (
+                    {semuaBebas ? (
+                      <p className="text-[13px] text-ink-faint">
+                        Semua item ialah item bebas, jadi bendera penguasaan
+                        tidak dikira.
+                      </p>
+                    ) : laporanAktif.bendera.length === 0 &&
+                    itemOutcome.every((o) => o.avgMasteryPct == null) ? (
                       <p className="text-[13px] text-ink-faint">
                         Bendera memerlukan data penguasaan. Tag kuiz atau
                         aktiviti kepada Outcome kelas ini dahulu.
@@ -938,7 +1045,7 @@ export default function HalamanLnaKelas() {
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="text-left text-ink-faint border-b border-hairline">
-                          <th className="py-2 pr-3">Outcome</th>
+                          <th className="py-2 pr-3">Item</th>
                           <th className="py-2 pr-3">Delta keyakinan</th>
                           <th className="py-2 pr-3">Delta MWDS</th>
                           <th className="py-2 pr-3">Delta penguasaan</th>
@@ -946,8 +1053,18 @@ export default function HalamanLnaKelas() {
                       </thead>
                       <tbody>
                         {laporan.perbandingan.outcomes.map((d) => (
-                          <tr key={d.outcomeId} className="border-b border-hairline">
-                            <td className="py-2 pr-3 text-ink">{d.label}</td>
+                          <tr key={d.itemId} className="border-b border-hairline">
+                            <td className="py-2 pr-3 text-ink">
+                              {d.label}
+                              {d.kind === "bebas" ? (
+                                <span
+                                  title="Item bukan Outcome tidak dinilai melalui aktiviti"
+                                  className="ml-1.5 inline-block rounded-md bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 align-middle"
+                                >
+                                  Bukan Outcome
+                                </span>
+                              ) : null}
+                            </td>
                             <td className="py-2 pr-3">{d.deltaMeanC ?? "-"}</td>
                             <td className="py-2 pr-3">{d.deltaMwds ?? "-"}</td>
                             <td className="py-2 pr-3">{d.deltaMastery ?? "-"}</td>

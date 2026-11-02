@@ -36,10 +36,6 @@ function check(name: string, cond: boolean, extra?: unknown) {
   }
 }
 
-function hampir(a: number | null, b: number, toleransi = 0.005): boolean {
-  return a != null && Math.abs(a - b) <= toleransi;
-}
-
 /* ===== Bahagian 1: data lampiran tiket (5 outcome x 4 pelajar) ===== */
 
 const ITEM_LAMPIRAN: ItemLna[] = [
