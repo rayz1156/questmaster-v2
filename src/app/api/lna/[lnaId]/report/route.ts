@@ -39,10 +39,11 @@ export async function GET(
   const supa = akses.supa!;
   const lna = akses.lna!;
 
-  // Item LNA ikut susunan.
+  // Item LNA ikut susunan (KZ-038: kunci itemId; label item Outcome dari
+  // embed, label item bebas dari lajur label qm_lna_items).
   const { data: itemsData, error: errItems } = await supa
     .from('qm_lna_items')
-    .select('outcome_id, position, qm_learning_outcomes(label)')
+    .select('id, outcome_id, label, position, qm_learning_outcomes(label)')
     .eq('lna_id', lna.id)
     .order('position', { ascending: true });
   if (errItems) {
@@ -50,11 +51,16 @@ export async function GET(
     return NextResponse.json({ error: 'Laporan tidak dapat dibina.' }, { status: 500 });
   }
   const items: ItemLna[] = ((itemsData ?? []) as unknown as {
-    outcome_id: string;
+    id: string;
+    outcome_id: string | null;
+    label: string | null;
     qm_learning_outcomes: unknown;
   }[]).map((i) => ({
+    itemId: i.id,
     outcomeId: i.outcome_id,
-    label: labelOutcome(i.qm_learning_outcomes),
+    label: i.outcome_id != null
+      ? labelOutcome(i.qm_learning_outcomes)
+      : (i.label ?? ''),
   }));
 
   // Semua jawapan LNA ini melalui pusingannya.
@@ -71,7 +77,7 @@ export async function GET(
 
   const { data: responsesData, error: errResp } = await supa
     .from('qm_lna_responses')
-    .select('round_id, user_id, outcome_id, importance, current_level, submitted_at')
+    .select('round_id, user_id, item_id, importance, current_level, submitted_at')
     .in('round_id', rounds.length > 0 ? rounds.map((r) => r.id) : ['00000000-0000-0000-0000-000000000000']);
   if (errResp) {
     console.error('[lna] baca jawapan gagal:', errResp.message);
@@ -80,7 +86,7 @@ export async function GET(
   const semuaJawapan = (responsesData ?? []) as {
     round_id: string;
     user_id: string;
-    outcome_id: string;
+    item_id: string;
     importance: number;
     current_level: number;
     submitted_at: string;
@@ -91,7 +97,7 @@ export async function GET(
       .filter((r) => r.round_id === roundId)
       .map((r) => ({
         userId: r.user_id,
-        outcomeId: r.outcome_id,
+        itemId: r.item_id,
         importance: r.importance,
         currentLevel: r.current_level,
       }));

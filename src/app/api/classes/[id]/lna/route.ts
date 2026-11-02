@@ -4,13 +4,16 @@
  *
  * KZ-035. Guru (pemilik kelas atau ko-pendidik diterima) melihat semua
  * LNA kelas. Pelajar hanya melihat LNA yang ada pusingan terbuka, tanpa
- * laporan. POST menerima tiga cara mengisi senarai item:
+ * POST menerima empat cara mengisi senarai item:
  *  - outcomeIds: Outcomes sedia ada kelas ini;
  *  - newOutcomes: label baharu (1 hingga 200 aksara) yang dicipta sebagai
  *    qm_learning_outcomes dalam kelas ini;
  *  - copyFromClassId: salin label/code/description Outcomes kelas lain
- *    yang guru ini juga gurunya.
- * Jumlah item akhir mesti 3 hingga 15 (400 jika tidak).
+ *    yang guru ini juga gurunya;
+ *  - freeItems (KZ-038): label item bebas, tiada Outcome; nyah-dup tidak
+ *    sensitif huruf.
+ * Jumlah item akhir mesti 3 hingga 15 (400 jika tidak). Susunan: sedia
+ * ada, Outcome baharu, salinan, kemudian item bebas.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, requireUser } from '@/lib/supabase-route';
@@ -131,10 +134,12 @@ export async function POST(
     );
   }
 
-  // Kumpul id outcome daripada ketiga-tiga sumber.
+  // Kumpul id outcome daripada sumber Outcome, dan label item bebas
+  // (KZ-038) yang tidak menjadi Outcome.
   const idTerkumpul: string[] = [];
   const labelBaharu: string[] = [];
   const salinanKelasLain: { code: string | null; label: string; description: string | null }[] = [];
+  const labelBebas: string[] = [];
 
   if (body.outcomeIds !== undefined) {
     if (!Array.isArray(body.outcomeIds)) {
@@ -191,6 +196,31 @@ export async function POST(
     }
   }
 
+  if (body.freeItems !== undefined) {
+    if (!Array.isArray(body.freeItems)) {
+      return NextResponse.json({ error: 'freeItems mesti senarai.' }, { status: 400 });
+    }
+    // Nyah-dup tidak sensitif huruf: "Kemahiran A" dan "kemahiran a"
+    // dianggap item yang sama.
+    const dilihatBebas = new Set<string>();
+    for (const x of body.freeItems) {
+      if (typeof x !== 'string') {
+        return NextResponse.json({ error: 'freeItems mesti senarai teks.' }, { status: 400 });
+      }
+      const label = x.trim();
+      if (label.length < 1 || label.length > 200) {
+        return NextResponse.json(
+          { error: 'Setiap item bebas mesti 1 hingga 200 aksara.' },
+          { status: 400 },
+        );
+      }
+      const kunci = label.toLowerCase();
+      if (dilihatBebas.has(kunci)) continue;
+      dilihatBebas.add(kunci);
+      labelBebas.push(label);
+    }
+  }
+
   // Outcome sedia ada mesti milik kelas ini (400 jika ada yang lain).
   if (idTerkumpul.length > 0) {
     const { data: sah } = await svc
@@ -210,8 +240,10 @@ export async function POST(
   }
 
   // Jumlah item akhir 3 hingga 15, dikira SEBELUM mencipta apa-apa
-  // supaya LNA separuh jalan tidak wujud.
-  const jumlahItem = new Set(idTerkumpul).size + labelBaharu.length + salinanKelasLain.length;
+  // supaya LNA separuh jalan tidak wujud. Item bebas turut dikira.
+  const jumlahItem =
+    new Set(idTerkumpul).size + labelBaharu.length + salinanKelasLain.length
+    + labelBebas.length;
   if (jumlahItem < 3 || jumlahItem > 15) {
     return NextResponse.json(
       { error: 'Jumlah item LNA mesti 3 hingga 15.' },
@@ -231,8 +263,10 @@ export async function POST(
     return NextResponse.json({ error: 'LNA tidak dapat dicipta.' }, { status: 500 });
   }
 
-  // Kedudukan item mengikut susunan: sedia ada, taip baharu, salinan.
-  const barisItem: { lna_id: string; outcome_id: string; position: number }[] = [];
+  // Kedudukan item mengikut susunan: sedia ada, taip baharu, salinan,
+  // kemudian item bebas (KZ-038). Baris item Outcome membawa outcome_id;
+  // baris item bebas membawa label.
+  const barisItem: { lna_id: string; outcome_id?: string; label?: string; position: number }[] = [];
   const dilihat = new Set<string>();
   let kedudukan = 0;
   const tambah = (outcomeId: string) => {
@@ -262,6 +296,12 @@ export async function POST(
       return NextResponse.json({ error: 'LNA tidak dapat dicipta.' }, { status: 500 });
     }
     for (const o of (outcomesBaru ?? []) as { id: string }[]) tambah(o.id);
+  }
+
+  // Item bebas (KZ-038): paling akhir, label sendiri tanpa Outcome.
+  for (const label of labelBebas) {
+    kedudukan += 1;
+    barisItem.push({ lna_id: String(lnaBaru.id), label, position: kedudukan });
   }
 
   const { error: errItem } = await svc.from('qm_lna_items').insert(barisItem);

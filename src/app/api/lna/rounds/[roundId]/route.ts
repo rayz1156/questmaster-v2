@@ -46,10 +46,11 @@ export async function GET(
   const round = akses.round!;
   const lna = akses.lna!;
 
-  // Item LNA ikut susunan, dengan label Outcome.
+  // Item LNA ikut susunan (KZ-038: kunci itemId; item Outcome membawa
+  // label Outcome, item bebas membawa label sendiri).
   const { data: items, error: errItem } = await supa
     .from('qm_lna_items')
-    .select('outcome_id, position, qm_learning_outcomes(label, code)')
+    .select('id, outcome_id, label, position, qm_learning_outcomes(label, code)')
     .eq('lna_id', lna.id)
     .order('position', { ascending: true });
   if (errItem) {
@@ -57,10 +58,10 @@ export async function GET(
     return NextResponse.json({ error: 'Pusingan tidak dapat dibaca.' }, { status: 500 });
   }
 
-  // Jawapan pemanggil sendiri sahaja (pelajar atau guru).
+  // Jawapan pemanggil sendiri sahaja (pelajar atau guru), dikunci item.
   const { data: mine, error: errMine } = await supa
     .from('qm_lna_responses')
-    .select('outcome_id, importance, current_level, submitted_at')
+    .select('item_id, importance, current_level, submitted_at')
     .eq('round_id', round.id)
     .eq('user_id', akses.user!.id);
   if (errMine) {
@@ -79,21 +80,27 @@ export async function GET(
       title: lna.title,
     },
     items: ((items ?? []) as unknown as {
-      outcome_id: string;
+      id: string;
+      outcome_id: string | null;
+      label: string | null;
       position: number;
       qm_learning_outcomes: unknown;
     }[]).map((i) => ({
+      itemId: i.id,
       outcomeId: i.outcome_id,
+      label: i.outcome_id != null
+        ? labelOutcome(i.qm_learning_outcomes)
+        : (i.label ?? ''),
+      kind: i.outcome_id != null ? 'outcome' as const : 'bebas' as const,
       position: i.position,
-      label: labelOutcome(i.qm_learning_outcomes),
     })),
     myResponses: (mine ?? []).map((m: {
-      outcome_id: string;
+      item_id: string;
       importance: number;
       current_level: number;
       submitted_at: string;
     }) => ({
-      outcomeId: m.outcome_id,
+      itemId: m.item_id,
       importance: m.importance,
       currentLevel: m.current_level,
       submittedAt: m.submitted_at,

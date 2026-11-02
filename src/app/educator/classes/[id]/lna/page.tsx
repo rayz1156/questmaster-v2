@@ -904,7 +904,7 @@ export default function HalamanLnaKelas() {
                           const nama =
                             laporan.pelajar.find((p) => p.userId === b.userId)?.nama ?? "Pelajar";
                           const labelOutcome =
-                            laporanAktif.outcomes.find((o) => o.outcomeId === b.outcomeId)?.label ?? "";
+                            laporanAktif.outcomes.find((o) => o.itemId === b.itemId)?.label ?? "";
                           return (
                             <li key={i} className="text-[13px] text-ink">
                               <span className="font-semibold">{nama}</span>{" "}
@@ -965,8 +965,8 @@ export default function HalamanLnaKelas() {
                       const nama =
                         laporan.pelajar.find((p) => p.userId === d.userId)?.nama ?? "Pelajar";
                       const labelOutcome =
-                        laporan.pra?.outcomes.find((o) => o.outcomeId === d.outcomeId)?.label
-                        ?? laporan.pasca?.outcomes.find((o) => o.outcomeId === d.outcomeId)?.label
+                        laporan.pra?.outcomes.find((o) => o.itemId === d.itemId)?.label
+                        ?? laporan.pasca?.outcomes.find((o) => o.itemId === d.itemId)?.label
                         ?? "";
                       return (
                         <li key={i} className="text-[13px] text-ink">

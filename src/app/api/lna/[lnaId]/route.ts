@@ -47,27 +47,60 @@ export async function PATCH(
     set.title = title;
   }
 
-  // Ganti senarai item: hanya jika belum ada jawapan dalam mana-mana
-  // pusingan LNA ini.
-  if (body.outcomeIds !== undefined) {
-    if (!Array.isArray(body.outcomeIds) || body.outcomeIds.length === 0) {
-      return NextResponse.json(
-        { error: 'outcomeIds mesti senarai tidak kosong.' },
-        { status: 400 },
-      );
-    }
+  // Ganti senarai item: Outcome dan/atau item bebas (KZ-038 menambah
+  // freeItems pada bentuk yang sama). Hanya jika belum ada jawapan
+  // dalam mana-mana pusingan LNA ini.
+  if (body.outcomeIds !== undefined || body.freeItems !== undefined) {
     const ids: string[] = [];
-    for (const x of body.outcomeIds) {
-      if (typeof x !== 'string' || !sahUuid(x)) {
+    if (body.outcomeIds !== undefined) {
+      if (!Array.isArray(body.outcomeIds) || body.outcomeIds.length === 0) {
         return NextResponse.json(
-          { error: 'outcomeIds mengandungi id tidak sah.' },
+          { error: 'outcomeIds mesti senarai tidak kosong.' },
           { status: 400 },
         );
       }
-      ids.push(x);
+      for (const x of body.outcomeIds) {
+        if (typeof x !== 'string' || !sahUuid(x)) {
+          return NextResponse.json(
+            { error: 'outcomeIds mengandungi id tidak sah.' },
+            { status: 400 },
+          );
+        }
+        ids.push(x);
+      }
+    }
+    const bebas: string[] = [];
+    if (body.freeItems !== undefined) {
+      if (!Array.isArray(body.freeItems)) {
+        return NextResponse.json(
+          { error: 'freeItems mesti senarai.' },
+          { status: 400 },
+        );
+      }
+      // Nyah-dup tidak sensitif huruf (seperti POST cipta).
+      const dilihatBebas = new Set<string>();
+      for (const x of body.freeItems) {
+        if (typeof x !== 'string') {
+          return NextResponse.json(
+            { error: 'freeItems mesti senarai teks.' },
+            { status: 400 },
+          );
+        }
+        const label = x.trim();
+        if (label.length < 1 || label.length > 200) {
+          return NextResponse.json(
+            { error: 'Setiap item bebas mesti 1 hingga 200 aksara.' },
+            { status: 400 },
+          );
+        }
+        const kunci = label.toLowerCase();
+        if (dilihatBebas.has(kunci)) continue;
+        dilihatBebas.add(kunci);
+        bebas.push(label);
+      }
     }
     const unik = Array.from(new Set(ids));
-    if (unik.length < 3 || unik.length > 15) {
+    if (unik.length + bebas.length < 3 || unik.length + bebas.length > 15) {
       return NextResponse.json(
         { error: 'Jumlah item LNA mesti 3 hingga 15.' },
         { status: 400 },
@@ -115,11 +148,21 @@ export async function PATCH(
       console.error('[lna] ganti item gagal (padam):', errPadam.message);
       return NextResponse.json({ error: 'Item LNA tidak dapat diubah.' }, { status: 500 });
     }
-    const baris = unik.map((outcomeId, i) => ({
-      lna_id: lna.id,
-      outcome_id: outcomeId,
-      position: i + 1,
-    }));
+    // Susunan sama seperti cipta: item Outcome dahulu, item bebas
+    // kemudian (KZ-038).
+    const baris: { lna_id: string; outcome_id?: string; label?: string; position: number }[] =
+      unik.map((outcomeId, i) => ({
+        lna_id: lna.id,
+        outcome_id: outcomeId,
+        position: i + 1,
+      }));
+    for (const label of bebas) {
+      baris.push({
+        lna_id: lna.id,
+        label,
+        position: baris.length + 1,
+      });
+    }
     const { error: errIsi } = await supa.from('qm_lna_items').insert(baris);
     if (errIsi) {
       console.error('[lna] ganti item gagal (isi):', errIsi.message);
@@ -127,7 +170,11 @@ export async function PATCH(
     }
   }
 
-  if (Object.keys(set).length === 0 && body.outcomeIds === undefined) {
+  if (
+    Object.keys(set).length === 0
+    && body.outcomeIds === undefined
+    && body.freeItems === undefined
+  ) {
     return NextResponse.json(
       { error: 'Tiada medan untuk dikemas kini.' },
       { status: 400 },

@@ -2,11 +2,14 @@
  * POST /api/lna/rounds/[roundId]/respond: pelajar menghantar atau
  * mengemas kini jawapan satu pusingan terbuka.
  *
- * KZ-035. Badan: { answers: [{ outcomeId, importance, currentLevel }] }.
- * Jawapan mesti meliputi SEMUA item LNA dengan nilai integer 1 hingga
- * 5; outcome yang bukan item LNA ini ditolak 400 (kzsec: pelajar tidak
- * boleh menyuntik outcome kelas lain). Jawapan selepas pusingan
- * ditutup ditolak 409. Had kadar 10 seminit bagi setiap pelajar.
+ * KZ-035. Badan: { answers: [{ itemId, importance, currentLevel }] }.
+ * KZ-038: kunci item ialah itemId (id qm_lna_items); keserasian klien
+ * lama: jika itemId tiada tetapi outcomeId ada, padankan kepada item
+ * Outcome LNA itu. Jawapan mesti meliputi SEMUA item LNA dengan nilai
+ * integer 1 hingga 5; item yang bukan milik LNA ini ditolak 400 (kzsec:
+ * pelajar tidak boleh menyuntik item kelas lain). Jawapan selepas
+ * pusingan ditutup ditolak 409. Had kadar 10 seminit bagi setiap
+ * pelajar.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { dalamHad } from '@/lib/hadKadar';
@@ -17,8 +20,14 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
+/** Item LNA seperti yang dimuat untuk semakan jawapan. */
+interface ItemUntukJawap {
+  id: string;
+  outcome_id: string | null;
+}
+
 interface JawapanMasuk {
-  outcomeId: string;
+  itemId: string;
   importance: number;
   currentLevel: number;
 }
@@ -56,15 +65,26 @@ export async function POST(
     );
   }
 
+  // Muat item LNA dahulu supaya keserasian outcomeId (klien lama dalam
+  // cache) boleh dipadankan kepada itemId (KZ-038).
+  const { data: itemsData } = await supa
+    .from('qm_lna_items')
+    .select('id, outcome_id')
+    .eq('lna_id', lna.id);
+  const items = (itemsData ?? []) as ItemUntukJawap[];
+  const itemById = new Map<string, ItemUntukJawap>(items.map((i) => [i.id, i]));
+  // Peta keserasian: outcome_id -> item (hanya item Outcome).
+  const itemByOutcome = new Map<string, ItemUntukJawap>();
+  for (const i of items) {
+    if (i.outcome_id != null) itemByOutcome.set(i.outcome_id, i);
+  }
+
   const jawapan: JawapanMasuk[] = [];
   for (const a of body.answers) {
     if (!a || typeof a !== 'object') {
       return NextResponse.json({ error: 'Format jawapan tidak sah.' }, { status: 400 });
     }
     const o = a as Record<string, unknown>;
-    if (typeof o.outcomeId !== 'string') {
-      return NextResponse.json({ error: 'outcomeId mesti teks.' }, { status: 400 });
-    }
     // Pembetulan CTO (kzsec #3): mesti nombor JSON sebenar; boole,
     // rentetan atau tatasusunan ditolak sebelum dipaksa.
     if (typeof o.importance !== 'number' || typeof o.currentLevel !== 'number') {
@@ -84,7 +104,24 @@ export async function POST(
         { status: 400 },
       );
     }
-    jawapan.push({ outcomeId: o.outcomeId, importance, currentLevel });
+    if (typeof o.itemId === 'string') {
+      jawapan.push({ itemId: o.itemId, importance, currentLevel });
+      continue;
+    }
+    // Keserasian klien lama: outcomeId dipadankan kepada item Outcome
+    // LNA ini (KZ-038).
+    if (typeof o.outcomeId === 'string') {
+      const item = itemByOutcome.get(o.outcomeId);
+      if (!item) {
+        return NextResponse.json(
+          { error: 'Outcome bukan item LNA ini.' },
+          { status: 400 },
+        );
+      }
+      jawapan.push({ itemId: item.id, importance, currentLevel });
+      continue;
+    }
+    return NextResponse.json({ error: 'itemId mesti teks.' }, { status: 400 });
   }
 
   // Jawapan selepas pusingan ditutup ditolak 409.
@@ -96,13 +133,8 @@ export async function POST(
   }
 
   // Jawapan mesti meliputi SEMUA item LNA ini, tanpa item asing dan
-  // tanpa duplikat.
-  const { data: items } = await supa
-    .from('qm_lna_items')
-    .select('outcome_id')
-    .eq('lna_id', lna.id);
-  const idsItem = new Set(((items ?? []) as { outcome_id: string }[]).map((r) => r.outcome_id));
-  if (idsItem.size === 0) {
+  // tanpa duplikat (kzsec: itemId daripada LNA kelas lain ditolak).
+  if (items.length === 0) {
     return NextResponse.json(
       { error: 'LNA ini tiada item.' },
       { status: 400 },
@@ -110,21 +142,21 @@ export async function POST(
   }
   const dilihat = new Set<string>();
   for (const j of jawapan) {
-    if (!idsItem.has(j.outcomeId)) {
+    if (!itemById.has(j.itemId)) {
       return NextResponse.json(
-        { error: 'Outcome bukan item LNA ini.' },
+        { error: 'Item bukan item LNA ini.' },
         { status: 400 },
       );
     }
-    if (dilihat.has(j.outcomeId)) {
+    if (dilihat.has(j.itemId)) {
       return NextResponse.json(
         { error: 'Ada item dijawab lebih daripada sekali.' },
         { status: 400 },
       );
     }
-    dilihat.add(j.outcomeId);
+    dilihat.add(j.itemId);
   }
-  if (dilihat.size !== idsItem.size) {
+  if (dilihat.size !== items.length) {
     return NextResponse.json(
       { error: 'Jawapan mesti meliputi semua item.' },
       { status: 400 },
@@ -132,18 +164,20 @@ export async function POST(
   }
 
   // Upsert: pelajar boleh mengemas kini selagi pusingan dibuka.
+  // outcome_id diisi bagi item Outcome, null bagi item bebas (KZ-038).
   const sekarang = new Date().toISOString();
   const baris = jawapan.map((j) => ({
     round_id: round.id,
     user_id: user.id,
-    outcome_id: j.outcomeId,
+    item_id: j.itemId,
+    outcome_id: itemById.get(j.itemId)?.outcome_id ?? null,
     importance: j.importance,
     current_level: j.currentLevel,
     submitted_at: sekarang,
   }));
   const { error } = await supa
     .from('qm_lna_responses')
-    .upsert(baris, { onConflict: 'round_id,user_id,outcome_id' });
+    .upsert(baris, { onConflict: 'round_id,user_id,item_id' });
   if (error) {
     console.error('[lna] simpan jawapan gagal:', error.message);
     return NextResponse.json({ error: 'Jawapan tidak dapat disimpan.' }, { status: 500 });

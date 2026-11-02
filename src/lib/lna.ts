@@ -26,16 +26,28 @@
  *    penghantaran tidak menipu bendera.
  */
 
-/** Satu item LNA: merujuk Outcome kelas dengan label paparan. */
+/** Jenis item LNA: merujuk Outcome kelas atau item bebas (KZ-038). */
+export type JenisItemLna = 'outcome' | 'bebas';
+
+/**
+ * Satu item LNA: merujuk Outcome kelas, atau item bebas dengan label
+ * sendiri (outcomeId null). Item bebas dikira untuk MWDS, RDS, kuadran
+ * dan delta keyakinan, tetapi TIDAK untuk penguasaan, bendera dan delta
+ * penguasaan.
+ */
 export interface ItemLna {
-  outcomeId: string;
+  /** Kunci item: id qm_lna_items. */
+  itemId: string;
+  /** Null bagi item bebas: tiada data penguasaan yang boleh dipadankan. */
+  outcomeId: string | null;
   label: string;
 }
 
 /** Satu jawapan pelajar (skala 1 hingga 5, disahkan di laluan API). */
 export interface JawapanLna {
   userId: string;
-  outcomeId: string;
+  /** Kunci item: id qm_lna_items. */
+  itemId: string;
   importance: number;
   currentLevel: number;
 }
@@ -66,8 +78,13 @@ export const LABEL_BENDERA_LNA: Record<BenderaLna, string> = {
 
 /** Kedudukan paparan: seri berkongsi kedudukan terkecil (1,1,3,3,5). */
 export interface BarisOutcomeLna {
-  outcomeId: string;
+  /** Kunci item: id qm_lna_items. */
+  itemId: string;
+  /** Null bagi item bebas. */
+  outcomeId: string | null;
   label: string;
+  /** 'bebas' = penguasaan dan bendera tidak dikira bagi baris ini. */
+  kind: JenisItemLna;
   /** Bilangan pelajar yang menjawab outcome ini dalam pusingan ini. */
   n: number;
   /** Purata kepentingan, 2 titik perpuluhan; null jika tiada jawapan. */
@@ -91,7 +108,8 @@ export interface BarisOutcomeLna {
 /** Satu bendera pelajar (hanya baris yang benar-benar berbendera). */
 export interface BenderaPelajarLna {
   userId: string;
-  outcomeId: string;
+  /** Kunci item: id qm_lna_items. */
+  itemId: string;
   currentLevel: number;
   masteryPct: number | null;
   scored: number;
@@ -116,22 +134,31 @@ export interface LaporanLna {
   purataMeanC: number;
 }
 
-/** Delta pra/pasca bagi satu outcome. */
+/** Delta pra/pasca bagi satu item (Outcome atau bebas). */
 export interface BarisDeltaOutcomeLna {
-  outcomeId: string;
+  /** Kunci item: id qm_lna_items. */
+  itemId: string;
+  /** Null bagi item bebas. */
+  outcomeId: string | null;
   label: string;
+  /** 'bebas' = delta penguasaan tidak dikira (sentiasa null). */
+  kind: JenisItemLna;
   /** meanC(pasca) - meanC(pra); null jika salah satu pusingan tiada data. */
   deltaMeanC: number | null;
   /** MWDS(pasca) - MWDS(pra); null jika salah satu pusingan tiada data. */
   deltaMwds: number | null;
-  /** Purata mastery pasca - pra daripada snapshot; null jika tiada. */
+  /**
+   * Purata mastery pasca - pra daripada snapshot; null jika tiada.
+   * Item bebas tidak mempunyai penguasaan: sentiasa null (KZ-038).
+   */
   deltaMastery: number | null;
 }
 
-/** Delta tahap semasa seorang pelajar bagi satu outcome. */
+/** Delta tahap semasa seorang pelajar bagi satu item. */
 export interface BarisDeltaPelajarLna {
   userId: string;
-  outcomeId: string;
+  /** Kunci item: id qm_lna_items. */
+  itemId: string;
   /** currentLevel(pasca) - currentLevel(pra). */
   deltaC: number;
 }
@@ -305,13 +332,15 @@ export function binaLaporanLna(input: {
 }): LaporanLna {
   const { items, jawapan, mastery } = input;
 
-  // Peta jawapan per outcome dan peta mastery per pelajar+outcome.
-  const jawapanPerOutcome = new Map<string, JawapanLna[]>();
+  // Peta jawapan per item dan peta mastery per pelajar+outcome.
+  // Kunci item ialah itemId (id qm_lna_items); mastery kekal dipadankan
+  // melalui outcomeId item kerana qm_mastery_summary berbentuk Outcome.
+  const jawapanPerItem = new Map<string, JawapanLna[]>();
   const responden = new Set<string>();
   for (const j of jawapan) {
-    const senarai = jawapanPerOutcome.get(j.outcomeId) ?? [];
+    const senarai = jawapanPerItem.get(j.itemId) ?? [];
     senarai.push(j);
-    jawapanPerOutcome.set(j.outcomeId, senarai);
+    jawapanPerItem.set(j.itemId, senarai);
     responden.add(j.userId);
   }
   const masteryPeta = new Map<string, MasteryLna>();
@@ -325,7 +354,7 @@ export function binaLaporanLna(input: {
     jawapanItem: JawapanLna[];
   }
   const agihan: Agihan[] = items.map((item) => {
-    const senarai = jawapanPerOutcome.get(item.outcomeId) ?? [];
+    const senarai = jawapanPerItem.get(item.itemId) ?? [];
     let jumlahI = 0;
     let jumlahC = 0;
     for (const j of senarai) {
@@ -358,19 +387,25 @@ export function binaLaporanLna(input: {
       rds = bulat2((100 * (pr - nr)) / n);
     }
 
-    // Purata mastery responden outcome ini yang telah dinilai.
+    // Purata mastery responden item ini yang telah dinilai. Item bebas
+    // (outcomeId null) tidak mempunyai penguasaan: avgMasteryPct null
+    // dan tiada bendera (KZ-038).
     const nilaiMastery: number[] = [];
-    for (const j of senarai) {
-      const m = masteryPeta.get(`${j.userId}|${j.outcomeId}`);
-      if (m && m.masteryPct != null) nilaiMastery.push(m.masteryPct);
+    if (item.outcomeId != null) {
+      for (const j of senarai) {
+        const m = masteryPeta.get(`${j.userId}|${item.outcomeId}`);
+        if (m && m.masteryPct != null) nilaiMastery.push(m.masteryPct);
+      }
     }
     const avgMastery = purataNilai(nilaiMastery);
 
     return {
       jawapanItem: senarai,
       baris: {
+        itemId: item.itemId,
         outcomeId: item.outcomeId,
         label: item.label,
+        kind: item.outcomeId == null ? 'bebas' : 'outcome',
         n,
         meanI: meanI != null ? bulat2(meanI) : null,
         meanC: meanC != null ? bulat2(meanC) : null,
@@ -470,11 +505,13 @@ export function binaLaporanLna(input: {
   const kaedahSepakat =
     spearmanRho == null ? null : spearmanRho >= 0.6;
 
-  // Bendera keyakinan lawan penguasaan bagi setiap jawapan.
+  // Bendera keyakinan lawan penguasaan bagi setiap jawapan. Item bebas
+  // tidak mempunyai penguasaan, jadi ia tidak pernah berbendera (KZ-038).
   const bendera: BenderaPelajarLna[] = [];
   for (const a of agihan) {
+    if (a.baris.outcomeId == null) continue;
     for (const j of a.jawapanItem) {
-      const m = masteryPeta.get(`${j.userId}|${j.outcomeId}`);
+      const m = masteryPeta.get(`${j.userId}|${a.baris.outcomeId}`);
       const flag = benderaKeyakinan(
         j.currentLevel,
         m ? m.masteryPct : null,
@@ -483,7 +520,7 @@ export function binaLaporanLna(input: {
       if (flag) {
         bendera.push({
           userId: j.userId,
-          outcomeId: j.outcomeId,
+          itemId: j.itemId,
           currentLevel: j.currentLevel,
           masteryPct: m ? m.masteryPct : null,
           scored: m ? m.scored : 0,
@@ -521,18 +558,18 @@ export function binaPerbandinganLna(input: {
 }): PerbandinganLna {
   const { items, jawapanPra, jawapanPasca, masteryPra, masteryPasca } = input;
 
-  // meanC dan MWDS per outcome bagi satu senarai jawapan.
-  const statPerOutcome = (
+  // meanC dan MWDS per item bagi satu senarai jawapan (kunci itemId).
+  const statPerItem = (
     senarai: JawapanLna[],
   ): Map<string, { meanC: number; mwds: number }> => {
-    const perOutcome = new Map<string, JawapanLna[]>();
+    const perItem = new Map<string, JawapanLna[]>();
     for (const j of senarai) {
-      const arr = perOutcome.get(j.outcomeId) ?? [];
+      const arr = perItem.get(j.itemId) ?? [];
       arr.push(j);
-      perOutcome.set(j.outcomeId, arr);
+      perItem.set(j.itemId, arr);
     }
     const hasil = new Map<string, { meanC: number; mwds: number }>();
-    perOutcome.forEach((arr, outcomeId) => {
+    perItem.forEach((arr, itemId) => {
       let jumlahI = 0;
       let jumlahC = 0;
       for (const j of arr) {
@@ -544,7 +581,7 @@ export function binaPerbandinganLna(input: {
       for (const j of arr) {
         jumlahWds += (j.importance - j.currentLevel) * meanI;
       }
-      hasil.set(outcomeId, {
+      hasil.set(itemId, {
         meanC: jumlahC / arr.length,
         mwds: jumlahWds / arr.length,
       });
@@ -552,8 +589,8 @@ export function binaPerbandinganLna(input: {
     return hasil;
   };
 
-  const statPra = statPerOutcome(jawapanPra);
-  const statPasca = statPerOutcome(jawapanPasca);
+  const statPra = statPerItem(jawapanPra);
+  const statPasca = statPerItem(jawapanPasca);
 
   // Purata mastery per outcome daripada satu snapshot.
   const purataMasteryPerOutcome = (
@@ -581,38 +618,45 @@ export function binaPerbandinganLna(input: {
   const masteryPascaPeta = purataMasteryPerOutcome(masteryPasca);
 
   const outcomes: BarisDeltaOutcomeLna[] = items.map((item) => {
-    const pra = statPra.get(item.outcomeId);
-    const pasca = statPasca.get(item.outcomeId);
+    const pra = statPra.get(item.itemId);
+    const pasca = statPasca.get(item.itemId);
     const deltaMeanC =
       pra && pasca ? bulat2(pasca.meanC - pra.meanC) : null;
     const deltaMwds =
       pra && pasca ? bulat2(pasca.mwds - pra.mwds) : null;
-    const mPra = masteryPraPeta.get(item.outcomeId);
-    const mPasca = masteryPascaPeta.get(item.outcomeId);
-    const deltaMastery =
-      mPra != null && mPasca != null ? bulat2(mPasca - mPra) : null;
+    // Delta penguasaan hanya bagi item Outcome; item bebas sentiasa
+    // null walaupun snapshot wujud (KZ-038).
+    let deltaMastery: number | null = null;
+    if (item.outcomeId != null) {
+      const mPra = masteryPraPeta.get(item.outcomeId);
+      const mPasca = masteryPascaPeta.get(item.outcomeId);
+      deltaMastery =
+        mPra != null && mPasca != null ? bulat2(mPasca - mPra) : null;
+    }
     return {
+      itemId: item.itemId,
       outcomeId: item.outcomeId,
       label: item.label,
+      kind: item.outcomeId == null ? 'bebas' : 'outcome',
       deltaMeanC,
       deltaMwds,
       deltaMastery,
     };
   });
 
-  // Delta per pelajar per outcome bagi pelajar yang menjawab kedua-dua
+  // Delta per pelajar per item bagi pelajar yang menjawab kedua-dua
   // pusingan.
-  const kunci = (userId: string, outcomeId: string) =>
-    `${userId}|${outcomeId}`;
+  const kunci = (userId: string, itemId: string) =>
+    `${userId}|${itemId}`;
   const petaPra = new Map<string, JawapanLna>();
-  for (const j of jawapanPra) petaPra.set(kunci(j.userId, j.outcomeId), j);
+  for (const j of jawapanPra) petaPra.set(kunci(j.userId, j.itemId), j);
   const pelajar: BarisDeltaPelajarLna[] = [];
   for (const j of jawapanPasca) {
-    const p = petaPra.get(kunci(j.userId, j.outcomeId));
+    const p = petaPra.get(kunci(j.userId, j.itemId));
     if (!p) continue;
     pelajar.push({
       userId: j.userId,
-      outcomeId: j.outcomeId,
+      itemId: j.itemId,
       deltaC: j.currentLevel - p.currentLevel,
     });
   }

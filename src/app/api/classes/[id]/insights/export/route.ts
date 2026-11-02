@@ -108,22 +108,39 @@ export async function GET(
         .in('lna_id', senaraiLna.map((l) => l.id));
       const pusinganLna = (roundsLna ?? []) as { id: string; kind: string }[];
       if (pusinganLna.length > 0) {
+        // Item LNA (KZ-038): kunci item_id; item Outcome membawa
+        // outcome_id, item bebas membawa label sendiri.
+        const { data: itemsLna } = await svcLna
+          .from('qm_lna_items')
+          .select('id, outcome_id, label')
+          .in('lna_id', senaraiLna.map((l) => l.id));
+        const itemPeta = new Map<string, { label: string; outcomeId: string | null }>();
+        for (const it of (itemsLna ?? []) as {
+          id: string;
+          outcome_id: string | null;
+          label: string | null;
+        }[]) {
+          itemPeta.set(it.id, { label: it.label ?? '', outcomeId: it.outcome_id });
+        }
         const { data: jawapanLna } = await svcLna
           .from('qm_lna_responses')
-          .select('round_id, user_id, outcome_id, importance, current_level')
+          .select('round_id, user_id, item_id, importance, current_level')
           .in('round_id', pusinganLna.map((r) => r.id));
         const jawapan = (jawapanLna ?? []) as {
           round_id: string;
           user_id: string;
-          outcome_id: string;
+          item_id: string;
           importance: number;
           current_level: number;
         }[];
         if (jawapan.length > 0) {
-          // Label outcome dan nama pelajar.
+          // Label Outcome dan nama pelajar.
           const idsOutcome: string[] = [];
           for (const j of jawapan) {
-            if (idsOutcome.indexOf(j.outcome_id) < 0) idsOutcome.push(j.outcome_id);
+            const it = itemPeta.get(j.item_id);
+            if (it && it.outcomeId && idsOutcome.indexOf(it.outcomeId) < 0) {
+              idsOutcome.push(it.outcomeId);
+            }
           }
           const { data: outcomesLna } = await svcLna
             .from('qm_learning_outcomes')
@@ -158,7 +175,13 @@ export async function GET(
           }
 
           barisLna = jawapan.map((j) => {
-            const m = masteryPeta.get(`${j.user_id}|${j.outcome_id}`);
+            const it = itemPeta.get(j.item_id)
+              ?? { label: '', outcomeId: null };
+            // Penguasaan dan bendera hanya bagi item Outcome; item
+            // bebas (KZ-038) kekal kosong.
+            const m = it.outcomeId != null
+              ? masteryPeta.get(`${j.user_id}|${it.outcomeId}`)
+              : undefined;
             const flag = benderaKeyakinan(
               j.current_level,
               m ? m.pct : null,
@@ -166,7 +189,10 @@ export async function GET(
             );
             return {
               nama: nama.get(j.user_id) ?? `User ${j.user_id.slice(0, 8)}`,
-              outcome: labelOutcome.get(j.outcome_id) ?? '',
+              outcome: it.outcomeId != null
+                ? (labelOutcome.get(it.outcomeId) ?? '')
+                : it.label,
+              jenisItem: it.outcomeId != null ? 'Outcome' : 'Bebas',
               pusingan: jenisPusingan.get(j.round_id) ?? '',
               kepentingan: j.importance,
               tahapSemasa: j.current_level,

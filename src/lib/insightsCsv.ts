@@ -27,14 +27,17 @@ export const NAMA_BAHAGIAN: Record<string, string> = {
 
 /**
  * Satu baris bahagian LNA (KZ-035): jawapan seorang pelajar bagi satu
- * outcome dalam satu pusingan, dengan penguasaan dan bendera
- * keyakinan lawan penguasaan.
+ * item (Outcome atau bebas, KZ-038) dalam satu pusingan, dengan
+ * penguasaan dan bendera keyakinan lawan penguasaan (kosong bagi item
+ * bebas).
  */
 export interface BarisLnaEksport {
   /** Nama paparan pelajar. */
   nama: string;
-  /** Label Outcome. */
+  /** Label item: label Outcome atau label item bebas. */
   outcome: string;
+  /** 'Outcome' atau 'Bebas' (KZ-038). */
+  jenisItem: string;
   /** Pusingan: 'Pre' atau 'Post'. */
   pusingan: string;
   kepentingan: number;
@@ -254,9 +257,9 @@ function barisTrend(data: InsightsKelas): string[] {
   return [tajuk, ...baris];
 }
 
-/** Baris bahagian LNA: satu baris per pelajar per outcome per pusingan. */
+/** Baris bahagian LNA: satu baris per pelajar per item per pusingan. */
 function barisLna(senarai: readonly BarisLnaEksport[]): string[] {
-  const tajuk = 'Student,Outcome,Round,Importance,Current level,Mastery %,Flags';
+  const tajuk = 'Student,Item,jenis_item,Round,Importance,Current level,Mastery %,Flags';
   // Susun ikut nama pelajar, pusingan (Pre sebelum Post), kemudian label.
   const tertib = senarai.slice(0).sort((a, b) => {
     if (a.nama !== b.nama) return a.nama < b.nama ? -1 : 1;
@@ -269,6 +272,7 @@ function barisLna(senarai: readonly BarisLnaEksport[]): string[] {
     [
       teks(r.nama),
       teks(r.outcome),
+      teks(r.jenisItem),
       teks(r.pusingan),
       nombor(r.kepentingan),
       nombor(r.tahapSemasa),

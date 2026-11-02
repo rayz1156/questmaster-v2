@@ -270,12 +270,13 @@ check('all: ketujuh-tujuh tajuk bahagian ada',
     .every((t) => csvAll.includes(t + '\r\n')),
   csvAll.length);
 
-/* ===== Bahagian 7b: bahagian LNA (KZ-035) ===== */
+/* ===== Bahagian 7b: bahagian LNA (KZ-035, jenis_item KZ-038) ===== */
 
 const barisLna: BarisLnaEksport[] = [
   {
     nama: 'Siti Aminah',
     outcome: 'Saya boleh membuat analisis',
+    jenisItem: 'Outcome',
     pusingan: 'Post',
     kepentingan: 5,
     tahapSemasa: 4,
@@ -285,6 +286,7 @@ const barisLna: BarisLnaEksport[] = [
   {
     nama: 'Ali, "Best" Ahmad',
     outcome: 'Saya boleh membuat analisis',
+    jenisItem: 'Outcome',
     pusingan: 'Pre',
     kepentingan: 4,
     tahapSemasa: 2,
@@ -294,31 +296,46 @@ const barisLna: BarisLnaEksport[] = [
   {
     nama: '=cmd|/C calc',
     outcome: 'Saya boleh mengira Borich',
+    jenisItem: 'Outcome',
     pusingan: 'Pre',
     kepentingan: 5,
     tahapSemasa: 5,
     masteryPct: 30,
     bendera: 'Yakin tetapi lemah',
   },
+  {
+    // Item bebas (KZ-038): tiada penguasaan dan bendera.
+    nama: 'Zulaika',
+    outcome: 'Kemahiran insaniah',
+    jenisItem: 'Bebas',
+    pusingan: 'Pre',
+    kepentingan: 5,
+    tahapSemasa: 2,
+    masteryPct: null,
+    bendera: '',
+  },
 ];
 const csvLna = binaCsvInsights(data, ['lna'], barisLna);
 const barisCsvLna = csvLna.slice(1).split('\r\n').filter((b) => b.length > 0);
-check('lna: tajuk tujuh lajur',
-  barisCsvLna[0] === 'Student,Outcome,Round,Importance,Current level,Mastery %,Flags',
+check('lna: tajuk lapan lajur termasuk jenis_item',
+  barisCsvLna[0] === 'Student,Item,jenis_item,Round,Importance,Current level,Mastery %,Flags',
   barisCsvLna[0]);
 // Susunan ikut nama mentah: "=cmd" (0x3D) sebelum "Ali" sebelum "Siti".
 check('lna: susunan nama dan Pre sebelum Post',
-  barisCsvLna[1].startsWith("'=cmd|/C calc,Saya boleh mengira Borich,Pre,5,5,30.0,")
-    && barisCsvLna[2].startsWith('"Ali, ""Best"" Ahmad",Saya boleh membuat analisis,Pre,4,2,,')
-    && barisCsvLna[3].startsWith('Siti Aminah,Saya boleh membuat analisis,Post,5,4,90.0,'),
+  barisCsvLna[1].startsWith("'=cmd|/C calc,Saya boleh mengira Borich,Outcome,Pre,5,5,30.0,")
+    && barisCsvLna[2].startsWith('"Ali, ""Best"" Ahmad",Saya boleh membuat analisis,Outcome,Pre,4,2,,')
+    && barisCsvLna[3].startsWith('Siti Aminah,Saya boleh membuat analisis,Outcome,Post,5,4,90.0,'),
   barisCsvLna.slice(1));
 check('lna: suntikan formula dilindungi dan bendera BM kekal',
   barisCsvLna[1].endsWith(',Yakin tetapi lemah')
     && barisCsvLna[3].endsWith(',Kurang yakin tetapi menguasai'),
   [barisCsvLna[1], barisCsvLna[3]]);
+check('lna: item bebas (KZ-038) jenama Bebas, mastery dan bendera kosong',
+  barisCsvLna[4] === 'Zulaika,Kemahiran insaniah,Bebas,Pre,5,2,,',
+  barisCsvLna[4]);
 check('lna: tanpa data hanya baris tajuk',
   binaCsvInsights(data, ['lna'], []) ===
-    '\uFEFFStudent,Outcome,Round,Importance,Current level,Mastery %,Flags\r\n',
+    '\uFEFFStudent,Item,jenis_item,Round,Importance,Current level,Mastery %,Flags\r\n',
   JSON.stringify(binaCsvInsights(data, ['lna'], [])));
 check('lna: bahagian lain tidak terjejas oleh argumen ketiga',
   binaCsvInsights(data, ['teams'], barisLna) === binaCsvInsights(data, ['teams']),
