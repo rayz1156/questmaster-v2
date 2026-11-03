@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { kodPeer, mesejPeer, statusPeer } from '@/lib/peer-mesej';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,20 +24,17 @@ export async function POST(req: NextRequest, { params }: { params: { roundId: st
   const body = await req.json().catch(() => ({}));
   const masuk: Kriteria[] = Array.isArray(body.ratings) ? body.ratings : [];
   if (masuk.length === 0) {
-    return NextResponse.json({ error: 'No ratings were submitted.' }, { status: 400 });
+    return ralatJson('No ratings were submitted.', 400);
   }
   if (masuk.length > 50) {
-    return NextResponse.json({ error: 'Too many ratings in one submission.' }, { status: 400 });
+    return ralatJson('Too many ratings in one submission.', 400);
   }
   for (const m of masuk) {
     const kriteria = [m.k1, m.k2, m.k3, m.k4, m.k5];
     const sah = typeof m.ratee_id === 'string' && m.ratee_id.length === 36 && m.ratee_id !== auth.user!.id
       && kriteria.every((k) => Number.isInteger(k) && k >= 0 && k <= 2);
     if (!sah) {
-      return NextResponse.json(
-        { error: 'Each rating needs a teammate and five scores between 0 and 2.' },
-        { status: 400 },
-      );
+      return ralatJson('Each rating needs a teammate and five scores between 0 and 2.', 400);
     }
   }
 
@@ -47,14 +45,14 @@ export async function POST(req: NextRequest, { params }: { params: { roundId: st
   });
   if (sErr) {
     const kod = kodPeer(sErr);
-    return NextResponse.json({ error: mesejPeer(sErr) }, { status: statusPeer(kod) });
+    return ralatJson(mesejPeer(sErr), statusPeer(kod));
   }
   const st = (status ?? {}) as { in_team?: boolean; team_id?: string | null; submitted_count?: number; total_to_evaluate?: number };
   if (!st.in_team || !st.team_id) {
-    return NextResponse.json({ error: 'You are not in a group for this round.' }, { status: 403 });
+    return ralatJson('You are not in a group for this round.', 403);
   }
   if ((st.submitted_count ?? 0) >= (st.total_to_evaluate ?? 0) && (st.total_to_evaluate ?? 0) > 0) {
-    return NextResponse.json({ error: 'You have already submitted ratings for this round.' }, { status: 409 });
+    return ralatJson('You have already submitted ratings for this round.', 409);
   }
 
   const baris = masuk.map((m) => ({
@@ -77,10 +75,10 @@ export async function POST(req: NextRequest, { params }: { params: { roundId: st
   if (error) {
     // Pelanggaran unique: sudah pernah menghantar sebahagian atau semua.
     if ((error as any).code === '23505') {
-      return NextResponse.json({ error: 'You have already submitted ratings for this round.' }, { status: 409 });
+      return ralatJson('You have already submitted ratings for this round.', 409);
     }
     const kod = kodPeer(error);
-    return NextResponse.json({ error: mesejPeer(error) }, { status: statusPeer(kod) });
+    return ralatJson(mesejPeer(error), statusPeer(kod));
   }
   return NextResponse.json({ ok: true, submitted: baris.length }, { status: 201 });
 }

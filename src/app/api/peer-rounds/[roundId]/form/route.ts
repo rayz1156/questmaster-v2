@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { balasRalatPeer } from '@/lib/peer-server';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -23,7 +24,7 @@ export async function GET(req: NextRequest, { params }: { params: { roundId: str
     .eq('id', params.roundId)
     .maybeSingle();
   if (!round) {
-    return NextResponse.json({ error: 'Evaluation round not found.' }, { status: 404 });
+    return ralatJson('Evaluation round not found.', 404);
   }
 
   const { data: status, error: sErr } = await auth.supa.rpc('qm_peer_my_status', {
