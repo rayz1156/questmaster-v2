@@ -19,6 +19,7 @@ import type { SubmissionBoard, SubmissionBoardColumn, SubmissionBoardItem } from
 import { Alert, PageHead } from '@/components/ui';
 
 import { supabase } from '@/lib/supabase';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 /** Wrap fetch() to attach the Supabase access token. */
 async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -31,6 +32,7 @@ async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Pr
 
 export default function EducatorSubmissionBoardPage() {
   const params = useParams<{ id: string; classId: string }>();
+  const { t } = useBahasa();
   const [data, setData] = useState<{ board: SubmissionBoard | null; items: SubmissionBoardItem[]; columns: SubmissionBoardColumn[]; myRole: 'educator' | 'student' | 'admin'; myId: string } | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
@@ -38,7 +40,7 @@ export default function EducatorSubmissionBoardPage() {
     (async () => {
       try {
         const r = await authedFetch(`/api/submission-boards/${params.id}/${params.classId}`, { cache: 'no-store' });
-        if (!r.ok) throw new Error((await r.json()).error || 'Failed to load');
+        if (!r.ok) throw new Error((await r.json()).error || t('papanKelas.failedToLoad'));
         const j = await r.json();
         setData({ board: j.board, items: j.items || [], columns: j.columns || [], myRole: j.myRole || 'student', myId: j.myId });
       } catch (e) { setErr(e instanceof Error ? e.message : null); }
@@ -51,14 +53,14 @@ export default function EducatorSubmissionBoardPage() {
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        crumb={tajuk ? `Activities / ${tajuk}` : 'Activities'}
-        name="Submissions"
+        crumb={tajuk ? `${t('educator.activities.sectionTitle')} / ${tajuk}` : t('educator.activities.sectionTitle')}
+        name={t('educator.activityDetail.subName')}
         secondaryActions={[
-          { label: 'Back', icon: <ArrowLeft className="w-4 h-4" />, href: `/educator/activities/${params.id}` },
+          { label: t('common.back'), icon: <ArrowLeft className="w-4 h-4" />, href: `/educator/activities/${params.id}` },
         ]}
       />
       {err && <Alert tone="danger" className="mb-4">{err}</Alert>}
-      {!data && !err && <p className="text-sm text-ink-muted">Loading...</p>}
+      {!data && !err && <p className="text-sm text-ink-muted">{t('common.loadingDots')}</p>}
       {data && (
         <SubmissionBoardView
           huntId={params.id}

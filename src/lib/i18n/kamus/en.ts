@@ -722,5 +722,12 @@ export const en = {
       notSignedIn: 'Not signed in',
       activityNotFound: 'Activity not found',
     },
+    // Halaman papan kelas (classes/[id]/board, classes/[id]/learning-board).
+    boards: {
+      introDesc: 'Where the class introduces itself.',
+      introNotCreated: 'No intro board has been created for this class yet.',
+      learningTitle: 'Everything for your next session.',
+      learningDesc: 'Organise your content, share resources and keep your class on track.',
+    },
   },
 };

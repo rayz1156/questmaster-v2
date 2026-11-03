@@ -686,5 +686,12 @@ export const ms: Kamus = {
       notSignedIn: 'Belum log masuk',
       activityNotFound: 'Aktiviti tidak ditemui',
     },
+    // Halaman papan kelas (classes/[id]/board, classes/[id]/learning-board).
+    boards: {
+      introDesc: 'Tempat kelas memperkenalkan dirinya.',
+      introNotCreated: 'Papan pengenalan belum dicipta untuk kelas ini.',
+      learningTitle: 'Segalanya untuk sesi anda seterusnya.',
+      learningDesc: 'Atur kandungan anda, kongsi sumber dan pastikan kelas anda sentiasa di landasan.',
+    },
   },
 };
