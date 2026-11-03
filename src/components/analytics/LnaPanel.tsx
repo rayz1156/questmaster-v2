@@ -9,6 +9,7 @@
 import { useEffect, useState } from "react";
 import { ClipboardList } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import type { LaporanLna, PerbandinganLna } from "@/lib/lna";
 
 interface LnaRingkas {
@@ -24,6 +25,7 @@ interface LaporanPenuh {
 }
 
 export default function LnaPanel({ classId }: { classId: string | null }) {
+  const { t } = useBahasa();
   const [senarai, setSenarai] = useState<LnaRingkas[]>([]);
   const [laporan, setLaporan] = useState<LaporanPenuh | null>(null);
   const [loading, setLoading] = useState(false);
@@ -59,13 +61,13 @@ export default function LnaPanel({ classId }: { classId: string | null }) {
           if (!cancelled) setLaporan(j2 as LaporanPenuh);
         }
       } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+        if (!cancelled) setError(e instanceof Error ? e.message : t("analytics.loadFailed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [classId]);
+  }, [classId, t]);
 
   if (!classId || classId === "all") return null;
 
@@ -108,32 +110,32 @@ export default function LnaPanel({ classId }: { classId: string | null }) {
       <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-100">
         <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
           <ClipboardList className="w-4 h-4 text-indigo-500" />
-          Learning Needs Analysis (LNA)
+          {t("analytics.lna.title")}
         </div>
         {terkini ? (
           <a
             href={`/educator/classes/${classId}/lna`}
             className="text-[13px] text-indigo-600 hover:underline"
           >
-            View full report
+            {t("analytics.lna.viewFull")}
           </a>
         ) : null}
       </div>
 
       <div className="p-4">
-        {loading ? <p className="text-sm text-gray-500">Loading…</p> : null}
+        {loading ? <p className="text-sm text-gray-500">{t("common.loadingDots")}</p> : null}
         {error ? <p className="text-sm text-rose-600">{error}</p> : null}
 
         {!loading && !error && !terkini ? (
           <div className="text-center py-6">
             <p className="text-[14px] text-gray-500 mb-3">
-              Belum ada LNA untuk kelas ini.
+              {t("analytics.lna.empty")}
             </p>
             <a
               href={`/educator/classes/${classId}/lna`}
               className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600"
             >
-              Cipta LNA untuk kelas ini
+              {t("analytics.lna.create")}
             </a>
           </div>
         ) : null}
@@ -146,7 +148,7 @@ export default function LnaPanel({ classId }: { classId: string | null }) {
 
             {keutamaan.length === 0 ? (
               <p className="text-[13px] text-gray-500">
-                Belum ada jawapan pelajar untuk LNA ini.
+                {t("analytics.lna.noAnswers")}
               </p>
             ) : (
               <ol className="space-y-1.5">
@@ -166,12 +168,12 @@ export default function LnaPanel({ classId }: { classId: string | null }) {
 
             <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[13px]">
               <span className="text-gray-600">
-                Yakin tetapi lemah:{" "}
+                {t("analytics.lna.confidentWeak")}{" "}
                 <span className="font-semibold text-rose-600">{benderaLemah ?? 0}</span>
               </span>
               {purataDeltaC != null ? (
                 <span className="text-gray-600">
-                  Delta keyakinan pra/pasca:{" "}
+                  {t("analytics.lna.deltaConfidence")}{" "}
                   <span className="font-semibold text-indigo-600">
                     {purataDeltaC > 0 ? "+" : ""}
                     {purataDeltaC}
@@ -180,7 +182,7 @@ export default function LnaPanel({ classId }: { classId: string | null }) {
               ) : null}
               {purataDeltaMastery != null ? (
                 <span className="text-gray-600">
-                  Delta penguasaan pra/pasca:{" "}
+                  {t("analytics.lna.deltaMastery")}{" "}
                   <span className="font-semibold text-indigo-600">
                     {purataDeltaMastery > 0 ? "+" : ""}
                     {purataDeltaMastery}
