@@ -16,6 +16,7 @@ type Kamus = typeof en;
 
 export const ms: Kamus = {
   common: {
+    unknownError: 'Ralat tidak diketahui',
     loading: 'Memuat…',
     loadingDots: 'Memuat...',
     back: 'Kembali',
@@ -1670,6 +1671,7 @@ export const ms: Kamus = {
       csvColumns: 'Lajur',
       csvColQuestion: 'teks soalan',
       csvColOptions: 'pilihan. Sekurang-kurangnya A dan B diperlukan, diisi ikut susunan.',
+      csvColRange: 'hingga',
       csvColCorrect: 'huruf jawapan betul, A hingga D',
       csvColPoints: 'pilihan, 1 hingga 10000. Kosong bermaksud 1000.',
       csvColSeconds: 'pilihan, 5 hingga 300. Kosong bermaksud 20.',
@@ -2077,6 +2079,7 @@ export const ms: Kamus = {
       edit: 'Sunting',
       delete: 'Padam',
       deleteConfirm: 'Padam siaran ini?',
+      deleteFailed: 'Siaran tidak dapat dipadam.',
       nameRequired: 'Sila masukkan nama anda.',
       imageRequired: 'Sila pilih satu imej.',
       uploadFailed: 'Muat naik gagal ({status})',

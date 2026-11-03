@@ -705,7 +705,7 @@ export default function EditorKuizLangsung() {
           <div className="font-semibold mb-1">{t("live.educatorEditor.csvColumns")}</div>
           <ul className="list-disc ml-4 space-y-0.5">
             <li><code className="font-mono">question</code>, {t("live.educatorEditor.csvColQuestion")}</li>
-            <li><code className="font-mono">option_a</code> to <code className="font-mono">option_d</code>, {t("live.educatorEditor.csvColOptions")}</li>
+            <li><code className="font-mono">option_a</code> {t("live.educatorEditor.csvColRange")} <code className="font-mono">option_d</code>, {t("live.educatorEditor.csvColOptions")}</li>
             <li><code className="font-mono">correct</code>, {t("live.educatorEditor.csvColCorrect")}</li>
             <li><code className="font-mono">points</code>, {t("live.educatorEditor.csvColPoints")}</li>
             <li><code className="font-mono">seconds</code>, {t("live.educatorEditor.csvColSeconds")}</li>

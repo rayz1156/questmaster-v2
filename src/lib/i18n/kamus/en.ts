@@ -18,6 +18,7 @@
 
 export const en = {
   common: {
+    unknownError: 'Unknown error',
     loading: 'Loading…',
     loadingDots: 'Loading...',
     back: 'Back',
@@ -1706,6 +1707,7 @@ export const en = {
       csvColumns: 'Columns',
       csvColQuestion: 'the question text',
       csvColOptions: 'the choices. At least A and B are needed, filled in order.',
+      csvColRange: 'to',
       csvColCorrect: 'the letter of the right answer, A to D',
       csvColPoints: 'optional, 1 to 10000. Blank means 1000.',
       csvColSeconds: 'optional, 5 to 300. Blank means 20.',
@@ -2113,6 +2115,7 @@ export const en = {
       edit: 'Edit',
       delete: 'Delete',
       deleteConfirm: 'Delete this post?',
+      deleteFailed: 'Could not delete the post.',
       nameRequired: 'Please enter your name.',
       imageRequired: 'Please choose an image.',
       uploadFailed: 'Upload failed ({status})',

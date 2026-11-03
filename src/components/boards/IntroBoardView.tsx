@@ -55,7 +55,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
   const handleDelete = async (p: IntroPost) => {
     if (!(await confirm({ title: t('boards.intro.deleteConfirm'), tone: 'danger' }))) return;
     try { await deleteIntroPost(p.id); await reload(); }
-    catch (e: any) { alert(e.message || String(e)); }
+    catch (e: any) { alert(e?.message || t('boards.intro.deleteFailed')); }
   };
 
   return (

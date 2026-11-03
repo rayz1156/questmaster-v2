@@ -896,7 +896,7 @@ function CardRenderer({
                     if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.error || 'Failed'); }
                     onChanged();
                   } catch (e: any) {
-                    alert(t('boards.learning.aiThumbFailed', { ralat: e?.message || 'unknown error' }));
+                    alert(t('boards.learning.aiThumbFailed', { ralat: e?.message || t('common.unknownError') }));
                   }
                 }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-indigo-600">{t('boards.learning.aiThumbMenu')}</button>
               <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">{t('boards.learning.deleteLabel')}</button>
@@ -1442,11 +1442,11 @@ function MoodBoardGrid({
   );
 
   const ensureUncategorizedColumn = async (): Promise<string | null> => {
-    // Bandingkan dengan tajuk terlokalisasi supaya lajur "Tanpa kategori"
-    // tidak dicipta berulang kali dalam BM.
-    const tajukTanpaKategori = t('boards.learning.uncategorizedPlain').trim().toLowerCase();
+    // Terima tajuk English asal dan tajuk terlokalisasi supaya lajur sedia ada
+    // tidak dicipta semula apabila pendidik menukar bahasa.
+    const tajukDiterima = ['uncategorized', t('boards.learning.uncategorizedPlain').trim().toLowerCase()];
     const existing = snap.columns.find(
-      (c) => (c.title || '').trim().toLowerCase() === tajukTanpaKategori
+      (c) => tajukDiterima.includes((c.title || '').trim().toLowerCase())
     );
     if (existing) return existing.id;
     setCreatingUncat(true);
@@ -1694,7 +1694,7 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
       }
       try { onDone(); } catch {}
     } catch (e: any) {
-      if (e?.name !== 'AbortError') alert(t('boards.learning.batchFailed', { ralat: e?.message || 'unknown error' }));
+      if (e?.name !== 'AbortError') alert(t('boards.learning.batchFailed', { ralat: e?.message || t('common.unknownError') }));
     } finally {
       setRunning(false);
       abortRef.current = null;
