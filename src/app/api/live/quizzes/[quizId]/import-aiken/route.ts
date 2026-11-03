@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost, parseAiken } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
 
   const body = await req.json().catch(() => ({}));
   if (typeof body.content !== 'string' || !body.content.trim()) {
-    return NextResponse.json({ error: 'Aiken content is required.' }, { status: 400 });
+    return ralatJson('Aiken content is required.', 400);
   }
 
   const { questions, skipped } = parseAiken(body.content);
@@ -48,6 +49,6 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .from('qm_live_questions')
     .insert(rows);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ created: rows.length, skipped });
 }

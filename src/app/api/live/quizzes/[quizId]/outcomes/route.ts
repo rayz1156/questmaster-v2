@@ -4,6 +4,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { perananKelas } from '@/lib/lnaAkses';
 import { sahUuid, sahOutcomeIds } from '@/lib/live-outcomes';
 import { bacaJsonKecil } from '@/lib/bilikAi';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -58,7 +59,7 @@ async function aksesGuru(
   const auth = await requireUser(req);
   if (auth.response) return { ok: false, response: auth.response };
   const svc = getServiceSupabase();
-  const tidakJumpa = NextResponse.json({ error: 'Quiz not found.' }, { status: 404 });
+  const tidakJumpa = ralatJson('Quiz not found.', 404);
 
   if (!sahUuid(quizId)) return { ok: false, response: tidakJumpa };
 
@@ -136,7 +137,7 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
     return NextResponse.json({ classId: null, outcomes: [] });
   }
   const { outcomes, error } = await muatTag(akses.svc, akses.kuiz.class_id, params.quizId);
-  if (error) return NextResponse.json({ error }, { status: 500 });
+  if (error) return ralatJson(error, 500);
   return NextResponse.json({ classId: akses.kuiz.class_id, outcomes });
 }
 
@@ -151,10 +152,7 @@ export async function PUT(req: NextRequest, { params }: { params: { quizId: stri
   if (!akses.ok) return akses.response;
 
   if (akses.kuiz.class_id === null) {
-    return NextResponse.json(
-      { error: 'Kongsi kuiz dengan kelas dahulu untuk memilih Outcome.' },
-      { status: 400 },
-    );
+    return ralatJson('Kongsi kuiz dengan kelas dahulu untuk memilih Outcome.', 400);
   }
   const classId = akses.kuiz.class_id;
 
@@ -166,10 +164,7 @@ export async function PUT(req: NextRequest, { params }: { params: { quizId: stri
   // (quiz_id, outcome_id)). Nilai null bermakna badan tidak sah.
   const ids = sahOutcomeIds(badan.body.outcomeIds);
   if (!ids) {
-    return NextResponse.json(
-      { error: 'outcomeIds must be a list of at most 15 valid Outcome IDs.' },
-      { status: 400 },
-    );
+    return ralatJson('outcomeIds must be a list of at most 15 valid Outcome IDs.', 400);
   }
 
   if (ids.length > 0) {
@@ -181,12 +176,9 @@ export async function PUT(req: NextRequest, { params }: { params: { quizId: stri
       .select('id')
       .eq('class_id', classId)
       .in('id', ids)) as { data: { id: string }[] | null; error: { message: string } | null };
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return ralatJson(error.message, 500);
     if (!milik || milik.length !== ids.length) {
-      return NextResponse.json(
-        { error: 'Every Outcome must belong to this class.' },
-        { status: 400 },
-      );
+      return ralatJson('Every Outcome must belong to this class.', 400);
     }
   }
 
@@ -195,17 +187,17 @@ export async function PUT(req: NextRequest, { params }: { params: { quizId: stri
     .from('qm_live_quiz_outcomes')
     .delete()
     .eq('quiz_id', params.quizId)) as { error: { message: string } | null };
-  if (ralatPadam) return NextResponse.json({ error: ralatPadam.message }, { status: 500 });
+  if (ralatPadam) return ralatJson(ralatPadam.message, 500);
 
   if (ids.length > 0) {
     const baris = ids.map((outcome_id) => ({ quiz_id: params.quizId, outcome_id, weight: 1 }));
     const { error: ralatUpsert } = (await akses.svc
       .from('qm_live_quiz_outcomes')
       .upsert(baris, { onConflict: 'quiz_id,outcome_id' })) as { error: { message: string } | null };
-    if (ralatUpsert) return NextResponse.json({ error: ralatUpsert.message }, { status: 500 });
+    if (ralatUpsert) return ralatJson(ralatUpsert.message, 500);
   }
 
   const { outcomes, error } = await muatTag(akses.svc, classId, params.quizId);
-  if (error) return NextResponse.json({ error }, { status: 500 });
+  if (error) return ralatJson(error, 500);
   return NextResponse.json({ classId: classId, outcomes });
 }

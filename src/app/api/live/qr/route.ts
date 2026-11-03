@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const code = (req.nextUrl.searchParams.get('code') || '').trim().toUpperCase();
   if (!/^[A-Z0-9]{6}$/.test(code)) {
-    return NextResponse.json({ error: 'A six character session code is required.' }, { status: 400 });
+    return ralatJson('A six character session code is required.', 400);
   }
 
   const sizeRaw = Number(req.nextUrl.searchParams.get('size') || 220);
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
 
   const host = req.headers.get('x-forwarded-host') || req.headers.get('host') || '';
   if (!/^[a-z0-9.-]+(:\d+)?$/i.test(host)) {
-    return NextResponse.json({ error: 'The request host could not be read.' }, { status: 400 });
+    return ralatJson('The request host could not be read.', 400);
   }
   const proto = (req.headers.get('x-forwarded-proto') || 'https').split(',')[0].trim();
   const url = `${proto === 'http' ? 'http' : 'https'}://${host}/live/${code}`;
@@ -46,6 +47,6 @@ export async function GET(req: NextRequest) {
       },
     });
   } catch {
-    return NextResponse.json({ error: 'The QR code could not be drawn.' }, { status: 500 });
+    return ralatJson('The QR code could not be drawn.', 500);
   }
 }

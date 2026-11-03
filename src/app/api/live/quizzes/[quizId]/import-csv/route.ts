@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost, parseQuizCsv, QUIZ_CSV_MAX_BYTES } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -21,13 +22,10 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
 
   const body = await req.json().catch(() => ({}));
   if (typeof body.content !== 'string' || !body.content.trim()) {
-    return NextResponse.json({ error: 'A CSV file is required.' }, { status: 400 });
+    return ralatJson('A CSV file is required.', 400);
   }
   if (body.content.length > QUIZ_CSV_MAX_BYTES) {
-    return NextResponse.json(
-      { error: 'That file is too large. The limit is about 500 KB.' },
-      { status: 400 },
-    );
+    return ralatJson('That file is too large. The limit is about 500 KB.', 400);
   }
 
   const { questions, errors } = parseQuizCsv(body.content);
@@ -59,7 +57,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   }));
 
   const { error } = await host.supa.from('qm_live_questions').insert(rows);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
 
   return NextResponse.json({ created: rows.length });
 }

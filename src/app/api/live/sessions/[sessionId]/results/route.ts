@@ -3,6 +3,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { kedudukanSeri, pangkasTeks, ringkasanSesi } from '@/lib/laporanMarkah';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -76,7 +77,7 @@ export async function GET(
   { params }: { params: { sessionId: string } },
 ) {
   if (!UUID.test(String(params.sessionId))) {
-    return NextResponse.json({ error: 'Not a valid session id.' }, { status: 400 });
+    return ralatJson('Not a valid session id.', 400);
   }
 
   const auth = await requireUser(req);
@@ -86,10 +87,7 @@ export async function GET(
 
   // Had kadar 30 permintaan seminit bagi setiap pengguna.
   if (!dalamHad(`live-results:${callerId}`, 30)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   const svc = getServiceSupabase();
@@ -103,7 +101,7 @@ export async function GET(
     .maybeSingle();
   const sesi = sesiRow as BarisSesi | null;
   if (!sesi) {
-    return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
+    return ralatJson('Session not found.', 404);
   }
 
   const { data: kuizRow } = await svc
@@ -113,7 +111,7 @@ export async function GET(
     .maybeSingle();
   const kuiz = kuizRow as BarisKuiz | null;
   if (!kuiz) {
-    return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
+    return ralatJson('Session not found.', 404);
   }
 
   // ----- Kebenaran (sebelum sebarang bacaan data berat) -----
@@ -131,7 +129,7 @@ export async function GET(
   }
   if (!dibenarkan) {
     // Kuiz tanpa kelas milik orang lain: 403 generik.
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   // ----- Pemain dan jawapan -----
@@ -141,7 +139,7 @@ export async function GET(
     .eq('session_id', params.sessionId);
   if (errPemain) {
     console.error('live results players failed');
-    return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
+    return ralatJson('Failed to load results.', 500);
   }
   const pemain = (pemainData || []) as BarisPemain[];
 
@@ -151,7 +149,7 @@ export async function GET(
     .eq('session_id', params.sessionId);
   if (errJawapan) {
     console.error('live results answers failed');
-    return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
+    return ralatJson('Failed to load results.', 500);
   }
   // KZ-012: dalam Speed Race soalan dikitar semula, jadi hanya cubaan
   // pertama setiap soalan dikira supaya "answered" dan ketepatan setanding
@@ -224,7 +222,7 @@ export async function GET(
     .order('order_idx');
   if (errSoalan) {
     console.error('live results questions failed');
-    return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
+    return ralatJson('Failed to load results.', 500);
   }
   const soalan = (soalanData || []) as BarisSoalan[];
 

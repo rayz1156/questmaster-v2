@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
     .eq('quiz_id', params.quizId)
     .order('order_idx');
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ data: { quiz: host.quiz, questions: questions || [] } });
 }
 
@@ -31,18 +32,18 @@ export async function PATCH(req: NextRequest, { params }: { params: { quizId: st
   const body = await req.json().catch(() => ({}));
   const patch: Record<string, unknown> = {};
   if (typeof body.title === 'string') {
-    if (!body.title.trim()) return NextResponse.json({ error: 'The title cannot be empty.' }, { status: 400 });
+    if (!body.title.trim()) return ralatJson('The title cannot be empty.', 400);
     patch.title = body.title.trim();
   }
   if (typeof body.description === 'string') patch.description = body.description;
   if (body.streak_bonus !== undefined) {
     if (typeof body.streak_bonus !== 'boolean') {
-      return NextResponse.json({ error: 'streak_bonus must be true or false.' }, { status: 400 });
+      return ralatJson('streak_bonus must be true or false.', 400);
     }
     patch.streak_bonus = body.streak_bonus;
   }
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: 'No fields to update.' }, { status: 400 });
+    return ralatJson('No fields to update.', 400);
   }
 
   const { data: quiz, error } = await host.supa
@@ -53,7 +54,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { quizId: st
     .single();
 
   if (error || !quiz) {
-    return NextResponse.json({ error: error?.message || 'Update failed.' }, { status: 500 });
+    return ralatJson(error?.message || 'Update failed.', 500);
   }
   return NextResponse.json({ data: quiz });
 }
@@ -68,6 +69,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { quizId: s
     .delete()
     .eq('id', params.quizId);
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ ok: true });
 }

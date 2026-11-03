@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
 import { BONUS_LALAI_SEC, susunPenyerang } from '@/lib/lumba-laju';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,7 +47,7 @@ type Sah =
 /** Sahkan kod sesi, mod raksasa dan token pemain. */
 async function sahkanPemain(code: string, playerId: string, playerToken: string): Promise<Sah> {
   if (!playerId || !playerToken || !UUID.test(playerId)) {
-    return { ok: false, response: NextResponse.json({ error: 'playerId and playerToken are required.' }, { status: 400 }) };
+    return { ok: false, response: ralatJson('playerId and playerToken are required.', 400) };
   }
   const supa = getServiceSupabase();
   const { data: sesi } = (await supa
@@ -55,10 +56,10 @@ async function sahkanPemain(code: string, playerId: string, playerToken: string)
     .eq('code', code)
     .maybeSingle()) as { data: SesiRaksasa | null };
   if (!sesi) {
-    return { ok: false, response: NextResponse.json({ error: 'Session not found.' }, { status: 404 }) };
+    return { ok: false, response: ralatJson('Session not found.', 404) };
   }
   if (sesi.game_mode !== 'boss') {
-    return { ok: false, response: NextResponse.json({ error: 'This session is not a Boss Battle.' }, { status: 409 }) };
+    return { ok: false, response: ralatJson('This session is not a Boss Battle.', 409) };
   }
   const { data: pemain } = (await supa
     .from('qm_live_players')
@@ -67,7 +68,7 @@ async function sahkanPemain(code: string, playerId: string, playerToken: string)
     .eq('session_id', sesi.id)
     .maybeSingle()) as { data: { id: string; player_token: string } | null };
   if (!pemain || pemain.player_token !== playerToken) {
-    return { ok: false, response: NextResponse.json({ error: 'Invalid player token.' }, { status: 403 }) };
+    return { ok: false, response: ralatJson('Invalid player token.', 403) };
   }
   return { ok: true, sesi, playerId: pemain.id };
 }
@@ -85,7 +86,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const { data: keadaan, error } = await supa.rpc('qm_boss_state', { p_player: sah.playerId });
   if (error || !keadaan) {
     console.error('qm_boss_state failed', error?.code);
-    return NextResponse.json({ error: 'Could not read the battle.' }, { status: 500 });
+    return ralatJson('Could not read the battle.', 500);
   }
   const k = keadaan as Record<string, unknown>;
   // KZ-032: tempoh bonus kelajuan sesi, untuk bar pemain. Lalai 30 untuk
@@ -168,17 +169,14 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   try {
     body = await req.json();
   } catch {
-    return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
+    return ralatJson('Invalid request body.', 400);
   }
   const playerId = typeof body.playerId === 'string' ? body.playerId : '';
   const playerToken = typeof body.playerToken === 'string' ? body.playerToken : '';
   const questionId = typeof body.questionId === 'string' ? body.questionId : '';
   const choiceKey = typeof body.choiceKey === 'string' ? body.choiceKey.trim().toUpperCase() : '';
   if (!playerId || !playerToken || !UUID.test(questionId) || !/^[A-F]$/.test(choiceKey)) {
-    return NextResponse.json(
-      { error: 'playerId, playerToken, questionId and choiceKey are required.' },
-      { status: 400 },
-    );
+    return ralatJson('playerId, playerToken, questionId and choiceKey are required.', 400);
   }
 
   const sah = await sahkanPemain(code, playerId, playerToken);
@@ -186,7 +184,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   // Jawapan secepat mungkin masih jauh di bawah 120 seminit; lebihan ialah skrip.
   if (!dalamHad(`boss-answer:${sah.playerId}`, 120)) {
-    return NextResponse.json({ error: 'Too many answers. Slow down a little.' }, { status: 429 });
+    return ralatJson('Too many answers. Slow down a little.', 429);
   }
 
   const supa = getServiceSupabase();
@@ -197,7 +195,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   });
   if (error || !data) {
     console.error('qm_boss_submit failed', error?.code);
-    return NextResponse.json({ error: 'Your answer could not be saved.' }, { status: 500 });
+    return ralatJson('Your answer could not be saved.', 500);
   }
   // Senarai medan yang dibenarkan sahaja, sama seperti GET. correctKey
   // selepas menjawab adalah disengajakan (keputusan Boss, 14 Okt 2026).

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost, validateOptions } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -15,14 +16,14 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
 
   const body = await req.json().catch(() => ({}));
   const prompt = typeof body.prompt === 'string' ? body.prompt.trim() : '';
-  if (!prompt) return NextResponse.json({ error: 'A question prompt is required.' }, { status: 400 });
+  if (!prompt) return ralatJson('A question prompt is required.', 400);
 
   const opts = validateOptions(body.options);
-  if (!opts.ok) return NextResponse.json({ error: opts.error }, { status: 400 });
+  if (!opts.ok) return ralatJson(opts.error as string, 400);
 
   const correctKey = typeof body.correct_key === 'string' ? body.correct_key : body.correctKey;
   if (typeof correctKey !== 'string' || !opts.keys!.includes(correctKey)) {
-    return NextResponse.json({ error: 'correct_key must be one of the option keys.' }, { status: 400 });
+    return ralatJson('correct_key must be one of the option keys.', 400);
   }
 
   const points = Number.isFinite(Number(body.points)) ? Math.max(1, Math.floor(Number(body.points))) : 1000;
@@ -57,7 +58,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .single();
 
   if (error || !question) {
-    return NextResponse.json({ error: error?.message || 'The question could not be saved.' }, { status: 500 });
+    return ralatJson(error?.message || 'The question could not be saved.', 500);
   }
   return NextResponse.json({ data: question }, { status: 201 });
 }

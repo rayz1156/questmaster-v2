@@ -3,6 +3,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import type { LiveSessionRow } from '@/lib/live-quiz';
 import { TINDAKAN_REVIEW, langkahReview, type TindakanReview } from '@/lib/lumba-laju';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 const TINDAKAN_ASAS = ['start', 'next', 'reveal', 'end', 'reset'];
 const LAJUR_BALAS =
@@ -27,9 +28,9 @@ async function kemasKiniDanBalas(
         .maybeSingle();
   if (upErr) {
     console.error('race control update failed', upErr.code);
-    return NextResponse.json({ error: 'Could not update the session.' }, { status: 500 });
+    return ralatJson('Could not update the session.', 500);
   }
-  if (!updated) return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
+  if (!updated) return ralatJson('Session not found.', 404);
   return NextResponse.json({ data: updated });
 }
 
@@ -46,31 +47,31 @@ async function kawalLumba(
 ) {
   const svc = getServiceSupabase();
   if (action === 'next' || action === 'reveal') {
-    return NextResponse.json({ error: 'This action is not used in a Speed Race.' }, { status: 400 });
+    return ralatJson('This action is not used in a Speed Race.', 400);
   }
   if (action === 'start') {
     if (status !== 'lobby') {
-      return NextResponse.json({ error: 'The race is not in the lobby. Reset it first.' }, { status: 400 });
+      return ralatJson('The race is not in the lobby. Reset it first.', 400);
     }
     const { error } = await svc.rpc('qm_race_start', { p_session: sessionId });
     if (error) {
-      if (error.code === 'RACE1') return NextResponse.json({ error: 'This quiz has no questions.' }, { status: 400 });
+      if (error.code === 'RACE1') return ralatJson('This quiz has no questions.', 400);
       if (error.code === 'RACE2') {
-        return NextResponse.json({ error: 'The race is not in the lobby. Reset it first.' }, { status: 400 });
+        return ralatJson('The race is not in the lobby. Reset it first.', 400);
       }
       console.error('qm_race_start failed', error.code);
-      return NextResponse.json({ error: 'The race could not be started.' }, { status: 500 });
+      return ralatJson('The race could not be started.', 500);
     }
     return kemasKiniDanBalas(supa, sessionId, {});
   }
   if (action === 'end') {
     if (status === 'ended') {
-      return NextResponse.json({ error: 'The session is already over.' }, { status: 400 });
+      return ralatJson('The session is already over.', 400);
     }
     const { error } = await svc.rpc('qm_race_end', { p_session: sessionId });
     if (error) {
       console.error('qm_race_end failed', error.code);
-      return NextResponse.json({ error: 'The race could not be stopped.' }, { status: 500 });
+      return ralatJson('The race could not be stopped.', 500);
     }
     // qm_race_end hanya menamatkan sesi yang berstatus selain ended. Sesi
     // lobi yang dihentikan juga ditamatkan oleh fungsi yang sama.
@@ -78,14 +79,14 @@ async function kawalLumba(
   }
   // reset
   if (status === 'ended') {
-    return NextResponse.json({ error: 'The session is over and cannot be reset.' }, { status: 400 });
+    return ralatJson('The session is over and cannot be reset.', 400);
   }
   // Reset guna klien pengguna supaya RLS hos terpakai, sama seperti reset
   // klasik. Klien service hanya untuk fungsi qm_race_* (kzsec KZ-012).
   const { error: delErr } = await supa.from('qm_live_answers').delete().eq('session_id', sessionId);
   if (delErr) {
     console.error('race reset answers failed', delErr.code);
-    return NextResponse.json({ error: 'The race could not be reset.' }, { status: 500 });
+    return ralatJson('The race could not be reset.', 500);
   }
   const { error: pErr } = await supa
     .from('qm_live_players')
@@ -97,7 +98,7 @@ async function kawalLumba(
     .eq('session_id', sessionId);
   if (pErr) {
     console.error('race reset players failed', pErr.code);
-    return NextResponse.json({ error: 'The race could not be reset.' }, { status: 500 });
+    return ralatJson('The race could not be reset.', 500);
   }
   return kemasKiniDanBalas(supa, sessionId, {
     status: 'lobby', current_index: -1, question_started_at: null,
@@ -118,44 +119,44 @@ async function kawalRaksasa(
 ) {
   const svc = getServiceSupabase();
   if (action === 'next' || action === 'reveal') {
-    return NextResponse.json({ error: 'This action is not used in a Boss Battle.' }, { status: 400 });
+    return ralatJson('This action is not used in a Boss Battle.', 400);
   }
   if (action === 'start') {
     const { error } = await svc.rpc('qm_boss_start', { p_session: sessionId });
     if (error) {
-      if (error.code === 'BOSS1') return NextResponse.json({ error: 'This quiz has no questions.' }, { status: 400 });
+      if (error.code === 'BOSS1') return ralatJson('This quiz has no questions.', 400);
       if (error.code === 'BOSS2') {
-        return NextResponse.json({ error: 'The battle is not in the lobby. Reset it first.' }, { status: 400 });
+        return ralatJson('The battle is not in the lobby. Reset it first.', 400);
       }
       if (error.code === 'BOSS3') {
-        return NextResponse.json({ error: 'Wait for at least one player to join.' }, { status: 400 });
+        return ralatJson('Wait for at least one player to join.', 400);
       }
       console.error('qm_boss_start failed', error.code);
-      return NextResponse.json({ error: 'The battle could not be started.' }, { status: 500 });
+      return ralatJson('The battle could not be started.', 500);
     }
     return kemasKiniDanBalas(supa, sessionId, {});
   }
   if (action === 'end') {
     if (status === 'ended') {
-      return NextResponse.json({ error: 'The session is already over.' }, { status: 400 });
+      return ralatJson('The session is already over.', 400);
     }
     const { error } = await svc.rpc('qm_boss_end', { p_session: sessionId, p_result: 'stopped' });
     if (error) {
       console.error('qm_boss_end failed', error.code);
-      return NextResponse.json({ error: 'The battle could not be stopped.' }, { status: 500 });
+      return ralatJson('The battle could not be stopped.', 500);
     }
     return kemasKiniDanBalas(supa, sessionId, {});
   }
   // reset
   if (status === 'ended') {
-    return NextResponse.json({ error: 'The session is over and cannot be reset.' }, { status: 400 });
+    return ralatJson('The session is over and cannot be reset.', 400);
   }
   // Reset guna klien pengguna supaya RLS hos terpakai, sama seperti reset
   // lumba dan klasik (kzsec KZ-013). Klien service hanya untuk fungsi qm_boss_*.
   const { error: delErr } = await supa.from('qm_live_answers').delete().eq('session_id', sessionId);
   if (delErr) {
     console.error('boss reset answers failed', delErr.code);
-    return NextResponse.json({ error: 'The battle could not be reset.' }, { status: 500 });
+    return ralatJson('The battle could not be reset.', 500);
   }
   const { error: pErr } = await supa
     .from('qm_live_players')
@@ -167,7 +168,7 @@ async function kawalRaksasa(
     .eq('session_id', sessionId);
   if (pErr) {
     console.error('boss reset players failed', pErr.code);
-    return NextResponse.json({ error: 'The battle could not be reset.' }, { status: 500 });
+    return ralatJson('The battle could not be reset.', 500);
   }
   return kemasKiniDanBalas(supa, sessionId, {
     status: 'lobby', current_index: -1, question_started_at: null,
@@ -216,7 +217,7 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     .eq('id', params.sessionId)
     .maybeSingle();
   const ses = session as LiveSessionRow | null;
-  if (!ses) return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
+  if (!ses) return ralatJson('Session not found.', 404);
 
   // Sahkan hos: pemilik sesi, pendidik kelas kuiz atau admin.
   if (ses.host_id !== auth.user!.id) {
@@ -251,13 +252,13 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
       const me = profile as ProfileRef | null;
       if (me && !me.suspended && ['admin', 'superadmin'].includes(me.role)) allowed = true;
     }
-    if (!allowed) return NextResponse.json({ error: 'You are not the host of this session.' }, { status: 403 });
+    if (!allowed) return ralatJson('You are not the host of this session.', 403);
   }
 
   const body = await req.json().catch(() => ({}));
   const action = body.action;
   if (![...TINDAKAN_ASAS, ...TINDAKAN_REVIEW].includes(action)) {
-    return NextResponse.json({ error: 'Invalid action.' }, { status: 400 });
+    return ralatJson('Invalid action.', 400);
   }
 
   const { data: questions } = await auth.supa
@@ -267,7 +268,7 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     .order('order_idx');
   const totalQuestions = (questions || []).length;
   if (totalQuestions === 0) {
-    return NextResponse.json({ error: 'This quiz has no questions.' }, { status: 400 });
+    return ralatJson('This quiz has no questions.', 400);
   }
 
   // KZ-012: mod sesi dan keadaan perbincangan. Dibaca berasingan supaya
@@ -284,13 +285,10 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
   // Tindakan perbincangan: hanya sesi lumba atau raksasa yang sudah tamat.
   if ((TINDAKAN_REVIEW as readonly string[]).includes(action)) {
     if ((!lumba && !raksasa) || ses.status !== 'ended') {
-      return NextResponse.json(
-        { error: 'Question review is available after the game ends.' },
-        { status: 400 },
-      );
+      return ralatJson('Question review is available after the game ends.', 400);
     }
     const langkah = langkahReview(action as TindakanReview, modRow?.review_index ?? -1, totalQuestions);
-    if (!langkah.ok) return NextResponse.json({ error: langkah.error }, { status: 400 });
+    if (!langkah.ok) return ralatJson(langkah.error, 400);
     const tampal: Record<string, unknown> = { review_index: langkah.index };
     if (langkah.revealed !== null) tampal.review_revealed = langkah.revealed;
     return kemasKiniDanBalas(auth.supa, params.sessionId, tampal);
@@ -307,25 +305,25 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
 
   if (action === 'start') {
     if (ses.status !== 'lobby') {
-      return NextResponse.json({ error: 'The session is not in the lobby. Reset it first.' }, { status: 400 });
+      return ralatJson('The session is not in the lobby. Reset it first.', 400);
     }
     patch.status = 'asking';
     patch.current_index = 0;
     patch.question_started_at = new Date().toISOString();
   } else if (action === 'next') {
     if (!['asking', 'revealed'].includes(ses.status)) {
-      return NextResponse.json({ error: 'No question is open right now.' }, { status: 400 });
+      return ralatJson('No question is open right now.', 400);
     }
     const nextIdx = ses.current_index + 1;
     if (nextIdx >= totalQuestions) {
-      return NextResponse.json({ error: 'No more questions. Use End session.' }, { status: 400 });
+      return ralatJson('No more questions. Use End session.', 400);
     }
     patch.status = 'asking';
     patch.current_index = nextIdx;
     patch.question_started_at = new Date().toISOString();
   } else if (action === 'reveal') {
     if (ses.status !== 'asking') {
-      return NextResponse.json({ error: 'There is no open question to reveal.' }, { status: 400 });
+      return ralatJson('There is no open question to reveal.', 400);
     }
     patch.status = 'revealed';
     // Tidak menjawab memutuskan rentetan, sama seperti jawapan salah.
@@ -362,26 +360,26 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     }
   } else if (action === 'end') {
     if (ses.status === 'ended') {
-      return NextResponse.json({ error: 'The session is already over.' }, { status: 400 });
+      return ralatJson('The session is already over.', 400);
     }
     patch.status = 'ended';
     patch.ended_at = new Date().toISOString();
   } else if (action === 'reset') {
     if (ses.status === 'ended') {
-      return NextResponse.json({ error: 'The session is over and cannot be reset.' }, { status: 400 });
+      return ralatJson('The session is over and cannot be reset.', 400);
     }
     // Padam semua jawapan sesi ini.
     const { error: delErr } = await auth.supa
       .from('qm_live_answers')
       .delete()
       .eq('session_id', params.sessionId);
-    if (delErr) return NextResponse.json({ error: delErr.message }, { status: 500 });
+    if (delErr) return ralatJson(delErr.message, 500);
     // Set semula skor pemain kepada 0. Baris pemain JANGAN dipadam.
     const { error: pErr } = await auth.supa
       .from('qm_live_players')
       .update({ score: 0, total_ms: 0, streak: 0, best_streak: 0 })
       .eq('session_id', params.sessionId);
-    if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
+    if (pErr) return ralatJson(pErr.message, 500);
     patch.status = 'lobby';
     patch.current_index = -1;
     patch.question_started_at = null;
@@ -395,7 +393,7 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     .single();
 
   if (upErr || !updated) {
-    return NextResponse.json({ error: upErr?.message || 'Could not update the session.' }, { status: 500 });
+    return ralatJson(upErr?.message || 'Could not update the session.', 500);
   }
   return NextResponse.json({ data: updated });
 }

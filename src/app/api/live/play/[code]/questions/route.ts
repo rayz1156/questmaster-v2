@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { createHash } from 'crypto';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,7 +41,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const code = String(params.code || '').toUpperCase();
   const playerId = req.nextUrl.searchParams.get('playerId') || '';
   if (!playerId) {
-    return NextResponse.json({ error: 'playerId is required.' }, { status: 400 });
+    return ralatJson('playerId is required.', 400);
   }
 
   const supa = getServiceSupabase();
@@ -51,7 +52,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .eq('code', code)
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
-    return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
+    return ralatJson('Session not found.', 404);
   }
 
   // Sahkan playerId milik sesi itu sebelum memulangkan apa-apa.
@@ -62,7 +63,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .eq('session_id', session.id)
     .maybeSingle()) as { data: PlayerRow | null };
   if (!player) {
-    return NextResponse.json({ error: 'Player not found in this session.' }, { status: 403 });
+    return ralatJson('Player not found in this session.', 403);
   }
 
   // Senarai lajur eksplisit TANPA correct_key.

@@ -3,6 +3,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { tigaTeratas, type PemainTeratas } from '@/lib/laporanMarkah';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -64,13 +65,13 @@ export async function GET(req: NextRequest) {
   const limitRaw = Number(sp.get('limit'));
 
   if (classId !== null && !UUID.test(classId)) {
-    return NextResponse.json({ error: 'Not a valid class id.' }, { status: 400 });
+    return ralatJson('Not a valid class id.', 400);
   }
   if (quizId !== null && !UUID.test(quizId)) {
-    return NextResponse.json({ error: 'Not a valid quiz id.' }, { status: 400 });
+    return ralatJson('Not a valid quiz id.', 400);
   }
   if (status !== null && !(STATUS_SESI as readonly string[]).includes(status)) {
-    return NextResponse.json({ error: 'Invalid status.' }, { status: 400 });
+    return ralatJson('Invalid status.', 400);
   }
   const limit =
     Number.isFinite(limitRaw) && limitRaw >= 1
@@ -84,10 +85,7 @@ export async function GET(req: NextRequest) {
 
   // Had kadar 60 permintaan seminit bagi setiap pengguna.
   if (!dalamHad(`live-sessions:${callerId}`, 60)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // Peranan pemanggil: admin yang tidak digantung melihat semua sesi.
@@ -126,18 +124,18 @@ export async function GET(req: NextRequest) {
       .eq('id', quizId)
       .maybeSingle();
     if (!kuiz) {
-      return NextResponse.json({ error: 'Quiz not found.' }, { status: 404 });
+      return ralatJson('Quiz not found.', 404);
     }
     const dibenarkan = kuiz.class_id
       ? kuiz.owner_id === callerId || (await bolehUrusKelas(kuiz.class_id))
       : kuiz.owner_id === callerId || adminAktif;
     if (!dibenarkan) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return ralatJson('Forbidden', 403);
     }
     idKuizTapis = [quizId];
   } else if (classId) {
     if (!(await bolehUrusKelas(classId))) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return ralatJson('Forbidden', 403);
     }
     const { data: kuizKelas, error: errKuizKelas } = await svc
       .from('qm_live_quizzes')
@@ -145,7 +143,7 @@ export async function GET(req: NextRequest) {
       .eq('class_id', classId);
     if (errKuizKelas) {
       console.error('live sessions quiz list failed');
-      return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
+      return ralatJson('Failed to load sessions.', 500);
     }
     idKuizTapis = (kuizKelas || []).map((k: { id: string }) => String(k.id));
   } else if (!adminAktif) {
@@ -170,7 +168,7 @@ export async function GET(req: NextRequest) {
       .eq('owner_id', callerId);
     if (errKuizSendiri) {
       console.error('live sessions own quiz list failed');
-      return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
+      return ralatJson('Failed to load sessions.', 500);
     }
     const senaraiId = new Set<string>((kuizSendiri || []).map((k: { id: string }) => String(k.id)));
     if (idsKelas.size > 0) {
@@ -180,7 +178,7 @@ export async function GET(req: NextRequest) {
         .in('class_id', Array.from(idsKelas));
       if (errKelas) {
         console.error('live sessions class quiz list failed');
-        return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
+        return ralatJson('Failed to load sessions.', 500);
       }
       for (const k of kuizKelas || []) senaraiId.add(String(k.id));
     }
@@ -202,7 +200,7 @@ export async function GET(req: NextRequest) {
   const { data: sesiData, error: errSesi } = await pertanyaan;
   if (errSesi) {
     console.error('live sessions list failed');
-    return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
+    return ralatJson('Failed to load sessions.', 500);
   }
   const semuaSesi = (sesiData || []) as BarisSesi[];
   const truncated = semuaSesi.length > limit;
@@ -217,7 +215,7 @@ export async function GET(req: NextRequest) {
     .in('id', idsKuiz.length > 0 ? idsKuiz : [TIADA_UUID]);
   if (errKuizBaris) {
     console.error('live sessions quiz read failed');
-    return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
+    return ralatJson('Failed to load sessions.', 500);
   }
   const petaKuiz = new Map<string, { title: string | null; class_id: string | null }>();
   for (const k of (kuizBaris || []) as Array<{ id: string; title: string | null; class_id: string | null }>) {
@@ -249,7 +247,7 @@ export async function GET(req: NextRequest) {
     .in('session_id', idsSesi.length > 0 ? idsSesi : [TIADA_UUID]);
   if (errPemain) {
     console.error('live sessions players read failed');
-    return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
+    return ralatJson('Failed to load sessions.', 500);
   }
   const pemain = (pemainData || []) as BarisPemain[];
 
@@ -259,7 +257,7 @@ export async function GET(req: NextRequest) {
     .in('session_id', idsSesi.length > 0 ? idsSesi : [TIADA_UUID]);
   if (errJawapan) {
     console.error('live sessions answers read failed');
-    return NextResponse.json({ error: 'Failed to load sessions.' }, { status: 500 });
+    return ralatJson('Failed to load sessions.', 500);
   }
   const jawapan = (jawapanData || []) as BarisJawapanRingkas[];
 

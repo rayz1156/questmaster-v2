@@ -4,6 +4,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,7 @@ export async function GET(_req: NextRequest, { params }: { params: { code: strin
     .eq('code', code)
     .maybeSingle()) as { data: { id: string } | null };
   if (!session) {
-    return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
+    return ralatJson('Session not found.', 404);
   }
 
   const { data: players } = (await supa

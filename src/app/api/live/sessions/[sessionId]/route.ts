@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import type { LiveSessionRow } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 import {
   susunPapan,
   susunPenyerang,
@@ -103,7 +104,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     .eq('id', params.sessionId)
     .maybeSingle();
   let ses = session as unknown as SesiHos | null;
-  if (!ses) return NextResponse.json({ error: 'Session not found.' }, { status: 404 });
+  if (!ses) return ralatJson('Session not found.', 404);
 
   const isHost = ses.host_id === auth.user!.id;
   let isEducator = isHost;
@@ -137,7 +138,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
   }
 
   if (!isEducator && !isAdmin) {
-    return NextResponse.json({ error: 'You are not the host of this session.' }, { status: 403 });
+    return ralatJson('You are not the host of this session.', 403);
   }
 
   const { data: quiz } = await auth.supa
@@ -151,7 +152,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     .select('id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
     .eq('quiz_id', ses.quiz_id)
     .order('order_idx');
-  if (qErr) return NextResponse.json({ error: qErr.message }, { status: 500 });
+  if (qErr) return ralatJson(qErr.message, 500);
   const allQuestions = questions || [];
 
   // KZ-012: sesi Speed Race mempunyai bentuk balasan sendiri.
@@ -175,7 +176,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
       .eq('session_id', params.sessionId);
     if (plErr) {
       console.error('race host players failed', plErr.code);
-      return NextResponse.json({ error: 'Could not load the racers.' }, { status: 500 });
+      return ralatJson('Could not load the racers.', 500);
     }
     const papan = susunPapan((pemainLumba || []) as unknown as Array<BarisPapanLumba & Record<string, unknown>>);
 
@@ -226,7 +227,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
       .eq('session_id', params.sessionId);
     if (prErr) {
       console.error('boss host players failed', prErr.code);
-      return NextResponse.json({ error: 'Could not load the players.' }, { status: 500 });
+      return ralatJson('Could not load the players.', 500);
     }
     const papan = susunPenyerang(
       (pemainRaksasa || []) as unknown as Array<BarisPenyerang & Record<string, unknown>>,
@@ -243,7 +244,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
       .limit(8);
     if (feedErr) {
       console.error('boss host feed failed', feedErr.code);
-      return NextResponse.json({ error: 'Could not load the battle.' }, { status: 500 });
+      return ralatJson('Could not load the battle.', 500);
     }
     const feed = ((feedRows || []) as Array<{
       player_id: string; is_correct: boolean; boss_effect: number; boss_crit: boolean; created_at: string;
@@ -310,7 +311,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     .select('id, nickname, score, total_ms, joined_at, streak, best_streak')
     .eq('session_id', params.sessionId)
     .order('score', { ascending: false });
-  if (pErr) return NextResponse.json({ error: pErr.message }, { status: 500 });
+  if (pErr) return ralatJson(pErr.message, 500);
 
   const currentQuestion =
     ses.current_index >= 0 && ses.current_index < allQuestions.length

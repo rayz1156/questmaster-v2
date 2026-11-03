@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireQuizHost, generateSessionCode } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 import {
   BONUS_LALAI_SEC,
   RACE_DEFAULT_MINUTES,
@@ -21,7 +22,7 @@ export const fetchCache = 'force-no-store';
 export async function POST(req: NextRequest, { params }: { params: { quizId: string } }) {
   const host = await requireQuizHost(req, params.quizId);
   if (host.response || !host.quiz) {
-    return host.response || NextResponse.json({ error: 'Quiz not found.' }, { status: 404 });
+    return host.response || ralatJson('Quiz not found.', 404);
   }
 
   // KZ-012: badan pilihan { mode, raceMinutes }. Badan kosong = classic,
@@ -37,16 +38,13 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   };
   const mod = sahModPermainan(badan?.mode);
   if (!mod) {
-    return NextResponse.json({ error: 'Invalid game mode.' }, { status: 400 });
+    return ralatJson('Invalid game mode.', 400);
   }
   let minitLumba = RACE_DEFAULT_MINUTES;
   if (mod === 'race' || mod === 'boss') {
     const m = sahMinitLumba(badan?.raceMinutes);
     if (m === null) {
-      return NextResponse.json(
-        { error: 'Race time must be a whole number of minutes from 1 to 60.' },
-        { status: 400 },
-      );
+      return ralatJson('Race time must be a whole number of minutes from 1 to 60.', 400);
     }
     minitLumba = m;
   }
@@ -58,10 +56,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
         ? BONUS_LALAI_SEC
         : sahBonusKelajuan(badan.raceBonusSec);
     if (b === null) {
-      return NextResponse.json(
-        { error: 'Speed bonus must be 15, 30, 45 or 60 seconds.' },
-        { status: 400 },
-      );
+      return ralatJson('Speed bonus must be 15, 30, 45 or 60 seconds.', 400);
     }
     bonusKelajuan = b;
   }
@@ -69,7 +64,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   if (mod === 'boss') {
     const t = sahTahapRaksasa(badan?.bossLevel);
     if (t === null) {
-      return NextResponse.json({ error: 'Invalid boss level.' }, { status: 400 });
+      return ralatJson('Invalid boss level.', 400);
     }
     tahapRaksasa = t;
   }
@@ -80,12 +75,12 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .eq('quiz_id', params.quizId)
     .limit(1);
   if (!questions || questions.length === 0) {
-    return NextResponse.json({ error: 'The quiz needs at least one question.' }, { status: 400 });
+    return ralatJson('The quiz needs at least one question.', 400);
   }
 
   const code = await generateSessionCode(host.supa);
   if (!code) {
-    return NextResponse.json({ error: 'Could not generate a session code. Please try again.' }, { status: 500 });
+    return ralatJson('Could not generate a session code. Please try again.', 500);
   }
 
   // Bahagian 2.3: petik had pemain pemilik kuiz pada masa sesi dicipta, supaya
@@ -122,7 +117,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .single();
 
   if (error || !session) {
-    return NextResponse.json({ error: error?.message || 'The session could not be created.' }, { status: 500 });
+    return ralatJson(error?.message || 'The session could not be created.', 500);
   }
   return NextResponse.json(
     { data: { sessionId: session.id, code: session.code, gameMode: session.game_mode ?? mod } },

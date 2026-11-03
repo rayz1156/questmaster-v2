@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { requireLiveHost } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -18,10 +19,10 @@ export async function POST(req: NextRequest) {
   const body = await req.json().catch(() => ({}));
   const { classId, title } = body;
   if (classId !== undefined && classId !== null && typeof classId !== 'string') {
-    return NextResponse.json({ error: 'classId is invalid.' }, { status: 400 });
+    return ralatJson('classId is invalid.', 400);
   }
   if (typeof title !== 'string' || !title.trim()) {
-    return NextResponse.json({ error: 'A title is required.' }, { status: 400 });
+    return ralatJson('A title is required.', 400);
   }
 
   // Jika classId diberi, sahkan pemanggil pendidik/pemilik kelas itu.
@@ -45,7 +46,7 @@ export async function POST(req: NextRequest) {
     .single();
 
   if (error || !quiz) {
-    return NextResponse.json({ error: error?.message || 'The quiz could not be created.' }, { status: 500 });
+    return ralatJson(error?.message || 'The quiz could not be created.', 500);
   }
   return NextResponse.json({ data: quiz }, { status: 201 });
 }
@@ -71,7 +72,7 @@ export async function GET(req: NextRequest) {
       .eq('class_id', classId)
       .order('created_at', { ascending: false });
 
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return ralatJson(error.message, 500);
     return NextResponse.json({ data: quizzes || [] });
   }
 
@@ -90,6 +91,6 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false });
 
   const { data: quizzes, error } = await query;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ data: quizzes || [] });
 }

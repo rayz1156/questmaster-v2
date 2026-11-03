@@ -27,6 +27,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, getRouteSupabase, bearerFromReq } from '@/lib/supabase-route';
 import { namaBerdaftar, ahliKelas, keputusanMasuk, potongNama } from '@/lib/live-quiz';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,7 +55,7 @@ function namaAkhiran(nama: string, i: number): string {
 export async function POST(req: NextRequest, { params }: { params: { code: string } }) {
   const code = String(params.code || '').toUpperCase();
   if (!/^[A-Z0-9]{6}$/.test(code)) {
-    return NextResponse.json({ error: 'Invalid session code.' }, { status: 400 });
+    return ralatJson('Invalid session code.', 400);
   }
 
   // Badan pilihan bagi pengguna berdaftar (klien masih menghantar nickname
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const HAD_BADAN = 1_000_000; // selari client_max_body_size nginx 1 MB
   const panjangBadan = Number(req.headers.get('content-length') || 0);
   if (panjangBadan > HAD_BADAN) {
-    return NextResponse.json({ error: 'Request body too large.' }, { status: 413 });
+    return ralatJson('Request body too large.', 413);
   }
   let raw = '';
   try {
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     raw = '';
   }
   if (raw.length > HAD_BADAN) {
-    return NextResponse.json({ error: 'Request body too large.' }, { status: 413 });
+    return ralatJson('Request body too large.', 413);
   }
   let nickname = '';
   if (raw.trim() !== '') {
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
       if (typeof body?.nickname === 'string') nickname = body.nickname.trim();
     } catch {
       // Badan bukan JSON: ralat yang jujur, bukan "nama mesti 1 hingga 24".
-      return NextResponse.json({ error: 'Invalid request body.' }, { status: 400 });
+      return ralatJson('Invalid request body.', 400);
     }
   }
 
@@ -97,10 +98,10 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .limit(1)
     .maybeSingle()) as { data: SessionRow | null };
   if (!session) {
-    return NextResponse.json({ error: 'Session not found, or already over.' }, { status: 404 });
+    return ralatJson('Session not found, or already over.', 404);
   }
   if (session.status === 'ended') {
-    return NextResponse.json({ error: 'This session is already over.' }, { status: 409 });
+    return ralatJson('This session is already over.', 409);
   }
 
   // Kelas kuiz sesi ini dicari SEBELUM sebarang logik nama (V2-012):
@@ -143,16 +144,10 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const keputusan = keputusanMasuk({ adaKelas: !!classId, logMasuk: !!user, ahli });
 
   if (keputusan === 'perlu_log_masuk') {
-    return NextResponse.json(
-      { error: 'Sign in to play this class quiz.', code: 'LOGIN_REQUIRED' },
-      { status: 401 },
-    );
+    return ralatJson('Sign in to play this class quiz.', 401, { code: 'LOGIN_REQUIRED' });
   }
   if (keputusan === 'bukan_ahli') {
-    return NextResponse.json(
-      { error: 'Join the class first to play this quiz.', code: 'NOT_CLASS_MEMBER' },
-      { status: 403 },
-    );
+    return ralatJson('Join the class first to play this quiz.', 403, { code: 'NOT_CLASS_MEMBER' });
   }
 
   // Kuiz kelas dan ahli: nama berdaftar (V2-007). Jika profil belum ada nama
@@ -164,10 +159,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     if (nama) {
       daftar = { userId: user.id, nama };
     } else {
-      return NextResponse.json(
-        { error: 'A player name must be 1 to 24 characters.' },
-        { status: 400 },
-      );
+      return ralatJson('A player name must be 1 to 24 characters.', 400);
     }
   }
 
@@ -197,10 +189,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   // Had 1 hingga 24 aksara hanya untuk nama bebas; nama berdaftar sentiasa
   // sah (dipotong 24) dan badan permintaan boleh kosong sama sekali.
   if (!daftar && (nickname.length < 1 || nickname.length > 24)) {
-    return NextResponse.json(
-      { error: 'A player name must be 1 to 24 characters.' },
-      { status: 400 },
-    );
+    return ralatJson('A player name must be 1 to 24 characters.', 400);
   }
 
   // Sisipan pemain melalui qm_live_join_player (migrasi 0018): kiraan pemain
@@ -236,29 +225,17 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   if (joinError || !joined || joined.length === 0) {
     // LV009 = nama sudah diambil (kekangan unik di pelayan pangkalan data).
     if (joinError?.code === 'LV009') {
-      return NextResponse.json(
-        { error: joinError.message || 'That name is taken. Please choose another.' },
-        { status: 409 },
-      );
+      return ralatJson(joinError.message || 'That name is taken. Please choose another.', 409);
     }
     // LV005 = had pemain sesi telah dicapai (Bahagian 2.3).
     if (joinError?.code === 'LV005') {
-      return NextResponse.json(
-        { error: joinError.message || 'This session is full.' },
-        { status: 409 },
-      );
+      return ralatJson(joinError.message || 'This session is full.', 409);
     }
     // LV004 = sesi tidak dijumpai.
     if (joinError?.code === 'LV004') {
-      return NextResponse.json(
-        { error: 'Session not found, or already over.' },
-        { status: 404 },
-      );
+      return ralatJson('Session not found, or already over.', 404);
     }
-    return NextResponse.json(
-      { error: joinError?.message || 'Could not join the session.' },
-      { status: 500 },
-    );
+    return ralatJson(joinError?.message || 'Could not join the session.', 500);
   }
 
   // Kaitkan baris pemain yang BARU dicipta dengan pengguna berdaftar
