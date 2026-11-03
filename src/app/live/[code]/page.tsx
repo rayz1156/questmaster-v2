@@ -8,6 +8,7 @@ import LiveLeaderboard from "@/components/LiveLeaderboard";
 import RacePlayer, { type SoalanLumba } from "@/components/RacePlayer";
 import BossPlayer, { type SoalanRaksasa } from "@/components/BossPlayer";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 interface Pilihan { key: string; text: string }
 // Soalan dalam cache klien (daripada laluan /questions, tiada correct_key).
@@ -49,6 +50,7 @@ export default function SkrinMainLangsung() {
   const { code } = useParams<{ code: string }>() as { code: string };
   const kod = String(code || "").toUpperCase();
   const router = useRouter();
+  const { t } = useBahasa();
 
   const [identiti, setIdentiti] = useState<Identiti | null>(null);
   const [dimuat, setDimuat] = useState(false);
@@ -199,8 +201,8 @@ export default function SkrinMainLangsung() {
       setBerbaki(Math.max(0, Math.ceil((tamat - sekarang) / 1000)));
     };
     kira();
-    const t = setInterval(kira, 250);
-    return () => clearInterval(t);
+    const pemasa = setInterval(kira, 250);
+    return () => clearInterval(pemasa);
   }, [keadaan]);
 
   // Tinjauan papan pendahulu bila soalan ditutup atau sesi tamat.
@@ -219,8 +221,8 @@ export default function SkrinMainLangsung() {
       } catch { /* abaikan */ }
     };
     muat();
-    const t = setInterval(muat, 2000);
-    return () => { hidup = false; clearInterval(t); };
+    const pemasa = setInterval(muat, 2000);
+    return () => { hidup = false; clearInterval(pemasa); };
   }, [keadaan?.status, keadaan?.gameMode, kod]);
 
   // Tinjauan keadaan setiap 2 saat; hantar fp terakhir diterima.
@@ -236,7 +238,7 @@ export default function SkrinMainLangsung() {
         const j = await r.json();
         if (!hidup) return;
         if (!r.ok) {
-          setErr(j.error || "Could not read the session state.");
+          setErr(j.error || t("live.play.stateReadFailed"));
           return;
         }
         setErr(null);
@@ -250,16 +252,16 @@ export default function SkrinMainLangsung() {
       } catch { /* cuba lagi pada kitaran seterusnya */ }
     };
     tinjau();
-    const t = setInterval(tinjau, 2000);
-    return () => { hidup = false; clearInterval(t); };
-  }, [identiti, kod, muatSoalan]);
+    const pemasa = setInterval(tinjau, 2000);
+    return () => { hidup = false; clearInterval(pemasa); };
+  }, [identiti, kod, muatSoalan, t]);
 
   const onSertai = async (e: React.FormEvent) => {
     e.preventDefault();
     setErr(null);
     const bersih = nama.trim();
     if (bersih.length < 1 || bersih.length > 24) {
-      setErr("Your player name must be 1 to 24 characters.");
+      setErr(t("live.play.nameLength"));
       return;
     }
     setBusy(true);
@@ -284,7 +286,7 @@ export default function SkrinMainLangsung() {
           setKodRalatMasuk(j.code);
           return;
         }
-        setErr(j.error || "Could not join the session.");
+        setErr(j.error || t("live.play.joinFailed"));
         return;
       }
       // Nama sebenar pemain datang daripada pelayan (boleh berbeza, cth
@@ -295,7 +297,7 @@ export default function SkrinMainLangsung() {
       identitiRef.current = id;
       setIdentiti(id);
     } catch {
-      setErr("Could not join the session. Please try again.");
+      setErr(t("live.play.joinRetry"));
     } finally {
       setBusy(false);
     }
@@ -318,11 +320,11 @@ export default function SkrinMainLangsung() {
         }),
       });
       const j = await r.json();
-      if (!r.ok) { setErr(j.error || "Your answer was not accepted."); return; }
+      if (!r.ok) { setErr(j.error || t("live.play.answerRejected")); return; }
       setErr(null);
       fpRef.current = ""; // paksa tinjauan penuh supaya jawapan terkunci dipapar
     } catch {
-      setErr("Could not send your answer. Please try again.");
+      setErr(t("live.play.answerSendFailed"));
     } finally {
       setBusy(false);
     }
@@ -351,46 +353,44 @@ export default function SkrinMainLangsung() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="card w-full max-w-sm">
-          <h1 className="text-xl font-bold text-center mb-1">Join Session {kod}</h1>
+          <h1 className="text-xl font-bold text-center mb-1">{t("live.play.joinTitle", { kod })}</h1>
           {perluLogMasuk ? (
             <>
               <p className="text-sm text-gray-500 text-center mb-4">
-                This quiz is part of a class. Sign in to play and your score will
-                count towards the class ranking.
+                {t("live.play.classQuizSignIn")}
               </p>
               <Link
                 href={`/login?next=/live/${kod}`}
                 className="btn-primary w-full py-2 block text-center"
               >
-                Sign in
+                {t("common.signIn")}
               </Link>
             </>
           ) : bukanAhli ? (
             <>
               <p className="text-sm text-gray-500 text-center mb-4">
-                Join the class first to play this quiz. Ask your educator for the
-                class code.
+                {t("live.play.joinClassFirst")}
               </p>
               <Link
                 href="/participant/join"
                 className="btn-primary w-full py-2 block text-center"
               >
-                Enter class code
+                {t("live.play.enterClassCode")}
               </Link>
             </>
           ) : (
             <>
               {berdaftar ? (
                 <p className="text-sm text-gray-500 text-center mb-4">
-                  Joining as <span className="font-semibold text-gray-800">{namaBerdaftar}</span>
+                  {t("live.play.joiningAs")} <span className="font-semibold text-gray-800">{namaBerdaftar}</span>
                 </p>
               ) : (
-                <p className="text-sm text-gray-500 text-center mb-4">Choose your player name.</p>
+                <p className="text-sm text-gray-500 text-center mb-4">{t("live.play.chooseName")}</p>
               )}
               <form onSubmit={onSertai}>
                 <input
                   className="input w-full mb-3"
-                  placeholder="Player name"
+                  placeholder={t("live.play.namePlaceholder")}
                   maxLength={24}
                   value={nama}
                   disabled={berdaftar}
@@ -399,13 +399,13 @@ export default function SkrinMainLangsung() {
                 />
                 {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
                 <button type="submit" disabled={busy} className="btn-primary w-full py-2">
-                  {busy ? "Joining…" : "Join"}
+                  {busy ? t("live.play.joining") : t("common.join")}
                 </button>
               </form>
             </>
           )}
           <div className="text-center mt-3">
-            <Link href="/live" className="text-xs text-gray-500 hover:text-gray-800">← Back</Link>
+            <Link href="/live" className="text-xs text-gray-500 hover:text-gray-800">← {t("common.back")}</Link>
           </div>
         </div>
       </div>
@@ -416,7 +416,7 @@ export default function SkrinMainLangsung() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
         <div className="card w-full max-w-md text-center">
-          <p className="text-sm text-gray-500 mb-1">Connecting to session {kod}…</p>
+          <p className="text-sm text-gray-500 mb-1">{t("live.play.connecting", { kod })}…</p>
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
       </div>
@@ -452,7 +452,7 @@ export default function SkrinMainLangsung() {
             />
           )}
           <div className="text-center mt-4">
-            <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">Leave session</button>
+            <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">{t("live.play.leaveSession")}</button>
           </div>
         </div>
       </div>
@@ -472,12 +472,12 @@ export default function SkrinMainLangsung() {
         <div className="w-full max-w-md space-y-4 py-6">
           <div className="card text-center">
             <Trophy className="w-10 h-10 mx-auto text-amber-500 mb-2" />
-            <h1 className="text-xl font-bold mb-1">Session Over</h1>
-            <p className="text-sm text-gray-500 mb-4">Thanks for playing!</p>
+            <h1 className="text-xl font-bold mb-1">{t("live.play.sessionOver")}</h1>
+            <p className="text-sm text-gray-500 mb-4">{t("live.play.thanksPlaying")}</p>
             <div className="text-3xl font-bold text-brand-purple mb-1">{k.reveal?.score ?? pendahuluSaya?.score ?? 0}</div>
-            <div className="text-xs text-gray-500">total points</div>
+            <div className="text-xs text-gray-500">{t("live.play.totalPoints")}</div>
             {(pendahuluSaya?.rank ?? 0) > 0 && (
-              <div className="text-xs text-gray-500 mt-1">finished #{pendahuluSaya?.rank}</div>
+              <div className="text-xs text-gray-500 mt-1">{t("live.play.finishedRank", { kedudukan: pendahuluSaya?.rank ?? 0 })}</div>
             )}
           </div>
           {papan && (
@@ -485,11 +485,11 @@ export default function SkrinMainLangsung() {
               rows={papan}
               limit={10}
               highlight={identiti.nickname}
-              title="Final leaderboard"
-              subtitle="Ranked by points, then by speed."
+              title={t("live.play.finalLbTitle")}
+              subtitle={t("live.play.lbSubtitle")}
             />
           )}
-          <button onClick={keluar} className="btn-primary w-full py-2">Exit</button>
+          <button onClick={keluar} className="btn-primary w-full py-2">{t("live.play.exit")}</button>
         </div>
       </div>
     );
@@ -501,9 +501,9 @@ export default function SkrinMainLangsung() {
         {k.status === "lobby" && (
           <div className="card text-center">
             <Users className="w-8 h-8 mx-auto text-indigo-600 mb-2" />
-            <h1 className="text-xl font-bold mb-1">Lobby</h1>
-            <p className="text-sm text-gray-500 mb-3">Waiting for your educator to start the quiz…</p>
-            <div className="text-xs text-gray-400">Session code: <span className="font-mono font-bold text-brand-purple">{kod}</span></div>
+            <h1 className="text-xl font-bold mb-1">{t("live.play.lobby")}</h1>
+            <p className="text-sm text-gray-500 mb-3">{t("live.play.waitingHost")}</p>
+            <div className="text-xs text-gray-400">{t("live.play.sessionCode")} <span className="font-mono font-bold text-brand-purple">{kod}</span></div>
           </div>
         )}
 
@@ -515,11 +515,11 @@ export default function SkrinMainLangsung() {
               </div>
             )}
             <div className="flex items-center justify-between text-xs text-gray-500 mb-2">
-              <span>Question {k.questionIndex + 1} / {k.totalQuestions}</span>
+              <span>{t("live.play.questionOf", { semasa: k.questionIndex + 1, jumlah: k.totalQuestions })}</span>
               <span className="flex items-center gap-1 font-semibold text-gray-700">
                 <Timer className="w-4 h-4" />{" "}
                 {k.useCountdown === false
-                  ? "No countdown"
+                  ? t("live.play.noCountdown")
                   : berbaki !== null ? `${berbaki}s` : ","}
               </span>
             </div>
@@ -538,7 +538,7 @@ export default function SkrinMainLangsung() {
                       ${terkunci && !dipilih ? "opacity-50" : ""}`}
                   >
                     <span className="font-mono mr-1">{o.key}.</span> {o.text}
-                    {dipilih && <span className="float-right text-xs">Answer sent ✓</span>}
+                    {dipilih && <span className="float-right text-xs">{t("live.play.answerSent")}</span>}
                   </button>
                 );
               })}
@@ -549,21 +549,21 @@ export default function SkrinMainLangsung() {
 
         {k.status === "revealed" && soalanSemasa && (
           <div className="card">
-            <div className="text-xs text-gray-500 mb-2">Question {k.questionIndex + 1} / {k.totalQuestions}</div>
+            <div className="text-xs text-gray-500 mb-2">{t("live.play.questionOf", { semasa: k.questionIndex + 1, jumlah: k.totalQuestions })}</div>
             {/* Lencana rentak gaya Kahoot: betul berturut-turut dua kali atau
                 lebih papar pil besar; salah selepas rentak panjang papar pil
                 "Streak lost". Animasi pop hanya bila gerakan dibenarkan. */}
             {k.reveal?.isCorrect && (k.reveal.streak ?? 0) >= 2 && (
               <div className="flex justify-center mb-2">
                 <div className="inline-flex items-center gap-1.5 rounded-full bg-gradient-to-r from-orange-500 to-red-500 px-4 py-1.5 font-semibold text-white motion-safe:animate-pop">
-                  <Flame className="w-4 h-4" /> Answer streak {k.reveal.streak}
+                  <Flame className="w-4 h-4" /> {t("live.play.streak", { n: k.reveal.streak ?? 0 })}
                 </div>
               </div>
             )}
             {!k.reveal?.isCorrect && k.reveal?.myChoice && streakHilang && (
               <div className="flex justify-center mb-2">
                 <div className="inline-flex items-center rounded-full bg-gray-200 px-3 py-0.5 text-xs font-medium text-gray-600">
-                  Streak lost
+                  {t("live.play.streakLost")}
                 </div>
               </div>
             )}
@@ -574,18 +574,18 @@ export default function SkrinMainLangsung() {
                   <div className="font-bold">
                     {k.reveal.isCorrect
                       ? k.reveal.pointsAwarded > 0
-                        ? `Correct! +${k.reveal.pointsAwarded} points`
-                        : "Correct, but the time ran out"
-                      : "Wrong"}
+                        ? t("live.play.correctPoints", { mata: k.reveal.pointsAwarded })
+                        : t("live.play.correctNoPoints")
+                      : t("live.play.wrong")}
                   </div>
                   {(k.reveal.streakBonus ?? 0) > 0 && (
                     <div className="text-xs font-semibold text-amber-600 mt-1">
-                      includes +{k.reveal.streakBonus} streak bonus ({k.reveal.streak} correct in a row)
+                      {t("live.play.streakBonus", { bonus: k.reveal.streakBonus ?? 0, rentak: k.reveal.streak ?? 0 })}
                     </div>
                   )}
                 </>
               ) : (
-                <div className="font-bold text-gray-500">No answer sent</div>
+                <div className="font-bold text-gray-500">{t("live.play.noAnswerSent")}</div>
               )}
             </div>
             <div className="space-y-1 mb-3">
@@ -598,14 +598,14 @@ export default function SkrinMainLangsung() {
                     className={`rounded-lg border px-3 py-2 text-sm ${betul ? "border-green-500 bg-green-50 font-semibold text-green-800" : pilihanSaya ? "border-red-300 bg-red-50" : "border-gray-200"}`}
                   >
                     <span className="font-mono mr-1">{o.key}.</span> {o.text}
-                    {pilihanSaya && !betul && <span className="text-xs float-right">your choice</span>}
-                    {betul && <span className="text-xs float-right">correct answer</span>}
+                    {pilihanSaya && !betul && <span className="text-xs float-right">{t("live.play.yourChoice")}</span>}
+                    {betul && <span className="text-xs float-right">{t("live.play.correctAnswer")}</span>}
                   </div>
                 );
               })}
             </div>
             <div className="text-center text-sm text-gray-600 border-t border-gray-100 pt-2">
-              Rank <strong>#{k.reveal?.rank ?? ","}</strong> · Total points <strong>{k.reveal?.score ?? 0}</strong>
+              {t("live.play.rankPrefix")} <strong>#{k.reveal?.rank ?? ","}</strong> · {t("live.play.totalPointsLabel")} <strong>{k.reveal?.score ?? 0}</strong>
             </div>
           </div>
         )}
@@ -616,13 +616,13 @@ export default function SkrinMainLangsung() {
               rows={papan}
               limit={5}
               highlight={identiti.nickname}
-              subtitle="Top five right now"
+              subtitle={t("live.play.topFiveNow")}
             />
           </div>
         )}
 
         <div className="text-center mt-4">
-          <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">Leave session</button>
+          <button onClick={keluar} className="text-xs text-gray-400 hover:text-gray-700">{t("live.play.leaveSession")}</button>
         </div>
       </div>
     </div>
