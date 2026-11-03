@@ -17,6 +17,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
 import { susunAturGridV1 } from '@/lib/sijil/grid';
 import type { ItemPustaka } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,14 +40,11 @@ export async function GET(req: NextRequest) {
   const userId = auth.user!.id;
 
   if (!dalamHad(`cert-gallery-admin:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   if (!(await adminAktif(auth.supa))) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   // RLS galeri pentadbir membenarkan semua baris gallery.
@@ -57,7 +55,7 @@ export async function GET(req: NextRequest) {
     .order('sort_order', { ascending: true })
     .order('title', { ascending: true })
     .limit(500);
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return ralatJson(error.message, 400);
 
   // URL pratonton latar melalui service role selepas semakan admin.
   const svc = getServiceSupabase();
@@ -79,19 +77,16 @@ export async function POST(req: NextRequest) {
   const userId = auth.user!.id;
 
   if (!dalamHad(`cert-gallery-admin:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   if (!(await adminAktif(auth.supa))) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const title = typeof body.title === 'string' ? body.title.trim().slice(0, 120) : '';
-  if (!title) return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
+  if (!title) return ralatJson('Title is required.', 400);
 
   const kind =
     body.kind === 'participation' || body.kind === 'achievement' ? body.kind : null;
@@ -120,7 +115,7 @@ export async function POST(req: NextRequest) {
     .select(LAJUR_ITEM)
     .single();
   if (insErr || !item) {
-    return NextResponse.json({ error: insErr?.message ?? 'Could not create the item.' }, { status: 400 });
+    return ralatJson(insErr?.message ?? 'Could not create the item.', 400);
   }
 
   // Audit (corak 0047: meta dibina dengan jsonb di pelayan; insert melalui

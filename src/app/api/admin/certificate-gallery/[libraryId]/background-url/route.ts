@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,18 +28,15 @@ export async function GET(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-gallery-admin:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const { data: adminAktif } = await auth.supa.rpc('qm_admin_aktif');
   if (adminAktif !== true) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   const { data: item } = await auth.supa
@@ -48,11 +46,11 @@ export async function GET(
     .eq('scope', 'gallery')
     .maybeSingle();
   if (!item) {
-    return NextResponse.json({ error: 'Gallery item not found.' }, { status: 404 });
+    return ralatJson('Gallery item not found.', 404);
   }
   const latar = (item as { background_path?: string | null }).background_path ?? null;
   if (!latar) {
-    return NextResponse.json({ error: 'This item has no background image.' }, { status: 404 });
+    return ralatJson('This item has no background image.', 404);
   }
 
   const svc = getServiceSupabase();
@@ -60,10 +58,7 @@ export async function GET(
     .from('certificate-assets')
     .createSignedUrl(latar, SAAT_URL);
   if (signErr || !signed) {
-    return NextResponse.json(
-      { error: signErr?.message ?? 'Could not sign the background URL.' },
-      { status: 500 },
-    );
+    return ralatJson(signErr?.message ?? 'Could not sign the background URL.', 500);
   }
   return NextResponse.json({ url: signed.signedUrl, expires_in: SAAT_URL });
 }

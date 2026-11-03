@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest) {
 
   const actor = me as any;
   if (!actor || actor.suspended || !ADMIN_ROLES.includes(actor.role)) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   const body = await req.json().catch(() => ({}) as any);
@@ -49,7 +50,7 @@ export async function POST(req: NextRequest) {
     : [];
 
   if (ids.length === 0) {
-    return NextResponse.json({ error: 'userIds required' }, { status: 400 });
+    return ralatJson('userIds required', 400);
   }
 
   const alsoApprove = body.alsoApprove === true;

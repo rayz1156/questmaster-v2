@@ -15,6 +15,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
 import { MAX_ASET_BYTES } from '@/lib/sijil/aset';
 import { laluanGaleri } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -53,18 +54,15 @@ export async function POST(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-gallery-aset:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const { data: adminAktif } = await auth.supa.rpc('qm_admin_aktif');
   if (adminAktif !== true) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   // Item mesti wujud dan berjenis galeri (RLS galeri pentadbir).
@@ -75,7 +73,7 @@ export async function POST(
     .eq('scope', 'gallery')
     .maybeSingle();
   if (!item) {
-    return NextResponse.json({ error: 'Gallery item not found.' }, { status: 404 });
+    return ralatJson('Gallery item not found.', 404);
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -84,16 +82,16 @@ export async function POST(
   const size = typeof body.size === 'number' && Number.isFinite(body.size) ? Math.floor(body.size) : 0;
 
   if (!kind) {
-    return NextResponse.json({ error: 'kind must be background or logo.' }, { status: 400 });
+    return ralatJson('kind must be background or logo.', 400);
   }
   if (mimeType !== 'image/png' && mimeType !== 'image/jpeg') {
-    return NextResponse.json({ error: 'mimeType must be image/png or image/jpeg.' }, { status: 400 });
+    return ralatJson('mimeType must be image/png or image/jpeg.', 400);
   }
   if (size <= 0) {
-    return NextResponse.json({ error: 'size is required.' }, { status: 400 });
+    return ralatJson('size is required.', 400);
   }
   if (size > MAX_ASET_BYTES) {
-    return NextResponse.json({ error: 'Image must be 8 MB or smaller.' }, { status: 400 });
+    return ralatJson('Image must be 8 MB or smaller.', 400);
   }
 
   // Laluan sentiasa dalam ruang nama galeri item ini.
@@ -106,18 +104,12 @@ export async function POST(
     .from('certificate-assets')
     .createSignedUploadUrl(path);
   if (signErr || !signed) {
-    return NextResponse.json(
-      { error: signErr?.message ?? 'Could not create the upload URL.' },
-      { status: 500 },
-    );
+    return ralatJson(signErr?.message ?? 'Could not create the upload URL.', 500);
   }
 
   if (!urlAwam(signed.signedUrl)) {
     console.error(`[cert-gallery-aset] NEXT_PUBLIC_SUPABASE_URL bukan awam: ${signed.signedUrl}`);
-    return NextResponse.json(
-      { error: 'The storage URL is not publicly reachable. Contact the administrator.' },
-      { status: 500 },
-    );
+    return ralatJson('The storage URL is not publicly reachable. Contact the administrator.', 500);
   }
 
   return NextResponse.json({

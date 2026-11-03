@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,7 +17,7 @@ async function requireAdmin(req: NextRequest) {
 
 export async function GET(req: NextRequest) {
   const auth = await requireAdmin(req);
-  if (!auth.ok) return NextResponse.json({ error: 'Forbidden' }, { status: auth.status });
+  if (!auth.ok) return ralatJson('Forbidden', auth.status);
   const url = new URL(req.url);
   const status = url.searchParams.get('status');
   const type = url.searchParams.get('type');
@@ -24,19 +25,19 @@ export async function GET(req: NextRequest) {
   if (status) q = q.eq('status', status);
   if (type) q = q.eq('type', type);
   const { data, error } = await q;
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ items: data ?? [] });
 }
 
 export async function PATCH(req: NextRequest) {
   const auth = await requireAdmin(req);
-  if (!auth.ok) return NextResponse.json({ error: 'Forbidden' }, { status: auth.status });
+  if (!auth.ok) return ralatJson('Forbidden', auth.status);
   const body = await req.json().catch(() => ({}));
   const { id, status } = body as { id?: string; status?: string };
   if (!id || !['open', 'in_review', 'resolved', 'closed'].includes(status ?? '')) {
-    return NextResponse.json({ error: 'Invalid payload' }, { status: 400 });
+    return ralatJson('Invalid payload', 400);
   }
   const { error } = await auth.supa.from('qm_feedback').update({ status }).eq('id', id);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ ok: true });
 }

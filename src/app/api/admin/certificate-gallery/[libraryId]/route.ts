@@ -14,6 +14,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import type { ItemPustaka } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,16 +51,13 @@ export async function PATCH(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-gallery-admin:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
   if (!(await adminAktif(auth.supa))) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   // Baris sedia ada untuk before/after audit (RLS galeri pentadbir).
@@ -70,7 +68,7 @@ export async function PATCH(
     .eq('scope', 'gallery')
     .maybeSingle();
   if (!sebelumData) {
-    return NextResponse.json({ error: 'Gallery item not found.' }, { status: 404 });
+    return ralatJson('Gallery item not found.', 404);
   }
   const sebelum = sebelumData as ItemPustaka;
 
@@ -98,7 +96,7 @@ export async function PATCH(
     .select(LAJUR_ITEM)
     .single();
   if (updErr || !item) {
-    return NextResponse.json({ error: updErr?.message ?? 'Could not update the item.' }, { status: 400 });
+    return ralatJson(updErr?.message ?? 'Could not update the item.', 400);
   }
   const selepas = item as ItemPustaka;
 
@@ -123,26 +121,20 @@ export async function DELETE(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-gallery-admin:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
   if (!(await adminAktif(auth.supa))) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   // Alasan wajib 5 hingga 500 aksara (corak 0047).
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (reason.length < 5 || reason.length > 500) {
-    return NextResponse.json(
-      { error: 'A reason between 5 and 500 characters is required.' },
-      { status: 400 },
-    );
+    return ralatJson('A reason between 5 and 500 characters is required.', 400);
   }
 
   const { data: sebelumData } = await auth.supa
@@ -152,7 +144,7 @@ export async function DELETE(
     .eq('scope', 'gallery')
     .maybeSingle();
   if (!sebelumData) {
-    return NextResponse.json({ error: 'Gallery item not found.' }, { status: 404 });
+    return ralatJson('Gallery item not found.', 404);
   }
   const sebelum = sebelumData as ItemPustaka;
 
@@ -162,7 +154,7 @@ export async function DELETE(
     .eq('id', params.libraryId)
     .eq('scope', 'gallery');
   if (delErr) {
-    return NextResponse.json({ error: delErr.message }, { status: 400 });
+    return ralatJson(delErr.message, 400);
   }
 
   // Audit ditulis SEBELUM pemadaman objek: rekod tidak bergantung pada

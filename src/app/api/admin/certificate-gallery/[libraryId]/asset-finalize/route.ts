@@ -17,6 +17,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
 import { muat16Bait, tandatanganImej } from '@/lib/sijil/aset';
 import { laluanAsetSah } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,18 +43,15 @@ export async function POST(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-gallery-aset:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const { data: adminAktif } = await auth.supa.rpc('qm_admin_aktif');
   if (adminAktif !== true) {
-    return NextResponse.json({ error: 'Admin only' }, { status: 403 });
+    return ralatJson('Admin only', 403);
   }
 
   const { data: item } = await auth.supa
@@ -63,7 +61,7 @@ export async function POST(
     .eq('scope', 'gallery')
     .maybeSingle();
   if (!item) {
-    return NextResponse.json({ error: 'Gallery item not found.' }, { status: 404 });
+    return ralatJson('Gallery item not found.', 404);
   }
   const itemPenuh = item as typeof item & {
     background_path: string | null;
@@ -75,32 +73,23 @@ export async function POST(
   const path = typeof body.path === 'string' ? body.path : '';
 
   if (!kind) {
-    return NextResponse.json({ error: 'kind must be background or logo.' }, { status: 400 });
+    return ralatJson('kind must be background or logo.', 400);
   }
 
   const prefiks = `gallery/${params.libraryId}/${kind}-`;
   if (!path.startsWith(prefiks) || !laluanAsetSah(path)) {
-    return NextResponse.json(
-      { error: 'Invalid path. Use the path returned by the asset ticket.' },
-      { status: 400 },
-    );
+    return ralatJson('Invalid path. Use the path returned by the asset ticket.', 400);
   }
 
   const bait = await muat16Bait(path);
   if (!bait) {
-    return NextResponse.json(
-      { error: 'Uploaded file not found. Upload it to the signed URL first.' },
-      { status: 404 },
-    );
+    return ralatJson('Uploaded file not found. Upload it to the signed URL first.', 404);
   }
   if (!tandatanganImej(bait)) {
     // Bukan PNG/JPEG: padam objek supaya bucket tidak menimpan sampah.
     const svc = getServiceSupabase();
     await svc.storage.from('certificate-assets').remove([path]).catch(() => undefined);
-    return NextResponse.json(
-      { error: 'The uploaded file is not a valid PNG or JPEG image.' },
-      { status: 400 },
-    );
+    return ralatJson('The uploaded file is not a valid PNG or JPEG image.', 400);
   }
 
   const lajur = LAJUR[kind];
@@ -116,10 +105,7 @@ export async function POST(
     .select(LAJUR_ITEM)
     .single();
   if (updErr || !updated) {
-    return NextResponse.json(
-      { error: updErr?.message ?? 'Could not attach the image.' },
-      { status: 400 },
-    );
+    return ralatJson(updErr?.message ?? 'Could not attach the image.', 400);
   }
 
   // Padam objek lama hanya jika tiada baris lain yang masih merujuknya
