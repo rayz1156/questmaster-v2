@@ -27,7 +27,8 @@ import { supabase } from "@/lib/supabase";
 import { listMyEducatorClasses } from "@/lib/data";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import type { LaporanLna, PerbandinganLna } from "@/lib/lna";
-import { LABEL_BENDERA_LNA } from "@/lib/lna";
+import { LOKAL } from "@/lib/i18n";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import {
   Alert,
   Badge,
@@ -90,14 +91,6 @@ async function baca(url: string, init?: RequestInit): Promise<Response> {
   return fetch(url, { ...init, headers: { ...(init?.headers ?? {}), ...pengepala } });
 }
 
-/** Label kuadran IPA (BM, ikut enjin). */
-const LABEL_KUADRAN: Record<string, string> = {
-  fokus: "Fokus",
-  kekal: "Kekal",
-  keutamaan_rendah: "Keutamaan rendah",
-  berlebihan: "Berlebihan",
-};
-
 /** Amaran lembut: label yang kelihatan mengandungi dua kemahiran. */
 function adaDan(label: string): boolean {
   const r = label.toLowerCase();
@@ -108,6 +101,19 @@ export default function HalamanLnaKelas() {
   const params = useParams<{ id: string }>();
   const id = String(params.id || "");
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
+
+  // Label kuadran IPA dan bendera keyakinan (dwibahasa; kekunci enjin kekal).
+  const labelKuadran: Record<string, string> = {
+    fokus: t("lnaEducator.kuadranFokus"),
+    kekal: t("lnaEducator.kuadranKekal"),
+    keutamaan_rendah: t("lnaEducator.kuadranRendah"),
+    berlebihan: t("lnaEducator.kuadranBerlebihan"),
+  };
+  const labelBendera: Record<string, string> = {
+    yakin_tetapi_lemah: t("lnaEducator.flagConfidentButWeak"),
+    kurang_yakin_tetapi_menguasai: t("lnaEducator.flagUnderconfident"),
+  };
 
   const [senarai, setSenarai] = useState<LnaUi[]>([]);
   const [outcomes, setOutcomes] = useState<OutcomeUi[]>([]);
@@ -146,7 +152,7 @@ export default function HalamanLnaKelas() {
       const r = await baca(`/api/classes/${id}/lna`);
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "Senarai LNA tidak dapat dibaca."));
+        setErr(String(j?.error ?? t("lnaEducator.loadFailed")));
         setSedia(true);
         return;
       }
@@ -158,11 +164,11 @@ export default function HalamanLnaKelas() {
         setOutcomes(((jo?.data ?? []) as OutcomeUi[]));
       }
     } catch {
-      setErr("Senarai LNA tidak dapat dibaca.");
+      setErr(t("lnaEducator.loadFailed"));
     } finally {
       setSedia(true);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void muat();
@@ -227,11 +233,11 @@ export default function HalamanLnaKelas() {
     setErr("");
     setMsg("");
     if (tajuk.trim().length < 1) {
-      setErr("Tajuk LNA mesti sekurang-kurangnya 1 aksara.");
+      setErr(t("lnaEducator.titleMin"));
       return;
     }
     if (jumlahPilihan < 3 || jumlahPilihan > 15) {
-      setErr("Jumlah item LNA mesti 3 hingga 15.");
+      setErr(t("lnaEducator.itemCount"));
       return;
     }
     setBusy(true);
@@ -256,7 +262,7 @@ export default function HalamanLnaKelas() {
       });
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "LNA tidak dapat dicipta."));
+        setErr(String(j?.error ?? t("lnaEducator.createFailed")));
         return;
       }
       setTajuk("");
@@ -264,7 +270,7 @@ export default function HalamanLnaKelas() {
       setTeksBaharu("");
       setTeksTambahan("");
       setSalinDari("");
-      setMsg("LNA dicipta. Buka pusingan PRA apabila sedia.");
+      setMsg(t("lnaEducator.created"));
       await muat();
     } finally {
       setBusy(false);
@@ -279,7 +285,7 @@ export default function HalamanLnaKelas() {
     setMsg("");
     const teks = aiTeks.trim();
     if (teks.length < 30 || teks.length > 4000) {
-      setErr("Teks mesti 30 hingga 4,000 aksara.");
+      setErr(t("lnaEducator.aiTextRange"));
       return;
     }
     setAiBusy(true);
@@ -291,7 +297,7 @@ export default function HalamanLnaKelas() {
       });
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "Cadangan AI tidak dapat dijana."));
+        setErr(String(j?.error ?? t("lnaEducator.aiFailed")));
         return;
       }
       const items = ((j?.items ?? []) as unknown[]).filter(
@@ -301,9 +307,9 @@ export default function HalamanLnaKelas() {
       setAiAmaran(
         ((j?.amaran ?? []) as unknown[]).filter((x): x is string => typeof x === "string"),
       );
-      setMsg("Cadangan dijana. Semak, sunting atau buang item sebelum Cipta LNA.");
+      setMsg(t("lnaEducator.aiDone"));
     } catch {
-      setErr("Cadangan AI tidak dapat dijana.");
+      setErr(t("lnaEducator.aiFailed"));
     } finally {
       setAiBusy(false);
     }
@@ -319,10 +325,10 @@ export default function HalamanLnaKelas() {
     });
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "Pusingan tidak dapat dibuka."));
+      setErr(String(j?.error ?? t("lnaEducator.openFailed")));
       return;
     }
-    setMsg(kind === "pre" ? "Pusingan PRA dibuka." : "Pusingan PASCA dibuka.");
+    setMsg(kind === "pre" ? t("lnaEducator.openedPre") : t("lnaEducator.openedPost"));
     await muat();
   };
 
@@ -336,17 +342,17 @@ export default function HalamanLnaKelas() {
     });
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "Pusingan tidak dapat ditutup."));
+      setErr(String(j?.error ?? t("lnaEducator.closeFailed")));
       return;
     }
-    setMsg("Pusingan ditutup dan snapshot penguasaan disimpan.");
+    setMsg(t("lnaEducator.closedMsg"));
     await muat();
   };
 
   const padam = async (lna: LnaUi) => {
     if (
       !(await confirm({
-        title: `Padam LNA "${lna.title}"? Semua pusingan dan jawapan akan hilang.`,
+        title: t("lnaEducator.deleteDesc", { tajuk: lna.title }),
         tone: "danger",
       }))
     ) {
@@ -355,10 +361,10 @@ export default function HalamanLnaKelas() {
     const r = await baca(`/api/lna/${lna.id}`, { method: "DELETE" });
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "LNA tidak dapat dipadam."));
+      setErr(String(j?.error ?? t("lnaEducator.deleteFailed")));
       return;
     }
-    setMsg("LNA dipadam.");
+    setMsg(t("lnaEducator.deleted"));
     setErr("");
     setLaporan(null);
     await muat();
@@ -375,17 +381,17 @@ export default function HalamanLnaKelas() {
       });
       setQr({ pautan, dataUrl });
     } catch {
-      setErr("QR tidak dapat dilukis.");
+      setErr(t("lnaEducator.qrFailed"));
     }
   };
 
   const salinPautan = async (roundId: string) => {
     try {
       await navigator.clipboard.writeText(`https://kuizen.fun/lna/${roundId}`);
-      setMsg("Pautan disalin ke papan keratan.");
+      setMsg(t("lnaEducator.linkCopied"));
       setErr("");
     } catch {
-      setErr("Papan keratan tidak dapat digunakan oleh pelayar ini.");
+      setErr(t("lnaEducator.clipboardFailed"));
     }
   };
 
@@ -394,7 +400,7 @@ export default function HalamanLnaKelas() {
     const r = await baca(`/api/lna/${lnaId}/report`);
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "Laporan tidak dapat dibaca."));
+      setErr(String(j?.error ?? t("lnaEducator.reportFailed")));
       return;
     }
     setLaporan(j as LaporanPenuh);
@@ -418,23 +424,21 @@ export default function HalamanLnaKelas() {
 
           <Card className="mb-6">
             <CardHead
-              title="Learning Needs Analysis (LNA)"
-              subtitle="Analisis Keperluan Pembelajaran"
+              title={t("lnaEducator.headerTitle")}
+              subtitle={t("lnaEducator.headerSubtitle")}
             />
             {/* Panduan tetap (tiket E): kotak violet. */}
             <div className="mt-4 bg-violet-50 border border-violet-200 rounded-xl p-4 text-[14px] text-ink">
-              Panduan senarai item: 3 hingga 15 item. Satu kemahiran bagi
-              setiap item (jangan guna &quot;dan&quot;). Tulis sebagai
-              &quot;Saya boleh ...&quot; supaya pelajar faham apa yang dinilai.
+              {t("lnaEducator.guide")}
             </div>
             <form onSubmit={cipta} className="mt-4 grid gap-4">
-              <Field label="Tajuk LNA" htmlFor="lna-title">
+              <Field label={t("lnaEducator.titleLabel")} htmlFor="lna-title">
                 <Input
                   id="lna-title"
                   value={tajuk}
                   maxLength={120}
                   onChange={(e) => setTajuk(e.target.value)}
-                  placeholder="cth. Analisis keperluan awal kursus"
+                  placeholder={t("lnaEducator.titlePlaceholder")}
                 />
               </Field>
 
@@ -442,9 +446,9 @@ export default function HalamanLnaKelas() {
               <div className="flex gap-2 flex-wrap">
                 {(
                   [
-                    ["sedia", "Outcomes sedia ada"],
-                    ["taip", "Taip baharu"],
-                    ["salin", "Salin dari kelas lain"],
+                    ["sedia", t("lnaEducator.caraSedia")],
+                    ["taip", t("lnaEducator.caraTaip")],
+                    ["salin", t("lnaEducator.caraSalin")],
                   ] as const
                 ).map(([kunci, label]) => (
                   <button
@@ -467,8 +471,7 @@ export default function HalamanLnaKelas() {
                   <div className="grid gap-1.5">
                     {outcomes.length === 0 ? (
                       <p className="text-[13px] text-ink-faint">
-                        Kelas ini belum ada Outcomes. Guna &quot;Taip baharu&quot;
-                        untuk menciptanya sekali gus.
+                        {t("lnaEducator.noOutcomes")}
                       </p>
                     ) : (
                       outcomes.map((o) => (
@@ -498,16 +501,16 @@ export default function HalamanLnaKelas() {
 
                   {/* KZ-038: item tambahan bukan Outcome, satu baris satu item. */}
                   <Field
-                    label="Item tambahan bukan Outcome (satu baris satu item)"
+                    label={t("lnaEducator.tambahanLabel")}
                     htmlFor="lna-tambahan"
-                    note="Item tambahan tidak dinilai melalui kuiz atau aktiviti; ia dikira dalam analisis keperluan sahaja (1 hingga 200 aksara setiap satu)."
+                    note={t("lnaEducator.tambahanNote")}
                   >
                     <Textarea
                       id="lna-tambahan"
                       value={teksTambahan}
                       rows={3}
                       onChange={(e) => setTeksTambahan(e.target.value)}
-                      placeholder={"cth. Kemahiran insaniah\ncth. Keperluan alat makmal"}
+                      placeholder={t("lnaEducator.tambahanPlaceholder")}
                     />
                   </Field>
                 </div>
@@ -523,7 +526,7 @@ export default function HalamanLnaKelas() {
                         className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2 border border-violet-300 bg-white text-violet-700 hover:bg-violet-50"
                       >
                         <Sparkles className="w-4 h-4" />
-                        Cadang dengan AI
+                        {t("lnaEducator.aiSuggest")}
                       </button>
                     </div>
                   ) : null}
@@ -531,7 +534,7 @@ export default function HalamanLnaKelas() {
                   {aiSedia && aiTerbuka ? (
                     <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 grid gap-2">
                       <Field
-                        label="Tampal sinopsis kursus atau senarai CLO"
+                        label={t("lnaEducator.aiLabel")}
                         htmlFor="lna-ai-teks"
                       >
                         <Textarea
@@ -540,12 +543,11 @@ export default function HalamanLnaKelas() {
                           rows={6}
                           maxLength={4000}
                           onChange={(e) => setAiTeks(e.target.value)}
-                          placeholder="Cth. sinopsis kursus, senarai hasil pembelajaran kursus (CLO)..."
+                          placeholder={t("lnaEducator.aiPlaceholder")}
                         />
                       </Field>
                       <p className="text-[13px] text-ink-faint">
-                        Jangan tampal nama atau data pelajar. Teks ini dihantar
-                        kepada Alibaba Cloud (Qwen) untuk dijana.
+                        {t("lnaEducator.aiNote")}
                       </p>
                       <div>
                         <button
@@ -554,7 +556,7 @@ export default function HalamanLnaKelas() {
                           disabled={aiBusy}
                           className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50"
                         >
-                          {aiBusy ? "Menjana cadangan..." : "Jana cadangan"}
+                          {aiBusy ? t("lnaEducator.aiGenerating") : t("lnaEducator.aiGenerate")}
                         </button>
                       </div>
                     </div>
@@ -572,8 +574,7 @@ export default function HalamanLnaKelas() {
                         onChange={() => setTaipJenis("outcome")}
                       />
                       <span>
-                        Cipta sebagai Outcome kelas (boleh dinilai melalui
-                        kuiz dan aktiviti)
+                        {t("lnaEducator.jenisOutcome")}
                       </span>
                     </label>
                     <label className="flex items-start gap-2 text-[14px] text-ink">
@@ -585,24 +586,24 @@ export default function HalamanLnaKelas() {
                         onChange={() => setTaipJenis("bebas")}
                       />
                       <span>
-                        Item LNA sahaja (tidak dikira dalam penguasaan)
+                        {t("lnaEducator.jenisBebas")}
                       </span>
                     </label>
                   </div>
 
                   <Field
-                    label={taipJenis === "outcome" ? "Satu Outcome setiap baris" : "Satu item setiap baris"}
+                    label={taipJenis === "outcome" ? t("lnaEducator.barisLabelOutcome") : t("lnaEducator.barisLabelBebas")}
                     htmlFor="lna-baris"
                     note={taipJenis === "outcome"
-                      ? "Setiap baris mencipta Outcome baharu dalam kelas ini (1 hingga 200 aksara)."
-                      : "Setiap baris menjadi item LNA bebas tanpa Outcome; ia tidak dinilai melalui kuiz atau aktiviti (1 hingga 200 aksara)."}
+                      ? t("lnaEducator.barisNoteOutcome")
+                      : t("lnaEducator.barisNoteBebas")}
                   >
                     <Textarea
                       id="lna-baris"
                       value={teksBaharu}
                       rows={5}
                       onChange={(e) => setTeksBaharu(e.target.value)}
-                      placeholder={"Saya boleh ...\nSaya boleh ..."}
+                      placeholder={t("lnaEducator.barisPlaceholder")}
                     />
                   </Field>
 
@@ -616,16 +617,16 @@ export default function HalamanLnaKelas() {
 
               {cara === "salin" ? (
                 <Field
-                  label="Kelas sumber"
+                  label={t("lnaEducator.salinLabel")}
                   htmlFor="lna-salin"
-                  note="Label, kod dan penerangan Outcomes kelas sumber disalin sebagai Outcomes baharu kelas ini."
+                  note={t("lnaEducator.salinNote")}
                 >
                   <Select
                     id="lna-salin"
                     value={salinDari}
                     onChange={(e) => setSalinDari(e.target.value)}
                   >
-                    <option value="">Pilih kelas</option>
+                    <option value="">{t("lnaEducator.pilihKelas")}</option>
                     {kelasSaya
                       .filter((k) => k.id !== id)
                       .map((k) => (
@@ -638,12 +639,11 @@ export default function HalamanLnaKelas() {
               ) : null}
 
               <p className="text-[13px] text-ink-faint">
-                Item dipilih: {jumlahPilihan} (3 hingga 15)
+                {t("lnaEducator.dipilih", { n: jumlahPilihan })}
               </p>
               {labelBerat.length > 0 ? (
                 <p className="text-[13px] text-yellow-700">
-                  Amaran lembut: label ini mengandungi &quot;dan&quot;, ia
-                  mungkin dua kemahiran digabungkan: {labelBerat.slice(0, 3).join("; ")}
+                  {t("lnaEducator.beratWarn", { senarai: labelBerat.slice(0, 3).join("; ") })}
                 </p>
               ) : null}
 
@@ -654,7 +654,7 @@ export default function HalamanLnaKelas() {
                   className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-4 py-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50"
                 >
                   <Plus className="w-4 h-4" />
-                  Cipta LNA
+                  {t("lnaEducator.ciptaBtn")}
                 </button>
               </div>
             </form>
@@ -663,8 +663,8 @@ export default function HalamanLnaKelas() {
           {sedia && senarai.length === 0 ? (
             <EmptyState
               icon={<ClipboardList className="w-7 h-7" />}
-              title="Belum ada LNA"
-              text="Cipta LNA pertama untuk kelas ini menggunakan borang di atas."
+              title={t("lnaEducator.emptyTitle")}
+              text={t("lnaEducator.emptyText")}
             />
           ) : null}
 
@@ -675,7 +675,9 @@ export default function HalamanLnaKelas() {
               <Card key={lna.id} className="mb-6">
                 <CardHead
                   title={lna.title}
-                  subtitle={`Dicipta ${new Date(lna.createdAt).toLocaleDateString("ms-MY")}`}
+                  subtitle={t("lnaEducator.createdOn", {
+                    tarikh: new Date(lna.createdAt).toLocaleDateString(LOKAL[bahasa]),
+                  })}
                 />
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <Button
@@ -683,7 +685,7 @@ export default function HalamanLnaKelas() {
                     size="sm"
                     onClick={() => void muatLaporan(lna.id)}
                   >
-                    Lihat laporan
+                    {t("lnaEducator.lihatLaporan")}
                   </Button>
                   {!pra ? (
                     <Button
@@ -691,7 +693,7 @@ export default function HalamanLnaKelas() {
                       size="sm"
                       onClick={() => void bukaPusingan(lna.id, "pre")}
                     >
-                      Buka PRA
+                      {t("lnaEducator.bukaPra")}
                     </Button>
                   ) : null}
                   {pra && pra.status === "open" ? (
@@ -700,7 +702,7 @@ export default function HalamanLnaKelas() {
                       size="sm"
                       onClick={() => void tutupPusingan(pra.id)}
                     >
-                      Tutup PRA
+                      {t("lnaEducator.tutupPra")}
                     </Button>
                   ) : null}
                   {pra && pra.status === "closed" && !pasca ? (
@@ -709,7 +711,7 @@ export default function HalamanLnaKelas() {
                       size="sm"
                       onClick={() => void bukaPusingan(lna.id, "post")}
                     >
-                      Buka PASCA
+                      {t("lnaEducator.bukaPasca")}
                     </Button>
                   ) : null}
                   {pasca && pasca.status === "open" ? (
@@ -718,15 +720,15 @@ export default function HalamanLnaKelas() {
                       size="sm"
                       onClick={() => void tutupPusingan(pasca.id)}
                     >
-                      Tutup PASCA
+                      {t("lnaEducator.tutupPasca")}
                     </Button>
                   ) : null}
                   <Button
                     variant="icon"
                     size="sm"
                     warna="red"
-                    ariaLabel="Padam LNA"
-                    title="Padam LNA"
+                    ariaLabel={t("lnaEducator.padamAria")}
+                    title={t("lnaEducator.padamAria")}
                     onClick={() => void padam(lna)}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -737,8 +739,7 @@ export default function HalamanLnaKelas() {
                 <div className="mt-4 grid gap-3">
                   {lna.rounds.length === 0 ? (
                     <p className="text-[13px] text-ink-faint">
-                      Belum ada pusingan. Buka PRA untuk mengumpul jawapan
-                      pelajar sebelum kursus bermula.
+                      {t("lnaEducator.tiadaPusingan")}
                     </p>
                   ) : (
                     lna.rounds.map((r) => (
@@ -747,13 +748,13 @@ export default function HalamanLnaKelas() {
                         className="flex flex-wrap items-center gap-3 rounded-lg border border-hairline px-4 py-3"
                       >
                         <span className="text-[14px] font-bold text-ink">
-                          {r.kind === "pre" ? "PRA" : "PASCA"}
+                          {r.kind === "pre" ? t("lnaEducator.praLabel") : t("lnaEducator.pascaLabel")}
                         </span>
                         <Badge warna={r.status === "open" ? "green" : "gray"}>
-                          {r.status === "open" ? "Terbuka" : "Ditutup"}
+                          {r.status === "open" ? t("lnaEducator.terbuka") : t("lnaEducator.ditutup")}
                         </Badge>
                         <span className="text-[13px] text-ink-faint">
-                          {r.responden} pelajar sudah menjawab
+                          {t("lnaEducator.responden", { n: r.responden })}
                         </span>
                         <span className="grow" />
                         {r.status === "open" ? (
@@ -764,8 +765,8 @@ export default function HalamanLnaKelas() {
                             <Button
                               variant="icon"
                               size="sm"
-                              ariaLabel="Salin pautan"
-                              title="Salin pautan"
+                              ariaLabel={t("lnaEducator.salinPautanAria")}
+                              title={t("lnaEducator.salinPautanAria")}
                               onClick={() => void salinPautan(r.id)}
                             >
                               <Copy className="w-4 h-4" />
@@ -773,8 +774,8 @@ export default function HalamanLnaKelas() {
                             <Button
                               variant="icon"
                               size="sm"
-                              ariaLabel="Papar QR"
-                              title="Papar QR"
+                              ariaLabel={t("lnaEducator.paparQrAria")}
+                              title={t("lnaEducator.paparQrAria")}
                               onClick={() => void paparQr(r.id)}
                             >
                               <QrCode className="w-4 h-4" />
@@ -793,8 +794,8 @@ export default function HalamanLnaKelas() {
           {laporan ? (
             <Card className="mb-6">
               <CardHead
-                title={`Laporan: ${laporan.lna.title}`}
-                subtitle="Keutamaan mengikut Borich MWDS dan RDM RDS"
+                title={t("lnaEducator.laporanTitle", { tajuk: laporan.lna.title })}
+                subtitle={t("lnaEducator.laporanSubtitle")}
               />
 
               <div className="mt-3 flex gap-2">
@@ -808,7 +809,7 @@ export default function HalamanLnaKelas() {
                       : "border-hairline bg-white text-ink-muted"
                   }`}
                 >
-                  PRA
+                  {t("lnaEducator.praLabel")}
                 </button>
                 <button
                   type="button"
@@ -820,33 +821,31 @@ export default function HalamanLnaKelas() {
                       : "border-hairline bg-white text-ink-muted"
                   }`}
                 >
-                  PASCA
+                  {t("lnaEducator.pascaLabel")}
                 </button>
               </div>
 
               {!laporanAktif ? (
                 <p className="mt-4 text-[14px] text-ink-faint">
-                  Belum ada jawapan untuk pusingan ini.
+                  {t("lnaEducator.tiadaJawapan")}
                 </p>
               ) : (
                 <>
                   {laporanAktif.amaranSampelKecil ? (
                     <Alert tone="warning" className="mt-4">
-                      Sampel kecil: kurang daripada 5 pelajar menjawab.
-                      Tafsir dengan berhati-hati.
+                      {t("lnaEducator.sampelKecil")}
                     </Alert>
                   ) : null}
                   {laporanAktif.kaedahSepakat === false ? (
                     <Alert tone="warning" className="mt-4">
-                      Kaedah tidak sepakat, semak secara manual.
+                      {t("lnaEducator.takSepakat")}
                     </Alert>
                   ) : null}
                   {laporanAktif.kaedahSepakat === null &&
                   laporanAktif.bilanganResponden > 0 &&
                   laporanAktif.outcomes.length >= 3 ? (
                     <p className="mt-3 text-[12px] text-ink-faint">
-                      Borich dan RDM tidak dapat dibandingkan kerana
-                      kedudukan sama untuk semua item.
+                      {t("lnaEducator.kedudukanSama")}
                     </p>
                   ) : null}
 
@@ -855,15 +854,15 @@ export default function HalamanLnaKelas() {
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="text-left text-ink-faint border-b border-hairline">
-                          <th className="py-2 pr-3">Item</th>
+                          <th className="py-2 pr-3">{t("lnaEducator.colItem")}</th>
                           <th className="py-2 pr-3">meanI</th>
                           <th className="py-2 pr-3">meanC</th>
                           <th className="py-2 pr-3">MWDS</th>
                           <th className="py-2 pr-3">Borich</th>
                           <th className="py-2 pr-3">RDS</th>
                           <th className="py-2 pr-3">RDM</th>
-                          <th className="py-2 pr-3">Penguasaan</th>
-                          <th className="py-2 pr-3">Kuadran</th>
+                          <th className="py-2 pr-3">{t("lnaEducator.colPenguasaan")}</th>
+                          <th className="py-2 pr-3">{t("lnaEducator.colKuadran")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -873,10 +872,10 @@ export default function HalamanLnaKelas() {
                               {o.label}
                               {o.kind === "bebas" ? (
                                 <span
-                                  title="Item bukan Outcome tidak dinilai melalui aktiviti"
+                                  title={t("lnaEducator.bebasTitle")}
                                   className="ml-1.5 inline-block rounded-md bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 align-middle"
                                 >
-                                  Bukan Outcome
+                                  {t("lnaEducator.bebasBadge")}
                                 </span>
                               ) : null}
                             </td>
@@ -889,15 +888,15 @@ export default function HalamanLnaKelas() {
                             <td className="py-2 pr-3">
                               {o.kind === "bebas" ? (
                                 <span
-                                  title="Item bukan Outcome tidak dinilai melalui aktiviti"
+                                  title={t("lnaEducator.bebasTitle")}
                                   className="text-ink-faint"
                                 >
-                                  Tiada
+                                  {t("lnaEducator.tiada")}
                                 </span>
                               ) : o.avgMasteryPct != null ? `${o.avgMasteryPct}%` : "-"}
                             </td>
                             <td className="py-2 pr-3">
-                              {o.kuadran ? LABEL_KUADRAN[o.kuadran] : "-"}
+                              {o.kuadran ? labelKuadran[o.kuadran] : "-"}
                             </td>
                           </tr>
                         ))}
@@ -908,13 +907,13 @@ export default function HalamanLnaKelas() {
                   {/* Carta kuadran IPA (SVG ringkas, tiada pustaka carta). */}
                   <div className="mt-6">
                     <p className="text-[14px] font-semibold text-ink mb-2">
-                      Carta kuadran IPA
+                      {t("lnaEducator.cartaKuadran")}
                     </p>
                     <svg
                       viewBox="0 0 100 100"
                       className="w-full max-w-[320px] bg-canvas rounded-lg"
                       role="img"
-                      aria-label="Carta kuadran IPA"
+                      aria-label={t("lnaEducator.cartaKuadran")}
                     >
                       {/* Paksi: x = meanI (kepentingan), y = meanC (keyakinan). */}
                       <line x1="10" y1="90" x2="90" y2="90" stroke="#dbdfea" strokeWidth="1" />
@@ -955,10 +954,10 @@ export default function HalamanLnaKelas() {
                         );
                       })}
                       <text x="50" y="98" textAnchor="middle" fontSize="4" fill="#8094ae">
-                        Kepentingan (meanI)
+                        {t("lnaEducator.paksiKepentingan")}
                       </text>
                       <text x="4" y="50" fontSize="4" fill="#8094ae" transform="rotate(-90 4 50)" textAnchor="middle">
-                        Keyakinan (meanC)
+                        {t("lnaEducator.paksiKeyakinan")}
                       </text>
                       {laporanAktif.outcomes.map((o, i) => {
                         if (o.meanI == null || o.meanC == null) return null;
@@ -978,38 +977,33 @@ export default function HalamanLnaKelas() {
                       })}
                     </svg>
                     <p className="text-[12px] text-ink-faint mt-1">
-                      Nombor mewakili susunan item dalam jadual (1 = item
-                      pertama). Titik kanan bawah = penting tetapi keyakinan
-                      rendah (Fokus).
+                      {t("lnaEducator.cartaNota")}
                     </p>
                   </div>
 
                   {/* Senarai pelajar berbendera. */}
                   <div className="mt-6">
                     <p className="text-[14px] font-semibold text-ink mb-2">
-                      Keyakinan lawan penguasaan
+                      {t("lnaEducator.benderaTitle")}
                     </p>
                     {semuaBebas ? (
                       <p className="text-[13px] text-ink-faint">
-                        Semua item ialah item bebas, jadi bendera penguasaan
-                        tidak dikira.
+                        {t("lnaEducator.semuaBebas")}
                       </p>
                     ) : laporanAktif.bendera.length === 0 &&
                     itemOutcome.every((o) => o.avgMasteryPct == null) ? (
                       <p className="text-[13px] text-ink-faint">
-                        Bendera memerlukan data penguasaan. Tag kuiz atau
-                        aktiviti kepada Outcome kelas ini dahulu.
+                        {t("lnaEducator.benderaPerluData")}
                       </p>
                     ) : laporanAktif.bendera.length === 0 ? (
                       <p className="text-[13px] text-ink-faint">
-                        Tiada bendera. Pelajar yang yakin memang menguasai,
-                        dan yang kurang yakin memang belum menguasai.
+                        {t("lnaEducator.tiadaBendera")}
                       </p>
                     ) : (
                       <ul className="grid gap-1.5">
                         {laporanAktif.bendera.map((b, i) => {
                           const nama =
-                            laporan.pelajar.find((p) => p.userId === b.userId)?.nama ?? "Pelajar";
+                            laporan.pelajar.find((p) => p.userId === b.userId)?.nama ?? t("lnaEducator.namaPelajar");
                           const labelOutcome =
                             laporanAktif.outcomes.find((o) => o.itemId === b.itemId)?.label ?? "";
                           return (
@@ -1023,9 +1017,9 @@ export default function HalamanLnaKelas() {
                                     : "text-kz-up"
                                 }
                               >
-                                {LABEL_BENDERA_LNA[b.bendera]}
+                                {labelBendera[b.bendera]}
                               </span>
-                              {b.masteryPct != null ? ` (penguasaan ${b.masteryPct}%)` : ""}
+                              {b.masteryPct != null ? t("lnaEducator.penguasaanSuffix", { n: b.masteryPct }) : ""}
                             </li>
                           );
                         })}
@@ -1039,16 +1033,16 @@ export default function HalamanLnaKelas() {
               {laporan.perbandingan ? (
                 <div className="mt-6">
                   <p className="text-[14px] font-semibold text-ink mb-2">
-                    Perubahan PRA ke PASCA
+                    {t("lnaEducator.perubahanTitle")}
                   </p>
                   <div className="overflow-x-auto">
                     <table className="w-full text-[13px]">
                       <thead>
                         <tr className="text-left text-ink-faint border-b border-hairline">
-                          <th className="py-2 pr-3">Item</th>
-                          <th className="py-2 pr-3">Delta keyakinan</th>
-                          <th className="py-2 pr-3">Delta MWDS</th>
-                          <th className="py-2 pr-3">Delta penguasaan</th>
+                          <th className="py-2 pr-3">{t("lnaEducator.colItem")}</th>
+                          <th className="py-2 pr-3">{t("lnaEducator.colDeltaKeyakinan")}</th>
+                          <th className="py-2 pr-3">{t("lnaEducator.colDeltaMwds")}</th>
+                          <th className="py-2 pr-3">{t("lnaEducator.colDeltaPenguasaan")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1058,10 +1052,10 @@ export default function HalamanLnaKelas() {
                               {d.label}
                               {d.kind === "bebas" ? (
                                 <span
-                                  title="Item bukan Outcome tidak dinilai melalui aktiviti"
+                                  title={t("lnaEducator.bebasTitle")}
                                   className="ml-1.5 inline-block rounded-md bg-violet-100 px-1.5 py-0.5 text-[11px] font-semibold text-violet-700 align-middle"
                                 >
-                                  Bukan Outcome
+                                  {t("lnaEducator.bebasBadge")}
                                 </span>
                               ) : null}
                             </td>
@@ -1075,12 +1069,12 @@ export default function HalamanLnaKelas() {
                   </div>
 
                   <p className="text-[14px] font-semibold text-ink mt-4 mb-2">
-                    Perubahan keyakinan setiap pelajar
+                    {t("lnaEducator.pelajarTitle")}
                   </p>
                   <ul className="grid gap-1">
                     {laporan.perbandingan.pelajar.map((d, i) => {
                       const nama =
-                        laporan.pelajar.find((p) => p.userId === d.userId)?.nama ?? "Pelajar";
+                        laporan.pelajar.find((p) => p.userId === d.userId)?.nama ?? t("lnaEducator.namaPelajar");
                       const labelOutcome =
                         laporan.pra?.outcomes.find((o) => o.itemId === d.itemId)?.label
                         ?? laporan.pasca?.outcomes.find((o) => o.itemId === d.itemId)?.label
@@ -1102,17 +1096,17 @@ export default function HalamanLnaKelas() {
 
       {/* Modal QR pautan pusingan. */}
       {qr ? (
-        <Modal open={true} onClose={() => setQr(null)} title="Imbas untuk menjawab LNA">
+        <Modal open={true} onClose={() => setQr(null)} title={t("lnaEducator.qrTitle")}>
           <div className="text-center">
             {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src={qr.dataUrl} alt="QR pautan LNA" className="mx-auto" width={220} height={220} />
+            <img src={qr.dataUrl} alt={t("lnaEducator.qrAlt")} className="mx-auto" width={220} height={220} />
             <p className="mt-3 text-[13px] text-ink-muted break-all">{qr.pautan}</p>
             <button
               type="button"
               onClick={() => setQr(null)}
               className="mt-4 text-sm font-semibold rounded-lg px-4 py-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600"
             >
-              Tutup
+              {t("lnaEducator.tutup")}
             </button>
           </div>
         </Modal>
