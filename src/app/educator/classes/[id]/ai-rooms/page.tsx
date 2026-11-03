@@ -32,6 +32,7 @@ import {
   Select,
   Textarea,
 } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 interface ModelUi {
   id: string;
@@ -72,6 +73,7 @@ export default function HalamanBilikAiKelas() {
   const params = useParams<{ id: string }>();
   const id = String(params.id || "");
   const confirm = useConfirm();
+  const { t } = useBahasa();
 
   const [rooms, setRooms] = useState<BilikUi[]>([]);
   const [models, setModels] = useState<ModelUi[]>([]);
@@ -91,7 +93,7 @@ export default function HalamanBilikAiKelas() {
       const r = await baca(`/api/classes/${id}/ai-rooms`);
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "Senarai chatroom tidak dapat dibaca."));
+        setErr(String(j?.error ?? t("aiRooms.classPage.loadFailed")));
         setSedia(true);
         return;
       }
@@ -109,13 +111,13 @@ export default function HalamanBilikAiKelas() {
         }
       }
     } catch {
-      setErr("Senarai chatroom tidak dapat dibaca.");
+      setErr(t("aiRooms.classPage.loadFailed"));
     } finally {
       setSedia(true);
     }
     // modelId sengaja tidak dalam kebergantungan: hanya isi sekali.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     void muat();
@@ -126,7 +128,7 @@ export default function HalamanBilikAiKelas() {
     setErr("");
     setMsg("");
     if (tajuk.trim().length < 1) {
-      setErr("Tajuk chatroom mesti sekurang-kurangnya 1 aksara.");
+      setErr(t("aiRooms.classPage.titleMin"));
       return;
     }
     setBusy(true);
@@ -142,13 +144,13 @@ export default function HalamanBilikAiKelas() {
       });
       const j = await r.json().catch(() => ({}) as Record<string, unknown>);
       if (!r.ok) {
-        setErr(String(j?.error ?? "Chatroom tidak dapat dicipta."));
+        setErr(String(j?.error ?? t("aiRooms.classPage.createFailed")));
         return;
       }
       setTajuk("");
       setPenerangan("");
       const kod = String((j?.room as BilikUi | undefined)?.join_code ?? "");
-      setMsg("Chatroom dicipta. Kod masuk: " + kod);
+      setMsg(t("aiRooms.classPage.created", { kod }));
       await muat();
     } finally {
       setBusy(false);
@@ -165,17 +167,17 @@ export default function HalamanBilikAiKelas() {
       });
       setQr({ bilik: room, dataUrl });
     } catch {
-      setErr("QR tidak dapat dilukis.");
+      setErr(t("aiRooms.classPage.qrFailed"));
     }
   };
 
   const salin = async (room: BilikUi) => {
     try {
       await navigator.clipboard.writeText(`https://kuizen.fun/chatroom/${room.join_code}`);
-      setMsg("Pautan chatroom disalin ke papan keratan.");
+      setMsg(t("aiRooms.classPage.linkCopied"));
       setErr("");
     } catch {
-      setErr("Papan keratan tidak dapat digunakan oleh pelayar ini.");
+      setErr(t("aiRooms.classPage.clipboardFailed"));
     }
   };
 
@@ -188,7 +190,7 @@ export default function HalamanBilikAiKelas() {
     });
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "Chatroom tidak dapat diubah."));
+      setErr(String(j?.error ?? t("aiRooms.classPage.updateFailed")));
       return;
     }
     setErr("");
@@ -198,7 +200,7 @@ export default function HalamanBilikAiKelas() {
   const padam = async (room: BilikUi) => {
     if (
       !(await confirm({
-        title: `Padam chatroom "${room.title}"? Semua mesej dalam chatroom ini akan hilang.`,
+        title: t("aiRooms.classPage.deleteDesc", { tajuk: room.title }),
         tone: "danger",
       }))
     ) {
@@ -207,10 +209,10 @@ export default function HalamanBilikAiKelas() {
     const r = await baca(`/api/ai-rooms/${room.id}`, { method: "DELETE" });
     const j = await r.json().catch(() => ({}) as Record<string, unknown>);
     if (!r.ok) {
-      setErr(String(j?.error ?? "Chatroom tidak dapat dipadam."));
+      setErr(String(j?.error ?? t("aiRooms.classPage.deleteFailed")));
       return;
     }
-    setMsg("Chatroom dipadam.");
+    setMsg(t("aiRooms.classPage.deleted"));
     setErr("");
     await muat();
   };
@@ -232,36 +234,36 @@ export default function HalamanBilikAiKelas() {
 
           <Card className="mb-6">
             <CardHead
-              title="Cipta chatroom baharu"
-              subtitle="Setiap chatroom ada kod masuk 6 aksara dan menjawab dengan satu model AI."
+              title={t("aiRooms.classPage.createTitle")}
+              subtitle={t("aiRooms.classPage.createSubtitle")}
             />
             <form onSubmit={cipta} className="mt-4 grid gap-4">
-              <Field label="Tajuk chatroom" htmlFor="ai-room-title">
+              <Field label={t("aiRooms.classPage.titleLabel")} htmlFor="ai-room-title">
                 <Input
                   id="ai-room-title"
                   value={tajuk}
                   maxLength={80}
                   onChange={(e) => setTajuk(e.target.value)}
-                  placeholder="cth. Chatroom Soal Sains"
+                  placeholder={t("aiRooms.classPage.titlePlaceholder")}
                 />
               </Field>
-              <Field label="Penerangan (pilihan)" htmlFor="ai-room-desc">
+              <Field label={t("aiRooms.classPage.descLabel")} htmlFor="ai-room-desc">
                 <Textarea
                   id="ai-room-desc"
                   value={penerangan}
                   maxLength={300}
                   rows={2}
                   onChange={(e) => setPenerangan(e.target.value)}
-                  placeholder="Untuk apa chatroom ini"
+                  placeholder={t("aiRooms.classPage.descPlaceholder")}
                 />
               </Field>
               <Field
-                label="Model AI"
+                label={t("aiRooms.classPage.modelLabel")}
                 htmlFor="ai-room-model"
                 note={
                   models.length === 0
-                    ? "Tiada model didayakan buat masa ini."
-                    : "Model lalai ditanda oleh pentadbir."
+                    ? t("aiRooms.classPage.noModels")
+                    : t("aiRooms.classPage.defaultModelNote")
                 }
               >
                 <Select
@@ -269,18 +271,18 @@ export default function HalamanBilikAiKelas() {
                   value={modelId}
                   onChange={(e) => setModelId(e.target.value)}
                 >
-                  {models.length === 0 ? <option value="">Model lalai pentadbir</option> : null}
+                  {models.length === 0 ? <option value="">{t("aiRooms.classPage.adminDefaultModel")}</option> : null}
                   {models.map((m) => (
                     <option key={m.id} value={m.id}>
                       {m.label}
-                      {m.is_default ? " (lalai)" : ""}
+                      {m.is_default ? t("aiRooms.classPage.defaultSuffix") : ""}
                     </option>
                   ))}
                 </Select>
               </Field>
               <div>
                 <Button type="submit" disabled={busy}>
-                  Cipta bilik
+                  {t("aiRooms.classPage.createRoom")}
                 </Button>
               </div>
             </form>
@@ -290,8 +292,8 @@ export default function HalamanBilikAiKelas() {
             <Card>
               <EmptyState
                 icon={<Bot className="w-6 h-6" />}
-                title="Belum ada chatroom"
-                text="Cipta chatroom pertama untuk kelas ini; ahli kelas akan masuk melalui kod 6 aksara."
+                title={t("aiRooms.classPage.emptyTitle")}
+                text={t("aiRooms.classPage.emptyText")}
               />
             </Card>
           ) : null}
@@ -301,7 +303,7 @@ export default function HalamanBilikAiKelas() {
               <CardHead
                 title={room.title}
                 subtitle={
-                  "Model: " + (room.qm_ai_models?.label ?? "lalai pentadbir")
+                  t("aiRooms.classPage.modelLine", { model: room.qm_ai_models?.label ?? t("aiRooms.classPage.adminDefaultModel") })
                 }
                 right={
                   <span
@@ -312,7 +314,7 @@ export default function HalamanBilikAiKelas() {
                         : "bg-[#eff1f5] text-ink-faint")
                     }
                   >
-                    {room.status === "open" ? "Buka" : "Ditutup"}
+                    {room.status === "open" ? t("aiRooms.classPage.statusOpen") : t("aiRooms.classPage.statusClosed")}
                   </span>
                 }
               />
@@ -320,39 +322,39 @@ export default function HalamanBilikAiKelas() {
                 <p className="text-[14px] text-ink-muted mt-2">{room.description}</p>
               ) : null}
               <p className="text-[13px] text-ink-faint mt-3">
-                Kod masuk:{" "}
+                {t("aiRooms.classPage.joinCodeLabel")}
                 <span className="font-bold tracking-[0.2em] text-ink">{room.join_code}</span>
               </p>
               <div className="flex flex-wrap gap-2 mt-4">
-                <Button href={`/chatroom/${room.join_code}`}>Buka chatroom</Button>
+                <Button href={`/chatroom/${room.join_code}`}>{t("aiRooms.classPage.openRoom")}</Button>
                 <Button variant="outline" onClick={() => void salin(room)}>
-                  <Copy className="w-4 h-4" /> Salin pautan
+                  <Copy className="w-4 h-4" /> {t("aiRooms.classPage.copyLink")}
                 </Button>
                 <Button variant="outline" onClick={() => void paparQr(room)}>
                   <QrCode className="w-4 h-4" /> QR
                 </Button>
                 <Button variant="outline" onClick={() => void tutupBuka(room)}>
-                  {room.status === "open" ? "Tutup chatroom" : "Buka semula"}
+                  {room.status === "open" ? t("aiRooms.classPage.closeRoom") : t("aiRooms.classPage.reopenRoom")}
                 </Button>
                 <Button variant="ghost" warna="red" onClick={() => void padam(room)}>
-                  <Trash2 className="w-4 h-4" /> Padam
+                  <Trash2 className="w-4 h-4" /> {t("aiRooms.classPage.deleteBtn")}
                 </Button>
               </div>
             </Card>
           ))}
 
-          <Modal open={!!qr} onClose={() => setQr(null)} title="QR chatroom">
+          <Modal open={!!qr} onClose={() => setQr(null)} title={t("aiRooms.classPage.qrTitle")}>
             {qr ? (
               <div className="text-center">
                 <p className="text-[14px] text-ink-muted mb-3">
-                  Imbas untuk masuk {qr.bilik.title} ({qr.bilik.join_code}).
+                  {t("aiRooms.classPage.scanToJoin", { tajuk: qr.bilik.title, kod: qr.bilik.join_code })}
                 </p>
                 {/* QR data URL tidak boleh dioptimumkan next/image;
                     img biasa, corak QR sedia ada dalam repo. */}
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={qr.dataUrl}
-                  alt={"QR chatroom " + qr.bilik.join_code}
+                  alt={t("aiRooms.classPage.qrAlt", { kod: qr.bilik.join_code })}
                   className="mx-auto rounded-[4px]"
                   width={260}
                   height={260}
