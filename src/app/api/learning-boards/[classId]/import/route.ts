@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,8 +32,8 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const body: Body = await req.json().catch(() => ({} as Body));
   const sourceClassId = body.sourceClassId;
   const mode = body.mode === 'replace' ? 'replace' : 'append';
-  if (!sourceClassId) return NextResponse.json({ error: 'sourceClassId required' }, { status: 400 });
-  if (sourceClassId === params.classId) return NextResponse.json({ error: 'Source and destination must differ' }, { status: 400 });
+  if (!sourceClassId) return ralatJson('sourceClassId required', 400);
+  if (sourceClassId === params.classId) return ralatJson('Source and destination must differ', 400);
 
   const admin = getServiceSupabase();
 
@@ -41,8 +42,8 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     userCanEditClass(admin, params.classId, userId),
     userCanEditClass(admin, sourceClassId, userId),
   ]);
-  if (!canDst) return NextResponse.json({ error: 'Not authorized for destination class' }, { status: 403 });
-  if (!canSrc) return NextResponse.json({ error: 'Not authorized for source class' }, { status: 403 });
+  if (!canDst) return ralatJson('Not authorized for destination class', 403);
+  if (!canSrc) return ralatJson('Not authorized for source class', 403);
 
   // Source board
   const { data: srcBoard } = await admin
@@ -50,7 +51,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .select('id')
     .eq('class_id', sourceClassId)
     .maybeSingle();
-  if (!srcBoard) return NextResponse.json({ error: 'Source has no learning board' }, { status: 404 });
+  if (!srcBoard) return ralatJson('Source has no learning board', 404);
 
   // Destination board (create if missing)
   let { data: dstBoard } = await admin
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     const ins = await admin.from('qm_learning_boards').insert({ class_id: params.classId, is_published: true }).select('id').single();
     dstBoard = ins.data;
   }
-  if (!dstBoard) return NextResponse.json({ error: 'Failed to ensure destination board' }, { status: 500 });
+  if (!dstBoard) return ralatJson('Failed to ensure destination board', 500);
 
   // Replace mode: delete all destination columns (cascades to cards if FK is ON DELETE CASCADE)
   let basePosition = 0;

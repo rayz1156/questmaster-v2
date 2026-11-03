@@ -5,6 +5,7 @@ import { s5HeadObject, s5FileCode, s5DeleteObject } from '@/lib/s5';
 import { fileluShareUrl } from '@/lib/filelu';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,7 +29,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
 
   const body = await req.json().catch(() => ({} as any));
   const ticketId = typeof body.ticketId === 'string' ? body.ticketId.trim() : '';
-  if (!ticketId) return NextResponse.json({ error: 'ticketId required' }, { status: 400 });
+  if (!ticketId) return ralatJson('ticketId required', 400);
 
   const { data: ticket } = await admin()
     .from('upload_tickets')
@@ -37,32 +38,29 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .maybeSingle();
 
   const t = ticket as any;
-  if (!t) return NextResponse.json({ error: 'Ticket not found' }, { status: 404 });
+  if (!t) return ralatJson('Ticket not found', 404);
   if (t.user_id !== owner.user!.id) {
-    return NextResponse.json({ error: 'Ticket belongs to another user' }, { status: 403 });
+    return ralatJson('Ticket belongs to another user', 403);
   }
   if (t.class_id !== params.classId) {
-    return NextResponse.json({ error: 'Ticket belongs to another class' }, { status: 403 });
+    return ralatJson('Ticket belongs to another class', 403);
   }
-  if (t.consumed_at) return NextResponse.json({ error: 'Ticket already used' }, { status: 409 });
+  if (t.consumed_at) return ralatJson('Ticket already used', 409);
   if (new Date(t.expires_at).getTime() < Date.now()) {
-    return NextResponse.json({ error: 'Ticket expired' }, { status: 410 });
+    return ralatJson('Ticket expired', 410);
   }
 
   let head: any;
   try {
     head = await s5HeadObject(t.object_key);
   } catch (e: any) {
-    return NextResponse.json({ error: `Storage read failed: ${e?.message || e}` }, { status: 502 });
+    return ralatJson(`Storage read failed: ${e?.message || e}`, 502);
   }
   if (!head?.exists) {
-    return NextResponse.json(
-      { error: 'No object at the ticket path. Was the file actually PUT to upload_url?' },
-      { status: 409 }
-    );
+    return ralatJson('No object at the ticket path. Was the file actually PUT to upload_url?', 409);
   }
   const size = Number(head.size || 0);
-  if (size <= 0) return NextResponse.json({ error: 'Uploaded object is empty' }, { status: 409 });
+  if (size <= 0) return ralatJson('Uploaded object is empty', 409);
 
   // Guna sekali sahaja. Kemas kini bersyarat supaya dua finalize serentak
   // tidak boleh kedua-duanya berjaya.
@@ -73,7 +71,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .is('consumed_at', null)
     .select('id')
     .maybeSingle();
-  if (!claimed) return NextResponse.json({ error: 'Ticket already used' }, { status: 409 });
+  if (!claimed) return ralatJson('Ticket already used', 409);
 
   const fileCode = s5FileCode(t.object_key);
   const mime = head.contentType || t.mime_type || 'application/octet-stream';
@@ -83,7 +81,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   // video tidak boleh diseludup melalui URL pratertanda.
   if (failVideo(String(t.file_name ?? ''), mime)) {
     try { await s5DeleteObject(t.object_key); } catch {}
-    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+    return ralatJson(MESEJ_SEKAT_VIDEO, 400);
   }
 
   // Kuota disemak dengan saiz SEBENAR yang diterima di storan (head.size),

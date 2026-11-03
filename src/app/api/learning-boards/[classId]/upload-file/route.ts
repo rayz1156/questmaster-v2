@@ -7,6 +7,7 @@ import { normMime } from '@/lib/sajianSelamat';
 import { s5ObjectKey, s5PutStream, s5FileCode } from '@/lib/s5';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -83,7 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     const body = await req.json().catch(() => ({}) as any);
     const sourceUrl = typeof body.sourceUrl === 'string' ? body.sourceUrl.trim() : '';
     if (!sourceUrl) {
-      return NextResponse.json({ error: 'sourceUrl required for JSON requests' }, { status: 400 });
+      return ralatJson('sourceUrl required for JSON requests', 400);
     }
 
     // KZ-039: fail video ditolak sebelum pengambilan supaya fail besar tidak
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     // MIME yang diisytihar; MIME sebenar yang dihidu daripada bait disemak
     // semula selepas pengambilan di bawah.
     if (failVideo(String(body.fileName || fileNameFromUrl(sourceUrl)), String(body.mimeType || ''))) {
-      return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+      return ralatJson(MESEJ_SEKAT_VIDEO, 400);
     }
 
     const rate = checkRateLimit(owner.user!.id);
@@ -120,7 +121,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     // dibenarkan selepas bait dihidu. Pemanggil sudah disahkan ahli kelas oleh
     // requireClassMember.
     const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
-    if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
+    if (!cap.ok) return ralatJson(cap.message, cap.status);
 
     let remote;
     try {
@@ -156,7 +157,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       // KZ-039: semakan kedua dengan MIME sebenar yang dihidu daripada bait,
       // kerana pelayan jauh boleh mengisytihar apa sahaja pada header.
       if (failVideo(fileName, mimeSebenar)) {
-        return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+        return ralatJson(MESEJ_SEKAT_VIDEO, 400);
       }
       const key = s5ObjectKey(fileName);
       await s5PutStream(key, readTmp(remote.tmpPath), remote.bytes, mimeSebenar);
@@ -213,23 +214,20 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const capAwal = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
   const panjangDiumum = Number(req.headers.get('content-length') || 0);
   if (!capAwal.ok && panjangDiumum > 25 * 1024 * 1024) {
-    return NextResponse.json({ error: 'Image too large. Maximum 25 MB.' }, { status: 413 });
+    return ralatJson('Image too large. Maximum 25 MB.', 413);
   }
 
   const form = await req.formData().catch(() => null);
-  if (!form) return NextResponse.json({ error: 'multipart/form-data expected' }, { status: 400 });
+  if (!form) return ralatJson('multipart/form-data expected', 400);
 
   const file = form.get('file');
   if (!(file instanceof File)) {
-    return NextResponse.json({ error: 'file field missing' }, { status: 400 });
+    return ralatJson('file field missing', 400);
   }
 
-  if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
+  if (file.size <= 0) return ralatJson('empty file', 400);
   if (MAX_BYTES && file.size > MAX_BYTES) {
-    return NextResponse.json(
-      { error: `File too large. Max ${Math.round(MAX_BYTES / 1024 / 1024)} MB, set by MAX_UPLOAD_BYTES` },
-      { status: 413 },
-    );
+    return ralatJson(`File too large. Max ${Math.round(MAX_BYTES / 1024 / 1024)} MB, set by MAX_UPLOAD_BYTES`, 413);
   }
 
   const mime = (file.type || 'application/octet-stream').split(';')[0].trim().toLowerCase();
@@ -238,11 +236,11 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   // dalam senarai prefix untuk kepentingan laluan source_url, lihat komentar
   // ALLOWED_MIME_PREFIXES di atas).
   if (failVideo(file.name, file.type)) {
-    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+    return ralatJson(MESEJ_SEKAT_VIDEO, 400);
   }
   const isAllowed = ALLOWED_MIME_PREFIXES.some((p) => mime.startsWith(p));
   if (!isAllowed) {
-    return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
+    return ralatJson(`Unsupported file type: ${mime}`, 415);
   }
 
   // KZ-017 P1 (pembetulan kzsec penemuan 1): bait dibaca SEKALI di sini, sebelum
@@ -260,7 +258,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   if (!imejRaster && !capAwal.ok) {
     // R2-3: capAwal dikira sekali sebelum formData() dan diguna semula di
     // sini, bukan semakan kedua. Imej raster sebenar tidak perlu keupayaan.
-    return NextResponse.json({ error: capAwal.message }, { status: capAwal.status });
+    return ralatJson(capAwal.message, capAwal.status);
   }
 
   // Kuota disemak SEBELUM bait dihantar ke FileLu (tiket V2-002b).
@@ -273,7 +271,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   try {
     uploaded = await fileluUpload(bytes, file.name || `upload.${ext || 'bin'}`, mime);
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
+    return ralatJson(e?.message || 'FileLu upload failed', 502);
   }
 
   const rekod = await rekodMuatNaik(owner.supa, params.classId, uploaded.fileCode, uploaded.sizeBytes, mime, 'learning_board');

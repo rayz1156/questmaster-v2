@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 import { parseYouTubeId, youtubeThumbnail } from '@/lib/video-embed';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -16,16 +17,16 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const admin = getServiceSupabase();
   const body = await req.json().catch(() => ({}));
   const { columnId, cardType } = body;
-  if (!columnId || !cardType) return NextResponse.json({ error: 'columnId and cardType required' }, { status: 400 });
+  if (!columnId || !cardType) return ralatJson('columnId and cardType required', 400);
   if (cardType === 'chatbot') {
-    return NextResponse.json({ error: 'Kad chatbot tidak lagi disokong.' }, { status: 400 });
+    return ralatJson('Kad chatbot tidak lagi disokong.', 400);
   }
   if (!['link', 'image', 'text', 'file', 'youtube'].includes(cardType)) {
     // 'video' turut ditolak di sini: kad video hanya melalui pautan YouTube.
-    return NextResponse.json({ error: 'cardType must be one of link, image, text, file, youtube' }, { status: 400 });
+    return ralatJson('cardType must be one of link, image, text, file, youtube', 400);
   }
   const { data: col } = await admin.from('qm_learning_columns').select('id, board_id').eq('id', columnId).single();
-  if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
+  if (!col) return ralatJson('Column not found', 404);
 
   const { data: existing } = await owner.supa
     .from('qm_learning_cards')
@@ -58,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   };
 
   if (cardType === 'link') {
-    if (!body.linkUrl) return NextResponse.json({ error: 'linkUrl required' }, { status: 400 });
+    if (!body.linkUrl) return ralatJson('linkUrl required', 400);
     insert.link_url = body.linkUrl;
     insert.link_title = body.linkTitle ?? null;
     insert.link_description = body.linkDescription ?? null;
@@ -66,12 +67,12 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     insert.link_site_name = body.linkSiteName ?? null;
     insert.link_favicon_url = body.linkFaviconUrl ?? null;
   } else if (cardType === 'image') {
-    if (!body.imageUrl) return NextResponse.json({ error: 'imageUrl required' }, { status: 400 });
+    if (!body.imageUrl) return ralatJson('imageUrl required', 400);
     insert.image_url = body.imageUrl;
     insert.image_path = body.imagePath ?? null;
     if (typeof body.fileluFileCode === 'string') insert.filelu_file_code = body.fileluFileCode;
   } else if (cardType === 'file') {
-    if (!body.fileUrl) return NextResponse.json({ error: 'fileUrl required' }, { status: 400 });
+    if (!body.fileUrl) return ralatJson('fileUrl required', 400);
     insert.file_url = body.fileUrl;
     insert.file_path = body.filePath ?? null;
     insert.file_name = body.fileName ?? null;
@@ -82,7 +83,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   }
   if (cardType === 'youtube') {
     const ytId = parseYouTubeId(String(body.youtubeUrl || ''));
-    if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
+    if (!ytId) return ralatJson('Please provide a valid YouTube link', 400);
     insert.video_provider = 'youtube';
     insert.video_provider_id = ytId;
     insert.video_thumbnail_url = youtubeThumbnail(ytId);
@@ -90,6 +91,6 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   // 'text' card just uses title + description.
 
   const { data, error } = await admin.from('qm_learning_cards').insert(insert).select('*').single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ card: data });
 }

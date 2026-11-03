@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -14,14 +15,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
   }
   if (typeof body.position === 'number') updates.position = body.position;
   if (typeof body.column_id === 'string') updates.column_id = body.column_id;
-  if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  if (Object.keys(updates).length === 0) return ralatJson('Nothing to update', 400);
   const { data, error } = await admin
     .from('qm_learning_cards')
     .update(updates)
     .eq('id', params.cardId)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ card: data });
 }
 
@@ -32,6 +33,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { classId: 
   // Note: Adilo file is intentionally NOT deleted here, the educator may
   // re-link or recover. Cleanup is a Phase 2 admin operation.
   const { error } = await admin.from('qm_learning_cards').delete().eq('id', params.cardId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ ok: true });
 }

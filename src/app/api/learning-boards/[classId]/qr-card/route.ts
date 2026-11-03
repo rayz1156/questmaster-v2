@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import QRCode from 'qrcode';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 import { fileluUpload } from '@/lib/filelu';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,17 +21,17 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const body = await req.json().catch(() => ({}));
   const { columnId, url, title, insertIndex } = body || {};
   if (!columnId || typeof columnId !== 'string') {
-    return NextResponse.json({ error: 'columnId required' }, { status: 400 });
+    return ralatJson('columnId required', 400);
   }
   if (!url || typeof url !== 'string') {
-    return NextResponse.json({ error: 'url required' }, { status: 400 });
+    return ralatJson('url required', 400);
   }
   const trimmed = url.trim();
   // basic URL validation; allow http/https only
   let parsed: URL;
-  try { parsed = new URL(trimmed); } catch { return NextResponse.json({ error: 'Invalid URL' }, { status: 400 }); }
+  try { parsed = new URL(trimmed); } catch { return ralatJson('Invalid URL', 400); }
   if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
-    return NextResponse.json({ error: 'Only http(s) URLs allowed' }, { status: 400 });
+    return ralatJson('Only http(s) URLs allowed', 400);
   }
 
   // Verify column belongs to this class's board
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .select('id, board_id')
     .eq('id', columnId)
     .single();
-  if (!col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
+  if (!col) return ralatJson('Column not found', 404);
 
   // Generate QR PNG buffer (high error correction so logo overlays could fit later)
   let pngBuf: Buffer;
@@ -52,7 +53,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
       color: { dark: '#111827', light: '#ffffff' },
     });
   } catch (e: any) {
-    return NextResponse.json({ error: `QR generation failed: ${e?.message || e}` }, { status: 500 });
+    return ralatJson(`QR generation failed: ${e?.message || e}`, 500);
   }
 
   // Upload PNG to FileLu
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     const filename = `qr-${safeHost}-${Date.now()}.png`;
     uploaded = await fileluUpload(pngBuf, filename, 'image/png');
   } catch (e: any) {
-    return NextResponse.json({ error: `Upload failed: ${e?.message || e}` }, { status: 502 });
+    return ralatJson(`Upload failed: ${e?.message || e}`, 502);
   }
   const qrImageUrl = `/api/learning-boards/${params.classId}/file-redirect/${uploaded.fileCode}`;
 
@@ -108,6 +109,6 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .insert(insert)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ card: data });
 }

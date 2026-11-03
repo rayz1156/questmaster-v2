@@ -4,6 +4,7 @@ import { assertCapability } from '@/lib/capabilities';
 import { admin } from '@/lib/mcp/db';
 import { s5PresignPut, s5ObjectKey } from '@/lib/s5';
 import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,11 +27,11 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   // KZ-017: jenis MIME yang diisytihar klien tidak dipercayai, jadi tiada
   // pengecualian imej di sini. Keupayaan fail diwarisi daripada pemilik kelas.
   const cap = await assertCapability(owner.supa, owner.user!.id, 'files', { classId: params.classId });
-  if (!cap.ok) return NextResponse.json({ error: cap.message }, { status: cap.status });
+  if (!cap.ok) return ralatJson(cap.message, cap.status);
 
   const body = await req.json().catch(() => ({} as any));
   const fileName = typeof body.fileName === 'string' ? body.fileName.trim() : '';
-  if (!fileName) return NextResponse.json({ error: 'fileName required' }, { status: 400 });
+  if (!fileName) return ralatJson('fileName required', 400);
 
   const mimeType =
     typeof body.mimeType === 'string' && body.mimeType ? body.mimeType : 'application/octet-stream';
@@ -40,7 +41,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   // sambungan kedua-duanya disemak supaya video dengan MIME octet-stream
   // tidak lalu.
   if (failVideo(fileName, mimeType)) {
-    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+    return ralatJson(MESEJ_SEKAT_VIDEO, 400);
   }
 
   // Laluan objek SENTIASA dijana oleh pelayan. Menerima laluan daripada klien
@@ -65,7 +66,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .single();
 
   if (error || !ticket) {
-    return NextResponse.json({ error: error?.message || 'Could not create upload ticket' }, { status: 500 });
+    return ralatJson(error?.message || 'Could not create upload ticket', 500);
   }
 
   console.log(

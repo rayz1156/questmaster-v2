@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function PATCH(
     .select('id, board_id, position')
     .eq('id', params.columnId)
     .single();
-  if (colErr || !col) return NextResponse.json({ error: 'Column not found' }, { status: 404 });
+  if (colErr || !col) return ralatJson('Column not found', 404);
 
   const { data: board } = await admin
     .from('qm_learning_boards')
@@ -28,7 +29,7 @@ export async function PATCH(
     .eq('id', col.board_id)
     .single();
   if (!board || board.class_id !== params.classId) {
-    return NextResponse.json({ error: 'Board mismatch' }, { status: 403 });
+    return ralatJson('Board mismatch', 403);
   }
 
   const { data: list, error: listErr } = await admin
@@ -37,10 +38,10 @@ export async function PATCH(
     .eq('board_id', col.board_id)
     .order('position', { ascending: true })
     .order('created_at', { ascending: true });
-  if (listErr) return NextResponse.json({ error: listErr.message }, { status: 500 });
+  if (listErr) return ralatJson(listErr.message, 500);
   const cols = (list || []) as Array<{ id: string }>;
   const idx = cols.findIndex((c) => c.id === col.id);
-  if (idx < 0) return NextResponse.json({ error: 'Column not in board' }, { status: 500 });
+  if (idx < 0) return ralatJson('Column not in board', 500);
 
   let newIdx = idx;
   if (action === 'left') newIdx = Math.max(0, idx - 1);
@@ -51,7 +52,7 @@ export async function PATCH(
     const p = Number.isFinite(body?.position) ? Math.max(0, Math.floor(body.position)) : idx;
     newIdx = Math.min(cols.length - 1, p);
   } else {
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    return ralatJson('Unknown action', 400);
   }
 
   if (newIdx === idx) return NextResponse.json({ ok: true, unchanged: true });
@@ -65,7 +66,7 @@ export async function PATCH(
       .from('qm_learning_columns')
       .update({ position: i })
       .eq('id', next[i].id);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+    if (error) return ralatJson(error.message, 500);
   }
   return NextResponse.json({ ok: true });
 }

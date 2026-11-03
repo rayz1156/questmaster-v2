@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -21,7 +22,7 @@ export async function PATCH(
     .select('id, board_id, column_id, position')
     .eq('id', params.cardId)
     .single();
-  if (cardErr || !card) return NextResponse.json({ error: 'Card not found' }, { status: 404 });
+  if (cardErr || !card) return ralatJson('Card not found', 404);
 
   // Verify the board belongs to this class
   const { data: board } = await admin
@@ -30,7 +31,7 @@ export async function PATCH(
     .eq('id', card.board_id)
     .single();
   if (!board || board.class_id !== params.classId) {
-    return NextResponse.json({ error: 'Board mismatch' }, { status: 403 });
+    return ralatJson('Board mismatch', 403);
   }
 
   // Helper: load all cards in a column ordered
@@ -61,7 +62,7 @@ export async function PATCH(
     if (action === 'up' || action === 'down' || action === 'top' || action === 'bottom') {
       const list = await loadColumnCards(card.column_id);
       const idx = list.findIndex((c) => c.id === card.id);
-      if (idx < 0) return NextResponse.json({ error: 'Card not in column' }, { status: 500 });
+      if (idx < 0) return ralatJson('Card not in column', 500);
       let newIdx = idx;
       if (action === 'up') newIdx = Math.max(0, idx - 1);
       else if (action === 'down') newIdx = Math.min(list.length - 1, idx + 1);
@@ -78,7 +79,7 @@ export async function PATCH(
     if (action === 'to') {
       const targetColumnId = String(body?.columnId || '');
       const targetPos = Number.isFinite(body?.position) ? Math.max(0, Math.floor(body.position)) : 0;
-      if (!targetColumnId) return NextResponse.json({ error: 'columnId required' }, { status: 400 });
+      if (!targetColumnId) return ralatJson('columnId required', 400);
 
       // Verify target column belongs to same board
       const { data: targetCol } = await admin
@@ -87,7 +88,7 @@ export async function PATCH(
         .eq('id', targetColumnId)
         .single();
       if (!targetCol || targetCol.board_id !== card.board_id) {
-        return NextResponse.json({ error: 'Target column not in same board' }, { status: 400 });
+        return ralatJson('Target column not in same board', 400);
       }
 
       if (targetColumnId === card.column_id) {
@@ -111,8 +112,8 @@ export async function PATCH(
       }
     }
 
-    return NextResponse.json({ error: 'Unknown action' }, { status: 400 });
+    return ralatJson('Unknown action', 400);
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || String(e) }, { status: 500 });
+    return ralatJson(e?.message || String(e), 500);
   }
 }

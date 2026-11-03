@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -8,9 +9,9 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   if (owner.response) return owner.response;
   const admin = getServiceSupabase();
   const { title } = await req.json().catch(() => ({}));
-  if (!title || typeof title !== 'string') return NextResponse.json({ error: 'title required' }, { status: 400 });
+  if (!title || typeof title !== 'string') return ralatJson('title required', 400);
   const { data: board } = await admin.from('qm_learning_boards').select('id').eq('class_id', params.classId).single();
-  if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+  if (!board) return ralatJson('Board not found', 404);
   const { data: maxRow } = await owner.supa
     .from('qm_learning_columns')
     .select('position')
@@ -24,6 +25,6 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
     .insert({ board_id: board.id, title, position: nextPos })
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ column: data });
 }

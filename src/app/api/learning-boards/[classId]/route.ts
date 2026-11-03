@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 import { getAdiloFile } from '@/lib/adilo';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
       .insert({ class_id: classId, title: 'Learning Board' })
       .select('*')
       .single();
-    if (cErr || !created) return NextResponse.json({ error: cErr?.message || 'Could not create board' }, { status: 500 });
+    if (cErr || !created) return ralatJson(cErr?.message || 'Could not create board', 500);
     board = created;
     // Board is created empty; users add columns via the '+ Add column' button.
   }
@@ -78,13 +79,13 @@ export async function PATCH(req: NextRequest, { params }: { params: { classId: s
   if (typeof body.title === 'string') updates.title = body.title;
   if (typeof body.description === 'string') updates.description = body.description;
   if (typeof body.is_published === 'boolean') updates.is_published = body.is_published;
-  if (Object.keys(updates).length === 0) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  if (Object.keys(updates).length === 0) return ralatJson('Nothing to update', 400);
   const { data, error } = await owner.supa
     .from('qm_learning_boards')
     .update(updates)
     .eq('class_id', params.classId)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ board: data });
 }

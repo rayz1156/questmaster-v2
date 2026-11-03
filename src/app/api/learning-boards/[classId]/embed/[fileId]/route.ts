@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
 import { buildAdiloEmbedUrl, getAdiloFile } from '@/lib/adilo';
 import { buildSignedBunnyEmbedUrl } from '@/lib/bunny';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -15,14 +16,14 @@ export async function GET(req: NextRequest, { params }: { params: { classId: str
   const access = await requireClassMember(req, params.classId);
   if (access.response) return access.response;
   if (!/^[A-Za-z0-9_-]{5,64}$/.test(params.fileId)) {
-    return NextResponse.json({ error: 'Bad id' }, { status: 400 });
+    return ralatJson('Bad id', 400);
   }
   const { data: card } = await access.supa
     .from('qm_learning_cards')
     .select('id, video_provider, video_provider_id, adilo_file_id, video_thumbnail_url, video_duration_seconds, board_id, qm_learning_boards!inner(class_id)')
     .or(`video_provider_id.eq.${params.fileId},adilo_file_id.eq.${params.fileId}`)
     .maybeSingle();
-  if (!card) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!card) return ralatJson('Not found', 404);
 
   const provider: string = (card as any).video_provider
     || ((card as any).adilo_file_id === params.fileId ? 'adilo' : 'bunny');

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, getServiceSupabase } from '@/lib/supabase-route';
 import { fileluUpload } from '@/lib/filelu';
 import { generateAiImage, buildPromptForCard } from '@/lib/ai-image';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +23,7 @@ export async function POST(
     .eq('id', params.cardId)
     .single();
   if (loadErr || !card) {
-    return NextResponse.json({ error: 'Card not found' }, { status: 404 });
+    return ralatJson('Card not found', 404);
   }
 
   let body: any = {};
@@ -34,10 +35,7 @@ export async function POST(
   try {
     img = await generateAiImage(prompt, { width: 1024, height: 576 });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || 'AI image generation failed' },
-      { status: 502 }
-    );
+    return ralatJson(e?.message || 'AI image generation failed', 502);
   }
 
   // Push to FileLu using the same helper the manual upload uses.
@@ -50,10 +48,7 @@ export async function POST(
       img.mime
     );
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || 'FileLu upload failed' },
-      { status: 502 }
-    );
+    return ralatJson(e?.message || 'FileLu upload failed', 502);
   }
 
   const fileluFileUrl = `/api/learning-boards/${params.classId}/file-redirect/${uploaded.fileCode}`;
@@ -73,7 +68,7 @@ export async function POST(
     .select('*')
     .single();
   if (updErr) {
-    return NextResponse.json({ error: updErr.message }, { status: 500 });
+    return ralatJson(updErr.message, 500);
   }
 
   return NextResponse.json({

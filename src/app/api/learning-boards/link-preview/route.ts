@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 15;
@@ -54,17 +55,17 @@ export async function GET(req: NextRequest) {
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
   const url = req.nextUrl.searchParams.get('url');
-  if (!url) return NextResponse.json({ error: 'url required' }, { status: 400 });
+  if (!url) return ralatJson('url required', 400);
   try {
     const u = new URL(url);
     if (!['http:', 'https:'].includes(u.protocol)) {
-      return NextResponse.json({ error: 'Bad protocol' }, { status: 400 });
+      return ralatJson('Bad protocol', 400);
     }
     const res = await fetch(url, {
       headers: { 'User-Agent': 'KuizenBot/1.0 (+https://kuizen.fun)' },
       signal: AbortSignal.timeout(8000),
     });
-    if (!res.ok) return NextResponse.json({ error: `Fetch failed ${res.status}` }, { status: 502 });
+    if (!res.ok) return ralatJson(`Fetch failed ${res.status}`, 502);
     const html = (await res.text()).slice(0, 200_000); // cap
     const titleM = html.match(/<title[^>]*>([^<]+)<\/title>/i);
     const data = {
@@ -81,6 +82,6 @@ export async function GET(req: NextRequest) {
     }
     return NextResponse.json(data);
   } catch (e: any) {
-    return NextResponse.json({ error: e.message || 'preview failed' }, { status: 500 });
+    return ralatJson(e.message || 'preview failed', 500);
   }
 }
