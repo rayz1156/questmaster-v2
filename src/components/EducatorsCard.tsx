@@ -13,6 +13,7 @@ import {
 import type { ClassEducator, ClassEducatorInvite } from "@/lib/types";
 import { Copy, Trash2, Crown, UserPlus, ShieldCheck, RefreshCw } from "lucide-react";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 type Props = { classId: string };
 
@@ -21,6 +22,7 @@ export default function EducatorsCard({ classId }: Props) {
   const meId = user?.id || null;
   const [educators, setEducators] = useState<ClassEducator[]>([]);
   const confirm = useConfirm();
+  const { t } = useBahasa();
   const [invites, setInvites] = useState<ClassEducatorInvite[]>([]);
   const [email, setEmail] = useState("");
   const [busy, setBusy] = useState(false);
@@ -42,9 +44,9 @@ export default function EducatorsCard({ classId }: Props) {
         setInvites([]);
       }
     } catch (err: any) {
-      setMsg({ type: "err", text: err?.message || "Failed to load educators" });
+      setMsg({ type: "err", text: err?.message || t('educator.educators.loadFailed') });
     }
-  }, [classId]);
+  }, [classId, t]);
 
   useEffect(() => {
     reload();
@@ -72,59 +74,59 @@ export default function EducatorsCard({ classId }: Props) {
           body: JSON.stringify({ classId, email: res.email, code: res.code }),
         });
         if (r.ok) {
-          emailStatus = ` Invite email sent to ${res.email}.`;
+          emailStatus = t('educator.educators.emailSent', { emel: res.email });
         } else {
           const j = await r.json().catch(() => ({}));
-          emailStatus = ` (email not sent: ${j.error || r.status})`;
+          emailStatus = t('educator.educators.emailNotSent', { sebab: j.error || r.status });
         }
       } catch (mailErr: any) {
-        emailStatus = ` (email not sent: ${mailErr?.message || "network"})`;
+        emailStatus = t('educator.educators.emailNotSent', { sebab: mailErr?.message || t('educator.educators.networkFallback') });
       }
-      setMsg({ type: "ok", text: `Invite created.${emailStatus} Share the code with ${res.email} as a fallback.` });
+      setMsg({ type: "ok", text: t('educator.educators.inviteCreated') + emailStatus + t('educator.educators.shareCodeFallback', { emel: res.email }) });
       await reload();
     } catch (err: any) {
-      setMsg({ type: "err", text: err?.message || "Failed to invite" });
+      setMsg({ type: "err", text: err?.message || t('educator.educators.inviteFailed') });
     } finally {
       setBusy(false);
     }
   }
 
   async function handleRevoke(inviteId: string) {
-    if (!(await confirm({ title: "Revoke this invite?", tone: 'danger' }))) return;
+    if (!(await confirm({ title: t('educator.educators.revokeConfirm'), tone: 'danger' }))) return;
     try {
       await revokeClassEducatorInvite(inviteId);
       await reload();
     } catch (err: any) {
-      setMsg({ type: "err", text: err?.message || "Failed to revoke" });
+      setMsg({ type: "err", text: err?.message || t('educator.educators.revokeFailed') });
     }
   }
 
   async function handleRemove(educatorId: string, name: string) {
-    if (!(await confirm({ title: `Remove ${name} from this class? They will lose access immediately.`, tone: 'danger' }))) return;
+    if (!(await confirm({ title: t('educator.educators.removeConfirm', { nama: name }), tone: 'danger' }))) return;
     try {
       await removeClassEducator(classId, educatorId);
       await reload();
     } catch (err: any) {
-      setMsg({ type: "err", text: err?.message || "Failed to remove" });
+      setMsg({ type: "err", text: err?.message || t('educator.educators.removeFailed') });
     }
   }
 
   async function handleTransfer(targetId: string, targetName: string) {
     if (
       !(await confirm({
-        title: `Transfer ownership of this class to ${targetName}?`,
-        description: 'You will become a co-creator and lose the ability to delete the class, remove other educators, or transfer ownership again.',
-        confirmLabel: 'Transfer',
+        title: t('educator.educators.transferConfirmTitle', { nama: targetName }),
+        description: t('educator.educators.transferConfirmDesc'),
+        confirmLabel: t('educator.educators.transferLabel'),
         tone: 'danger',
       }))
     )
       return;
     try {
       await transferClassOwnership(classId, targetId);
-      setMsg({ type: "ok", text: `Ownership transferred to ${targetName}.` });
+      setMsg({ type: "ok", text: t('educator.educators.transferDone', { nama: targetName }) });
       await reload();
     } catch (err: any) {
-      setMsg({ type: "err", text: err?.message || "Failed to transfer ownership" });
+      setMsg({ type: "err", text: err?.message || t('educator.educators.transferFailed') });
     }
   }
 
@@ -133,12 +135,12 @@ export default function EducatorsCard({ classId }: Props) {
   return (
     <div className="card mb-3">
       <div className="font-semibold mb-2 flex items-center gap-2">
-        <ShieldCheck className="w-4 h-4" /> Educators ({educators.length})
+        <ShieldCheck className="w-4 h-4" /> {t('educator.educators.heading', { n: educators.length })}
       </div>
 
       <div className="space-y-1 mb-3">
         {educators.map((e) => {
-          const name = e.display_name || e.email || ("User " + e.educator_id.slice(0, 8));
+          const name = e.display_name || e.email || t('common.user', { id: e.educator_id.slice(0, 8) });
           const isMe = e.educator_id === meId;
           return (
             <div key={e.educator_id} className="flex items-center gap-2 text-sm py-1 border-b last:border-0">
@@ -146,11 +148,11 @@ export default function EducatorsCard({ classId }: Props) {
                 <div className="truncate font-medium flex items-center gap-1">
                   {e.role === "owner" && <Crown className="w-3 h-3 text-yellow-500" />}
                   {name}
-                  {isMe && <span className="text-xs text-gray-400">(you)</span>}
+                  {isMe && <span className="text-xs text-gray-400">({t('common.you')})</span>}
                 </div>
                 <div className="text-xs text-gray-500 truncate">
                   {e.email || ""}
-                  <span className="ml-2 px-1 bg-gray-100 rounded">{e.role === "owner" ? "Owner" : "Co-creator"}</span>
+                  <span className="ml-2 px-1 bg-gray-100 rounded">{e.role === "owner" ? t('educator.classes.roleOwner') : t('educator.classes.roleCocreator')}</span>
                 </div>
               </div>
               {isOwner && !isMe && e.role === "co_creator" && (
@@ -158,14 +160,14 @@ export default function EducatorsCard({ classId }: Props) {
                   <button
                     onClick={() => handleTransfer(e.educator_id, name)}
                     className="text-xs px-2 py-1 rounded border hover:bg-gray-50"
-                    title="Transfer ownership"
+                    title={t('educator.educators.transferTitle')}
                   >
-                    <RefreshCw className="w-3 h-3 inline" /> Transfer
+                    <RefreshCw className="w-3 h-3 inline" /> {t('educator.educators.transferLabel')}
                   </button>
                   <button
                     onClick={() => handleRemove(e.educator_id, name)}
                     className="text-red-600 px-2 py-1 rounded hover:bg-red-50"
-                    title="Remove"
+                    title={t('educator.educators.removeTitle')}
                   >
                     <Trash2 className="w-3 h-3" />
                   </button>
@@ -182,7 +184,7 @@ export default function EducatorsCard({ classId }: Props) {
             <input
               type="email"
               required
-              placeholder="Educator email"
+              placeholder={t('educator.educators.emailPlaceholder')}
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               className="flex-1 px-4 py-3 text-sm rounded-xl border border-gray-200 bg-white focus:outline-none focus:ring-2 focus:ring-violet-400 focus:border-transparent"
@@ -192,14 +194,14 @@ export default function EducatorsCard({ classId }: Props) {
             disabled={busy}
             className="inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl text-white font-medium text-sm bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-sm disabled:opacity-60 disabled:cursor-not-allowed"
           >
-            <UserPlus className="w-4 h-4" /> Invite
+            <UserPlus className="w-4 h-4" /> {t('educator.educators.inviteButton')}
           </button>
           </form>
 
         {lastInvite && (
           <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-3">
             <div className="text-sm text-gray-700 mb-2">
-              Invite code for <span className="font-medium">{lastInvite.email}</span>:
+              {t('educator.educators.inviteCodeFor')}<span className="font-medium">{lastInvite.email}</span>{t('educator.educators.inviteCodeColon')}
             </div>
             <div className="flex items-center gap-2">
               <code className="font-mono text-lg tracking-wider bg-white px-4 py-2.5 rounded-lg border border-gray-200 flex-1 text-center text-gray-900">
@@ -209,15 +211,15 @@ export default function EducatorsCard({ classId }: Props) {
                 type="button"
                 onClick={() => {
                   navigator.clipboard.writeText(lastInvite.code);
-                  setMsg({ type: "ok", text: "Code copied" });
+                  setMsg({ type: "ok", text: t('educator.classDetail.codeCopied') });
                 }}
                 className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-lg text-white font-medium text-sm bg-gradient-to-br from-violet-500 to-indigo-600 hover:from-violet-600 hover:to-indigo-700 shadow-sm"
               >
-                <Copy className="w-4 h-4" /> Copy
+                <Copy className="w-4 h-4" /> {t('educator.classDetail.copy')}
               </button>
             </div>
             <div className="text-xs text-gray-600 mt-2">
-              We emailed {lastInvite.email} an accept link. They can also sign in and paste the code at <span className="font-mono">/educator/invites</span>.
+              {t('educator.educators.emailedNote', { emel: lastInvite.email })}
             </div>
           </div>
         )}
@@ -225,7 +227,7 @@ export default function EducatorsCard({ classId }: Props) {
         {pending.length > 0 && (
           <div className="mt-3">
             <div className="text-sm font-semibold text-gray-800 mb-2">
-              Pending invites <span className="text-gray-500 font-normal">({pending.length})</span>
+              {t('educator.educators.pendingInvitesLabel')} <span className="text-gray-500 font-normal">({pending.length})</span>
             </div>
             <div className="space-y-1">
               {pending.map((inv) => (
@@ -235,17 +237,17 @@ export default function EducatorsCard({ classId }: Props) {
                   <button
                     onClick={() => {
                       navigator.clipboard.writeText(inv.code);
-                      setMsg({ type: "ok", text: "Code copied" });
+                      setMsg({ type: "ok", text: t('educator.classDetail.codeCopied') });
                     }}
                     className="p-1.5 text-gray-500 hover:text-gray-800 hover:bg-gray-100 rounded"
-                    title="Copy code"
+                    title={t('educator.educators.copyCodeTitle')}
                   >
                     <Copy className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => handleRevoke(inv.id)}
                     className="p-1.5 text-red-600 hover:bg-red-50 rounded"
-                    title="Revoke"
+                    title={t('educator.educators.revokeTitle')}
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
