@@ -2272,6 +2272,11 @@ export const ms: Kamus = {
       assistantFallback: 'Pembantu Pembelajaran',
       chatAssistant: 'Sembang dengan pembantu',
       assistantFrame: 'Pembantu',
+      failedGeneric: 'Gagal',
+      createCardFailed: 'Gagal mencipta kad',
+      saveFailed: 'Simpan gagal',
+      previewFailed: 'Pratonton gagal',
+      uploadFailed: 'Muat naik gagal',
     },
   },
   // Halaman LNA pendidik (src/app/educator/classes/[id]/lna/page.tsx).

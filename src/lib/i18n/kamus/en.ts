@@ -2308,6 +2308,11 @@ export const en = {
       assistantFallback: 'Learning Assistant',
       chatAssistant: 'Chat with assistant',
       assistantFrame: 'Assistant',
+      failedGeneric: 'Failed',
+      createCardFailed: 'Failed to create card',
+      saveFailed: 'Save failed',
+      previewFailed: 'Preview failed',
+      uploadFailed: 'Upload failed',
     },
   },
   // Halaman LNA pendidik (src/app/educator/classes/[id]/lna/page.tsx).

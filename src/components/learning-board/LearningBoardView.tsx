@@ -650,7 +650,7 @@ function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: (
       onClick={create}
       disabled={busy}
       className="flex-shrink-0 w-72 bg-white hover:bg-slate-50 border-2 border-dashed border-slate-300 hover:border-indigo-400 rounded-xl text-slate-600 hover:text-indigo-600 text-sm py-3 self-start transition shadow-sm hover:shadow-md"
-    >+ Add column</button>
+    >{t('boards.learning.newColumnBtn')}</button>
   );
 }
 
@@ -664,6 +664,7 @@ function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: (
  * used for links that have no image at all.
  */
 function LinkThumb({ src, alt, grad, letter }: { src: string | null | undefined; alt: string; grad: { from: string; to: string }; letter: string }) {
+  const { t } = useBahasa();
   const [failed, setFailed] = useState(false);
   const showImage = !!src && !failed;
   if (showImage) {
@@ -687,7 +688,7 @@ function LinkThumb({ src, alt, grad, letter }: { src: string | null | undefined;
       <div className="w-14 h-14 rounded-xl bg-white/95 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
         <span className="text-2xl font-bold tracking-tight" style={{ color: grad.from }}>{letter}</span>
       </div>
-      <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 text-slate-700 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm" title="Open link">Open ↗</div>
+      <div className="absolute bottom-2 right-2 inline-flex items-center gap-1 bg-white/95 text-slate-700 text-[10px] font-medium px-1.5 py-0.5 rounded shadow-sm" title={t('boards.learning.openLinkTitle')}>{t('boards.learning.openLink')}</div>
     </div>
   );
 }
@@ -730,10 +731,11 @@ function CardRenderer({
   onEdit: (card: LearningCard) => void;
   moveCard: (cardId: string, payload: any) => Promise<void>;
 }) {
+  const { t } = useBahasa();
   const [menuOpen, setMenuOpen] = useState(false);
 
   const handleDelete = async () => {
-    const ok = await showConfirm({ title: "Delete this card?", description: "This action cannot be undone.", confirmLabel: "Delete", tone: "danger" }); if (!ok) return;
+    const ok = await showConfirm({ title: t('boards.learning.deleteCardTitle'), description: t('boards.learning.deleteCardDesc'), confirmLabel: t('boards.learning.deleteLabel'), tone: "danger" }); if (!ok) return;
     await authedFetch(`/api/learning-boards/${classId}/cards/${card.id}`, { method: 'DELETE' });
     onChanged();
   };
@@ -750,7 +752,7 @@ function CardRenderer({
               // eslint-disable-next-line @next/next/no-img-element
               <img src={card.video_thumbnail_url} alt={card.title || ''} className="w-full h-full object-cover" />
             ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">Processing…</div>
+              <div className="w-full h-full flex items-center justify-center text-gray-500 text-xs">{t('boards.learning.processing')}</div>
             )}
             <div className="absolute inset-0 flex items-center justify-center">
               <div className="bg-black/60 rounded-full w-12 h-12 flex items-center justify-center text-white">▶</div>
@@ -772,7 +774,7 @@ function CardRenderer({
               type="button"
               onClick={() => onOpenImage(card.link_image_url!, card.title || 'QR code')}
               className="block w-full bg-white rounded-md overflow-hidden cursor-zoom-in group"
-              aria-label="View QR code full screen"
+              aria-label={t('boards.learning.qrViewAria')}
             >
               <div className="aspect-square bg-white p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -784,8 +786,8 @@ function CardRenderer({
               target="_blank"
               rel="noopener noreferrer"
               className="absolute bottom-1 right-1 inline-flex items-center gap-1 bg-indigo-600 text-white text-[11px] px-2 py-0.5 rounded-md hover:bg-indigo-500"
-              title="Open link"
-            >Open ↗</a>
+              title={t('boards.learning.openLinkTitle')}
+            >{t('boards.learning.openLink')}</a>
           </div>
         );
       }
@@ -805,7 +807,7 @@ function CardRenderer({
         type="button"
         onClick={() => onOpenImage(card.image_url!, card.title || null)}
         className="block w-full rounded-md overflow-hidden bg-white cursor-zoom-in group"
-        aria-label="View image full screen"
+        aria-label={t('boards.learning.imageFullAria')}
       >
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={card.image_url} alt={card.title || ''} referrerPolicy="no-referrer" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} className="w-full object-cover transition-opacity group-hover:opacity-90" />
@@ -877,16 +879,16 @@ function CardRenderer({
             <button
               className="text-gray-600 hover:text-gray-900 px-1"
               onClick={() => setMenuOpen((v) => !v)}
-              aria-label="Card menu"
+              aria-label={t('boards.learning.cardMenu')}
             >…</button>
             {menuOpen && (
               <div className="absolute right-0 top-6 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
-                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'top' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to top</button>
-                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'up' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move up</button>
-                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'down' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move down</button>
-                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'bottom' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to bottom</button>
+                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'top' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveToTop')}</button>
+                <button disabled={cardIndex === 0} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'up' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveUp')}</button>
+                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'down' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveDown')}</button>
+                <button disabled={cardIndex >= totalCards - 1} onClick={() => { setMenuOpen(false); moveCard(card.id, { action: 'bottom' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveToBottom')}</button>
                 <div className="h-px bg-gray-100" />
-                <button onClick={() => { setMenuOpen(false); onEdit(card); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">Edit</button>
+                <button onClick={() => { setMenuOpen(false); onEdit(card); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">{t('boards.learning.editLabel')}</button>
               <button onClick={async () => {
                   setMenuOpen(false);
                   try {
@@ -894,10 +896,10 @@ function CardRenderer({
                     if (!r.ok) { const d = await r.json().catch(()=>({})); throw new Error(d.error || 'Failed'); }
                     onChanged();
                   } catch (e: any) {
-                    alert('AI thumbnail failed: ' + (e?.message || 'unknown error'));
+                    alert(t('boards.learning.aiThumbFailed', { ralat: e?.message || 'unknown error' }));
                   }
-                }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-indigo-600">✨ Generate AI thumbnail</button>
-              <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
+                }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-indigo-600">{t('boards.learning.aiThumbMenu')}</button>
+              <button onClick={handleDelete} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">{t('boards.learning.deleteLabel')}</button>
               </div>
             )}
           </div>
@@ -940,6 +942,7 @@ function AddCardModal({
   onCreated: () => void;
 }) {
   const [tab, setTab] = useState<LearningCardType | 'qr' | 'youtube'>('link');
+  const { t } = useBahasa();
   // KZ-017: keupayaan dalam konteks kelas supaya pelajar mengikut kebenaran
   // pemilik kelas, bukan hanya bendera akaun sendiri.
   const caps = useCapabilities(classId);
@@ -950,18 +953,18 @@ function AddCardModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-xl font-semibold">Add card</h3>
+          <h3 className="text-xl font-semibold">{t('boards.learning.addCardTitle')}</h3>
           <button onClick={onClose} className="text-gray-600 hover:text-gray-900">✕</button>
         </div>
         <div className="flex flex-wrap gap-1 mb-5 bg-white p-1 rounded-lg">
           {/* KZ-039: tab 'video' (muat naik terus) dan 'chatbot' dibuang;
               kad video hanya melalui tab 'youtube' (pautan luar). */}
-          {(['link', 'qr', 'text', 'file', 'image', 'youtube'] as Array<LearningCardType | 'qr' | 'youtube'>).map((t) => (
+          {(['link', 'qr', 'text', 'file', 'image', 'youtube'] as Array<LearningCardType | 'qr' | 'youtube'>).map((jenis) => (
             <button
-              key={t}
-              onClick={() => setTab(t)}
-              className={`px-3 py-1.5 rounded-md text-sm capitalize ${tab === t ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-            >{t}</button>
+              key={jenis}
+              onClick={() => setTab(jenis)}
+              className={`px-3 py-1.5 rounded-md text-sm capitalize ${tab === jenis ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
+            >{t(jenis === 'link' ? 'boards.learning.tabLink' : jenis === 'qr' ? 'boards.learning.tabQr' : jenis === 'text' ? 'boards.learning.tabText' : jenis === 'file' ? 'boards.learning.tabFile' : jenis === 'image' ? 'boards.learning.tabImage' : 'boards.learning.tabYoutube')}</button>
           ))}
         </div>
         {tab === 'youtube' && <YouTubeForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
@@ -970,7 +973,7 @@ function AddCardModal({
         {tab === 'image' && <ImageForm classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
         {tab === 'file'  && (caps.canUploadFiles
           ? <FileForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />
-          : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">File upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or use a Link instead.</div>)}
+          : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">{t('boards.learning.uploadDisabled')}</div>)}
         {tab === 'text'  && <TextForm  classId={classId} columnId={columnId} insertIndex={insertIndex ?? null} onCreated={onCreated} />}
       </div>
     </div>
@@ -978,13 +981,14 @@ function AddCardModal({
 }
 
 function YouTubeForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const { t } = useBahasa();
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const submit = async () => {
-    if (!url.trim()) { setErr('Please paste a YouTube link'); return; }
+    if (!url.trim()) { setErr(t('boards.learning.ytUrlRequired')); return; }
     setBusy(true); setErr(null);
     try {
       const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
@@ -993,7 +997,7 @@ function YouTubeForm({ classId, columnId, insertIndex, onCreated }: { classId: s
         body: JSON.stringify({ columnId, cardType: 'youtube', youtubeUrl: url.trim(), title: title || null, description: description || null, insertIndex }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      if (!r.ok) throw new Error(data.error || t('boards.learning.failedGeneric'));
       onCreated();
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -1001,21 +1005,22 @@ function YouTubeForm({ classId, columnId, insertIndex, onCreated }: { classId: s
     <div className="space-y-3">
       <input value={url} onChange={(e) => setUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..."
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
-      <p className="text-xs text-gray-500">Paste a YouTube link or its embed code (unlisted is fine). It will play right on the board.</p>
+      <p className="text-xs text-gray-500">{t('boards.learning.ytNote')}</p>
       {/* KZ-039: muat naik video terus dibuang; ini satu-satunya jalan untuk video. */}
-      <p className="text-xs text-gray-500">Video mesti dikongsi melalui pautan YouTube.</p>
-      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)"
+      <p className="text-xs text-gray-500">{t('boards.learning.ytVideoNote')}</p>
+      <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('boards.learning.titleOptional')}
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
-      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" rows={2}
+      <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('boards.learning.descOptional')} rows={2}
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400" />
       {err && <div className="text-red-400 text-xs">{err}</div>}
       <button onClick={submit} disabled={busy || !url.trim()}
-        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm">{busy ? 'Adding…' : 'Add YouTube video'}</button>
+        className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm">{busy ? t('boards.learning.adding') : t('boards.learning.addYt')}</button>
     </div>
   );
 }
 
 function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const { t } = useBahasa();
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -1033,12 +1038,12 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
     try {
       const pres = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(url)}`);
       const meta = await pres.json();
-      if (!pres.ok) throw new Error(meta.error || 'Preview failed');
+      if (!pres.ok) throw new Error(meta.error || t('boards.learning.previewFailed'));
       setAutoMeta(meta);
       if (!title && meta.title) setTitle(meta.title);
       if (!description && meta.description) setDescription(meta.description);
       if (!imageUrl && meta.image) setImageUrl(meta.image);
-    } catch (e: any) { setErr(e.message || 'Preview failed'); }
+    } catch (e: any) { setErr(e.message || t('boards.learning.previewFailed')); }
     finally { setPreviewLoading(false); }
   };
 
@@ -1049,9 +1054,9 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
       const fd = new FormData(); fd.append('file', await mampatImej(file));
       const r = await authedFetch(`/api/learning-boards/${classId}/upload-file`, { method: 'POST', body: fd });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Upload failed');
+      if (!r.ok) throw new Error(data.error || t('boards.learning.uploadFailed'));
       setImageUrl(data.fileluFileUrl || data.fileUrl);
-    } catch (e: any) { setErr(e.message || 'Upload failed'); }
+    } catch (e: any) { setErr(e.message || t('boards.learning.uploadFailed')); }
     finally { setUploading(false); }
   };
 
@@ -1085,7 +1090,7 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      if (!r.ok) throw new Error(data.error || t('boards.learning.failedGeneric'));
       onCreated();
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -1103,12 +1108,12 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
           onClick={fetchPreview}
           disabled={!url || previewLoading}
           className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 rounded-md disabled:opacity-50"
-        >{previewLoading ? '...' : 'Preview'}</button>
+        >{previewLoading ? '...' : t('boards.learning.previewBtn')}</button>
       </div>
 
       {(imageUrl || autoMeta) && (
         <div className="border border-gray-200 rounded-md p-3 bg-gray-50">
-          <div className="text-xs text-gray-500 mb-2">Preview</div>
+          <div className="text-xs text-gray-500 mb-2">{t('boards.learning.previewLabel')}</div>
           {imageUrl ? (
             /* eslint-disable-next-line @next/next/no-img-element */
             <img src={imageUrl} alt="" className="w-full aspect-video object-cover rounded-md mb-2 bg-white" />
@@ -1117,12 +1122,12 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
           )}
           <input
             value={title} onChange={(e) => setTitle(e.target.value)}
-            placeholder="Title"
+            placeholder={t('boards.learning.titlePlaceholder')}
             className="w-full bg-white border border-gray-200 rounded-md px-2 py-1.5 text-sm text-gray-900 mb-2"
           />
           <textarea
             value={description} onChange={(e) => setDescription(e.target.value)}
-            placeholder="Description (optional)"
+            placeholder={t('boards.learning.descOptional')}
             rows={2}
             className="w-full bg-white border border-gray-200 rounded-md px-2 py-1.5 text-sm text-gray-900"
           />
@@ -1130,14 +1135,14 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
       )}
 
       <div>
-        <label className="block text-xs text-gray-600 mb-1">Custom thumbnail (optional)</label>
+        <label className="block text-xs text-gray-600 mb-1">{t('boards.learning.customThumb')}</label>
         <input
           type="file" accept="image/*"
           onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadCustomThumb(f); }}
           disabled={uploading}
           className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500"
         />
-        {uploading && <div className="text-xs text-gray-500 mt-1">Uploading thumbnail…</div>}
+        {uploading && <div className="text-xs text-gray-500 mt-1">{t('boards.learning.uploadingThumb')}</div>}
       </div>
 
       {err && <div className="text-red-400 text-xs">{err}</div>}
@@ -1145,18 +1150,19 @@ function LinkForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         onClick={submit}
         disabled={!url || busy || uploading}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Adding…' : 'Add link'}</button>
+      >{busy ? t('boards.learning.adding') : t('boards.learning.addLink')}</button>
     </div>
   );
 }
 
 function QRForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const { t } = useBahasa();
   const [url, setUrl] = useState('');
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const submit = async () => {
-    if (!url.trim()) { setErr('Please enter a URL.'); return; }
+    if (!url.trim()) { setErr(t('boards.learning.qrUrlRequired')); return; }
     setBusy(true); setErr(null);
     try {
       const r = await authedFetch(`/api/learning-boards/${classId}/qr-card`, {
@@ -1165,7 +1171,7 @@ function QRForm({ classId, columnId, insertIndex, onCreated }: { classId: string
         body: JSON.stringify({ columnId, url: url.trim(), title: title.trim() || null, insertIndex }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      if (!r.ok) throw new Error(data.error || t('boards.learning.failedGeneric'));
       onCreated();
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -1178,21 +1184,22 @@ function QRForm({ classId, columnId, insertIndex, onCreated }: { classId: string
       />
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title (optional)"
+        placeholder={t('boards.learning.titleOptional')}
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
-      <p className="text-xs text-gray-500">A QR code image will be generated for this URL. Tapping the card opens the URL; the QR enlarges when clicked.</p>
+      <p className="text-xs text-gray-500">{t('boards.learning.qrNote')}</p>
       {err && <div className="text-red-400 text-xs">{err}</div>}
       <button
         onClick={submit}
         disabled={!url.trim() || busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Creating QR...' : 'Add QR card'}</button>
+      >{busy ? t('boards.learning.creatingQr') : t('boards.learning.addQr')}</button>
     </div>
   );
 }
 
 function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const { t } = useBahasa();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1200,7 +1207,7 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    if (!file) { setErr('Choose an image'); return; }
+    if (!file) { setErr(t('boards.learning.chooseImage')); return; }
     setBusy(true); setErr(null); setProgress(0);
     try {
       const fd = new FormData();
@@ -1210,7 +1217,7 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
         body: fd,
       });
       const upData = await upRes.json();
-      if (!upRes.ok) throw new Error(upData.error || 'Upload failed');
+      if (!upRes.ok) throw new Error(upData.error || t('boards.learning.uploadFailed'));
       setProgress(70);
 
       // Image card stores the FileLu redirect endpoint as image_url so <img src> works.
@@ -1229,11 +1236,11 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
         }),
       });
       const cardData = await cardRes.json();
-      if (!cardRes.ok) throw new Error(cardData.error || 'Failed to create card');
+      if (!cardRes.ok) throw new Error(cardData.error || t('boards.learning.createCardFailed'));
       setProgress(100);
       onCreated();
     } catch (e: any) {
-      setErr(e.message || 'Upload failed');
+      setErr(e.message || t('boards.learning.uploadFailed'));
     } finally {
       setBusy(false);
     }
@@ -1255,7 +1262,7 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
       )}
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
-        placeholder="Caption (optional)"
+        placeholder={t('boards.learning.captionOptional')}
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       {busy && (
@@ -1268,17 +1275,18 @@ function ImageForm({ classId, columnId, insertIndex, onCreated }: { classId: str
         onClick={submit}
         disabled={!file || busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Uploading…' : 'Add image'}</button>
+      >{busy ? t('boards.learning.uploading') : t('boards.learning.addImage')}</button>
     </div>
   );
 }
 function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const { t } = useBahasa();
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const submit = async () => {
-    if (!title && !description) { setErr('Add a title or description'); return; }
+    if (!title && !description) { setErr(t('boards.learning.titleOrDesc')); return; }
     setBusy(true); setErr(null);
     try {
       const r = await authedFetch(`/api/learning-boards/${classId}/cards`, {
@@ -1287,7 +1295,7 @@ function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         body: JSON.stringify({ columnId, cardType: 'text', title: title || null, description: description || null, insertIndex }),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed');
+      if (!r.ok) throw new Error(data.error || t('boards.learning.failedGeneric'));
       onCreated();
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -1295,12 +1303,12 @@ function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
     <div className="space-y-3">
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title"
+        placeholder={t('boards.learning.titlePlaceholder')}
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       <textarea
         value={description} onChange={(e) => setDescription(e.target.value)}
-        placeholder="Note text"
+        placeholder={t('boards.learning.notePlaceholder')}
         rows={5}
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
@@ -1309,12 +1317,13 @@ function TextForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         onClick={submit}
         disabled={busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Adding…' : 'Add note'}</button>
+      >{busy ? t('boards.learning.adding') : t('boards.learning.addNote')}</button>
     </div>
   );
 }
 
 function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: string; columnId: string; insertIndex: number | null; onCreated: () => void }) {
+  const { t } = useBahasa();
   const [file, setFile] = useState<File | null>(null);
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -1322,7 +1331,7 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
   const [err, setErr] = useState<string | null>(null);
 
   const submit = async () => {
-    if (!file) { setErr('Choose a file'); return; }
+    if (!file) { setErr(t('boards.learning.chooseFile')); return; }
     setBusy(true); setErr(null); setProgress(0);
     try {
       // 1) Upload to Supabase Storage via our API route
@@ -1333,7 +1342,7 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         body: fd,
       });
       const upData = await upRes.json();
-      if (!upRes.ok) throw new Error(upData.error || 'Upload failed');
+      if (!upRes.ok) throw new Error(upData.error || t('boards.learning.uploadFailed'));
       setProgress(70);
 
       // 2) Create the card record
@@ -1358,11 +1367,11 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         }),
       });
       const cardData = await cardRes.json();
-      if (!cardRes.ok) throw new Error(cardData.error || 'Failed to create card');
+      if (!cardRes.ok) throw new Error(cardData.error || t('boards.learning.createCardFailed'));
       setProgress(100);
       onCreated();
     } catch (e: any) {
-      setErr(e.message || 'Upload failed');
+      setErr(e.message || t('boards.learning.uploadFailed'));
     } finally {
       setBusy(false);
     }
@@ -1384,7 +1393,7 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
       )}
       <input
         value={title} onChange={(e) => setTitle(e.target.value)}
-        placeholder="Title (optional)"
+        placeholder={t('boards.learning.titleOptional')}
         className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-gray-900 text-sm placeholder-gray-400"
       />
       {busy && (
@@ -1397,8 +1406,8 @@ function FileForm({ classId, columnId, insertIndex, onCreated }: { classId: stri
         onClick={submit}
         disabled={!file || busy}
         className="w-full bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white font-medium rounded-md py-2 text-sm"
-      >{busy ? 'Uploading…' : 'Upload file'}</button>
-      <div className="text-[11px] text-gray-500">Supports PDF, Word, Excel, PowerPoint, text, archives, and more (up to 50 MB).</div>
+      >{busy ? t('boards.learning.uploading') : t('boards.learning.uploadFile')}</button>
+      <div className="text-[11px] text-gray-500">{t('boards.learning.fileSupports')}</div>
     </div>
   );
 }
@@ -1424,6 +1433,7 @@ function MoodBoardGrid({
   moveCard: (cardId: string, payload: any) => Promise<void>;
   onAddCard?: (columnId: string, insertIndex?: number | null) => void;
 }) {
+  const { t, bahasa } = useBahasa();
   const [pickerOpen, setPickerOpen] = useState(false);
   const [creatingUncat, setCreatingUncat] = useState(false);
 
@@ -1432,8 +1442,11 @@ function MoodBoardGrid({
   );
 
   const ensureUncategorizedColumn = async (): Promise<string | null> => {
+    // Bandingkan dengan tajuk terlokalisasi supaya lajur "Tanpa kategori"
+    // tidak dicipta berulang kali dalam BM.
+    const tajukTanpaKategori = t('boards.learning.uncategorizedPlain').trim().toLowerCase();
     const existing = snap.columns.find(
-      (c) => (c.title || '').trim().toLowerCase() === 'uncategorized'
+      (c) => (c.title || '').trim().toLowerCase() === tajukTanpaKategori
     );
     if (existing) return existing.id;
     setCreatingUncat(true);
@@ -1441,7 +1454,7 @@ function MoodBoardGrid({
       const r = await authedFetch(`/api/learning-boards/${classId}/columns`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title: 'Uncategorized' }),
+        body: JSON.stringify({ title: t('boards.learning.uncategorizedPlain') }),
       });
       const data = await r.json();
       if (!r.ok || !data?.column?.id) throw new Error(data?.error || 'Could not create column');
@@ -1468,16 +1481,16 @@ function MoodBoardGrid({
     <div className="mx-4 my-6 rounded-2xl bg-gradient-to-b from-slate-900 to-slate-800 p-12 text-center text-slate-300 text-sm shadow-inner">
       {isEditor ? (
         <div className="flex flex-col items-center gap-3">
-          <div>No items on this board yet.</div>
+          <div>{t('boards.learning.noBoardItemsEditor')}</div>
           <button
             onClick={() => setPickerOpen(true)}
             className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-white/10 hover:bg-white/15 border border-white/15 text-white text-xs font-semibold"
           >
-            <span className="text-base leading-none">+</span> Add resource
+            <span className="text-base leading-none">+</span> {t('boards.learning.addResource')}
           </button>
         </div>
       ) : (
-        'No items have been added to this board yet.'
+        t('boards.learning.noBoardItemsStudent')
       )}
     </div>
   );
@@ -1503,17 +1516,17 @@ function MoodBoardGrid({
       <div className="mb-5 flex items-center justify-between text-slate-300 flex-wrap gap-3">
         <div className="flex items-center gap-2">
           <span className="inline-block w-2 h-2 rounded-full bg-fuchsia-400 shadow-[0_0_12px_2px_rgba(232,121,249,0.6)]" />
-          <span className="text-xs uppercase tracking-[0.18em] text-slate-400">Mood Board</span>
+          <span className="text-xs uppercase tracking-[0.18em] text-slate-400">{t('boards.learning.moodBoardLabel')}</span>
         </div>
         <div className="flex items-center gap-3">
-          <span className="text-xs text-slate-500">{allCards.length} item{allCards.length === 1 ? '' : 's'} · {snap.columns.length} topic{snap.columns.length === 1 ? '' : 's'}</span>
+          <span className="text-xs text-slate-500">{terjemahBilangan(bahasa, 'boards.learning.itemOne', 'boards.learning.itemOther', allCards.length, { n: allCards.length })} · {terjemahBilangan(bahasa, 'boards.learning.topicOne', 'boards.learning.topicOther', snap.columns.length, { n: snap.columns.length })}</span>
           {isEditor && (
             <button
               onClick={() => setPickerOpen(true)}
               disabled={creatingUncat}
               className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-fuchsia-500 to-violet-600 hover:from-fuchsia-400 hover:to-violet-500 text-white text-xs font-semibold shadow-lg shadow-fuchsia-900/30 disabled:opacity-60"
             >
-              <span className="text-base leading-none">+</span> Add resource
+              <span className="text-base leading-none">+</span> {t('boards.learning.addResource')}
             </button>
           )}
         </div>
@@ -1538,7 +1551,7 @@ function MoodBoardGrid({
                     title={columnTitle}
                   >
                     <span className="inline-block w-1.5 h-1.5 rounded-full bg-white/90" />
-                    <span className="max-w-[160px] truncate">{columnTitle || 'Uncategorized'}</span>
+                    <span className="max-w-[160px] truncate">{columnTitle || t('boards.learning.uncategorizedPlain')}</span>
                   </div>
 
                   <div className="text-slate-100">
@@ -1572,10 +1585,10 @@ function MoodBoardGrid({
             className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-2xl p-5 text-gray-900"
           >
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold">Add resource to…</h3>
+              <h3 className="text-base font-semibold">{t('boards.learning.pickerTitle')}</h3>
               <button onClick={() => setPickerOpen(false)} className="text-gray-500 hover:text-gray-900">×</button>
             </div>
-            <p className="text-xs text-slate-400 mb-3">Pick a topic for the new card. Choose “No topic” to add it without a category.</p>
+            <p className="text-xs text-slate-400 mb-3">{t('boards.learning.pickerDesc')}</p>
             <div className="max-h-[55vh] overflow-y-auto pr-1 -mr-1 space-y-1.5">
               <button
                 onClick={() => handleStartAdd(null)}
@@ -1583,7 +1596,7 @@ function MoodBoardGrid({
                 className="w-full flex items-center gap-2 px-3 py-2 rounded-lg bg-white/5 hover:bg-white/10 border border-dashed border-white/15 text-left disabled:opacity-60"
               >
                 <span className="inline-flex w-6 h-6 rounded-md items-center justify-center bg-slate-800 text-slate-300 text-xs">,</span>
-                <span className="text-sm">No topic <span className="text-slate-500">(Uncategorized)</span></span>
+                <span className="text-sm">{t('boards.learning.noTopic')} <span className="text-slate-500">{t('boards.learning.uncategorized')}</span></span>
               </button>
               {snap.columns.map((c) => {
                 const g = cardGradient(c.title || c.id);
@@ -1599,7 +1612,7 @@ function MoodBoardGrid({
                     >
                       {(c.title || '?').slice(0, 1).toUpperCase()}
                     </span>
-                    <span className="text-sm truncate flex-1">{c.title || 'Untitled'}</span>
+                    <span className="text-sm truncate flex-1">{c.title || t('boards.learning.untitled')}</span>
                     <span className="text-xs text-slate-500">{(c.cards || []).length}</span>
                   </button>
                 );
@@ -1617,6 +1630,7 @@ function MoodBoardGrid({
 // AI Thumbnail Batch Button, drives the SSE stream from /ai-thumbnail-all.
 // -----------------------------------------------------------------------------
 function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: () => void }) {
+  const { t } = useBahasa();
   const [confirmOpen, setConfirmOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [progress, setProgress] = useState<{ processed: number; total: number; succeeded: number; failed: number } | null>(null);
@@ -1637,8 +1651,9 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
         signal: ac.signal,
       });
       if (!r.ok || !r.body) {
-        const t = await r.text().catch(()=>'');
-        throw new Error(`Stream failed (${r.status}): ${t.slice(0,160)}`);
+        // Namakan semula supaya tidak bertembung dengan fungsi terjemahan t.
+        const teks = await r.text().catch(()=>'');
+        throw new Error(`Stream failed (${r.status}): ${teks.slice(0,160)}`);
       }
       const reader = r.body.getReader();
       const dec = new TextDecoder();
@@ -1679,7 +1694,7 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
       }
       try { onDone(); } catch {}
     } catch (e: any) {
-      if (e?.name !== 'AbortError') alert('Batch failed: ' + (e?.message || 'unknown error'));
+      if (e?.name !== 'AbortError') alert(t('boards.learning.batchFailed', { ralat: e?.message || 'unknown error' }));
     } finally {
       setRunning(false);
       abortRef.current = null;
@@ -1691,20 +1706,20 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
       <button
         onClick={() => setConfirmOpen(true)}
         disabled={running}
-        title="Generate AI thumbnails for cards without a real image"
+        title={t('boards.learning.aiBatchTitle')}
         className="ml-2 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-semibold bg-gradient-to-r from-indigo-500 to-fuchsia-500 hover:from-indigo-400 hover:to-fuchsia-400 text-white shadow disabled:opacity-60"
       >
-        ✨ {running ? `${progress?.processed ?? 0}/${progress?.total ?? '…'}` : 'AI thumbnails'}
+        ✨ {running ? `${progress?.processed ?? 0}/${progress?.total ?? '…'}` : t('boards.learning.aiBatchBtn')}
       </button>
 
       {confirmOpen && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" >
           <div className="w-full max-w-md rounded-2xl bg-white shadow-2xl p-5" onClick={(e)=>e.stopPropagation()}>
-            <h3 className="text-lg font-semibold text-gray-900 mb-2">Generate AI thumbnails?</h3>
-            <p className="text-sm text-gray-600">This will create AI-generated images for every card that is still using the default gradient tile. It uses free AI providers (AI Horde &rarr; Cloudflare &rarr; Hugging Face &rarr; Pollinations) in parallel and may take several minutes depending on queue load. Existing custom thumbnails are not touched.</p>
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">{t('boards.learning.aiBatchConfirm')}</h3>
+            <p className="text-sm text-gray-600">{t('boards.learning.aiBatchDesc')}</p>
             <div className="mt-5 flex justify-end gap-2">
-              <button onClick={() => setConfirmOpen(false)} className="px-3 py-1.5 rounded-md text-sm bg-gray-100 hover:bg-gray-200 text-gray-700">Cancel</button>
-              <button onClick={start} className="px-3 py-1.5 rounded-md text-sm bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white font-semibold">Generate</button>
+              <button onClick={() => setConfirmOpen(false)} className="px-3 py-1.5 rounded-md text-sm bg-gray-100 hover:bg-gray-200 text-gray-700">{t('common.cancel')}</button>
+              <button onClick={start} className="px-3 py-1.5 rounded-md text-sm bg-gradient-to-r from-indigo-500 to-fuchsia-500 text-white font-semibold">{t('boards.learning.generate')}</button>
             </div>
           </div>
         </div>
@@ -1713,10 +1728,10 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
       {running && progress && (
         <div className="fixed bottom-4 right-4 z-50 w-80 rounded-xl bg-white text-gray-900 border border-gray-200 shadow-2xl p-4">
           <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold">✨ Generating AI thumbnails</div>
-            <button onClick={() => abortRef.current?.abort()} className="text-xs text-gray-500 hover:text-gray-900">Cancel</button>
+            <div className="text-sm font-semibold">{t('boards.learning.generatingAi')}</div>
+            <button onClick={() => abortRef.current?.abort()} className="text-xs text-gray-500 hover:text-gray-900">{t('common.cancel')}</button>
           </div>
-          <div className="text-xs text-gray-500 mb-2">{progress.processed} / {progress.total} · {progress.succeeded} ok · {progress.failed} failed</div>
+          <div className="text-xs text-gray-500 mb-2">{t('boards.learning.progressSummary', { diproses: progress.processed, jumlah: progress.total, berjaya: progress.succeeded, gagal: progress.failed })}</div>
           <div className="h-2 bg-gray-200 rounded-full overflow-hidden">
             <div className="h-full bg-gradient-to-r from-indigo-400 to-fuchsia-400 transition-all" style={{ width: `${progress.total ? (progress.processed / progress.total) * 100 : 0}%` }} />
           </div>
@@ -1730,6 +1745,7 @@ function AiThumbnailBatchButton({ classId, onDone }: { classId: string; onDone: 
 // Edit Card Modal
 // ----------------------------------------------------------------------------
 function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; card: LearningCard; onClose: () => void; onSaved: () => void }) {
+  const { t } = useBahasa();
   const [title, setTitle] = useState(card.title || '');
   const [description, setDescription] = useState(card.description || '');
   const [linkUrl, setLinkUrl] = useState((card as any).link_url || '');
@@ -1749,9 +1765,9 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
       const fd = new FormData(); fd.append('file', file);
       const r = await authedFetch(`/api/learning-boards/${classId}/upload-file`, { method: 'POST', body: fd });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Upload failed');
+      if (!r.ok) throw new Error(data.error || t('boards.learning.uploadFailed'));
       setLinkImageUrl(data.fileUrl);
-    } catch (e: any) { setErr(e.message || 'Upload failed'); }
+    } catch (e: any) { setErr(e.message || t('boards.learning.uploadFailed')); }
     finally { setUploading(false); }
   };
 
@@ -1761,11 +1777,11 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
     try {
       const r = await authedFetch(`/api/learning-boards/link-preview?url=${encodeURIComponent(linkUrl)}`);
       const m = await r.json();
-      if (!r.ok) throw new Error(m.error || 'Preview failed');
+      if (!r.ok) throw new Error(m.error || t('boards.learning.previewFailed'));
       if (m.title) setLinkTitle(m.title);
       if (m.description) setLinkDescription(m.description);
       if (m.image) setLinkImageUrl(m.image);
-    } catch (e: any) { setErr(e.message || 'Preview failed'); }
+    } catch (e: any) { setErr(e.message || t('boards.learning.previewFailed')); }
     finally { setUploading(false); }
   };
 
@@ -1785,7 +1801,7 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
         body: JSON.stringify(body),
       });
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Save failed');
+      if (!r.ok) throw new Error(data.error || t('boards.learning.saveFailed'));
       onSaved();
     } catch (e: any) { setErr(e.message); } finally { setBusy(false); }
   };
@@ -1794,7 +1810,7 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
   <div className="fixed inset-0 z-40 flex items-center justify-center bg-black/50 p-4" >
       <div className="bg-white rounded-lg shadow-xl w-full max-w-md p-5 max-h-[90vh] overflow-y-auto" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between mb-4">
-          <h3 className="text-lg font-semibold text-gray-900">Edit card</h3>
+          <h3 className="text-lg font-semibold text-gray-900">{t('boards.learning.editCard')}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-800">✕</button>
         </div>
 
@@ -1802,51 +1818,51 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
           {isLink && (
             <>
               <div>
-                <label className="block text-xs text-gray-600 mb-1">URL</label>
+                <label className="block text-xs text-gray-600 mb-1">{t('boards.learning.urlLabel')}</label>
                 <div className="flex gap-2">
                   <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)}
                     className="flex-1 bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900" />
                   <button type="button" onClick={refetchPreview} disabled={!linkUrl || uploading}
-                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 rounded-md disabled:opacity-50">Refresh</button>
+                    className="bg-slate-100 hover:bg-slate-200 text-slate-700 text-sm px-3 rounded-md disabled:opacity-50">{t('common.refresh')}</button>
                 </div>
               </div>
             </>
           )}
           <div>
-            <label className="block text-xs text-gray-600 mb-1">Title</label>
+            <label className="block text-xs text-gray-600 mb-1">{t('boards.learning.titleLabel')}</label>
             <input value={title} onChange={(e) => { setTitle(e.target.value); if (isLink) setLinkTitle(e.target.value); }}
               className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900" />
           </div>
           <div>
-            <label className="block text-xs text-gray-600 mb-1">Description</label>
+            <label className="block text-xs text-gray-600 mb-1">{t('boards.learning.descLabel')}</label>
             <textarea value={description} onChange={(e) => { setDescription(e.target.value); if (isLink) setLinkDescription(e.target.value); }}
               rows={3}
               className="w-full bg-white border border-gray-200 rounded-md px-3 py-2 text-sm text-gray-900" />
           </div>
           {isLink && (
             <div>
-              <label className="block text-xs text-gray-600 mb-1">Thumbnail</label>
+              <label className="block text-xs text-gray-600 mb-1">{t('boards.learning.thumbLabel')}</label>
               {linkImageUrl ? (
                 <div className="relative mb-2">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img src={linkImageUrl} alt="" className="w-full aspect-video object-cover rounded-md bg-gray-50" />
-                  <button type="button" onClick={() => setLinkImageUrl(null)} className="absolute top-2 right-2 bg-white/90 hover:bg-white text-red-500 text-xs px-2 py-1 rounded-md shadow">Remove</button>
+                  <button type="button" onClick={() => setLinkImageUrl(null)} className="absolute top-2 right-2 bg-white/90 hover:bg-white text-red-500 text-xs px-2 py-1 rounded-md shadow">{t('boards.learning.remove')}</button>
                 </div>
               ) : (
-                <div className="w-full aspect-video rounded-md bg-gray-100 flex items-center justify-center text-xs text-gray-500 mb-2">No thumbnail</div>
+                <div className="w-full aspect-video rounded-md bg-gray-100 flex items-center justify-center text-xs text-gray-500 mb-2">{t('boards.learning.noThumb')}</div>
               )}
               <input type="file" accept="image/*"
                 onChange={(e) => { const f = e.target.files?.[0]; if (f) uploadThumb(f); }}
                 disabled={uploading}
                 className="block w-full text-xs text-gray-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-md file:border-0 file:bg-indigo-600 file:text-white file:cursor-pointer hover:file:bg-indigo-500" />
-              {uploading && <div className="text-xs text-gray-500 mt-1">Working…</div>}
+              {uploading && <div className="text-xs text-gray-500 mt-1">{t('boards.learning.working')}</div>}
             </div>
           )}
           {err && <div className="text-red-500 text-xs">{err}</div>}
           <div className="flex justify-end gap-2 pt-2">
-            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">Cancel</button>
+            <button onClick={onClose} className="px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 rounded-md">{t('common.cancel')}</button>
             <button onClick={save} disabled={busy || uploading}
-              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-md">{busy ? 'Saving…' : 'Save'}</button>
+              className="px-4 py-2 text-sm bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 text-white rounded-md">{busy ? t('boards.learning.saving') : t('boards.learning.save')}</button>
           </div>
         </div>
       </div>
@@ -1855,6 +1871,7 @@ function EditCardModal({ classId, card, onClose, onSaved }: { classId: string; c
 }
 
 function ChatbotCardBody({ url, title }: { url: string; title: string | null }) {
+  const { t } = useBahasa();
   const [open, setOpen] = useState(false);
   return (
     <div className="w-full">
@@ -1866,18 +1883,18 @@ function ChatbotCardBody({ url, title }: { url: string; title: string | null }) 
           AI
         </div>
         <div className="flex-1 min-w-0">
-          <div className="text-sm font-medium text-gray-900 truncate">{title || 'Learning Assistant'}</div>
-          <div className="text-xs text-indigo-600">Chat with assistant</div>
+          <div className="text-sm font-medium text-gray-900 truncate">{title || t('boards.learning.assistantFallback')}</div>
+          <div className="text-xs text-indigo-600">{t('boards.learning.chatAssistant')}</div>
         </div>
       </button>
       {open && (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4" >
           <div className="bg-white rounded-lg shadow-xl w-full max-w-2xl h-[80vh] flex flex-col overflow-hidden" onClick={(e) => e.stopPropagation()}>
             <div className="flex items-center justify-between px-4 py-2 border-b border-gray-200">
-              <div className="text-sm font-semibold text-gray-900">{title || 'Learning Assistant'}</div>
+              <div className="text-sm font-semibold text-gray-900">{title || t('boards.learning.assistantFallback')}</div>
               <button onClick={() => setOpen(false)} className="text-gray-500 hover:text-gray-900 text-lg leading-none px-2">{'\u00D7'}</button>
             </div>
-            <iframe src={url} title={title || 'Assistant'} className="flex-1 w-full border-0" />
+            <iframe src={url} title={title || t('boards.learning.assistantFrame')} className="flex-1 w-full border-0" />
           </div>
         </div>
       )}
