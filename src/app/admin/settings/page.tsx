@@ -27,28 +27,31 @@ import {
   type Profile,
   type UserMeta,
 } from "@/lib/data";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
-/** Baris matriks kebenaran: siapa boleh melakukan perkara ini. */
-const KEENAN = [
-  { label: "View everything", owner: true, admin: true },
-  { label: "Manage users and classes", owner: true, admin: true },
-  { label: "Suspend students and educators", owner: true, admin: true },
-  { label: "Suspend admins", owner: true, admin: false },
-  { label: "Change points and override reviews with a reason", owner: true, admin: true },
-  { label: "Edit or delete audit entries", owner: false, admin: false },
+/** Baris matriks kebenaran: siapa boleh melakukan perkara ini. KZ-043: label
+ *  diterjemah menerusi kunci kamus pada masa render, bukan pemalar module. */
+const KEENAN: { kunci: "permViewEverything" | "permManageUsersClasses" | "permSuspendStudentsEducators" | "permSuspendAdmins" | "permChangePoints" | "permEditAudit"; owner: boolean; admin: boolean }[] = [
+  { kunci: "permViewEverything", owner: true, admin: true },
+  { kunci: "permManageUsersClasses", owner: true, admin: true },
+  { kunci: "permSuspendStudentsEducators", owner: true, admin: true },
+  { kunci: "permSuspendAdmins", owner: true, admin: false },
+  { kunci: "permChangePoints", owner: true, admin: true },
+  { kunci: "permEditAudit", owner: false, admin: false },
 ];
 
 /** Sel matriks: tanda hijau bila dibenarkan, silang kelabu bila tidak. */
-function SelBenar({ ok }: { ok: boolean }) {
+function SelBenar({ ok, ya, tidak }: { ok: boolean; ya: string; tidak: string }) {
   return ok ? (
-    <Check className="w-4 h-4 text-kz-up" aria-label="Allowed" />
+    <Check className="w-4 h-4 text-kz-up" aria-label={ya} />
   ) : (
-    <X className="w-4 h-4 text-ink-faint" aria-label="Not allowed" />
+    <X className="w-4 h-4 text-ink-faint" aria-label={tidak} />
   );
 }
 
 export default function Page() {
   const router = useRouter();
+  const { t, bahasa } = useBahasa();
   const [muat, setMuat] = useState(true);
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [meta, setMeta] = useState<Record<string, UserMeta>>({});
@@ -85,60 +88,60 @@ export default function Page() {
   const lajurPentadbir: DataColumn<Profile>[] = [
     {
       key: "nama",
-      header: "Name",
+      header: t("admin.settings.colName"),
       render: (u, i) => (
         <span className="flex items-center gap-3 py-3">
-          <Avatar name={u.display_name || "Unnamed user"} size="sm" index={i} />
+          <Avatar name={u.display_name || t("admin.unnamedUser")} size="sm" index={i} />
           <Link
             href={`/admin/users/${u.id}`}
             onClick={(e) => e.stopPropagation()}
             className="text-[13px] font-bold text-ink hover:text-brand-purple truncate"
           >
-            {u.display_name || "Unnamed user"}
+            {u.display_name || t("admin.unnamedUser")}
           </Link>
         </span>
       ),
     },
     {
       key: "emel",
-      header: "Email",
+      header: t("admin.users.colEmail"),
       hideOnMobile: true,
       render: (u) => (
         <span className="text-[13px] text-ink-faint truncate block max-w-[220px]">
-          {meta[u.id]?.email || "No email"}
+          {meta[u.id]?.email || t("admin.noEmail")}
         </span>
       ),
     },
     {
       key: "peranan",
-      header: "Role",
+      header: t("admin.users.colRole"),
       render: (u) => (
         <Badge variant="dim" warna="purple">
-          {u.role === "superadmin" ? "Owner" : "Admin"}
+          {u.role === "superadmin" ? t("admin.roleOwner") : t("admin.roleAdmin")}
         </Badge>
       ),
     },
     {
       key: "status",
-      header: "Status",
+      header: t("admin.settings.colStatus"),
       render: (u) =>
         u.suspended ? (
           <Badge variant="dim" warna="red">
-            Suspended
+            {t("admin.suspended")}
           </Badge>
         ) : (
           <Badge variant="dot" warna="green">
-            Active
+            {t("admin.active")}
           </Badge>
         ),
     },
     {
       key: "aktif",
-      header: "Last active",
+      header: t("admin.users.colLastActive"),
       hideOnMobile: true,
       render: (u) => (
         <span className="text-[13px] text-ink-faint whitespace-nowrap">
-          {relTime(meta[u.id]?.last_sign_in_at)}
+          {relTime(meta[u.id]?.last_sign_in_at, undefined, bahasa)}
         </span>
       ),
     },
@@ -148,36 +151,36 @@ export default function Page() {
   const lajurKeenan: DataColumn<(typeof KEENAN)[number]>[] = [
     {
       key: "kebenaran",
-      header: "Permission",
-      render: (k) => <span className="text-[13px] text-ink">{k.label}</span>,
+      header: t("admin.settings.colPermission"),
+      render: (k) => <span className="text-[13px] text-ink">{t(`admin.settings.${k.kunci}`)}</span>,
     },
     {
       key: "owner",
-      header: "Owner",
+      header: t("admin.roleOwner"),
       className: "w-24",
-      render: (k) => <SelBenar ok={k.owner} />,
+      render: (k) => <SelBenar ok={k.owner} ya={t("admin.settings.allowed")} tidak={t("admin.settings.notAllowed")} />,
     },
     {
       key: "admin",
-      header: "Admin",
+      header: t("admin.roleAdmin"),
       className: "w-24",
-      render: (k) => <SelBenar ok={k.admin} />,
+      render: (k) => <SelBenar ok={k.admin} ya={t("admin.settings.allowed")} tidak={t("admin.settings.notAllowed")} />,
     },
   ];
 
   return (
     <AdminShell>
-      <PageHead title="Settings" />
+      <PageHead title={t("admin.settings.title")} />
 
       {muat ? (
-        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
       ) : (
         <div className="space-y-8">
           {/* ===== Admin access ===== */}
           <section>
-            <CardHead title="Admin access" subtitle="Owners and admins who can reach this workspace." className="mb-3" />
+            <CardHead title={t("admin.settings.adminAccess")} subtitle={t("admin.settings.adminAccessSub")} className="mb-3" />
             <DataTable
-              label="Admins"
+              label={t("admin.settings.tableLabel")}
               columns={lajurPentadbir}
               rows={pentadbir}
               rowKey={(u) => u.id}
@@ -185,8 +188,8 @@ export default function Page() {
               empty={
                 <EmptyState
                   icon={<UserIcon className="w-6 h-6" />}
-                  title="No admins"
-                  text="Admins appear here once they exist."
+                  title={t("admin.settings.noAdmins")}
+                  text={t("admin.settings.noAdminsText")}
                 />
               }
             />
@@ -194,10 +197,10 @@ export default function Page() {
 
           {/* ===== Role permissions ===== */}
           <section>
-            <CardHead title="Role permissions" subtitle="What each admin role can do. Read only." className="mb-3" />
-            <DataTable label="Role permissions" columns={lajurKeenan} rows={KEENAN} rowKey={(k) => k.label} />
+            <CardHead title={t("admin.settings.rolePermissions")} subtitle={t("admin.settings.rolePermissionsSub")} className="mb-3" />
+            <DataTable label={t("admin.settings.rolePermissions")} columns={lajurKeenan} rows={KEENAN} rowKey={(k) => k.kunci} />
             <p className="text-[12px] text-ink-faint mt-3">
-              To make someone an admin, open their profile in Users and change the role.
+              {t("admin.settings.changeRoleNote")}
             </p>
           </section>
         </div>

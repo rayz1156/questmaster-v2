@@ -10,6 +10,8 @@ import { useEffect, useState, useCallback } from 'react';
 import { MessageSquare, RefreshCw } from 'lucide-react';
 import { supabase } from '@/lib/supabaseClient';
 import AdminShell from '@/components/admin/AdminShell';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
+import { LOKAL } from '@/lib/i18n';
 import {
   Alert,
   Badge,
@@ -35,7 +37,6 @@ type FeedbackItem = {
 };
 
 const STATUS_OPTIONS = ['open', 'in_review', 'resolved', 'closed'] as const;
-const TYPE_LABELS: Record<string, string> = { bug: 'Bug', idea: 'Idea', question: 'Question', other: 'Other' };
 const STATUS_WARNA: Record<string, WarnaKit> = {
   open: 'yellow',
   in_review: 'blue',
@@ -44,11 +45,33 @@ const STATUS_WARNA: Record<string, WarnaKit> = {
 };
 
 export default function AdminFeedbackPage() {
+  const { t, bahasa } = useBahasa();
   const [items, setItems] = useState<FeedbackItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [filterStatus, setFilterStatus] = useState<string>('');
   const [filterType, setFilterType] = useState<string>('');
+
+  // KZ-043: label paparan jenis diterjemah pada masa render; nilai teknikal
+  // (bug/idea/question/other dalam DB) kekal.
+  const labelJenis: Record<string, string> = {
+    bug: t('admin.feedback.typeBug'),
+    idea: t('admin.feedback.typeIdea'),
+    question: t('admin.feedback.typeQuestion'),
+    other: t('admin.feedback.typeOther'),
+  };
+  const labelStatus: Record<string, string> = {
+    open: t('admin.feedback.statOpen'),
+    in_review: t('admin.feedback.statInReview'),
+    resolved: t('admin.feedback.statResolved'),
+    closed: t('admin.feedback.statClosed'),
+  };
+  const labelTanda: Record<string, string> = {
+    open: t('admin.feedback.markOpen'),
+    in_review: t('admin.feedback.markInReview'),
+    resolved: t('admin.feedback.markResolved'),
+    closed: t('admin.feedback.markClosed'),
+  };
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -61,15 +84,15 @@ export default function AdminFeedbackPage() {
       const headers: Record<string, string> = {};
       if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
       const res = await fetch(`/api/admin/feedback?${params.toString()}`, { headers });
-      if (!res.ok) throw new Error(res.status === 403 ? 'Admin access required.' : 'Failed to load feedback.');
+      if (!res.ok) throw new Error(res.status === 403 ? t('admin.feedback.adminRequired') : t('admin.feedback.loadFailed'));
       const json = await res.json();
       setItems(json.items ?? []);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'Failed to load feedback.');
+      setError(e instanceof Error ? e.message : t('admin.feedback.loadFailed'));
     } finally {
       setLoading(false);
     }
-  }, [filterStatus, filterType]);
+  }, [filterStatus, filterType, t]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -92,28 +115,28 @@ export default function AdminFeedbackPage() {
   const lajur: DataColumn<FeedbackItem>[] = [
     {
       key: 'subjek',
-      header: 'Feedback',
+      header: t('admin.feedback.colFeedback'),
       render: (it) => (
         <span className="min-w-0">
           <span className="block text-[13px] font-bold text-ink truncate">{it.subject}</span>
           <span className="block text-[12px] text-ink-faint truncate">
-            {it.user_email ?? 'anonymous'}{it.page_url ? ` · ${it.page_url}` : ''}
+            {it.user_email ?? t('admin.feedback.anonymous')}{it.page_url ? ` · ${it.page_url}` : ''}
           </span>
         </span>
       ),
     },
     {
       key: 'jenis',
-      header: 'Type',
+      header: t('admin.feedback.colType'),
       render: (it) => (
         <Badge variant="dim" warna="purple">
-          {TYPE_LABELS[it.type] ?? it.type}
+          {labelJenis[it.type] ?? it.type}
         </Badge>
       ),
     },
     {
       key: 'status',
-      header: 'Status',
+      header: t('admin.feedback.colStatus'),
       render: (it) => (
         <Badge variant="dim" warna={STATUS_WARNA[it.status] ?? 'gray'}>
           {it.status}
@@ -122,11 +145,11 @@ export default function AdminFeedbackPage() {
     },
     {
       key: 'masa',
-      header: 'Received',
+      header: t('admin.feedback.colReceived'),
       hideOnMobile: true,
       render: (it) => (
         <span className="text-[13px] text-ink-faint whitespace-nowrap">
-          {new Date(it.created_at).toLocaleString()}
+          {new Date(it.created_at).toLocaleString(LOKAL[bahasa])}
         </span>
       ),
     },
@@ -135,10 +158,10 @@ export default function AdminFeedbackPage() {
   return (
     <AdminShell>
       <PageHead
-        title="Feedback"
-        description="Submissions from the /help page."
+        title={t('admin.feedback.title')}
+        description={t('admin.feedback.description')}
         secondaryActions={[
-          { label: 'Refresh', icon: <RefreshCw className="w-4 h-4" />, onSelect: load },
+          { label: t('common.refresh'), icon: <RefreshCw className="w-4 h-4" />, onSelect: load },
         ]}
       />
 
@@ -146,13 +169,13 @@ export default function AdminFeedbackPage() {
       <Card className="mb-5">
         <StatGroup
           stats={STATUS_OPTIONS.map((s) => ({
-            label: s === 'in_review' ? 'In review' : s.charAt(0).toUpperCase() + s.slice(1),
+            label: labelStatus[s],
             value: counts[s] ?? 0,
           }))}
         />
       </Card>
 
-      {loading && <p className="text-[14px] text-ink-faint mb-4">Loading…</p>}
+      {loading && <p className="text-[14px] text-ink-faint mb-4">{t('common.loading')}</p>}
       {error && (
         <Alert tone="danger" className="mb-4">
           {error}
@@ -161,18 +184,18 @@ export default function AdminFeedbackPage() {
 
       {!loading && (
         <DataTable
-          label="Feedback"
+          label={t('admin.feedback.title')}
           columns={lajur}
           rows={items}
           rowKey={(it) => it.id}
           menuItems={(it) =>
             STATUS_OPTIONS.map((s) => ({
-              label: `Mark ${s.replace('_', ' ')}`,
+              label: labelTanda[s],
               onSelect: () => updateStatus(it.id, s),
               disabled: s === it.status,
             }))
           }
-          menuLabel="Feedback actions"
+          menuLabel={t('admin.feedback.actionsLabel')}
           renderRowExtra={(it) => (
             <p className="px-4 pb-3 text-[13px] text-ink-muted whitespace-pre-wrap">{it.message}</p>
           )}
@@ -181,10 +204,10 @@ export default function AdminFeedbackPage() {
               <Select
                 value={filterStatus}
                 onChange={(e) => setFilterStatus(e.target.value)}
-                aria-label="Filter by status"
+                aria-label={t('admin.feedback.filterStatusAria')}
                 className="w-auto"
               >
-                <option value="">All statuses</option>
+                <option value="">{t('admin.feedback.allStatuses')}</option>
                 {STATUS_OPTIONS.map((s) => (
                   <option key={s} value={s}>
                     {s}
@@ -194,11 +217,11 @@ export default function AdminFeedbackPage() {
               <Select
                 value={filterType}
                 onChange={(e) => setFilterType(e.target.value)}
-                aria-label="Filter by type"
+                aria-label={t('admin.feedback.filterTypeAria')}
                 className="w-auto"
               >
-                <option value="">All types</option>
-                {Object.entries(TYPE_LABELS).map(([k, v]) => (
+                <option value="">{t('admin.feedback.allTypes')}</option>
+                {Object.entries(labelJenis).map(([k, v]) => (
                   <option key={k} value={k}>
                     {v}
                   </option>
@@ -210,8 +233,8 @@ export default function AdminFeedbackPage() {
             !error ? (
               <EmptyState
                 icon={<MessageSquare className="w-6 h-6" />}
-                title="No feedback yet"
-                text="Submissions from the /help page appear here."
+                title={t('admin.feedback.emptyTitle')}
+                text={t('admin.feedback.emptyText')}
               />
             ) : null
           }
