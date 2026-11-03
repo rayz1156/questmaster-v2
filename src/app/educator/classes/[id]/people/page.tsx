@@ -29,6 +29,8 @@ import { namaAhli } from "@/lib/namaAhli";
 import { formatMata, kiraKedudukan } from "@/lib/markahPeserta";
 import LaciMarkahPeserta from "@/components/people/LaciMarkahPeserta";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, terjemahBilangan } from "@/lib/i18n";
 import {
   Avatar,
   Button,
@@ -95,6 +97,7 @@ async function kiraAhliKumpulan(classId: string): Promise<Record<string, number>
 
 export default function ClassPeoplePage() {
   const { id } = useParams<{ id: string }>() as { id: string };
+  const { t, bahasa } = useBahasa();
   const [sub, setSub] = useState<Sub>("students");
   const [members, setMembers] = useState<Record<string, unknown>[]>([]);
   const [teams, setTeams] = useState<Record<string, unknown>[]>([]);
@@ -131,7 +134,7 @@ export default function ClassPeoplePage() {
                 cache: "no-store",
             });
             if (!res.ok) {
-                let msg = "Export failed.";
+                let msg = t('educator.people.exportFailed');
                 try {
                     const j = await res.json();
                     if (j?.error) msg = j.error;
@@ -153,7 +156,7 @@ export default function ClassPeoplePage() {
             a.remove();
             URL.revokeObjectURL(url);
         } catch {
-            setExportErr("Export failed.");
+            setExportErr(t('educator.people.exportFailed'));
         } finally {
             setExportBusy(false);
         }
@@ -204,7 +207,7 @@ export default function ClassPeoplePage() {
           for (const s of ss || []) map[s.team_id] = Number(s.total_score) || 0;
           setScores(map);
         } catch (e) {
-          if (alive) setErr(e instanceof Error ? e.message : "Could not load this class.");
+          if (alive) setErr(e instanceof Error ? e.message : t('educator.people.loadFailed'));
         } finally {
           if (alive) setLoading(false);
         }
@@ -233,7 +236,7 @@ export default function ClassPeoplePage() {
             setPreviewErrors(data.errors);
             setPreview(null);
           } else {
-            setImportErr(data.error || "Import failed.");
+            setImportErr(data.error || t('educator.people.importFailed'));
           }
           return;
         }
@@ -246,7 +249,7 @@ export default function ClassPeoplePage() {
           setPreview(data as TeamImportPreview);
         }
       } catch (e) {
-        setImportErr(e instanceof Error ? e.message : "Import failed.");
+        setImportErr(e instanceof Error ? e.message : t('educator.people.importFailed'));
       } finally {
         setImportBusy(false);
       }
@@ -348,14 +351,14 @@ export default function ClassPeoplePage() {
           onClick={() => klikUrut("nama", 1)}
           className="inline-flex items-center gap-1 hover:text-ink"
         >
-          Name <IkonUrut kunci="nama" />
+          {t('educator.people.colName')} <IkonUrut kunci="nama" />
         </button>
       ),
       render: ({ m }, i) => (
         <button
           type="button"
           onClick={() => setLaciUser({ id: String(m.user_id || ""), nama: name(m) })}
-          aria-label={`Open scores for ${name(m)}`}
+          aria-label={t('educator.people.openScoresFor', { nama: name(m) })}
           className="flex items-center gap-3 min-w-0 text-left group"
         >
           <Avatar name={name(m)} size="sm" index={i} />
@@ -367,21 +370,21 @@ export default function ClassPeoplePage() {
     },
     {
       key: "status",
-      header: "Status",
+      header: t('educator.people.colStatus'),
       hideOnMobile: true,
       render: () => (
         <span className="inline-flex items-center gap-2 text-[13px] text-ink-muted">
-          <span className="w-1.5 h-1.5 rounded-full bg-[#4BA972]" aria-hidden="true" /> Active
+          <span className="w-1.5 h-1.5 rounded-full bg-[#4BA972]" aria-hidden="true" /> {t('educator.people.statusActive')}
         </span>
       ),
     },
     {
       key: "serta",
-      header: "Joined",
+      header: t('educator.people.colJoined'),
       render: ({ m }) => (
         <span className="text-[13px] text-ink-muted">
           {m.joined_at
-            ? new Date(String(m.joined_at)).toLocaleDateString(undefined, { day: "numeric", month: "short" })
+            ? new Date(String(m.joined_at)).toLocaleDateString(LOKAL[bahasa], { day: "numeric", month: "short" })
             : ","}
         </span>
       ),
@@ -394,7 +397,7 @@ export default function ClassPeoplePage() {
           onClick={() => klikUrut("aktiviti", -1)}
           className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
         >
-          Activities <IkonUrut kunci="aktiviti" />
+          {t('educator.people.colActivities')} <IkonUrut kunci="aktiviti" />
         </button>
       ),
       hideOnMobile: true,
@@ -413,7 +416,7 @@ export default function ClassPeoplePage() {
           onClick={() => klikUrut("langsung", -1)}
           className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
         >
-          Live Quiz <IkonUrut kunci="langsung" />
+          {t('educator.people.colLiveQuiz')} <IkonUrut kunci="langsung" />
         </button>
       ),
       hideOnMobile: true,
@@ -432,7 +435,7 @@ export default function ClassPeoplePage() {
           onClick={() => klikUrut("jumlah", -1)}
           className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
         >
-          Total <IkonUrut kunci="jumlah" />
+          {t('educator.people.colTotal')} <IkonUrut kunci="jumlah" />
         </button>
       ),
       className: "text-right",
@@ -450,7 +453,7 @@ export default function ClassPeoplePage() {
           onClick={() => klikUrut("kedudukan", 1)}
           className="inline-flex items-center gap-1 justify-end hover:text-ink w-full"
         >
-          Rank <IkonUrut kunci="kedudukan" />
+          {t('educator.people.colRank')} <IkonUrut kunci="kedudukan" />
         </button>
       ),
       hideOnMobile: true,
@@ -466,22 +469,23 @@ export default function ClassPeoplePage() {
   const lajurKumpulan: DataColumn<Kumpulan>[] = [
     {
       key: "kumpulan",
-      header: "Team",
-      render: (t, i) => (
+      header: t('educator.people.colTeam'),
+      // Parameter dinamakan `pas` supaya tidak berlanggar dengan fungsi t().
+      render: (pas, i) => (
         <span className="flex items-center gap-3 py-3 min-w-0">
-          <InitialTile name={String(t.name || "Team")} index={i} />
-          <span className="text-[14px] font-medium text-ink truncate">{t.name || "Team"}</span>
+          <InitialTile name={String(pas.name || t('common.team'))} index={i} />
+          <span className="text-[14px] font-medium text-ink truncate">{pas.name || t('common.team')}</span>
         </span>
       ),
     },
     {
       key: "ahli",
-      header: "Members",
+      header: t('educator.people.colMembers'),
       hideOnMobile: true,
       className: "text-right",
-      render: (t) => {
-        const max = Number(t.max_members) || 6;
-        const filled = bilAhli[String(t.id)] ?? Number(t.member_count ?? t.members_count ?? 0);
+      render: (pas) => {
+        const max = Number(pas.max_members) || 6;
+        const filled = bilAhli[String(pas.id)] ?? Number(pas.member_count ?? pas.members_count ?? 0);
         return (
           <span className="inline-flex items-center gap-2 whitespace-nowrap">
             <span className="flex gap-0.5" aria-hidden="true">
@@ -489,18 +493,18 @@ export default function ClassPeoplePage() {
                 <span key={k} className={`w-2.5 h-1.5 rounded-full ${k < filled ? "bg-brand-purple" : "bg-[#e5e9f2]"}`} />
               ))}
             </span>
-            <span className="text-[12px] text-ink-muted tabular-nums">{filled} of {max}</span>
+            <span className="text-[12px] text-ink-muted tabular-nums">{t('educator.people.membersOf', { penuh: filled, maks: max })}</span>
           </span>
         );
       },
     },
     {
       key: "mata",
-      header: "Points",
+      header: t('educator.people.colPoints'),
       className: "text-right",
-      render: (t) => (
+      render: (pas) => (
         <span className="text-[14px] text-ink tabular-nums">
-          {scores[String(t.id)] ?? Number(t.score ?? 0)}
+          {scores[String(pas.id)] ?? Number(pas.score ?? 0)}
         </span>
       ),
     },
@@ -512,9 +516,9 @@ export default function ClassPeoplePage() {
         <Tabs
           className="mb-5"
           items={[
-            { label: `Students${members.length > 0 ? ` (${members.length})` : ""}`, onSelect: () => setSub("students"), aktif: sub === "students" },
-            { label: `Teams${teams.length > 0 ? ` (${teams.length})` : ""}`, onSelect: () => setSub("teams"), aktif: sub === "teams" },
-            { label: "Educators", onSelect: () => setSub("educators"), aktif: sub === "educators" },
+            { label: `${t('educator.people.tabStudents')}${members.length > 0 ? ` (${members.length})` : ""}`, onSelect: () => setSub("students"), aktif: sub === "students" },
+            { label: `${t('educator.people.tabTeams')}${teams.length > 0 ? ` (${teams.length})` : ""}`, onSelect: () => setSub("teams"), aktif: sub === "teams" },
+            { label: t('educator.people.tabEducators'), onSelect: () => setSub("educators"), aktif: sub === "educators" },
           ]}
         />
 
@@ -524,16 +528,16 @@ export default function ClassPeoplePage() {
               <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 className="input pl-9"
-                placeholder={sub === "students" ? "Search people..." : "Search teams..."}
+                placeholder={sub === "students" ? t('educator.people.searchPeople') : t('educator.people.searchTeams')}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                aria-label={sub === "students" ? "Search people" : "Search teams"}
+                aria-label={sub === "students" ? t('educator.people.searchPeopleAria') : t('educator.people.searchTeamsAria')}
               />
             </div>
           )}
           {sub === "students" && (
             <Button variant="outline" size="sm" onClick={eksportCsv} disabled={exportBusy}>
-              <Download className="w-4 h-4" /> {exportBusy ? "Exporting..." : "Export CSV"}
+              <Download className="w-4 h-4" /> {exportBusy ? t('educator.people.exporting') : t('educator.people.exportCsv')}
             </Button>
           )}
           <EmailExportButton classId={id} />
@@ -541,11 +545,11 @@ export default function ClassPeoplePage() {
 
         {err && <div className="text-sm text-kz-down mb-4">{err}</div>}
         {exportErr && <div className="text-sm text-kz-down mb-4">{exportErr}</div>}
-        {loading && <p className="text-sm text-ink-muted">Loading…</p>}
+        {loading && <p className="text-sm text-ink-muted">{t('common.loading')}</p>}
 
         {!loading && sub === "students" && (
           <DataTable
-            label="Student scores"
+            label={t('educator.people.tableLabel')}
             columns={lajurAhli}
             rows={barisAhli}
             rowKey={({ m }, i) => String(m.user_id || i)}
@@ -555,7 +559,7 @@ export default function ClassPeoplePage() {
                     tersembunyi di telefon, jadi satu-satunya cara menyusun
                     ialah select ini. Tidak kelihatan pada sm ke atas. */}
                 <div className="sm:hidden contents">
-                  <label htmlFor="urut-mudah-alihs" className="sr-only">Sort by</label>
+                  <label htmlFor="urut-mudah-alihs" className="sr-only">{t('educator.people.sortBy')}</label>
                   <Select
                     id="urut-mudah-alihs"
                     className="w-44"
@@ -565,27 +569,27 @@ export default function ClassPeoplePage() {
                       klikUrut(kunci, kunci === "nama" ? 1 : -1);
                     }}
                   >
-                    <option value="nama">Name</option>
-                    <option value="jumlah">Total</option>
-                    <option value="aktiviti">Activities</option>
-                    <option value="langsung">Live Quiz</option>
+                    <option value="nama">{t('educator.people.optName')}</option>
+                    <option value="jumlah">{t('educator.people.optTotal')}</option>
+                    <option value="aktiviti">{t('educator.people.optActivities')}</option>
+                    <option value="langsung">{t('educator.people.optLiveQuiz')}</option>
                   </Select>
                 </div>
               </>
             }
             menuItems={({ m }) => [
               {
-                label: "Open scores",
+                label: t('educator.people.menuOpenScores'),
                 icon: <Users className="w-4 h-4" />,
                 onSelect: () => setLaciUser({ id: String(m.user_id || ""), nama: name(m) }),
               },
             ]}
-            menuLabel="Student actions"
+            menuLabel={t('educator.people.menuLabel')}
             empty={
               <EmptyState
                 icon={<Users className="w-6 h-6" />}
-                title="Your class starts with people."
-                text="Share your class code to welcome your first students."
+                title={t('educator.people.emptyTitle')}
+                text={t('educator.people.emptyText')}
               />
             }
           />
@@ -599,7 +603,7 @@ export default function ClassPeoplePage() {
                 size="sm"
                 href={`/api/classes/${id}/teams/template`}
               >
-                <Download className="w-4 h-4" /> Download template
+                <Download className="w-4 h-4" /> {t('educator.people.downloadTemplate')}
               </Button>
               <Button
                 variant="outline"
@@ -607,7 +611,7 @@ export default function ClassPeoplePage() {
                 disabled={importBusy}
                 onClick={() => fileRef.current?.click()}
               >
-                <Upload className="w-4 h-4" /> Upload CSV
+                <Upload className="w-4 h-4" /> {t('educator.people.uploadCsv')}
               </Button>
               <input
                 ref={fileRef}
@@ -628,12 +632,12 @@ export default function ClassPeoplePage() {
             {previewErrors.length > 0 && (
               <Card className="mb-4">
                 <div className="section-title mb-2 text-sm">
-                  Nothing was imported. Fix the rows below and upload again.
+                  {t('educator.people.nothingImported')}
                 </div>
                 <ul className="text-sm text-kz-down space-y-1">
                   {previewErrors.map((e, i) => (
                     <li key={i}>
-                      {e.row > 0 ? `Row ${e.row}: ` : ""}
+                      {e.row > 0 ? t('educator.people.rowError', { baris: e.row }) : ""}
                       {e.message}
                     </li>
                   ))}
@@ -643,18 +647,18 @@ export default function ClassPeoplePage() {
 
             {preview && (
               <Card className="mb-4">
-                <div className="section-title mb-2 text-sm">Preview</div>
+                <div className="section-title mb-2 text-sm">{t('educator.people.preview')}</div>
                 <div className="text-sm text-ink-muted mb-3">
-                  {preview.teams_created + preview.teams_reused} teams
-                  {" ("}{preview.teams_created} new, {preview.teams_reused} reused{")"},{" "}
-                  {" | "}{preview.joined_now} will join now, {preview.pending} waiting for sign-up
+                  {terjemahBilangan(bahasa, 'educator.people.teamsCountOne', 'educator.people.teamsCountOther', preview.teams_created + preview.teams_reused, { n: preview.teams_created + preview.teams_reused })}
+                  {" "}{t('educator.people.previewNewReused', { baharu: preview.teams_created, gunaSemula: preview.teams_reused })}
+                  {" | "}{t('educator.people.previewJoin', { sertai: preview.joined_now, tunggu: preview.pending })}
                 </div>
                 <ul className="text-sm space-y-1 mb-2">
-                  {preview.teams.map((t, i) => (
+                  {preview.teams.map((pas, i) => (
                     <li key={i}>
-                      <span className="text-ink">{t.name}</span>{" "}
-                      <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${t.action === "create" ? "bg-[#EAE6FC] text-[#5B42C4]" : "bg-[#E4EEFD] text-[#2B5FBF]"}`}>
-                        {t.action === "create" ? "will be created" : "reused"}
+                      <span className="text-ink">{pas.name}</span>{" "}
+                      <span className={`ml-1 px-1.5 py-0.5 rounded-full text-xs ${pas.action === "create" ? "bg-[#EAE6FC] text-[#5B42C4]" : "bg-[#E4EEFD] text-[#2B5FBF]"}`}>
+                        {pas.action === "create" ? t('educator.people.willBeCreated') : t('educator.people.reused')}
                       </span>
                     </li>
                   ))}
@@ -665,11 +669,11 @@ export default function ClassPeoplePage() {
                       <span className="text-ink">{m.email}</span>{" "}
                       {m.action === "join" ? (
                         <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-[#E3F5EA] text-[#2E7D4F]">
-                          joins {m.team} now
+                          {t('educator.people.joinsNow', { kumpulan: m.team })}
                         </span>
                       ) : (
                         <span className="ml-1 px-1.5 py-0.5 rounded-full text-xs bg-[#FBF0DC] text-[#96661A]">
-                          waiting for sign-up ({m.team})
+                          {t('educator.people.waitingForSignup', { kumpulan: m.team })}
                         </span>
                       )}
                     </li>
@@ -690,7 +694,7 @@ export default function ClassPeoplePage() {
                       onChange={(e) => setReplace(e.target.checked)}
                       className="accent-[#5B42C4]"
                     />
-                    Replace existing groups
+                    {t('educator.people.replaceExisting')}
                   </label>
                   <Button
                     disabled={importBusy}
@@ -698,7 +702,7 @@ export default function ClassPeoplePage() {
                       if (fileRef.current?.files?.[0]) runImport(fileRef.current.files[0], true);
                     }}
                   >
-                    {importBusy ? "Importing..." : "Confirm import"}
+                    {importBusy ? t('educator.people.importing') : t('educator.people.confirmImport')}
                   </Button>
                 </div>
               </Card>
@@ -708,28 +712,28 @@ export default function ClassPeoplePage() {
               <div className="bg-white rounded-[4px] shadow-card">
                 <EmptyState
                   icon={<Users className="w-6 h-6" />}
-                  title="Better learning, together."
-                  text="Create a team to get started."
-                  actionLabel="Create team"
+                  title={t('educator.people.teamsEmptyTitle')}
+                  text={t('educator.people.teamsEmptyText')}
+                  actionLabel={t('educator.people.createTeam')}
                   href={`/educator/teams?classId=${id}`}
                 />
               </div>
             ) : (
               <>
                 <DataTable
-                  label="Class teams"
+                  label={t('educator.people.teamsTableLabel')}
                   columns={lajurKumpulan}
                   rows={(shownTeams as unknown as Kumpulan[])}
-                  rowKey={(t, i) => String(t.id || i)}
-                  renderRowExtra={(t) => {
-                    const pendingRows = invites.filter((iv) => iv.team_id === String(t.id));
+                  rowKey={(pas, i) => String(pas.id || i)}
+                  renderRowExtra={(pas) => {
+                    const pendingRows = invites.filter((iv) => iv.team_id === String(pas.id));
                     if (pendingRows.length === 0) return null;
                     return (
                       <ul className="mt-1 space-y-1">
                         {pendingRows.map((iv) => (
                           <li key={iv.id} className="flex items-center gap-2 text-[13px]">
                             <span className="px-1.5 py-0.5 rounded-full text-[12px] bg-[#FBF0DC] text-[#96661A]">
-                              pending
+                              {t('educator.people.pending')}
                             </span>
                             <span className="text-ink-muted truncate">{iv.email}</span>
                           </li>
@@ -740,15 +744,15 @@ export default function ClassPeoplePage() {
                   empty={
                     <EmptyState
                       icon={<Users className="w-6 h-6" />}
-                      title="No teams match."
-                      text="Try another search."
+                      title={t('educator.people.noTeamsMatch')}
+                      text={t('educator.people.tryAnotherSearch')}
                     />
                   }
                 />
                 <div className="px-6 py-4 border-t border-kz-line flex items-center justify-between">
-                  <span className="text-[12px] text-ink-faint">{teams.length} teams</span>
+                  <span className="text-[12px] text-ink-faint">{terjemahBilangan(bahasa, 'educator.people.teamsCountOne', 'educator.people.teamsCountOther', teams.length, { n: teams.length })}</span>
                   <Link href={`/educator/teams?classId=${id}`} className="text-[13px] font-medium text-brand-purple hover:underline">
-                    Manage teams
+                    {t('educator.people.manageTeams')}
                   </Link>
                 </div>
               </>
