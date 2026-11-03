@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,13 +12,13 @@ export async function POST(req: NextRequest) {
     const page_url = body.page_url ? String(body.page_url).slice(0, 500) : null;
 
     if (!subject || !message) {
-      return NextResponse.json({ error: 'Subject and message are required.' }, { status: 400 });
+      return ralatJson('Subject and message are required.', 400);
     }
     if (subject.length > 200 || message.length > 4000) {
-      return NextResponse.json({ error: 'Subject or message too long.' }, { status: 400 });
+      return ralatJson('Subject or message too long.', 400);
     }
     if (!['bug', 'idea', 'question', 'other'].includes(type)) {
-      return NextResponse.json({ error: 'Invalid type.' }, { status: 400 });
+      return ralatJson('Invalid type.', 400);
     }
 
     const supa = getRouteSupabase(req);
@@ -40,11 +41,11 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('feedback insert failed', error);
-      return NextResponse.json({ error: 'Could not save feedback.' }, { status: 500 });
+      return ralatJson('Could not save feedback.', 500);
     }
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return ralatJson(msg, 500);
   }
 }
