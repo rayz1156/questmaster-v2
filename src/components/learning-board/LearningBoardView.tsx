@@ -10,6 +10,8 @@ import { importLearningBoardFromClass, listMyEducatorClasses } from '@/lib/data'
 import { mampatImej } from '@/lib/mampatImej';
 import { FolderInput } from 'lucide-react';
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { terjemahBilangan } from '@/lib/i18n';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 
 /** Wrap fetch() to attach the Supabase access token from localStorage so
@@ -28,6 +30,7 @@ type Snapshot = {
 };
 
 export default function LearningBoardView({ classId, isEditor }: { classId: string; isEditor: boolean }) {
+  const { t } = useBahasa();
   const [snap, setSnap] = useState<Snapshot | null>(null);
   const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
@@ -61,19 +64,19 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
     try {
       const rows = await listMyEducatorClasses();
       setImpClasses((rows || []).filter((r: any) => r.id !== classId));
-    } catch (e: any) { setImpErr(e?.message || 'Failed to load classes'); }
+    } catch (e: any) { setImpErr(e?.message || t('boards.learning.importFailed')); }
     finally { setImpLoading(false); }
   };
   const onImport = async () => {
-    if (!impSourceId) { setImpErr('Pick a source class first'); return; }
-    if (impMode === 'replace' && !(await confirm({ title: 'This will permanently delete the current learning board on this class. Continue?', tone: 'danger' }))) return;
+    if (!impSourceId) { setImpErr(t('boards.learning.importPickFirst')); return; }
+    if (impMode === 'replace' && !(await confirm({ title: t('boards.learning.importConfirmReplace'), tone: 'danger' }))) return;
     setImpBusy(true); setImpErr(null);
     try {
       const res = await importLearningBoardFromClass(classId, impSourceId, impMode);
       setImpOpen(false);
-      alert(`Imported ${res.columns} columns and ${res.cards} cards (${res.mode}).`);
+      alert(t('boards.learning.imported', { lajur: res.columns, kad: res.cards, mod: res.mode }));
       if (typeof window !== 'undefined') window.location.reload();
-    } catch (e: any) { setImpErr(e?.message || 'Failed to import'); }
+    } catch (e: any) { setImpErr(e?.message || t('boards.learning.importFailed')); }
     finally { setImpBusy(false); }
   };
 
@@ -87,7 +90,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
     try {
       const r = await authedFetch(`/api/learning-boards/${classId}`);
       const data = await r.json();
-      if (!r.ok) throw new Error(data.error || 'Failed to load');
+      if (!r.ok) throw new Error(data.error || t('papanKelas.failedToLoad'));
       setSnap(data);
       setError(null);
     } catch (e: any) {
@@ -95,7 +98,7 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
     } finally {
       setLoading(false);
     }
-  }, [classId]);
+  }, [classId, t]);
 
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -131,12 +134,12 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
     } finally { refresh(); }
   }, [classId, refresh]);
 
-  if (loading && !snap) return <div className="text-gray-600 p-8">Loading…</div>;
-  if (error) return <div className="text-red-400 p-8">Error: {error}</div>;
+  if (loading && !snap) return <div className="text-gray-600 p-8">{t('common.loading')}</div>;
+  if (error) return <div className="text-red-400 p-8">{t('boards.learning.errorPrefix', { mesej: error })}</div>;
   if (!snap || !snap.board) {
     return (
       <div className="text-gray-600 p-8">
-        {isEditor ? 'No learning board yet. It will be created automatically.' : 'No learning board has been set up for this class yet.'}
+        {isEditor ? t('boards.learning.noBoardEditor') : t('boards.learning.noBoardStudent')}
       </div>
     );
   }
@@ -149,17 +152,17 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
             type="button"
             onClick={() => changeLayout('columns')}
             className={`px-3.5 py-1.5 font-medium transition ${layoutMode === 'columns' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}
-            title="Display items side by side in columns"
-          >Columns</button>
+            title={t('boards.learning.layoutColumnsTitle')}
+          >{t('boards.learning.layoutColumns')}</button>
           <button
             type="button"
             onClick={() => changeLayout('mood')}
             className={`px-3.5 py-1.5 font-medium transition border-l border-hairline ${layoutMode === 'mood' ? 'bg-[#F4F2FD] text-brand-purple' : 'text-ink-muted hover:text-ink'}`}
-            title="Display items in a visual mood-board grid"
-          >Mood Board</button>
+            title={t('boards.learning.layoutMoodTitle')}
+          >{t('boards.learning.layoutMood')}</button>
           {isEditor && (
             <>
-              <button type="button" onClick={openImport} disabled={impBusy} title="Import learning board from another class" className="ml-3 btn-quiet disabled:opacity-40"><FolderInput className="w-3.5 h-3.5"/>Import from class</button>
+              <button type="button" onClick={openImport} disabled={impBusy} title={t('boards.learning.importBtnTitle')} className="ml-3 btn-quiet disabled:opacity-40"><FolderInput className="w-3.5 h-3.5"/>{t('boards.learning.importBtn')}</button>
               <AiThumbnailBatchButton classId={classId} onDone={refresh} />
             </>
           )}
@@ -278,30 +281,30 @@ export default function LearningBoardView({ classId, isEditor }: { classId: stri
    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50 p-4" >
         <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
           <div className="flex items-center justify-between mb-3">
-            <h3 className="text-base font-semibold text-gray-900">Import learning board</h3>
+            <h3 className="text-base font-semibold text-gray-900">{t('boards.learning.importTitle')}</h3>
             <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="text-gray-500 hover:text-gray-900">✕</button>
           </div>
-          <p className="text-xs text-gray-600 mb-3">Copy columns and cards from another class you own or co-educate. File references are reused (no re-upload).</p>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Source class</label>
+          <p className="text-xs text-gray-600 mb-3">{t('boards.learning.importDesc')}</p>
+          <label className="block text-xs font-medium text-gray-700 mb-1">{t('boards.learning.importSource')}</label>
           <select value={impSourceId} onChange={(e)=>setImpSourceId(e.target.value)} disabled={impLoading || impBusy} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 bg-white">
-            <option value="">{impLoading ? 'Loading…' : ', Select a class ,'}</option>
+            <option value="">{impLoading ? t('common.loading') : t('boards.learning.importSelectClass')}</option>
             {impClasses.map((c:any) => (<option key={c.id} value={c.id}>{c.name}</option>))}
           </select>
-          <label className="block text-xs font-medium text-gray-700 mb-1">Mode</label>
+          <label className="block text-xs font-medium text-gray-700 mb-1">{t('boards.learning.importMode')}</label>
           <div className="space-y-1.5 mb-4">
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input type="radio" name="impmode" value="append" checked={impMode==='append'} onChange={()=>setImpMode('append')} className="mt-1"/>
-              <span><span className="font-medium">Append</span> <span className="text-xs text-gray-500">, add source columns after existing ones (safe)</span></span>
+              <span><span className="font-medium">{t('boards.learning.importAppend')}</span> <span className="text-xs text-gray-500">{t('boards.learning.importAppendNote')}</span></span>
             </label>
             <label className="flex items-start gap-2 text-sm cursor-pointer">
               <input type="radio" name="impmode" value="replace" checked={impMode==='replace'} onChange={()=>setImpMode('replace')} className="mt-1"/>
-              <span><span className="font-medium text-red-700">Replace</span> <span className="text-xs text-gray-500">, delete the current board on this class first</span></span>
+              <span><span className="font-medium text-red-700">{t('boards.learning.importReplace')}</span> <span className="text-xs text-gray-500">{t('boards.learning.importReplaceNote')}</span></span>
             </label>
           </div>
           {impErr && <div className="text-xs text-red-600 mb-2">{impErr}</div>}
           <div className="flex items-center justify-end gap-2">
-            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-700">Cancel</button>
-            <button onClick={onImport} disabled={impBusy || !impSourceId} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm disabled:opacity-60">{impBusy ? 'Importing…' : 'Import'}</button>
+            <button onClick={()=>setImpOpen(false)} disabled={impBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm text-gray-700">{t('common.cancel')}</button>
+            <button onClick={onImport} disabled={impBusy || !impSourceId} className="px-3 py-1.5 rounded-lg bg-indigo-600 text-white hover:bg-indigo-700 text-sm disabled:opacity-60">{impBusy ? t('boards.learning.importing') : t('boards.learning.importGo')}</button>
           </div>
         </div>
       </div>
@@ -330,10 +333,11 @@ function SessionRail({
   onDropCard: (columnId: string) => void;
 }) {
   const [over, setOver] = useState<string | null>(null);
+  const { t } = useBahasa();
   if (columns.length === 0) return null;
   return (
-    <nav className="hidden lg:block w-[210px] shrink-0 overflow-y-auto pr-1" aria-label="Sessions">
-      <div className="eyebrow px-2.5 pb-2">Sessions</div>
+    <nav className="hidden lg:block w-[210px] shrink-0 overflow-y-auto pr-1" aria-label={t('boards.learning.sessionsTitle')}>
+      <div className="eyebrow px-2.5 pb-2">{t('boards.learning.sessionsTitle')}</div>
       {columns.map((col, i) => {
         const active = activeId === col.id;
         const hot = !!dragCardId && over === col.id;
@@ -360,7 +364,7 @@ function SessionRail({
             }`}
           >
             <span className={`block text-sm truncate ${active ? 'text-brand-purple font-medium' : 'text-ink-muted'}`}>{col.title}</span>
-            <span className="block text-xs text-ink-faint mt-0.5">{col.cards.length} {col.cards.length === 1 ? 'item' : 'items'}</span>
+            <span className="block text-xs text-ink-faint mt-0.5">{col.cards.length === 1 ? t('boards.learning.itemOne', { n: col.cards.length }) : t('boards.learning.itemOther', { n: col.cards.length })}</span>
           </button>
         );
       })}
@@ -425,8 +429,9 @@ function ColumnCard({
   onColumnDragOverIndex: (index: number) => void;
   onColumnDrop: (index: number) => void;
 }) {
+  const { t } = useBahasa();
   const renameColumn = async () => {
-    const next = await showPrompt({ title: 'Rename column', initialValue: column.title, confirmLabel: 'Save' });
+    const next = await showPrompt({ title: t('boards.learning.renameTitle'), initialValue: column.title, confirmLabel: t('boards.learning.saveLabel') });
     if (!next || next === column.title) return;
     await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, {
       method: 'PATCH',
@@ -437,7 +442,7 @@ function ColumnCard({
     onChanged();
   };
   const deleteColumn = async () => {
-    const ok = await showConfirm({ title: `Delete column "${column.title}"?`, description: "All cards in this column will be permanently removed. This cannot be undone.", confirmLabel: "Delete", tone: "danger" }); if (!ok) return;
+    const ok = await showConfirm({ title: t('boards.learning.deleteColumnTitle', { tajuk: column.title }), description: t('boards.learning.deleteColumnDesc'), confirmLabel: t('boards.learning.deleteLabel'), tone: "danger" }); if (!ok) return;
     await authedFetch(`/api/learning-boards/${classId}/columns/${column.id}`, { method: 'DELETE' });
     onToggleMenu(false);
     onChanged();
@@ -475,7 +480,7 @@ function ColumnCard({
         }}
         onDragEnd={() => onColumnDragEnd()}
       >
-        <span className={`select-none ${isEditor ? 'text-gray-600 cursor-grab active:cursor-grabbing' : 'text-gray-400'}`} aria-hidden title={isEditor ? 'Drag column to reorder' : ''}>≡</span>
+        <span className={`select-none ${isEditor ? 'text-gray-600 cursor-grab active:cursor-grabbing' : 'text-gray-400'}`} aria-hidden title={isEditor ? t('boards.learning.dragColumnTitle') : ''}>≡</span>
         <div className="flex-1 flex items-center gap-2 min-w-0">
         <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0" style={{ background: `linear-gradient(135deg, ${cardGradient(column.title || column.id).from}, ${cardGradient(column.title || column.id).to})` }}>
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/></svg>
@@ -486,19 +491,19 @@ function ColumnCard({
           <div className="relative" onClick={(e) => e.stopPropagation()}>
             <button
               className="text-gray-600 hover:text-gray-900 px-1"
-              aria-label="Column menu"
+              aria-label={t('boards.learning.columnMenu')}
               onClick={() => onToggleMenu(!menuOpen)}
             >…</button>
             {menuOpen && (
               <div className="absolute right-0 top-7 z-20 bg-white border border-gray-200 rounded-md shadow-lg w-44 text-sm">
-                <button onClick={renameColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">Rename</button>
+                <button onClick={renameColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700">{t('boards.learning.rename')}</button>
                 <div className="h-px bg-gray-100" />
-                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'first' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to first</button>
-                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'left' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move left</button>
-                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'right' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move right</button>
-                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'last' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">Move to last</button>
+                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'first' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveToFirst')}</button>
+                <button disabled={columnIndex === 0} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'left' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveLeft')}</button>
+                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'right' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveRight')}</button>
+                <button disabled={columnIndex >= totalColumns - 1} onClick={() => { onToggleMenu(false); moveColumn(column.id, { action: 'last' }); }} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-gray-700 disabled:opacity-40 disabled:cursor-not-allowed">{t('boards.learning.moveToLast')}</button>
                 <div className="h-px bg-gray-100" />
-                <button onClick={deleteColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">Delete</button>
+                <button onClick={deleteColumn} className="w-full text-left px-3 py-2 hover:bg-gray-100 text-red-400">{t('boards.learning.deleteLabel')}</button>
               </div>
             )}
           </div>
@@ -510,10 +515,10 @@ function ColumnCard({
           onClick={() => onAddCard()}
           className="mx-3 my-3 flex items-center justify-center gap-2 py-2.5 rounded-xl border border-dashed text-sm font-medium transition group"
           style={{ borderColor: cardGradient(column.title || column.id).from + '40', color: cardGradient(column.title || column.id).from, background: cardGradient(column.title || column.id).from + '0d' }}
-          aria-label="Add resource"
+          aria-label={t('boards.learning.addResource')}
         >
           <span className="w-5 h-5 rounded-full flex items-center justify-center text-white text-xs" style={{ background: `linear-gradient(135deg, ${cardGradient(column.title || column.id).from}, ${cardGradient(column.title || column.id).to})` }}>+</span>
-          <span>Add resource</span>
+          <span>{t('boards.learning.addResource')}</span>
         </button>
       )}
 
@@ -532,7 +537,7 @@ function ColumnCard({
         }}
       >
         {column.cards.length === 0 && !isEditor && (
-          <div className="text-gray-500 text-xs text-center py-6">No items yet.</div>
+          <div className="text-gray-500 text-xs text-center py-6">{t('boards.learning.noItems')}</div>
         )}
         {column.cards.length === 0 && isEditor && dragCardId && (
           <div
@@ -609,11 +614,12 @@ function ColumnCard({
 }
 
 function InsertCardStrip({ onClick }: { onClick: () => void }) {
+  const { t } = useBahasa();
   return (
     <button
       type="button"
       onClick={onClick}
-      aria-label="Insert card here"
+      aria-label={t('boards.learning.insertHere')}
       className="group block w-full my-1 py-1 flex items-center justify-center text-slate-300 hover:text-indigo-500 transition-colors"
     >
       <span className="flex-1 h-px bg-slate-200 group-hover:bg-indigo-300 transition-colors" />
@@ -624,9 +630,10 @@ function InsertCardStrip({ onClick }: { onClick: () => void }) {
 }
 
 function NewColumnButton({ classId, onCreated }: { classId: string; onCreated: () => void }) {
+  const { t } = useBahasa();
   const [busy, setBusy] = useState(false);
   const create = async () => {
-    const title = await showPrompt({ title: 'New column', placeholder: 'e.g. Modul 4', confirmLabel: 'Create' });
+    const title = await showPrompt({ title: t('boards.learning.newColumnTitle'), placeholder: t('boards.learning.newColumnPlaceholder'), confirmLabel: t('boards.learning.createLabel') });
     if (!title) return;
     setBusy(true);
     try {
