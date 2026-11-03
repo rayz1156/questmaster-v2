@@ -47,8 +47,42 @@ const LABELS: Record<string, AuditLabel> = {
   certificate_gallery_delete: { label: 'Deleted gallery template', tone: 'danger' },
 };
 
-export function labelTindakan(action: string): AuditLabel {
-  const dikenali = LABELS[action];
+// Versi BM bagi label paparan (KZ-043). Kunci sama dengan LABELS.
+const LABELS_MS: Record<string, AuditLabel> = {
+  user_suspend: { label: 'Akaun digantung', tone: 'danger' },
+  user_unsuspend: { label: 'Akaun dipulihkan', tone: 'good' },
+  suspend: { label: 'Akaun digantung', tone: 'danger' },
+  unsuspend: { label: 'Akaun dipulihkan', tone: 'good' },
+  role_change: { label: 'Menukar peranan', tone: 'warn' },
+  set_plan: { label: 'Menukar pelan', tone: 'warn' },
+  set_class_limits: { label: 'Menukar had kelas', tone: 'neutral' },
+  approve: { label: 'Meluluskan pendidik', tone: 'good' },
+  unapprove: { label: 'Menarik kelulusan', tone: 'warn' },
+  delete_user: { label: 'Memadam pengguna', tone: 'danger' },
+  verify_email_manual: { label: 'Menyahkan e-mel', tone: 'good' },
+  verify_email_manual_and_approve: { label: 'Menyahkan e-mel dan meluluskan', tone: 'good' },
+  enable_capability: { label: 'Membenarkan muat naik', tone: 'neutral' },
+  disable_capability: { label: 'Menyahbenarkan muat naik', tone: 'neutral' },
+  class_edit: { label: 'Menyunting kelas', tone: 'neutral' },
+  class_delete: { label: 'Memadam kelas', tone: 'danger' },
+  team_edit: { label: 'Menyunting pasukan', tone: 'neutral' },
+  team_delete: { label: 'Memadam pasukan', tone: 'danger' },
+  challenge_points: { label: 'Menukar mata', tone: 'warn' },
+  moderation_override: { label: 'Membatalkan semakan', tone: 'warn' },
+  password_reset_sent: { label: 'Menghantar set semula kata laluan', tone: 'neutral' },
+  users_export: { label: 'Mengeksport pengguna', tone: 'warn' },
+  members_export: { label: 'Mengeksport ahli kelas', tone: 'warn' },
+  insights_export: { label: 'Mengeksport insight kelas', tone: 'warn' },
+  hunt_status: { label: 'Menukar status aktiviti', tone: 'neutral' },
+  class_archive: { label: 'Mengarkib kelas', tone: 'neutral' },
+  class_unarchive: { label: 'Memulihkan kelas', tone: 'good' },
+  certificate_gallery_create: { label: 'Mencipta templat galeri', tone: 'good' },
+  certificate_gallery_update: { label: 'Mengemas kini templat galeri', tone: 'neutral' },
+  certificate_gallery_delete: { label: 'Memadam templat galeri', tone: 'danger' },
+};
+
+export function labelTindakan(action: string, bahasa: 'en' | 'ms' = 'en'): AuditLabel {
+  const dikenali = (bahasa === 'ms' ? LABELS_MS : LABELS)[action];
   if (dikenali) return dikenali;
   // Tindakan tidak dikenali: snake_case menjadi ayat, tone neutral.
   const ayat = action.replace(/_/g, ' ').trim();
@@ -57,9 +91,9 @@ export function labelTindakan(action: string): AuditLabel {
 }
 
 // Nilai kepada rentetan untuk lajur bezaAudit: null dan undefined menjadi
-// "(none)", objek dan tatasusunan diJSONkan, selebihnya dipaparkan terus.
-function nilaiKepadaTeks(nilai: unknown): string {
-  if (nilai === null || nilai === undefined) return '(none)';
+// "(none)" / "(tiada)", objek dan tatasusunan diJSONkan, selebihnya dipaparkan terus.
+function nilaiKepadaTeks(nilai: unknown, bahasa: 'en' | 'ms' = 'en'): string {
+  if (nilai === null || nilai === undefined) return bahasa === 'ms' ? '(tiada)' : '(none)';
   if (typeof nilai === 'object') return JSON.stringify(nilai);
   return String(nilai);
 }
@@ -77,7 +111,7 @@ export interface AuditBeza {
 
 // Membaca meta.before dan meta.after, kesatuan kunci tersusun. Meta tanpa
 // before/after (bukan objek) menghasilkan senarai kosong. Tidak pernah melontar.
-export function bezaAudit(meta: unknown): AuditBeza[] {
+export function bezaAudit(meta: unknown, bahasa: 'en' | 'ms' = 'en'): AuditBeza[] {
   try {
     const punca = objekBiasa(meta);
     if (!punca) return [];
@@ -90,8 +124,8 @@ export function bezaAudit(meta: unknown): AuditBeza[] {
     ])).sort();
     return kunci.map((key) => ({
       key,
-      before: nilaiKepadaTeks(sebelum ? sebelum[key] : undefined),
-      after: nilaiKepadaTeks(selepas ? selepas[key] : undefined),
+      before: nilaiKepadaTeks(sebelum ? sebelum[key] : undefined, bahasa),
+      after: nilaiKepadaTeks(selepas ? selepas[key] : undefined, bahasa),
     }));
   } catch {
     return [];

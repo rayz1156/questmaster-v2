@@ -14,31 +14,29 @@ import { useEffect, useState, type ReactNode } from 'react';
  * Fungsi tulen
  * ========================================================= */
 
-function tarikhRingkas(t: number): string {
-  // Locale tetap en-US supaya ujian dan skrin semua mesin konsisten.
-  return new Date(t).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
 
 /**
  * Masa relatif: "just now", "5 min ago", "3 h ago", "2 d ago", selepas
  * seminggu tarikh pendek. Masa rujukan boleh disuntik untuk ujian;
- * null atau tarikh rosak menjadi "Never" (lajur Last active).
+ * null atau tarikh rosak menjadi "Never" / "Tidak pernah" (lajur Last active).
+ * KZ-043: bahasa pilihan (lalai 'en' supaya ujian sedia ada tidak berubah).
  */
-export function relTime(iso: string | null | undefined, kiniMs?: number): string {
-  if (!iso) return 'Never';
+export function relTime(iso: string | null | undefined, kiniMs?: number, bahasa: 'en' | 'ms' = 'en'): string {
+  const ms = bahasa === 'ms';
+  if (!iso) return ms ? 'Tidak pernah' : 'Never';
   const t = new Date(iso).getTime();
-  if (Number.isNaN(t)) return 'Never';
+  if (Number.isNaN(t)) return ms ? 'Tidak pernah' : 'Never';
   const kini = typeof kiniMs === 'number' ? kiniMs : Date.now();
   const beza = kini - t;
-  if (beza < 60_000) return 'just now';
-  if (beza < 3_600_000) return `${Math.floor(beza / 60_000)} min ago`;
-  if (beza < 86_400_000) return `${Math.floor(beza / 3_600_000)} h ago`;
-  if (beza < 7 * 86_400_000) return `${Math.floor(beza / 86_400_000)} d ago`;
-  return tarikhRingkas(t);
+  if (beza < 60_000) return ms ? 'baru sahaja' : 'just now';
+  if (beza < 3_600_000) return ms ? `${Math.floor(beza / 60_000)} min lalu` : `${Math.floor(beza / 60_000)} min ago`;
+  if (beza < 86_400_000) return ms ? `${Math.floor(beza / 3_600_000)} j lalu` : `${Math.floor(beza / 3_600_000)} h ago`;
+  if (beza < 7 * 86_400_000) return ms ? `${Math.floor(beza / 86_400_000)} h lalu` : `${Math.floor(beza / 86_400_000)} d ago`;
+  return new Date(t).toLocaleDateString(bahasa === 'ms' ? 'ms-MY' : 'en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
 }
 
 /**
