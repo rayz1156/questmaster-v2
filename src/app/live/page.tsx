@@ -4,10 +4,12 @@ export const dynamic = "force-dynamic";
 
 import { Suspense, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 function BorangMasuk() {
   const router = useRouter();
   const sp = useSearchParams();
+  const { t } = useBahasa();
   const [kod, setKod] = useState(sp.get("code") || "");
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -17,7 +19,7 @@ function BorangMasuk() {
     setErr(null);
     const bersih = kod.trim().toUpperCase();
     if (!/^[A-Z0-9]{6}$/.test(bersih)) {
-      setErr("The session code must be 6 characters.");
+      setErr(t("live.join.codeLength"));
       return;
     }
     setBusy(true);
@@ -26,8 +28,8 @@ function BorangMasuk() {
 
   return (
     <div className="card w-full max-w-sm">
-      <h1 className="text-xl font-bold text-center mb-1">Live Quiz</h1>
-      <p className="text-sm text-gray-500 text-center mb-4">Enter the session code from your educator.</p>
+      <h1 className="text-xl font-bold text-center mb-1">{t("live.join.title")}</h1>
+      <p className="text-sm text-gray-500 text-center mb-4">{t("live.join.enterCode")}</p>
       <form onSubmit={onHantar}>
         <input
           className="input w-full text-center font-mono text-2xl tracking-widest uppercase mb-3"
@@ -39,7 +41,7 @@ function BorangMasuk() {
         />
         {err && <div className="text-xs text-red-600 mb-2">{err}</div>}
         <button type="submit" disabled={busy} className="btn-primary w-full py-2">
-          Enter
+          {t("live.join.enter")}
         </button>
       </form>
     </div>
@@ -47,9 +49,10 @@ function BorangMasuk() {
 }
 
 export default function HalamanMasukLangsung() {
+  const { t } = useBahasa();
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Suspense fallback={<div className="card w-full max-w-sm text-center text-sm text-gray-500">Loading…</div>}>
+      <Suspense fallback={<div className="card w-full max-w-sm text-center text-sm text-gray-500">{t("common.loading")}</div>}>
         <BorangMasuk />
       </Suspense>
     </div>

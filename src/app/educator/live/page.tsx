@@ -20,6 +20,8 @@ import ClassShell from "@/components/ClassShell";
 import { EDU_TABS } from "@/lib/eduTabs";
 import { listMyEducatorClasses } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, terjemahBilangan } from "@/lib/i18n";
 import {
   Button,
   Card,
@@ -63,6 +65,7 @@ async function authedFetch(url: string, init?: RequestInit) {
 function QuizList() {
   const router = useRouter();
   const sp = useSearchParams();
+  const { t, bahasa } = useBahasa();
   const tapisKelas = sp.get("classId") || "";
 
   const [classes, setClasses] = useState<{ id: string; name: string }[]>([]);
@@ -81,11 +84,11 @@ function QuizList() {
   useEffect(() => {
     authedFetch("/api/live/quizzes")
       .then((json) => setQuizzes(json.data || []))
-      .catch((e) => setErr(e.message || "Could not load your quizzes."));
+      .catch((e) => setErr(e.message || t("live.educatorList.loadFailed")));
 
     listMyEducatorClasses()
       .then((cs) => setClasses(cs))
-      .catch((e) => setErr(e.message || "Could not load your classes."));
+      .catch((e) => setErr(e.message || t("live.educatorList.loadClassesFailed")));
 
     supabase.auth.getUser().then(({ data: { user } }) => {
       if (!user) return;
@@ -101,8 +104,7 @@ function QuizList() {
     });
 
     setLoading(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [t]);
 
   useEffect(() => { setNewClassId(tapisKelas); }, [tapisKelas]);
 
@@ -112,7 +114,7 @@ function QuizList() {
       const json = await authedFetch("/api/live/quizzes");
       setQuizzes(json.data || []);
     } catch (e) {
-      setErr((e instanceof Error ? e.message : null) || "Could not load your quizzes.");
+      setErr((e instanceof Error ? e.message : null) || t("live.educatorList.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -120,7 +122,7 @@ function QuizList() {
 
   const onCipta = async () => {
     setErr(null);
-    if (!title.trim()) { setErr("A title is required."); return; }
+    if (!title.trim()) { setErr(t("live.educatorList.titleRequired")); return; }
     setBusy(true);
     try {
       await authedFetch("/api/live/quizzes", {
@@ -134,17 +136,17 @@ function QuizList() {
       setTitle(""); setDesc(""); setShowNew(false);
       await reload();
     } catch (e) {
-      setErr((e instanceof Error ? e.message : null) || "The quiz could not be created.");
+      setErr((e instanceof Error ? e.message : null) || t("live.educatorList.createFailed"));
     } finally { setBusy(false); }
   };
 
   const onPadam = async (quiz: LiveQuizRow) => {
-    if (!window.confirm(`Delete the quiz "${quiz.title}"? All of its questions will be deleted too.`)) return;
+    if (!window.confirm(t("live.educatorList.deleteConfirm", { tajuk: quiz.title }))) return;
     try {
       await authedFetch("/api/live/quizzes/" + quiz.id, { method: "DELETE" });
       await reload();
     } catch (e) {
-      alert((e instanceof Error ? e.message : null) || "Could not delete the quiz.");
+      alert((e instanceof Error ? e.message : null) || t("live.educatorList.deleteFailed"));
     }
   };
 
@@ -157,22 +159,22 @@ function QuizList() {
 
   // V2-012: kuiz tanpa kelas terbuka kepada tetamu; label "No class" jelas
   // berbanding "Personal" yang membayangkan kuiz itu milik peribadi sahaja.
-  const labelKelas = (x: LiveQuizRow) => (x.class?.name ? x.class.name : "No class");
+  const labelKelas = (x: LiveQuizRow) => (x.class?.name ? x.class.name : t("live.educatorList.noClass"));
 
   const CreateForm = () => (
     <Card className="mb-6">
-      <CardHead title="Create a quiz" subtitle="A quiz needs a title; the class is optional in your library." />
+      <CardHead title={t("live.educatorList.createTitle")} subtitle={t("live.educatorList.createSubtitle")} />
       <div className="mt-4 space-y-4">
-        <Field label="Quiz title" htmlFor="kuiz-tajuk">
-          <Input id="kuiz-tajuk" placeholder="e.g. Week 3 recap" value={title} onChange={(e) => setTitle(e.target.value)} />
+        <Field label={t("live.educatorList.titleLabel")} htmlFor="kuiz-tajuk">
+          <Input id="kuiz-tajuk" placeholder={t("live.educatorList.titlePlaceholder")} value={title} onChange={(e) => setTitle(e.target.value)} />
         </Field>
-        <Field label="Description" note="Optional." htmlFor="kuiz-desc">
-          <Input id="kuiz-desc" placeholder="What is this quiz about?" value={desc} onChange={(e) => setDesc(e.target.value)} />
+        <Field label={t("live.educatorList.descLabel")} note={t("live.educatorList.optional")} htmlFor="kuiz-desc">
+          <Input id="kuiz-desc" placeholder={t("live.educatorList.descPlaceholder")} value={desc} onChange={(e) => setDesc(e.target.value)} />
         </Field>
         {!tapisKelas && (
-          <Field label="Class" note="Optional. A quiz without a class lets guests join." htmlFor="kuiz-kelas">
+          <Field label={t("live.educatorList.classLabel")} note={t("live.educatorList.classNote")} htmlFor="kuiz-kelas">
             <Select id="kuiz-kelas" value={newClassId} onChange={(e) => setNewClassId(e.target.value)} className="max-w-sm">
-              <option value="">No class (anyone can join as a guest)</option>
+              <option value="">{t("live.educatorList.noClassOption")}</option>
               {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
             </Select>
           </Field>
@@ -182,12 +184,12 @@ function QuizList() {
             kuiz dicipta dalam Library (kelas dipilih) atau di dalam kelas. */}
         {(tapisKelas || newClassId) && (
           <p className="text-xs text-ink-faint max-w-sm">
-            Players must sign in. Scores add to the class ranking.
+            {t("live.educatorList.playersSignIn")}
           </p>
         )}
         <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
-          <Button disabled={busy} onClick={onCipta}>{busy ? "Creating…" : "Create quiz"}</Button>
+          <Button variant="outline" onClick={() => setShowNew(false)}>{t("common.cancel")}</Button>
+          <Button disabled={busy} onClick={onCipta}>{busy ? t("live.educatorList.creating") : t("live.educatorList.createButton")}</Button>
         </div>
       </div>
       {err && <div className="text-sm text-kz-down mt-3">{err}</div>}
@@ -197,7 +199,7 @@ function QuizList() {
   const lajur: DataColumn<LiveQuizRow>[] = [
     {
       key: "quiz",
-      header: "Quiz",
+      header: t("live.educatorList.colQuiz"),
       render: (x) => (
         <span className="flex items-center gap-3 py-3">
           <span
@@ -219,12 +221,12 @@ function QuizList() {
     },
     {
       key: "created",
-      header: "Created",
+      header: t("live.educatorList.colCreated"),
       hideOnMobile: true,
       className: "text-right",
       render: (x) => (
         <span className="text-[13px] text-ink-faint whitespace-nowrap">
-          {new Date(x.created_at).toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" })}
+          {new Date(x.created_at).toLocaleDateString(LOKAL[bahasa], { day: "numeric", month: "short", year: "numeric" })}
         </span>
       ),
     },
@@ -234,7 +236,7 @@ function QuizList() {
       className: "text-right",
       render: (x) => (
         <Button variant="outline" size="sm" onClick={() => router.push(`/educator/live/${x.id}`)}>
-          <ArrowRight className="w-3.5 h-3.5" /> Open
+          <ArrowRight className="w-3.5 h-3.5" /> {t("live.educatorList.open")}
         </Button>
       ),
     },
@@ -243,31 +245,31 @@ function QuizList() {
   const rows = (
     <>
       <DataTable
-        label="Live quizzes"
+        label={t("live.educatorList.tableLabel")}
         columns={lajur}
         rows={senarai}
         rowKey={(x) => x.id}
         menuItems={(x) => [
-          { label: "Open quiz", icon: <ArrowRight className="w-4 h-4" />, onSelect: () => router.push(`/educator/live/${x.id}`) },
-          { label: "Delete quiz", icon: <Trash2 className="w-4 h-4" />, danger: true, onSelect: () => onPadam(x) },
+          { label: t("live.educatorList.openQuiz"), icon: <ArrowRight className="w-4 h-4" />, onSelect: () => router.push(`/educator/live/${x.id}`) },
+          { label: t("live.educatorList.deleteQuiz"), icon: <Trash2 className="w-4 h-4" />, danger: true, onSelect: () => onPadam(x) },
         ]}
-        menuLabel="Quiz actions"
+        menuLabel={t("live.educatorList.quizActions")}
         halaman={halaman}
         saizHalaman={10}
         onHalaman={setHalaman}
         empty={
           <EmptyState
             icon={<Zap className="w-6 h-6" />}
-            title="No quizzes match."
-            text="Create a quiz or clear the search."
+            title={t("live.educatorList.emptyTitle")}
+            text={t("live.educatorList.emptyText")}
           />
         }
       />
       <div className="flex items-center justify-between gap-3 mt-3">
         <span className="text-xs text-ink-faint">
-          Up to {maxLivePlayers ?? 50} players per session.
+          {t("live.educatorList.maxPlayers", { n: maxLivePlayers ?? 50 })}
         </span>
-        <span className="text-xs text-ink-faint">{senarai.length} of {quizzes.length}</span>
+        <span className="text-xs text-ink-faint">{t("live.educatorList.nOf", { papar: senarai.length, jumlah: quizzes.length })}</span>
       </div>
     </>
   );
@@ -278,37 +280,37 @@ function QuizList() {
       <ClassShell classId={tapisKelas} current="quizzes">
         <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
           <div>
-            <h2 className="section-title">Quizzes</h2>
+            <h2 className="section-title">{t("live.educatorList.quizzesTitle")}</h2>
             {senarai.length > 0 && (
               <p className="text-sm text-ink-muted mt-0.5">
-                {senarai.length} {senarai.length === 1 ? "quiz" : "quizzes"}
+                {terjemahBilangan(bahasa, "live.educatorList.countOne", "live.educatorList.countOther", senarai.length, { n: senarai.length })}
               </p>
             )}
           </div>
           {senarai.length > 0 && (
             <Button onClick={() => setShowNew((v) => !v)}>
-              <Plus className="w-4 h-4" /> New quiz
+              <Plus className="w-4 h-4" /> {t("live.educatorList.newQuiz")}
             </Button>
           )}
         </div>
 
         {showNew && <CreateForm />}
         {!showNew && err && <div className="text-sm text-kz-down mb-4">{err}</div>}
-        {loading && <p className="text-sm text-ink-muted">Loading…</p>}
+        {loading && <p className="text-sm text-ink-muted">{t("common.loading")}</p>}
 
         {!loading && senarai.length === 0 ? (
           <div className="bg-white rounded-[4px] shadow-card">
             <EmptyState
               icon={<Zap className="w-7 h-7" />}
-              title="Make your first quiz."
-              text="Bring this class together with a live challenge."
-              actionLabel="Create quiz"
+              title={t("live.educatorList.firstTitle")}
+              text={t("live.educatorList.firstTextClass")}
+              actionLabel={t("live.educatorList.createButton")}
               onAction={() => setShowNew(true)}
             />
             <div className="pb-2">
-              <Link href="/educator/live" className="text-[13px] font-medium text-brand-purple hover:underline">Choose from your library</Link>
+              <Link href="/educator/live" className="text-[13px] font-medium text-brand-purple hover:underline">{t("live.educatorList.libraryLink")}</Link>
             </div>
-            <p className="text-xs text-ink-faint pb-5">Up to {maxLivePlayers ?? 50} players per session.</p>
+            <p className="text-xs text-ink-faint pb-5">{t("live.educatorList.maxPlayers", { n: maxLivePlayers ?? 50 })}</p>
           </div>
         ) : !loading && rows}
       </ClassShell>
@@ -319,49 +321,49 @@ function QuizList() {
   return (
     <>
       <PageHead
-        title="Your quizzes"
-        description="Create and manage quizzes for your classes, anytime."
-        primaryAction={{ label: "Create quiz", icon: <Plus className="w-4 h-4" />, onSelect: () => setShowNew((v) => !v) }}
+        title={t("live.educatorList.yourQuizzes")}
+        description={t("live.educatorList.yourQuizzesDesc")}
+        primaryAction={{ label: t("live.educatorList.createButton"), icon: <Plus className="w-4 h-4" />, onSelect: () => setShowNew((v) => !v) }}
       />
 
       <Tabs
         className="mb-5"
         items={[
-          { label: "Activities", href: "/educator/activities" },
-          { label: "Quizzes", href: "/educator/live" },
+          { label: t("nav.activities"), href: "/educator/activities" },
+          { label: t("live.educatorList.quizzesTitle"), href: "/educator/live" },
         ]}
       />
 
       <div className="flex items-center gap-3 flex-wrap mb-5">
         <div className="relative flex-1 min-w-[220px] max-w-sm">
           <Search className="w-4 h-4 text-ink-faint absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-          <input className="input pl-9" placeholder="Search quizzes" value={q} onChange={(e) => setQ(e.target.value)} aria-label="Search quizzes" />
+          <input className="input pl-9" placeholder={t("live.educatorList.searchPlaceholder")} value={q} onChange={(e) => setQ(e.target.value)} aria-label={t("live.educatorList.searchPlaceholder")} />
         </div>
         <Select
           value=""
           onChange={(e) => { if (e.target.value) router.push(`/educator/live?classId=${e.target.value}`); }}
-          aria-label="Filter by class"
+          aria-label={t("live.educatorList.filterByClass")}
           className="w-auto"
         >
-          <option value="">All classes</option>
+          <option value="">{t("live.educatorList.allClasses")}</option>
           {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
         </Select>
       </div>
 
       {showNew && <CreateForm />}
       {!showNew && err && <div className="text-sm text-kz-down mb-4">{err}</div>}
-      {loading && <p className="text-sm text-ink-muted">Loading…</p>}
+      {loading && <p className="text-sm text-ink-muted">{t("common.loading")}</p>}
 
       {!loading && senarai.length === 0 ? (
         <div className="bg-white rounded-[4px] shadow-card">
           <EmptyState
             icon={<Zap className="w-7 h-7" />}
-            title="Make your first quiz."
-            text="A live quiz turns a lesson into a moment the class shares."
-            actionLabel="Create quiz"
+            title={t("live.educatorList.firstTitle")}
+            text={t("live.educatorList.firstTextLibrary")}
+            actionLabel={t("live.educatorList.createButton")}
             onAction={() => setShowNew(true)}
           />
-          <p className="text-xs text-ink-faint pb-5">Up to {maxLivePlayers ?? 50} players per session.</p>
+          <p className="text-xs text-ink-faint pb-5">{t("live.educatorList.maxPlayers", { n: maxLivePlayers ?? 50 })}</p>
         </div>
       ) : !loading && rows}
     </>
@@ -369,9 +371,10 @@ function QuizList() {
 }
 
 export default function HalamanKuizLangsung() {
+  const { t } = useBahasa();
   return (
     <Shell tabs={EDU_TABS}>
-      <Suspense fallback={<p className="text-sm text-ink-muted">Loading…</p>}>
+      <Suspense fallback={<p className="text-sm text-ink-muted">{t("common.loading")}</p>}>
         <QuizList />
       </Suspense>
     </Shell>
