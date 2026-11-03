@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,7 +26,7 @@ export async function GET(req: NextRequest) {
     .eq('enabled', true)
     .order('sort_order', { ascending: true });
   if (error) {
-    return NextResponse.json({ error: 'Senarai model tidak dapat dibaca.' }, { status: 500 });
+    return ralatJson('Senarai model tidak dapat dibaca.', 500);
   }
   return NextResponse.json({ models: data ?? [] });
 }
