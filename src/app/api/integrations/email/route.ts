@@ -3,6 +3,7 @@ import { requireUser, getServiceSupabase } from "@/lib/supabase-route";
 import { encrypt } from "@/lib/mcp/crypto";
 import { PROVIDERS } from "@/lib/email-providers";
 import { pelanBerbayar } from "@/lib/pelan";
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -93,42 +94,33 @@ export async function PUT(req: NextRequest) {
   const apiKey = body?.apiKey;
 
   if (provider !== "encharge" || !PROVIDERS[provider as string]) {
-    return NextResponse.json({ error: "Unknown provider" }, { status: 400 });
+    return ralatJson("Unknown provider", 400);
   }
   if (typeof apiKey !== "string" || apiKey.length < 8 || apiKey.length > 200) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 400 });
+    return ralatJson("Invalid API key", 400);
   }
 
   if (!(await bolehBerbayar(auth.supa))) {
     // UI menunjuk kod QM_PRO_ONLY untuk keadaan terkunci.
-    return NextResponse.json(
-      {
-        error: "Email integration is available on the Pro plan.",
-        code: "QM_PRO_ONLY",
-      },
-      { status: 403 },
-    );
+    return ralatJson("Email integration is available on the Pro plan.", 403, { code: "QM_PRO_ONLY" });
   }
 
   // Sahkan kunci dengan penyedia SEBELUM menyimpan apa-apa.
   const penyedia = PROVIDERS[provider as string];
   const semakan = await penyedia.validateKey(apiKey);
   if (!semakan.ok && (semakan.status === 401 || semakan.status === 403)) {
-    return NextResponse.json({ error: "Invalid API key" }, { status: 400 });
+    return ralatJson("Invalid API key", 400);
   }
   if (!semakan.ok) {
     // 5xx, tamat masa atau rangkaian: ralat penyedia, jangan simpan kunci.
-    return NextResponse.json(
-      { error: "Encharge is unavailable right now. Please try again." },
-      { status: 502 },
-    );
+    return ralatJson("Encharge is unavailable right now. Please try again.", 502);
   }
 
   let disulit: string;
   try {
     disulit = encrypt(apiKey);
   } catch {
-    return NextResponse.json({ error: "Could not save integration." }, { status: 500 });
+    return ralatJson("Could not save integration.", 500);
   }
 
   const now = new Date().toISOString();
@@ -150,7 +142,7 @@ export async function PUT(req: NextRequest) {
     );
 
   if (ralatSimpan) {
-    return NextResponse.json({ error: "Could not save integration." }, { status: 500 });
+    return ralatJson("Could not save integration.", 500);
   }
 
   return NextResponse.json({ ok: true, connected: true, hint: apiKey.slice(-4) });
@@ -169,6 +161,6 @@ export async function DELETE(req: NextRequest) {
     .delete()
     .eq("owner_id", user.id);
 
-  if (error) return NextResponse.json({ error: "Could not disconnect." }, { status: 500 });
+  if (error) return ralatJson("Could not disconnect.", 500);
   return NextResponse.json({ ok: true });
 }
