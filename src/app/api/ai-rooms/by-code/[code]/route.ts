@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, requireUser } from '@/lib/supabase-route';
 import { aksesBilik, REGEX_KOD_BILIK, modelUntukBilik } from '@/lib/bilikAi';
 import { penyediaSedia } from '@/lib/ai/penyedia';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,10 +21,7 @@ export const fetchCache = 'force-no-store';
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   const kod = String(params.code || '').trim().toUpperCase();
   if (!REGEX_KOD_BILIK.test(kod)) {
-    return NextResponse.json(
-      { error: 'Kod chatroom mesti 6 aksara daripada abjad kod chatroom.' },
-      { status: 400 },
-    );
+    return ralatJson('Kod chatroom mesti 6 aksara daripada abjad kod chatroom.', 400);
   }
 
   // Pembetulan CTO (kzsec #1): log masuk dahulu, supaya pemanggil tanpa
@@ -39,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .eq('join_code', kod)
     .maybeSingle();
   if (!baris) {
-    return NextResponse.json({ error: 'Kod chatroom tidak ditemui.' }, { status: 404 });
+    return ralatJson('Kod chatroom tidak ditemui.', 404);
   }
 
   const akses = await aksesBilik(req, baris.id);

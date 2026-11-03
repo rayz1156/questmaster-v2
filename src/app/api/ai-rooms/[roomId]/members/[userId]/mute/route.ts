@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { aksesBilik, ralatBilik, bacaJsonKecil } from '@/lib/bilikAi';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,7 +27,7 @@ export async function POST(
   const hasil = await bacaJsonKecil(req);
   if (!hasil.ok) return hasil.response;
   if (typeof hasil.body.muted !== 'boolean') {
-    return NextResponse.json({ error: 'muted mesti boolean.' }, { status: 400 });
+    return ralatJson('muted mesti boolean.', 400);
   }
   const muted = hasil.body.muted;
 
@@ -38,14 +39,11 @@ export async function POST(
     .eq('user_id', params.userId)
     .maybeSingle();
   if (!sasaran) {
-    return NextResponse.json({ error: 'Ahli tidak ditemui dalam chatroom ini.' }, { status: 404 });
+    return ralatJson('Ahli tidak ditemui dalam chatroom ini.', 404);
   }
   // Guru tidak boleh dibisukan oleh sesiapa pun.
   if (sasaran.role === 'teacher') {
-    return NextResponse.json(
-      { error: 'Guru tidak boleh dibisukan dalam chatroom ini.' },
-      { status: 403 },
-    );
+    return ralatJson('Guru tidak boleh dibisukan dalam chatroom ini.', 403);
   }
 
   const { error } = await supa
@@ -55,7 +53,7 @@ export async function POST(
     .eq('user_id', params.userId);
   if (error) {
     console.error('[bilik-ai] bisu ahli gagal:', error.message);
-    return NextResponse.json({ error: 'Bisu ahli tidak dapat diubah.' }, { status: 500 });
+    return ralatJson('Bisu ahli tidak dapat diubah.', 500);
   }
   return NextResponse.json({ userId: params.userId, muted });
 }

@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { aksesBilik, ralatBilik } from '@/lib/bilikAi';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,20 +32,17 @@ export async function POST(
     .eq('room_id', params.roomId)
     .maybeSingle();
   if (!mesej) {
-    return NextResponse.json({ error: 'Mesej tidak ditemui.' }, { status: 404 });
+    return ralatJson('Mesej tidak ditemui.', 404);
   }
   if (mesej.author_kind !== 'ai' || mesej.deleted_at) {
-    return NextResponse.json({ error: 'Mesej ini bukan jawapan AI.' }, { status: 409 });
+    return ralatJson('Mesej ini bukan jawapan AI.', 409);
   }
   // Hanya penanya atau guru boleh menghentikan.
   if (akses.role !== 'teacher' && mesej.asked_by !== user.id) {
     return ralatBilik(403, 'NOT_ASKER', 'Hanya penanya atau guru boleh menghentikan jawapan AI.');
   }
   if (mesej.ai_status !== 'queued' && mesej.ai_status !== 'streaming') {
-    return NextResponse.json(
-      { error: 'Jawapan AI ini sudah tamat.', code: 'AI_DONE' },
-      { status: 409 },
-    );
+    return ralatJson('Jawapan AI ini sudah tamat.', 409, { code: 'AI_DONE' });
   }
 
   const now = new Date().toISOString();
@@ -55,7 +53,7 @@ export async function POST(
     .in('ai_status', ['queued', 'streaming']);
   if (error) {
     console.error('[bilik-ai] henti jawapan gagal:', error.message);
-    return NextResponse.json({ error: 'Jawapan tidak dapat dihentikan.' }, { status: 500 });
+    return ralatJson('Jawapan tidak dapat dihentikan.', 500);
   }
   return NextResponse.json({ status: 'stopped' });
 }

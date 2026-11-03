@@ -30,6 +30,7 @@ import {
 import { dapatkanPenyedia } from '@/lib/ai/penyedia';
 import { binaMesejAi, type SejarahMesej } from '@/lib/ai/bilikPrompt';
 import { dalamHad } from '@/lib/hadKadar';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,20 +66,14 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     return ralatBilik(403, 'MUTED', 'Anda dibisukan dalam chatroom ini.');
   }
   if (!dalamHad('bilik-ask:' + user.id, 3)) {
-    return NextResponse.json(
-      { error: 'Terlalu banyak soalan dalam masa singkat. Tunggu sebentar.' },
-      { status: 429 },
-    );
+    return ralatJson('Terlalu banyak soalan dalam masa singkat. Tunggu sebentar.', 429);
   }
 
   const hasil = await bacaJsonKecil(req);
   if (!hasil.ok) return hasil.response;
   const soalan = typeof hasil.body.question === 'string' ? hasil.body.question.trim() : '';
   if (soalan.length < 1 || soalan.length > 2000) {
-    return NextResponse.json(
-      { error: 'Soalan mesti 1 hingga 2000 aksara.' },
-      { status: 400 },
-    );
+    return ralatJson('Soalan mesti 1 hingga 2000 aksara.', 400);
   }
 
   // (b) penyedia mesti sedia sebelum sebarang baris dicipta. Model
@@ -87,17 +82,11 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   const model = await modelUntukBilik(supa, bilik.model_id);
   if (!model) {
     // Tiada model didayakan: AI memang tidak dapat digunakan.
-    return NextResponse.json(
-      { error: 'AI belum disediakan oleh pentadbir', code: 'AI_NOT_CONFIGURED' },
-      { status: 503 },
-    );
+    return ralatJson('AI belum disediakan oleh pentadbir', 503, { code: 'AI_NOT_CONFIGURED' });
   }
   const penyedia = dapatkanPenyedia(model.provider);
   if (!penyedia) {
-    return NextResponse.json(
-      { error: 'AI belum disediakan oleh pentadbir', code: 'AI_NOT_CONFIGURED' },
-      { status: 503 },
-    );
+    return ralatJson('AI belum disediakan oleh pentadbir', 503, { code: 'AI_NOT_CONFIGURED' });
   }
 
   // (c) kuota harian atomik, RPC dengan argumen bernama.
@@ -111,26 +100,17 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   })) as { data: unknown; error: { message: string } | null };
   if (errKuota) {
     console.error('[bilik-ai] reserve_ask gagal:', errKuota.message);
-    return NextResponse.json({ error: 'Kuota AI tidak dapat disemak.' }, { status: 500 });
+    return ralatJson('Kuota AI tidak dapat disemak.', 500);
   }
   if (kodKuota === 'USER_CAP') {
-    return NextResponse.json(
-      {
-        error: 'Anda sudah mencapai had harian menanya AI dalam chatroom ini.',
-        code: 'USER_CAP',
-      },
-      { status: 429 },
-    );
+    return ralatJson('Anda sudah mencapai had harian menanya AI dalam chatroom ini.', 429, { code: 'USER_CAP' });
   }
   if (kodKuota === 'ROOM_CAP') {
-    return NextResponse.json(
-      { error: 'Chatroom ini sudah mencapai had harian menanya AI.', code: 'ROOM_CAP' },
-      { status: 429 },
-    );
+    return ralatJson('Chatroom ini sudah mencapai had harian menanya AI.', 429, { code: 'ROOM_CAP' });
   }
   if (kodKuota !== 'OK') {
     console.error('[bilik-ai] reserve_ask balas tidak dikenali:', kodKuota);
-    return NextResponse.json({ error: 'Kuota AI tidak dapat disemak.' }, { status: 500 });
+    return ralatJson('Kuota AI tidak dapat disemak.', 500);
   }
 
   // Nama penanya, kelas dan sejarah untuk prompt.
@@ -178,7 +158,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     .single()) as { data: { id: string } | null; error: { message: string } | null };
   if (errS || !soalanRow) {
     console.error('[bilik-ai] sisip soalan gagal:', errS?.message);
-    return NextResponse.json({ error: 'Soalan tidak dapat disimpan.' }, { status: 500 });
+    return ralatJson('Soalan tidak dapat disimpan.', 500);
   }
 
   const { data: aiRow, error: errA } = (await supa
@@ -196,7 +176,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     .single()) as { data: { id: string } | null; error: { message: string } | null };
   if (errA || !aiRow) {
     console.error('[bilik-ai] sisip mesej AI gagal:', errA?.message);
-    return NextResponse.json({ error: 'Jawapan AI tidak dapat dimulakan.' }, { status: 500 });
+    return ralatJson('Jawapan AI tidak dapat dimulakan.', 500);
   }
 
   // Berhenti boleh berlaku semasa masih queued: semak sebelum mula strim.

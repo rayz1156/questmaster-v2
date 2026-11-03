@@ -9,6 +9,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { aksesBilik, ralatBilik } from '@/lib/bilikAi';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,7 +32,7 @@ export async function DELETE(
     .eq('room_id', params.roomId)
     .maybeSingle();
   if (!mesej) {
-    return NextResponse.json({ error: 'Mesej tidak ditemui.' }, { status: 404 });
+    return ralatJson('Mesej tidak ditemui.', 404);
   }
   if (mesej.deleted_at) {
     // Sudah dipadam; balas ok supaya klien bergerak tanpa ralat.
@@ -61,7 +62,7 @@ export async function DELETE(
     .eq('id', params.msgId);
   if (error) {
     console.error('[bilik-ai] padam mesej gagal:', error.message);
-    return NextResponse.json({ error: 'Mesej tidak dapat dipadam.' }, { status: 500 });
+    return ralatJson('Mesej tidak dapat dipadam.', 500);
   }
   return NextResponse.json({ ok: true });
 }

@@ -7,6 +7,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { aksesBilik, ralatBilik, bacaJsonKecil } from '@/lib/bilikAi';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,14 +32,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
 
   if (body.title !== undefined) {
     if (typeof body.title !== 'string') {
-      return NextResponse.json({ error: 'Tajuk chatroom mesti teks.' }, { status: 400 });
+      return ralatJson('Tajuk chatroom mesti teks.', 400);
     }
     const title = body.title.trim();
     if (title.length < 1 || title.length > 80) {
-      return NextResponse.json(
-        { error: 'Tajuk chatroom mesti 1 hingga 80 aksara.' },
-        { status: 400 },
-      );
+      return ralatJson('Tajuk chatroom mesti 1 hingga 80 aksara.', 400);
     }
     set.title = title;
   }
@@ -49,14 +47,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
     } else if (typeof body.description === 'string') {
       const d = body.description.trim() || null;
       if (d && d.length > 300) {
-        return NextResponse.json(
-          { error: 'Penerangan chatroom maksimum 300 aksara.' },
-          { status: 400 },
-        );
+        return ralatJson('Penerangan chatroom maksimum 300 aksara.', 400);
       }
       set.description = d;
     } else {
-      return NextResponse.json({ error: 'Penerangan chatroom mesti teks.' }, { status: 400 });
+      return ralatJson('Penerangan chatroom mesti teks.', 400);
     }
   }
 
@@ -72,27 +67,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
         .eq('enabled', true)
         .maybeSingle();
       if (!model) {
-        return NextResponse.json(
-          { error: 'Model tidak ditemui atau tidak didayakan.' },
-          { status: 400 },
-        );
+        return ralatJson('Model tidak ditemui atau tidak didayakan.', 400);
       }
       set.model_id = model.id;
     } else {
-      return NextResponse.json({ error: 'modelId mesti teks.' }, { status: 400 });
+      return ralatJson('modelId mesti teks.', 400);
     }
   }
 
   if (body.aiEnabled !== undefined) {
     if (typeof body.aiEnabled !== 'boolean') {
-      return NextResponse.json({ error: 'aiEnabled mesti boolean.' }, { status: 400 });
+      return ralatJson('aiEnabled mesti boolean.', 400);
     }
     set.ai_enabled = body.aiEnabled;
   }
 
   if (body.contextEnabled !== undefined) {
     if (typeof body.contextEnabled !== 'boolean') {
-      return NextResponse.json({ error: 'contextEnabled mesti boolean.' }, { status: 400 });
+      return ralatJson('contextEnabled mesti boolean.', 400);
     }
     set.context_enabled = body.contextEnabled;
   }
@@ -100,26 +92,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
   if (body.contextWindow !== undefined) {
     const n = Number(body.contextWindow);
     if (!Number.isInteger(n) || n < 0 || n > 50) {
-      return NextResponse.json(
-        { error: 'Tetingkap konteks mesti integer 0 hingga 50.' },
-        { status: 400 },
-      );
+      return ralatJson('Tetingkap konteks mesti integer 0 hingga 50.', 400);
     }
     set.context_window = n;
   }
 
   if (body.status !== undefined) {
     if (body.status !== 'open' && body.status !== 'closed') {
-      return NextResponse.json(
-        { error: 'Status chatroom mesti open atau closed.' },
-        { status: 400 },
-      );
+      return ralatJson('Status chatroom mesti open atau closed.', 400);
     }
     set.status = body.status;
   }
 
   if (Object.keys(set).length === 0) {
-    return NextResponse.json({ error: 'Tiada medan untuk dikemas kini.' }, { status: 400 });
+    return ralatJson('Tiada medan untuk dikemas kini.', 400);
   }
 
   // updated_at sentiasa ditetapkan pada setiap kemas kini.
@@ -133,7 +119,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
     .single();
   if (error || !data) {
     console.error('[bilik-ai] kemas kini bilik gagal:', error?.message);
-    return NextResponse.json({ error: 'Chatroom tidak dapat dikemas kini.' }, { status: 500 });
+    return ralatJson('Chatroom tidak dapat dikemas kini.', 500);
   }
   return NextResponse.json({ room: data });
 }
@@ -153,7 +139,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { roomId: s
     .eq('id', params.roomId);
   if (error) {
     console.error('[bilik-ai] padam bilik gagal:', error.message);
-    return NextResponse.json({ error: 'Chatroom tidak dapat dipadam.' }, { status: 500 });
+    return ralatJson('Chatroom tidak dapat dipadam.', 500);
   }
   return NextResponse.json({ ok: true });
 }
