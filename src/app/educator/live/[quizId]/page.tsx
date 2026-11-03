@@ -17,6 +17,7 @@ import { ArrowLeft, Plus, Trash2, Play, Upload, Pencil, Check, X, Download, File
 import { supabase } from "@/lib/supabase";
 import PanelMulaSesi from "@/components/PanelMulaSesi";
 import { BONUS_LALAI_SEC, RACE_DEFAULT_MINUTES, sahMinitLumba, type TahapRaksasa } from "@/lib/lumba-laju";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import {
   Alert,
   Button,
@@ -85,6 +86,7 @@ const HURUF = ["A", "B", "C", "D", "E", "F"];
 export default function EditorKuizLangsung() {
   const { quizId } = useParams<{ quizId: string }>() as { quizId: string };
   const router = useRouter();
+  const { t } = useBahasa();
 
   const [kuiz, setKuiz] = useState<Kuiz | null>(null);
   const [soalan, setSoalan] = useState<Soalan[]>([]);
@@ -140,7 +142,7 @@ export default function EditorKuizLangsung() {
       setKuiz(json.data.quiz);
       setSoalan(json.data.questions || []);
     } catch (e) {
-      setErr(mesejRalat(e, "Could not load the quiz."));
+      setErr(mesejRalat(e, t("live.educatorEditor.loadFailed")));
     } finally {
       setLoading(false);
     }
@@ -155,7 +157,7 @@ export default function EditorKuizLangsung() {
       setOutcomeSet(json);
       setOutcomePilih((json.outcomes || []).filter((o) => o.tagged).map((o) => o.id));
     } catch (e) {
-      setOutcomeMsg({ ok: false, text: mesejRalat(e, "The Outcomes could not be loaded.") });
+      setOutcomeMsg({ ok: false, text: mesejRalat(e, t("live.educatorEditor.outcomesLoadFailed")) });
     }
   };
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -164,9 +166,9 @@ export default function EditorKuizLangsung() {
   const onTambah = async () => {
     setErr(null);
     const bersih = opts.map((o, i) => ({ key: HURUF[i], text: o.text.trim() })).filter((o) => o.text);
-    if (!prompt.trim()) { setErr("A question is required."); return; }
-    if (bersih.length < 2) { setErr("At least two options must be filled in."); return; }
-    if (!bersih.some((o) => o.key === kunci)) { setErr("The answer key must be one of the options."); return; }
+    if (!prompt.trim()) { setErr(t("live.educatorEditor.questionRequired")); return; }
+    if (bersih.length < 2) { setErr(t("live.educatorEditor.optionsMin")); return; }
+    if (!bersih.some((o) => o.key === kunci)) { setErr(t("live.educatorEditor.answerKeyValid")); return; }
     setBusy(true);
     try {
       await authedFetch(`/api/live/quizzes/${quizId}/questions`, {
@@ -186,7 +188,7 @@ export default function EditorKuizLangsung() {
       setMataBerganda(false); setShowNew(false);
       await reload();
     } catch (e) {
-      setErr(mesejRalat(e, "The question could not be saved."));
+      setErr(mesejRalat(e, t("live.educatorEditor.questionSaveFailed")));
     } finally { setBusy(false); }
   };
 
@@ -206,7 +208,7 @@ export default function EditorKuizLangsung() {
     setErr(null);
     const bersih = editOpts.map((o) => ({ key: o.key, text: o.text.trim() })).filter((o) => o.text);
     if (!editPrompt.trim() || bersih.length < 2 || !bersih.some((o) => o.key === editKunci)) {
-      setErr("A question, at least two options and a valid answer key are required.");
+      setErr(t("live.educatorEditor.editRequired"));
       return;
     }
     setBusy(true);
@@ -226,34 +228,34 @@ export default function EditorKuizLangsung() {
       setEditId(null);
       await reload();
     } catch (e) {
-      setErr(mesejRalat(e, "Update failed."));
+      setErr(mesejRalat(e, t("live.educatorEditor.updateFailed")));
     } finally { setBusy(false); }
   };
 
   const onPadamSoalan = async (s: Soalan) => {
-    if (!window.confirm("Delete this question?")) return;
+    if (!window.confirm(t("live.educatorEditor.deleteConfirm"))) return;
     try {
       await authedFetch("/api/live/questions/" + s.id, { method: "DELETE" });
       await reload();
     } catch (e) {
-      alert(mesejRalat(e, "Could not delete the question."));
+      alert(mesejRalat(e, t("live.educatorEditor.deleteFailed")));
     }
   };
 
   const onImportAiken = async () => {
     setAikenMsg(null);
-    if (!aiken.trim()) { setAikenMsg({ ok: false, text: "Paste the Aiken content first." }); return; }
+    if (!aiken.trim()) { setAikenMsg({ ok: false, text: t("live.educatorEditor.aikenEmpty") }); return; }
     setAikenBusy(true);
     try {
       const json = await authedFetch(`/api/live/quizzes/${quizId}/import-aiken`, {
         method: "POST",
         body: JSON.stringify({ content: aiken }),
       });
-      setAikenMsg({ ok: true, text: `${json.created} questions imported, ${json.skipped} blocks skipped.` });
+      setAikenMsg({ ok: true, text: t("live.educatorEditor.aikenDone", { cipta: json.created, lompat: json.skipped }) });
       setAiken("");
       await reload();
     } catch (e) {
-      setAikenMsg({ ok: false, text: mesejRalat(e, "Import failed.") });
+      setAikenMsg({ ok: false, text: mesejRalat(e, t("live.educatorEditor.aikenImportFailed")) });
     } finally { setAikenBusy(false); }
   };
 
@@ -264,7 +266,7 @@ export default function EditorKuizLangsung() {
     setCsvMsg(null);
     setCsvErrors([]);
     if (file.size > 500000) {
-      setCsvMsg({ ok: false, text: "That file is too large. The limit is about 500 KB." });
+      setCsvMsg({ ok: false, text: t("live.educatorEditor.csvTooLarge") });
       if (csvInputRef.current) csvInputRef.current.value = "";
       return;
     }
@@ -283,13 +285,13 @@ export default function EditorKuizLangsung() {
       const j = await r.json().catch(() => ({}));
       if (!r.ok) {
         setCsvErrors(Array.isArray(j.errors) ? j.errors : []);
-        setCsvMsg({ ok: false, text: j.error || "The file could not be imported." });
+        setCsvMsg({ ok: false, text: j.error || t("live.educatorEditor.csvImportFailed") });
         return;
       }
-      setCsvMsg({ ok: true, text: `${j.created} questions imported from ${file.name}.` });
+      setCsvMsg({ ok: true, text: t("live.educatorEditor.csvDone", { n: j.created, fail: file.name }) });
       await reload();
     } catch {
-      setCsvMsg({ ok: false, text: "The file could not be read. Save it again as CSV UTF-8." });
+      setCsvMsg({ ok: false, text: t("live.educatorEditor.csvReadFailed") });
     } finally {
       setCsvBusy(false);
       if (csvInputRef.current) csvInputRef.current.value = "";
@@ -307,7 +309,7 @@ export default function EditorKuizLangsung() {
         body: JSON.stringify({ streak_bonus: v }),
       });
     } catch (e) {
-      setErr(mesejRalat(e, "The setting could not be saved."));
+      setErr(mesejRalat(e, t("live.educatorEditor.streakSaveFailed")));
       setKuiz(sebelum);
     }
   };
@@ -323,9 +325,9 @@ export default function EditorKuizLangsung() {
       })) as OutcomeSet;
       setOutcomeSet(json);
       setOutcomePilih((json.outcomes || []).filter((o) => o.tagged).map((o) => o.id));
-      setOutcomeMsg({ ok: true, text: "Outcome disimpan." });
+      setOutcomeMsg({ ok: true, text: t("live.educatorEditor.outcomeSaved") });
     } catch (e) {
-      setOutcomeMsg({ ok: false, text: mesejRalat(e, "The Outcomes could not be saved.") });
+      setOutcomeMsg({ ok: false, text: mesejRalat(e, t("live.educatorEditor.outcomeSaveFailed")) });
     } finally {
       setOutcomeBusy(false);
     }
@@ -333,7 +335,7 @@ export default function EditorKuizLangsung() {
 
   const onMulaSesi = async () => {
     setErr(null);
-    if (soalan.length === 0) { setErr("The quiz needs at least one question."); return; }
+    if (soalan.length === 0) { setErr(t("live.educatorEditor.needOneQuestion")); return; }
     // KZ-012: Speed Race perlu minit yang sah sebelum sesi dicipta.
     // KZ-013: Boss Battle juga menggunakan raceMinutes dan menambah bossLevel.
     const minit = sahMinitLumba(minitTeks);
@@ -352,7 +354,7 @@ export default function EditorKuizLangsung() {
       });
       router.push(`/educator/live/session/${json.data.sessionId}`);
     } catch (e) {
-      setErr(mesejRalat(e, "The session could not be started."));
+      setErr(mesejRalat(e, t("live.educatorEditor.sessionStartFailed")));
       setBusy(false);
     }
   };
@@ -368,14 +370,14 @@ export default function EditorKuizLangsung() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-muted">{t("common.loading")}</p>
       </Shell>
     );
   }
   if (!kuiz) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-ink-muted">Quiz not found. <Link href="/educator/live" className="text-brand-purple font-semibold">Back →</Link></p>
+        <p className="text-sm text-ink-muted">{t("live.educatorEditor.notFound")} <Link href="/educator/live" className="text-brand-purple font-semibold">{t("common.back")} →</Link></p>
       </Shell>
     );
   }
@@ -403,7 +405,7 @@ export default function EditorKuizLangsung() {
           />
           <div className="flex-1 min-w-0">
             <Input
-              placeholder={`Option ${senarai[i].key} text`}
+              placeholder={t("live.educatorEditor.optionPlaceholder", { huruf: senarai[i].key })}
               value={o.text}
               onChange={(e) => setSenarai(senarai.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
             />
@@ -412,8 +414,8 @@ export default function EditorKuizLangsung() {
             <Button
               variant="icon"
               size="sm"
-              title="Remove option"
-              ariaLabel="Remove option"
+              title={t("live.educatorEditor.removeOption")}
+              ariaLabel={t("live.educatorEditor.removeOption")}
               className="text-[#e85347] hover:bg-[#fce4e2]"
               onClick={() => setSenarai(senarai.filter((_, j) => j !== i).map((x, j) => ({ key: HURUF[j], text: x.text })))}
             >
@@ -428,12 +430,12 @@ export default function EditorKuizLangsung() {
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        crumb="Live Quiz"
+        crumb={t("live.educatorEditor.crumb")}
         name={kuiz.title}
         description={kuiz.description || undefined}
-        secondaryActions={[{ label: "All quizzes", icon: <ArrowLeft className="w-4 h-4" />, href: "/educator/live" }]}
+        secondaryActions={[{ label: t("live.educatorEditor.allQuizzes"), icon: <ArrowLeft className="w-4 h-4" />, href: "/educator/live" }]}
         primaryAction={{
-          label: "Start session",
+          label: t("live.educatorEditor.startSession"),
           icon: <Play className="w-4 h-4" />,
           // Butang asal dilumpuhkan ketika sibuk; pagar yang sama dipakai di sini.
           onSelect: () => { if (!busy) setPanelMula((v) => !v); },
@@ -461,31 +463,29 @@ export default function EditorKuizLangsung() {
 
       <Card className="mb-4">
         <CheckRadio
-          label="Answer streak bonus"
+          label={t("live.educatorEditor.streakBonusLabel")}
           checked={kuiz.streak_bonus !== false}
           onChange={(e) => onTukarStreak(e.target.checked)}
         />
         <p className="text-[12px] text-ink-faint mt-2">
-          Extra points for correct answers back to back: +100 on the second in a row, +200 on the
-          third, rising to +500. A wrong answer, a skipped question or running out of time resets
-          the streak. The setting is fixed when a session starts, so changing it mid-game is safe.
+          {t("live.educatorEditor.streakBonusDesc")}
         </p>
       </Card>
 
       {/* KZ-037: kad Outcome yang dinilai; guru memilih Outcome bagi seluruh kuiz. */}
       <Card className="mb-4">
-        <CardHead title="Outcome yang dinilai" />
+        <CardHead title={t("live.educatorEditor.outcomeTitle")} />
         {outcomeSet === null ? (
-          <p className="text-[12px] text-ink-faint mt-3">Loading…</p>
+          <p className="text-[12px] text-ink-faint mt-3">{t("common.loading")}</p>
         ) : outcomeSet.classId === null ? (
           <p className="text-[12px] text-ink-faint mt-3">
-            Kongsi kuiz ini dengan kelas untuk memilih Outcome.
+            {t("live.educatorEditor.outcomeShareClass")}
           </p>
         ) : outcomeSet.outcomes.length === 0 ? (
           <p className="text-[12px] text-ink-faint mt-3">
-            Kelas ini tiada Outcome lagi.{" "}
+            {t("live.educatorEditor.outcomeNone")}{" "}
             <Link href="/educator/outcomes" className="text-brand-purple font-semibold">
-              Cipta Outcome dahulu
+              {t("live.educatorEditor.outcomeCreateFirst")}
             </Link>
           </p>
         ) : (
@@ -505,12 +505,11 @@ export default function EditorKuizLangsung() {
               ))}
             </div>
             <p className="text-[12px] text-ink-faint mt-2">
-              Jawapan betul dan salah pelajar yang log masuk dikira dalam penguasaan Outcome
-              (analitik dan LNA). Pemain tetamu tidak dikira.
+              {t("live.educatorEditor.outcomeCountNote")}
             </p>
             <div className="flex items-center justify-end mt-3">
               <Button disabled={outcomeBusy} onClick={onSimpanOutcome}>
-                {outcomeBusy ? "Menyimpan…" : "Simpan Outcome"}
+                {outcomeBusy ? t("live.educatorEditor.saving") : t("live.educatorEditor.saveOutcomes")}
               </Button>
             </div>
           </>
@@ -521,26 +520,26 @@ export default function EditorKuizLangsung() {
       </Card>
 
       <div className="flex items-center justify-between mb-2 gap-2">
-        <h3 className="text-[14px] font-bold text-ink">Questions ({soalan.length})</h3>
+        <h3 className="text-[14px] font-bold text-ink">{t("live.educatorEditor.questionsCount", { n: soalan.length })}</h3>
         <Button onClick={() => setShowNew((s) => !s)}>
-          <Plus className="w-4 h-4" /> New Question
+          <Plus className="w-4 h-4" /> {t("live.educatorEditor.newQuestion")}
         </Button>
       </div>
 
       {showNew && (
         <Card className="mb-4">
-          <CardHead title="Add a question" />
+          <CardHead title={t("live.educatorEditor.addQuestion")} />
           <div className="mt-4 space-y-4">
-            <Field label="Question" htmlFor="soalan-baharu">
+            <Field label={t("live.educatorEditor.questionLabel")} htmlFor="soalan-baharu">
               <Textarea
                 id="soalan-baharu"
                 rows={2}
-                placeholder="Question text"
+                placeholder={t("live.educatorEditor.questionPlaceholder")}
                 value={prompt}
                 onChange={(e) => setPrompt(e.target.value)}
               />
             </Field>
-            <Field label="Options" note="Pick the circle beside the correct answer.">
+            <Field label={t("live.educatorEditor.optionsLabel")} note={t("live.educatorEditor.optionsNote")}>
               {barisPilihan(opts, setOpts, kunci, setKunci, "kunci-baharu", true)}
             </Field>
             {opts.length < 6 && (
@@ -550,11 +549,11 @@ export default function EditorKuizLangsung() {
                 className="text-brand-purple"
                 onClick={() => setOpts([...opts, { key: HURUF[opts.length], text: "" }])}
               >
-                + Add option
+                {t("live.educatorEditor.addOption")}
               </Button>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label="Points" htmlFor="soalan-baharu-mata">
+              <Field label={t("live.educatorEditor.pointsLabel")} htmlFor="soalan-baharu-mata">
                 <Input
                   id="soalan-baharu-mata"
                   type="number"
@@ -563,7 +562,7 @@ export default function EditorKuizLangsung() {
                   onChange={(e) => setPoints(Number(e.target.value) || 1000)}
                 />
               </Field>
-              <Field label={kiraDetik ? "Time (seconds)" : "Pace (seconds)"} htmlFor="soalan-baharu-masa">
+              <Field label={kiraDetik ? t("live.educatorEditor.timeSeconds") : t("live.educatorEditor.paceSeconds")} htmlFor="soalan-baharu-masa">
                 <Input
                   id="soalan-baharu-masa"
                   type="number"
@@ -574,17 +573,17 @@ export default function EditorKuizLangsung() {
               </Field>
             </div>
             <div className="flex flex-wrap gap-6">
-              <CheckRadio label="Countdown" checked={kiraDetik} onChange={(e) => setKiraDetik(e.target.checked)} />
-              <CheckRadio label="Double points" checked={mataBerganda} onChange={(e) => setMataBerganda(e.target.checked)} />
+              <CheckRadio label={t("live.educatorEditor.countdown")} checked={kiraDetik} onChange={(e) => setKiraDetik(e.target.checked)} />
+              <CheckRadio label={t("live.educatorEditor.doublePoints")} checked={mataBerganda} onChange={(e) => setMataBerganda(e.target.checked)} />
             </div>
             <p className="text-[12px] text-ink-faint">
               {kiraDetik
-                ? "Players see a clock. Answering at once earns the full points, answering on the last second earns half, and answers after time is up earn none."
-                : "No clock and no cut-off. Points still fall the longer a player takes, easing toward half, so faster answers always score higher."}
+                ? t("live.educatorEditor.countdownDesc")
+                : t("live.educatorEditor.paceDesc")}
             </p>
             <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowNew(false)}>Cancel</Button>
-              <Button disabled={busy} onClick={onTambah}>{busy ? "Saving…" : "Save question"}</Button>
+              <Button variant="outline" onClick={() => setShowNew(false)}>{t("common.cancel")}</Button>
+              <Button disabled={busy} onClick={onTambah}>{busy ? t("live.educatorEditor.saving") : t("live.educatorEditor.saveQuestion")}</Button>
             </div>
           </div>
         </Card>
@@ -594,8 +593,8 @@ export default function EditorKuizLangsung() {
         <div className="mb-4">
           <EmptyState
             icon={<Plus className="w-6 h-6" />}
-            title="No questions yet"
-            text="Add one by hand, or upload a CSV file below."
+            title={t("live.educatorEditor.emptyQuestionsTitle")}
+            text={t("live.educatorEditor.emptyQuestionsText")}
           />
         </div>
       ) : (
@@ -604,7 +603,7 @@ export default function EditorKuizLangsung() {
             <Card key={s.id}>
               {editId === s.id ? (
                 <div className="space-y-4">
-                  <Field label="Question" htmlFor={`sunting-${s.id}-prompt`}>
+                  <Field label={t("live.educatorEditor.questionLabel")} htmlFor={`sunting-${s.id}-prompt`}>
                     <Textarea
                       id={`sunting-${s.id}-prompt`}
                       rows={2}
@@ -612,11 +611,11 @@ export default function EditorKuizLangsung() {
                       onChange={(e) => setEditPrompt(e.target.value)}
                     />
                   </Field>
-                  <Field label="Options" note="Pick the circle beside the correct answer.">
+                  <Field label={t("live.educatorEditor.optionsLabel")} note={t("live.educatorEditor.optionsNote")}>
                     {barisPilihan(editOpts, setEditOpts, editKunci, setEditKunci, `kunci-sunting-${s.id}`, false)}
                   </Field>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label="Points" htmlFor={`sunting-${s.id}-mata`}>
+                    <Field label={t("live.educatorEditor.pointsLabel")} htmlFor={`sunting-${s.id}-mata`}>
                       <Input
                         id={`sunting-${s.id}-mata`}
                         type="number"
@@ -625,7 +624,7 @@ export default function EditorKuizLangsung() {
                         onChange={(e) => setEditPoints(Number(e.target.value) || 1000)}
                       />
                     </Field>
-                    <Field label={editKira ? "Time (seconds)" : "Pace (seconds)"} htmlFor={`sunting-${s.id}-masa`}>
+                    <Field label={editKira ? t("live.educatorEditor.timeSeconds") : t("live.educatorEditor.paceSeconds")} htmlFor={`sunting-${s.id}-masa`}>
                       <Input
                         id={`sunting-${s.id}-masa`}
                         type="number"
@@ -636,12 +635,12 @@ export default function EditorKuizLangsung() {
                     </Field>
                   </div>
                   <div className="flex flex-wrap gap-6">
-                    <CheckRadio label="Countdown" checked={editKira} onChange={(e) => setEditKira(e.target.checked)} />
-                    <CheckRadio label="Double points" checked={editBerganda} onChange={(e) => setEditBerganda(e.target.checked)} />
+                    <CheckRadio label={t("live.educatorEditor.countdown")} checked={editKira} onChange={(e) => setEditKira(e.target.checked)} />
+                    <CheckRadio label={t("live.educatorEditor.doublePoints")} checked={editBerganda} onChange={(e) => setEditBerganda(e.target.checked)} />
                   </div>
                   <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" onClick={() => setEditId(null)} disabled={busy}>Cancel</Button>
-                    <Button onClick={onSimpanSunting} disabled={busy}><Check className="w-4 h-4" /> Save</Button>
+                    <Button variant="outline" onClick={() => setEditId(null)} disabled={busy}>{t("common.cancel")}</Button>
+                    <Button onClick={onSimpanSunting} disabled={busy}><Check className="w-4 h-4" /> {t("live.educatorEditor.saveButton")}</Button>
                   </div>
                 </div>
               ) : (
@@ -657,18 +656,18 @@ export default function EditorKuizLangsung() {
                       ))}
                     </div>
                     <div className="text-[12px] text-ink-faint mt-1">
-                      {s.points} points{s.double_points ? " × 2" : ""} ·{" "}
+                      {t("live.educatorEditor.pointsN", { n: s.points })}{s.double_points ? " × 2" : ""} ·{" "}
                       {s.use_countdown === false
-                        ? `no countdown, pace ${s.time_limit_sec}s`
-                        : `${s.time_limit_sec}s countdown`}
+                        ? t("live.educatorEditor.noCountdownPace", { n: s.time_limit_sec })
+                        : t("live.educatorEditor.countdownSec", { n: s.time_limit_sec })}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
                     <Button
                       variant="icon"
                       size="sm"
-                      title="Edit question"
-                      ariaLabel="Edit question"
+                      title={t("live.educatorEditor.editQuestion")}
+                      ariaLabel={t("live.educatorEditor.editQuestion")}
                       onClick={() => mulaSunting(s)}
                     >
                       <Pencil className="w-4 h-4" />
@@ -676,8 +675,8 @@ export default function EditorKuizLangsung() {
                     <Button
                       variant="icon"
                       size="sm"
-                      title="Delete question"
-                      ariaLabel="Delete question"
+                      title={t("live.educatorEditor.deleteQuestion")}
+                      ariaLabel={t("live.educatorEditor.deleteQuestion")}
                       className="text-[#e85347] hover:bg-[#fce4e2]"
                       onClick={() => onPadamSoalan(s)}
                     >
@@ -695,27 +694,24 @@ export default function EditorKuizLangsung() {
         <CardHead
           title={
             <span className="flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-violet-600" /> Upload questions from a CSV file
+              <FileSpreadsheet className="w-4 h-4 text-violet-600" /> {t("live.educatorEditor.csvTitle")}
             </span>
           }
         />
         <p className="text-[12px] text-ink-faint mt-3 mb-3">
-          Download the template, type one question per row, then upload the file here. Every
-          question is added to the end of this quiz. If any row is wrong, nothing is imported and
-          the problem rows are listed below.
+          {t("live.educatorEditor.csvDesc")}
         </p>
         <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-3 text-xs text-gray-700">
-          <div className="font-semibold mb-1">Columns</div>
+          <div className="font-semibold mb-1">{t("live.educatorEditor.csvColumns")}</div>
           <ul className="list-disc ml-4 space-y-0.5">
-            <li><code className="font-mono">question</code>, the question text</li>
-            <li><code className="font-mono">option_a</code> to <code className="font-mono">option_d</code>, the choices. At least A and B are needed, filled in order.</li>
-            <li><code className="font-mono">correct</code>, the letter of the right answer, A to D</li>
-            <li><code className="font-mono">points</code>, optional, 1 to 10000. Blank means 1000.</li>
-            <li><code className="font-mono">seconds</code>, optional, 5 to 300. Blank means 20.</li>
+            <li><code className="font-mono">question</code>, {t("live.educatorEditor.csvColQuestion")}</li>
+            <li><code className="font-mono">option_a</code> to <code className="font-mono">option_d</code>, {t("live.educatorEditor.csvColOptions")}</li>
+            <li><code className="font-mono">correct</code>, {t("live.educatorEditor.csvColCorrect")}</li>
+            <li><code className="font-mono">points</code>, {t("live.educatorEditor.csvColPoints")}</li>
+            <li><code className="font-mono">seconds</code>, {t("live.educatorEditor.csvColSeconds")}</li>
           </ul>
           <div className="mt-2">
-            Save the file as <strong>CSV UTF-8</strong> in Excel, and keep the header row exactly as
-            it comes in the template. Up to 100 questions per upload.
+            {t("live.educatorEditor.csvSaveAs")} <strong>CSV UTF-8</strong> {t("live.educatorEditor.csvInExcel")}
           </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
@@ -724,7 +720,7 @@ export default function EditorKuizLangsung() {
             href="/api/live/quiz-template"
             className="px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 text-sm flex items-center gap-1"
           >
-            <Download className="w-4 h-4" /> Download template
+            <Download className="w-4 h-4" /> {t("live.educatorEditor.downloadTemplate")}
           </a>
           <input
             ref={csvInputRef}
@@ -734,7 +730,7 @@ export default function EditorKuizLangsung() {
             disabled={csvBusy}
             className="text-xs"
           />
-          {csvBusy && <span className="text-xs text-ink-faint">Uploading…</span>}
+          {csvBusy && <span className="text-xs text-ink-faint">{t("live.educatorEditor.uploading")}</span>}
         </div>
         {csvMsg && (
           <Alert tone={csvMsg.ok ? "success" : "danger"} className="mt-3">{csvMsg.text}</Alert>
@@ -742,7 +738,7 @@ export default function EditorKuizLangsung() {
         {csvErrors.length > 0 && (
           <ul className="mt-2 text-xs text-red-700 space-y-1 max-h-48 overflow-auto list-disc ml-4">
             {csvErrors.map((x, i) => (
-              <li key={i}>{x.row > 0 ? `Row ${x.row}: ` : ""}{x.message}</li>
+              <li key={i}>{x.row > 0 ? t("live.educatorEditor.csvRow", { n: x.row }) : ""}{x.message}</li>
             ))}
           </ul>
         )}
@@ -751,24 +747,24 @@ export default function EditorKuizLangsung() {
         <CardHead
           title={
             <span className="flex items-center gap-2">
-              <Upload className="w-4 h-4 text-indigo-600" /> Import Aiken format
+              <Upload className="w-4 h-4 text-indigo-600" /> {t("live.educatorEditor.aikenTitle")}
             </span>
           }
         />
         <p className="text-[12px] text-ink-faint mt-3 mb-2">
-          Paste questions in Aiken format. Separate every question with a blank line.
-          The <code className="font-mono bg-gray-100 px-1 rounded">ANSWER:</code> line sets the correct answer.
+          {t("live.educatorEditor.aikenDesc1")}
+          {t("live.educatorEditor.aikenDescMid")}<code className="font-mono bg-gray-100 px-1 rounded">ANSWER:</code>{t("live.educatorEditor.aikenDesc3")}
         </p>
         <Textarea
           className="w-full font-mono text-xs mb-2"
           rows={6}
-          placeholder={"What is the capital of Malaysia?\nA. Johor Bahru\nB. Kuala Lumpur\nC. Ipoh\nANSWER: B"}
+          placeholder={t("live.educatorEditor.aikenPlaceholder")}
           value={aiken}
           onChange={(e) => setAiken(e.target.value)}
         />
         <div className="flex items-center gap-3 flex-wrap">
           <Button onClick={onImportAiken} disabled={aikenBusy}>
-            <Upload className="w-4 h-4" /> {aikenBusy ? "Importing…" : "Import"}
+            <Upload className="w-4 h-4" /> {aikenBusy ? t("live.educatorEditor.importing") : t("live.educatorEditor.importLabel")}
           </Button>
           {aikenMsg && (
             <span className={`text-xs ${aikenMsg.ok ? "text-green-600" : "text-red-600"}`}>{aikenMsg.text}</span>
