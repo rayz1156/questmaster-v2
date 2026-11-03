@@ -30,6 +30,8 @@ import { EDU_TABS } from "@/lib/eduTabs";
 import { getClass, type Klass } from "@/lib/data";
 import { supabase } from "@/lib/supabase";
 import { peerApi } from "@/lib/peer-client";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, type Bahasa } from "@/lib/i18n";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import {
   Alert,
@@ -110,9 +112,10 @@ function statusPusingan(p: Pusingan): "akan" | "terbuka" | "tertutup" | "dikira"
   return "tertutup";
 }
 
-function formatTarikh(iso: string): string {
+// Format tarikh pusingan ikut bahasa semasa (en-GB / ms-MY).
+function formatTarikh(iso: string, bahasa: Bahasa): string {
   try {
-    return new Date(iso).toLocaleDateString(undefined, { month: "short", day: "numeric", year: "numeric" });
+    return new Date(iso).toLocaleDateString(LOKAL[bahasa], { month: "short", day: "numeric", year: "numeric" });
   } catch {
     return iso;
   }
@@ -127,6 +130,7 @@ export default function PeerReviewPage() {
   const params = useParams<{ id: string }>();
   const classId = params.id;
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
 
   const [klass, setKlass] = useState<Klass | null>(null);
   const [rounds, setRounds] = useState<Pusingan[]>([]);
@@ -158,12 +162,12 @@ export default function PeerReviewPage() {
     try {
       const res = await peerApi(`/api/classes/${classId}/peer-rounds`);
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to load rounds");
+      if (!res.ok) throw new Error(json.error || t('educator.peerReview.loadRoundsFailed'));
       setRounds(json.rounds ?? []);
     } catch (e: unknown) {
-      setMsg(mesejRalat(e, "Failed to load rounds"));
+      setMsg(mesejRalat(e, t('educator.peerReview.loadRoundsFailed')));
     }
-  }, [classId]);
+  }, [classId, t]);
 
   useEffect(() => {
     (async () => {
@@ -200,10 +204,10 @@ export default function PeerReviewPage() {
       try {
         const res = await peerApi(`/api/classes/${classId}/peer-rounds/${pusinganDipilih}/results`);
         const json = await res.json();
-        if (!res.ok) throw new Error(json.error || "Failed to load results");
+        if (!res.ok) throw new Error(json.error || t('educator.peerReview.loadResultsFailed'));
         setKeputusan(json);
       } catch (e: unknown) {
-        setMsg(mesejRalat(e, "Failed to load results"));
+        setMsg(mesejRalat(e, t('educator.peerReview.loadResultsFailed')));
         setKeputusan(null);
       }
     })();
@@ -234,7 +238,7 @@ export default function PeerReviewPage() {
       body: JSON.stringify({ name: p.name, week: p.week, opens_at: p.opens, closes_at: p.closes }),
     });
     const json = await res.json();
-    if (!res.ok) throw new Error(json.error || "Failed to create round");
+    if (!res.ok) throw new Error(json.error || t('educator.peerReview.createFailed'));
     await muatPusingan();
     return true;
   }
@@ -243,7 +247,7 @@ export default function PeerReviewPage() {
     setMsg(null);
     try {
       if (!nama.trim() || !dibuka || !ditutup) {
-        setMsg("A name and both dates are required.");
+        setMsg(t('educator.peerReview.nameAndDatesRequired'));
         return;
       }
       const sebelum = rounds.length;
@@ -255,9 +259,9 @@ export default function PeerReviewPage() {
       if (sebelum === 0) setAmaranSatuSudah(true);
       setBorangTerbuka(false);
       setNama(""); setMinggu(""); setDibuka(""); setDitutup("");
-      setMsg("Round created.");
+      setMsg(t('educator.peerReview.roundCreated'));
     } catch (e: unknown) {
-      setMsg(mesejRalat(e, "Failed to create round"));
+      setMsg(mesejRalat(e, t('educator.peerReview.createFailed')));
     }
   }
 
@@ -265,14 +269,15 @@ export default function PeerReviewPage() {
     setMsg(null);
     try {
       for (const week of TEMPLAT_MINGGU) {
-        const t = tarikhTemplat(week);
-        await ciptaPusingan({ name: `Peer review week ${week}`, week, opens: t.opens, closes: t.closes });
+        // Pembolehubah dinamakan `tarikh` supaya tidak berlanggar dengan fungsi t().
+        const tarikh = tarikhTemplat(week);
+        await ciptaPusingan({ name: t('educator.peerReview.roundNameTemplate', { minggu: week }), week, opens: tarikh.opens, closes: tarikh.closes });
       }
       // Tiga pusingan dicipta, jadi amaran satu pusingan tidak relevan.
       setAmaranSatuSudah(false);
-      setMsg("Three formative rounds created. Edit the dates if needed. Marked (summative) rounds will come in a later phase.");
+      setMsg(t('educator.peerReview.templateCreated'));
     } catch (e: unknown) {
-      setMsg(mesejRalat(e, "Failed to create template rounds"));
+      setMsg(mesejRalat(e, t('educator.peerReview.templateFailed')));
     }
   }
 
@@ -282,12 +287,12 @@ export default function PeerReviewPage() {
     try {
       const res = await peerApi(`/api/classes/${classId}/peer-rounds/${roundId}/compute`, { method: "POST" });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to compute");
+      if (!res.ok) throw new Error(json.error || t('educator.peerReview.computeFailed'));
       await muatPusingan();
       setVersiKeputusan((v) => v + 1);
-      setMsg(`Results computed: ${json.written ?? 0} students.`);
+      setMsg(t('educator.peerReview.resultsComputed', { n: json.written ?? 0 }));
     } catch (e: unknown) {
-      setMsg(mesejRalat(e, "Failed to compute"));
+      setMsg(mesejRalat(e, t('educator.peerReview.computeFailed')));
     } finally {
       setKiraBusy(false);
     }
@@ -295,9 +300,9 @@ export default function PeerReviewPage() {
 
   async function padamPusingan(p: Pusingan) {
     const ok = await confirm({
-      title: "Delete this round?",
-      description: `\"${p.name}\" will be removed. A round that already has submissions cannot be deleted.`,
-      confirmLabel: "Delete round",
+      title: t('educator.peerReview.deleteConfirmTitle'),
+      description: t('educator.peerReview.deleteConfirmDesc', { nama: p.name }),
+      confirmLabel: t('educator.peerReview.deleteLabel'),
       tone: "danger",
     });
     if (!ok) return;
@@ -305,21 +310,21 @@ export default function PeerReviewPage() {
     try {
       const res = await peerApi(`/api/classes/${classId}/peer-rounds/${p.id}`, { method: "DELETE" });
       const json = await res.json();
-      if (!res.ok) throw new Error(json.error || "Failed to delete");
+      if (!res.ok) throw new Error(json.error || t('educator.peerReview.deleteFailed'));
       if (pusinganDipilih === p.id) setPusinganDipilih("");
       await muatPusingan();
-      setMsg("Round deleted.");
+      setMsg(t('educator.peerReview.roundDeleted'));
     } catch (e: unknown) {
-      setMsg(mesejRalat(e, "Failed to delete"));
+      setMsg(mesejRalat(e, t('educator.peerReview.deleteFailed')));
     }
   }
 
   const belumLabel: Record<Penapis, string> = {
-    semua: "All",
-    merah: "Red only",
-    semak: "Needs review",
-    risiko: "At-risk groups",
-    belum: "Not submitted",
+    semua: t('educator.peerReview.filterAll'),
+    merah: t('educator.peerReview.filterRed'),
+    semak: t('educator.peerReview.filterReview'),
+    risiko: t('educator.peerReview.filterAtRisk'),
+    belum: t('educator.peerReview.filterNotSubmitted'),
   };
 
   const barisDitapis = useMemo(() => {
@@ -352,14 +357,14 @@ export default function PeerReviewPage() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <div className="p-10 text-[14px] text-ink-muted">Loading peer review...</div>
+        <div className="p-10 text-[14px] text-ink-muted">{t('educator.peerReview.loading')}</div>
       </Shell>
     );
   }
   if (!klass) {
     return (
       <Shell tabs={EDU_TABS}>
-        <div className="p-10 text-[14px] text-ink-muted">Class not found.</div>
+        <div className="p-10 text-[14px] text-ink-muted">{t('educator.peerReview.classNotFound')}</div>
       </Shell>
     );
   }
@@ -376,7 +381,7 @@ export default function PeerReviewPage() {
   const lajurKeputusan: DataColumn<BarisKeputusan>[] = [
     {
       key: "pelajar",
-      header: "Student",
+      header: t('common.student'),
       render: (b) => (
         <span className="flex items-center gap-2 min-w-0">
           <span
@@ -384,16 +389,16 @@ export default function PeerReviewPage() {
             className="h-2 w-2 shrink-0 rounded-full"
             style={{ backgroundColor: b.flag ? (titikBendera[b.flag] ?? "#dbdfea") : "#dbdfea" }}
           />
-          <span className="text-[13px] font-medium text-ink truncate">{b.name || "Student"}</span>
+          <span className="text-[13px] font-medium text-ink truncate">{b.name || t('common.student')}</span>
           {b.team_at_risk && (
-            <Badge variant="dim" warna="red">AT RISK</Badge>
+            <Badge variant="dim" warna="red">{t('educator.peerReview.atRisk')}</Badge>
           )}
         </span>
       ),
     },
     {
       key: "kumpulan",
-      header: "Group",
+      header: t('educator.peerReview.colGroup'),
       render: (b) => <span className="text-[13px] text-ink-muted">{b.team_name}</span>,
     },
     {
@@ -425,7 +430,7 @@ export default function PeerReviewPage() {
     },
     {
       key: "bendera",
-      header: "Flag",
+      header: t('educator.peerReview.colFlag'),
       render: (b) => (
         <span className="text-[12px] font-medium" style={{ color: b.flag ? (titikBendera[b.flag] ?? "#8094ae") : "#8094ae" }}>
           {b.flag ?? "-"}
@@ -434,10 +439,10 @@ export default function PeerReviewPage() {
     },
     {
       key: "semak",
-      header: "Review",
+      header: t('educator.peerReview.colReview'),
       render: (b) => (
         b.needs_review
-          ? <span className="text-[12px] font-bold text-kz-down">YES</span>
+          ? <span className="text-[12px] font-bold text-kz-down">{t('educator.peerReview.yes')}</span>
           : <span className="text-[13px] text-ink-faint">-</span>
       ),
     },
@@ -453,90 +458,90 @@ export default function PeerReviewPage() {
         {borangTerbuka && (
           <Card className="mb-4">
             <CardHead
-              title="Create evaluation round"
+              title={t('educator.peerReview.createTitle')}
               right={
-                <Button variant="icon" ariaLabel="Close form" onClick={() => setBorangTerbuka(false)}>
+                <Button variant="icon" ariaLabel={t('educator.peerReview.closeForm')} onClick={() => setBorangTerbuka(false)}>
                   <X className="w-4 h-4" />
                 </Button>
               }
             />
             {rounds.length === 0 && (
               <Alert tone="info" className="my-4">
-                <div className="font-bold text-ink mb-1">Suggested: three formative rounds</div>
-                <p className="mb-3">Weeks 4, 6 and 9 catch group problems early. Marked (summative) rounds will come in a later phase.</p>
-                <p className="text-[14px] font-medium text-[#344357] mb-2">Semester start date</p>
+                <div className="font-bold text-ink mb-1">{t('educator.peerReview.suggestedTitle')}</div>
+                <p className="mb-3">{t('educator.peerReview.suggestedText')}</p>
+                <p className="text-[14px] font-medium text-[#344357] mb-2">{t('educator.peerReview.semesterStart')}</p>
                 <div className="flex flex-wrap items-center gap-2">
                   <Input
                     type="date"
                     value={mulaSemester}
                     onChange={(e) => setMulaSemester(e.target.value)}
                     className="max-w-[200px]"
-                    aria-label="Semester start date"
+                    aria-label={t('educator.peerReview.semesterStart')}
                   />
                   <Button size="sm" disabled={!mulaSemester} onClick={ciptaTemplat}>
-                    Create all three rounds
+                    {t('educator.peerReview.createAllThree')}
                   </Button>
                   <span className="text-[12px] text-ink-faint">
-                    Opens at start + (week - 1) weeks; closes seven days later. Not saved anywhere; you can edit each date.
+                    {t('educator.peerReview.templateNote')}
                   </span>
                 </div>
               </Alert>
             )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mt-4">
-              <Field label="Round name" htmlFor="pusingan-nama">
-                <Input id="pusingan-nama" value={nama} onChange={(e) => setNama(e.target.value)} placeholder="Peer review week 4" />
+              <Field label={t('educator.peerReview.nameLabel')} htmlFor="pusingan-nama">
+                <Input id="pusingan-nama" value={nama} onChange={(e) => setNama(e.target.value)} placeholder={t('educator.peerReview.roundNameTemplate', { minggu: 4 })} />
               </Field>
-              <Field label="Week label (optional)" htmlFor="pusingan-minggu">
+              <Field label={t('educator.peerReview.weekLabel')} htmlFor="pusingan-minggu">
                 <Input id="pusingan-minggu" type="number" min={1} max={52} value={minggu} onChange={(e) => setMinggu(e.target.value)} />
               </Field>
-              <Field label="Opens at" htmlFor="pusingan-dibuka">
+              <Field label={t('educator.peerReview.opensLabel')} htmlFor="pusingan-dibuka">
                 <Input id="pusingan-dibuka" type="datetime-local" value={dibuka} onChange={(e) => setDibuka(e.target.value)} />
               </Field>
-              <Field label="Closes at" htmlFor="pusingan-ditutup">
+              <Field label={t('educator.peerReview.closesLabel')} htmlFor="pusingan-ditutup">
                 <Input id="pusingan-ditutup" type="datetime-local" value={ditutup} onChange={(e) => setDitutup(e.target.value)} />
               </Field>
             </div>
             <div className="mt-4 flex justify-end">
-              <Button onClick={simpanBorang}>Save round</Button>
+              <Button onClick={simpanBorang}>{t('educator.peerReview.saveRound')}</Button>
             </div>
           </Card>
         )}
 
         {amaranSatuSudah && (
           <Alert tone="warning" icon={<AlertTriangle className="w-4 h-4" />} className="mb-4">
-            <div className="font-bold">A single round measures but does not detect.</div>
-            <p className="mb-3">Group problems will only become visible after everything is over. More rounds give earlier warning.</p>
+            <div className="font-bold">{t('educator.peerReview.singleRoundTitle')}</div>
+            <p className="mb-3">{t('educator.peerReview.singleRoundText')}</p>
             <div className="flex flex-wrap gap-2">
-              <Button variant="outline" size="sm" onClick={() => setAmaranSatuSudah(false)}>Continue</Button>
-              <Button size="sm" onClick={() => { setAmaranSatuSudah(false); setBorangTerbuka(true); }}>Add round</Button>
+              <Button variant="outline" size="sm" onClick={() => setAmaranSatuSudah(false)}>{t('educator.peerReview.continue')}</Button>
+              <Button size="sm" onClick={() => { setAmaranSatuSudah(false); setBorangTerbuka(true); }}>{t('educator.peerReview.addRound')}</Button>
             </div>
           </Alert>
         )}
 
         {kumpulanDua.length > 0 && (
           <Alert tone="warning" icon={<Users className="w-4 h-4" />} className="mb-4">
-            <div className="font-bold">Some groups have only two members: {kumpulanDua.join(", ")}.</div>
-            <p>Each member receives a single evaluation, so no adjustment is made and both members are marked for review.</p>
+            <div className="font-bold">{t('educator.peerReview.twoMembersTitle', { senarai: kumpulanDua.join(", ") })}</div>
+            <p>{t('educator.peerReview.twoMembersText')}</p>
           </Alert>
         )}
 
         {/* Bahagian pusingan */}
         <Card className="mb-4">
           <CardHead
-            title="Rounds"
-            subtitle="Each member rates their teammates on five criteria. Scores stay private; only you see the raw data."
+            title={t('educator.peerReview.roundsTitle')}
+            subtitle={t('educator.peerReview.roundsSubtitle')}
             right={
               <Button size="sm" onClick={() => setBorangTerbuka(!borangTerbuka)}>
-                <Plus className="w-4 h-4" /> Create round
+                <Plus className="w-4 h-4" /> {t('educator.peerReview.createRound')}
               </Button>
             }
           />
           {rounds.length === 0 ? (
             <EmptyState
               icon={<Users className="w-6 h-6" />}
-              title="No rounds yet"
-              text="Use the suggested template or create a round."
-              actionLabel="Create round"
+              title={t('educator.peerReview.noRoundsTitle')}
+              text={t('educator.peerReview.noRoundsText')}
+              actionLabel={t('educator.peerReview.createRound')}
               onAction={() => setBorangTerbuka(true)}
             />
           ) : (
@@ -553,14 +558,14 @@ export default function PeerReviewPage() {
                     <div className="min-w-0 flex-1">
                       <div className="text-[14px] font-medium text-ink truncate">
                         {r.name}
-                        {r.week ? <span className="ml-2 text-[12px] text-ink-faint font-normal">week {r.week}</span> : null}
+                        {r.week ? <span className="ml-2 text-[12px] text-ink-faint font-normal">{t('educator.peerReview.weekLabelShort', { minggu: r.week })}</span> : null}
                       </div>
                       <div className="text-[12px] text-ink-faint">
-                        {formatTarikh(r.opens_at)} to {formatTarikh(r.closes_at)}
+                        {t('educator.peerReview.dateRange', { dari: formatTarikh(r.opens_at, bahasa), hingga: formatTarikh(r.closes_at, bahasa) })}
                       </div>
                     </div>
                     <Badge variant="dot" warna={warna}>
-                      {st === "akan" ? "Upcoming" : st === "terbuka" ? "Open" : st === "dikira" ? "Computed" : "Closed"}
+                      {st === "akan" ? t('educator.peerReview.statusUpcoming') : st === "terbuka" ? t('educator.peerReview.statusOpen') : st === "dikira" ? t('educator.peerReview.statusComputed') : t('educator.peerReview.statusClosed')}
                     </Badge>
                     {(st === "tertutup" || st === "dikira") && (
                       <Button
@@ -570,15 +575,15 @@ export default function PeerReviewPage() {
                         disabled={kiraBusy}
                       >
                         <RefreshCw className={`w-3.5 h-3.5 ${kiraBusy ? "animate-spin" : ""}`} />
-                        {st === "dikira" ? "Recompute" : "Compute results"}
+                        {st === "dikira" ? t('educator.peerReview.recompute') : t('educator.peerReview.computeResults')}
                       </Button>
                     )}
                     <Button size="sm" onClick={() => setPusinganDipilih(r.id)}>
-                      Results
+                      {t('educator.peerReview.results')}
                     </Button>
                     <Button
                       variant="icon"
-                      ariaLabel={`Delete round ${r.name}`}
+                      ariaLabel={t('educator.peerReview.deleteRoundAria', { nama: r.name })}
                       onClick={() => padamPusingan(r)}
                     >
                       <Trash2 className="w-4 h-4" />
@@ -596,11 +601,11 @@ export default function PeerReviewPage() {
           penapis === "belum" ? (
             <div className="bg-white rounded-[4px] shadow-card">
               <CardHead
-                title={`Results: ${keputusan.round.name}`}
+                title={t('educator.peerReview.resultsFor', { nama: keputusan.round.name })}
                 subtitle={
                   keputusan.round.computed_at
-                    ? `Computed ${formatTarikh(keputusan.round.computed_at)}`
-                    : "Not computed yet"
+                    ? t('educator.peerReview.computedOn', { tarikh: formatTarikh(keputusan.round.computed_at, bahasa) })
+                    : t('educator.peerReview.notComputedYet')
                 }
                 right={
                   <div className="flex flex-wrap gap-1.5">
@@ -619,13 +624,13 @@ export default function PeerReviewPage() {
               />
               <div className="px-6 pb-2">
                 {keputusan.not_submitted.length === 0 ? (
-                  <p className="text-[14px] text-ink-faint py-3">Everyone has submitted.</p>
+                  <p className="text-[14px] text-ink-faint py-3">{t('educator.peerReview.everyoneSubmitted')}</p>
                 ) : (
                   <ul className="divide-y divide-kz-line">
                     {keputusan.not_submitted.map((m) => (
                       <li key={m.user_id + m.team_id} className="py-3 text-[13px]">
-                        <span className="font-medium text-ink">{m.name || "Student"}</span>
-                        <span className="text-ink-muted"> has not submitted their evaluation ({m.team_name}).</span>
+                        <span className="font-medium text-ink">{m.name || t('common.student')}</span>
+                        <span className="text-ink-muted"> {t('educator.peerReview.notSubmitted', { kumpulan: m.team_name })}</span>
                       </li>
                     ))}
                   </ul>
@@ -634,18 +639,18 @@ export default function PeerReviewPage() {
             </div>
           ) : (
             <DataTable
-              label={`Peer review results for ${keputusan.round.name}`}
+              label={t('educator.peerReview.tableLabel', { nama: keputusan.round.name })}
               columns={lajurKeputusan}
               rows={barisDitapis}
               rowKey={(b) => b.user_id}
               onRowClick={(b) => setBarisTerbuka(barisTerbuka === b.user_id ? null : b.user_id)}
               head={
                 <CardHead
-                  title={`Results: ${keputusan.round.name}`}
+                  title={t('educator.peerReview.resultsFor', { nama: keputusan.round.name })}
                   subtitle={
                     keputusan.round.computed_at
-                      ? `Computed ${formatTarikh(keputusan.round.computed_at)}`
-                      : "Not computed yet"
+                      ? t('educator.peerReview.computedOn', { tarikh: formatTarikh(keputusan.round.computed_at, bahasa) })
+                      : t('educator.peerReview.notComputedYet')
                   }
                   right={
                     <div className="flex flex-wrap gap-1.5">
@@ -666,8 +671,8 @@ export default function PeerReviewPage() {
               empty={
                 <EmptyState
                   icon={<Users className="w-6 h-6" />}
-                  title="No students match this filter."
-                  text="Try another filter."
+                  title={t('educator.peerReview.noMatchTitle')}
+                  text={t('educator.peerReview.noMatchText')}
                 />
               }
               renderRowExtra={(b) => {
@@ -676,10 +681,10 @@ export default function PeerReviewPage() {
                 return (
                   <div className="rounded-[4px] border border-hairline bg-[#f8f9fc] p-4 text-[12px]">
                     <div className="font-bold text-ink mb-1">
-                      Justifications received about {b.name || "this student"} (raters stay anonymous):
+                      {t('educator.peerReview.justificationsFor', { nama: b.name || t('educator.peerReview.thisStudent') })}
                     </div>
                     {just.length === 0 ? (
-                      <p className="text-ink-faint">None. The student received no written justification.</p>
+                      <p className="text-ink-faint">{t('educator.peerReview.noJustifications')}</p>
                     ) : (
                       <ul className="list-disc pl-4 space-y-1 text-ink-muted">
                         {just.map((j, i) => (
