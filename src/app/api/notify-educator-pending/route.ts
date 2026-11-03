@@ -3,6 +3,7 @@ import nodemailer from 'nodemailer';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { emelPendidikMenunggu } from '@/lib/i18n/emel';
 import { LOKAL, type Bahasa } from '@/lib/i18n';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic';
 export async function POST(req: NextRequest) {
   try {
     const { email, name } = await req.json();
-    if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+    if (!email) return ralatJson('email required', 400);
 
     const adminTo = process.env.ADMIN_NOTIFICATION_EMAIL;
     // Penghantar emel: SMTP_* (Emailit) diutamakan; BREVO_* dikekalkan sebagai
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     const fromName = process.env.SMTP_FROM_NAME || process.env.BREVO_FROM_NAME || 'Kuizen';
 
     if (!adminTo || !host || !user || !pass) {
-      return NextResponse.json({ error: 'SMTP not configured' }, { status: 500 });
+      return ralatJson('SMTP not configured', 500);
     }
 
     const transporter = nodemailer.createTransport({ host, port, secure: false, auth: { user, pass } });
@@ -59,6 +60,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error('notify-educator-pending error', e);
-    return NextResponse.json({ error: e?.message || 'failed' }, { status: 500 });
+    return ralatJson(e?.message || 'failed', 500);
   }
 }
