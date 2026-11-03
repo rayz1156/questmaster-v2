@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -26,7 +27,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
   if (typeof body.moodW === 'number' && Number.isFinite(body.moodW)) updates.mood_w = Math.max(1, Math.floor(body.moodW));
   if (typeof body.moodH === 'number' && Number.isFinite(body.moodH)) updates.mood_h = Math.max(1, Math.floor(body.moodH));
   if (typeof body.moodZ === 'number' && Number.isFinite(body.moodZ)) updates.mood_z = Math.floor(body.moodZ);
-  if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  if (!Object.keys(updates).length) return ralatJson('Nothing to update', 400);
 
   // RLS: owner can update own; educator can update any. We just attempt the update.
   const { data, error } = await supa
@@ -35,7 +36,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
     .eq('id', params.itemId)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 403 });
+  if (error) return ralatJson(error.message, 403);
   return NextResponse.json({ item: data });
 }
 
@@ -46,6 +47,6 @@ export async function DELETE(req: NextRequest, { params }: { params: { huntId: s
 
   // RLS enforces who can delete (owner or class educator)
   const { error } = await supa.from('qm_submission_board_items').delete().eq('id', params.itemId);
-  if (error) return NextResponse.json({ error: error.message }, { status: 403 });
+  if (error) return ralatJson(error.message, 403);
   return NextResponse.json({ ok: true });
 }

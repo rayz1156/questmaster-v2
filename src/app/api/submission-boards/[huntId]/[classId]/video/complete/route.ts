@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -14,8 +15,5 @@ export const runtime = 'nodejs';
  * Balasan dihantar sebelum sebarang kerja: tiada panggilan Bunny/Adilo.
  */
 export async function POST() {
-  return NextResponse.json(
-    { error: 'Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.' },
-    { status: 410 },
-  );
+  return ralatJson('Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.', 410);
 }

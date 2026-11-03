@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -62,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   if (auth.response) return auth.response;
   const { supa, klass, user } = auth;
   const educator = await isEducator(supa, params.classId, user!.id, klass!.owner_id);
-  if (!educator) return NextResponse.json({ error: 'Only educators can create submission boards' }, { status: 403 });
+  if (!educator) return ralatJson('Only educators can create submission boards', 403);
 
   const body = await req.json().catch(() => ({}));
   const title: string = typeof body.title === 'string' && body.title.trim() ? body.title.trim() : 'Submission Board';
@@ -81,7 +82,7 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
     })
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ board: data });
 }
 
@@ -90,7 +91,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
   if (auth.response) return auth.response;
   const { supa, klass, user } = auth;
   const educator = await isEducator(supa, params.classId, user!.id, klass!.owner_id);
-  if (!educator) return NextResponse.json({ error: 'Only educators can edit the board' }, { status: 403 });
+  if (!educator) return ralatJson('Only educators can edit the board', 403);
 
   const body = await req.json().catch(() => ({}));
   const updates: any = {};
@@ -99,7 +100,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
   if (['public', 'private', 'class_scoped'].includes(body.visibility)) updates.visibility = body.visibility;
   if (typeof body.is_open === 'boolean') updates.is_open = body.is_open;
   if (typeof body.view_mode === 'string' && ['columns','mood'].includes(body.view_mode)) updates.view_mode = body.view_mode;
-  if (!Object.keys(updates).length) return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+  if (!Object.keys(updates).length) return ralatJson('Nothing to update', 400);
 
   const { data, error } = await supa
     .from('qm_submission_boards')
@@ -108,6 +109,6 @@ export async function PATCH(req: NextRequest, { params }: { params: { huntId: st
     .eq('class_id', params.classId)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ board: data });
 }

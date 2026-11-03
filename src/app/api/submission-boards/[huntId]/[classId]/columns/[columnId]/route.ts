@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -17,15 +18,15 @@ export async function PATCH(
   const updates: any = {};
   if (typeof body.title === 'string') {
     const t = body.title.trim();
-    if (!t) return NextResponse.json({ error: 'title cannot be empty' }, { status: 400 });
-    if (t.length > 80) return NextResponse.json({ error: 'title too long (max 80)' }, { status: 400 });
+    if (!t) return ralatJson('title cannot be empty', 400);
+    if (t.length > 80) return ralatJson('title too long (max 80)', 400);
     updates.title = t;
   }
   if (typeof body.position === 'number' && Number.isFinite(body.position)) {
     updates.position = Math.max(0, Math.floor(body.position));
   }
   if (!Object.keys(updates).length) {
-    return NextResponse.json({ error: 'Nothing to update' }, { status: 400 });
+    return ralatJson('Nothing to update', 400);
   }
 
   const { data, error } = await supa
@@ -34,7 +35,7 @@ export async function PATCH(
     .eq('id', params.columnId)
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 403 });
+  if (error) return ralatJson(error.message, 403);
   return NextResponse.json({ column: data });
 }
 
@@ -65,12 +66,9 @@ export async function DELETE(
   if (error) {
     // If the column is non-empty and the caller is not an educator, RLS will block delete.
     if (count && count > 0) {
-      return NextResponse.json(
-        { error: `Column has ${count} item${count === 1 ? '' : 's'}. Move them first, or ask your educator to delete.` },
-        { status: 409 }
-      );
+      return ralatJson(`Column has ${count} item${count === 1 ? '' : 's'}. Move them first, or ask your educator to delete.`, 409);
     }
-    return NextResponse.json({ error: error.message }, { status: 403 });
+    return ralatJson(error.message, 403);
   }
   return NextResponse.json({ ok: true });
 }

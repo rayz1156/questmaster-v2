@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -20,7 +21,7 @@ export async function GET(
     .eq('activity_id', params.huntId)
     .eq('class_id', params.classId)
     .maybeSingle();
-  if (bErr) return NextResponse.json({ error: bErr.message }, { status: 403 });
+  if (bErr) return ralatJson(bErr.message, 403);
   if (!board) return NextResponse.json({ columns: [] });
 
   const { data, error } = await supa
@@ -29,7 +30,7 @@ export async function GET(
     .eq('board_id', board.id)
     .order('position', { ascending: true })
     .order('created_at', { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 403 });
+  if (error) return ralatJson(error.message, 403);
   return NextResponse.json({ columns: data || [] });
 }
 
@@ -45,8 +46,8 @@ export async function POST(
 
   const body = await req.json().catch(() => ({}));
   const title = typeof body.title === 'string' ? body.title.trim() : '';
-  if (!title) return NextResponse.json({ error: 'title required' }, { status: 400 });
-  if (title.length > 80) return NextResponse.json({ error: 'title too long (max 80)' }, { status: 400 });
+  if (!title) return ralatJson('title required', 400);
+  if (title.length > 80) return ralatJson('title too long (max 80)', 400);
 
   const { data: board, error: bErr } = await supa
     .from('qm_submission_boards')
@@ -54,7 +55,7 @@ export async function POST(
     .eq('activity_id', params.huntId)
     .eq('class_id', params.classId)
     .maybeSingle();
-  if (bErr || !board) return NextResponse.json({ error: bErr?.message || 'Board not found' }, { status: 404 });
+  if (bErr || !board) return ralatJson(bErr?.message || 'Board not found', 404);
 
   // Next position = max(position)+1
   const { data: existing } = await supa
@@ -70,6 +71,6 @@ export async function POST(
     .insert({ board_id: board.id, title, position: nextPos, created_by: user!.id })
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 403 });
+  if (error) return ralatJson(error.message, 403);
   return NextResponse.json({ column: data });
 }
