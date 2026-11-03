@@ -24,6 +24,7 @@ import { pelanSijilBerbayar } from '@/lib/sijil/pelanSijil';
 import { janaPdfSijil } from '@/lib/sijil/janaPdf';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import type { ItemPustaka } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,13 +49,10 @@ export async function POST(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-lib-sample:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   // RLS mengawal keterlihatan: item yang tidak boleh dilihat pemanggil
@@ -65,7 +63,7 @@ export async function POST(
     .eq('id', params.libraryId)
     .maybeSingle();
   if (!item) {
-    return NextResponse.json({ error: 'Template not found.' }, { status: 404 });
+    return ralatJson('Template not found.', 404);
   }
   const itemPenuh = item as ItemPustaka;
 
@@ -117,16 +115,13 @@ export async function POST(
       .from('certificates')
       .upload(namaFail, bait, { contentType: 'application/pdf' });
     if (upErr) {
-      return NextResponse.json({ error: upErr.message }, { status: 500 });
+      return ralatJson(upErr.message, 500);
     }
     const { data: signed, error: signErr } = await svc.storage
       .from('certificates')
       .createSignedUrl(namaFail, SAAT_URL);
     if (signErr || !signed) {
-      return NextResponse.json(
-        { error: signErr?.message ?? 'Could not sign the sample URL.' },
-        { status: 500 },
-      );
+      return ralatJson(signErr?.message ?? 'Could not sign the sample URL.', 500);
     }
     return NextResponse.json({ url: signed.signedUrl, expires_in: SAAT_URL });
   }

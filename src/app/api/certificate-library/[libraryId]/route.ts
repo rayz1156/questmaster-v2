@@ -17,6 +17,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import type { ItemPustaka } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,13 +37,10 @@ export async function PATCH(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-lib-edit:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -52,7 +50,7 @@ export async function PATCH(
   if (typeof body.title === 'string') {
     const title = body.title.trim().slice(0, 120);
     if (!title) {
-      return NextResponse.json({ error: 'Title is required.' }, { status: 400 });
+      return ralatJson('Title is required.', 400);
     }
     kemas.title = title;
   }
@@ -61,7 +59,7 @@ export async function PATCH(
     kemas.layout = normaliseSusunAtur(body.layout);
   }
   if (Object.keys(kemas).length === 1) {
-    return NextResponse.json({ error: 'Title or layout is required.' }, { status: 400 });
+    return ralatJson('Title or layout is required.', 400);
   }
 
   // RLS mengecilkan kepada item personal milik sendiri sahaja.
@@ -74,7 +72,7 @@ export async function PATCH(
     .select(LAJUR_ITEM)
     .single();
   if (error || !data) {
-    return NextResponse.json({ error: 'Template not found.' }, { status: 404 });
+    return ralatJson('Template not found.', 404);
   }
   return NextResponse.json({ item: data });
 }
@@ -88,13 +86,10 @@ export async function DELETE(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(params.libraryId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-lib-edit:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   // Baca item dahulu (RLS: personal milik sendiri) untuk dapatkan laluan
@@ -107,7 +102,7 @@ export async function DELETE(
     .eq('owner_id', userId)
     .maybeSingle();
   if (!item) {
-    return NextResponse.json({ error: 'Template not found.' }, { status: 404 });
+    return ralatJson('Template not found.', 404);
   }
   const itemPenuh = item as ItemPustaka;
 
@@ -118,7 +113,7 @@ export async function DELETE(
     .eq('scope', 'personal')
     .eq('owner_id', userId);
   if (delErr) {
-    return NextResponse.json({ error: 'Could not delete the template.' }, { status: 400 });
+    return ralatJson('Could not delete the template.', 400);
   }
 
   // Selepas baris dipadam, semak rujukan: templat kelas yang memakai item

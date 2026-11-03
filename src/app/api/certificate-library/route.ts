@@ -25,6 +25,7 @@ import { pelanSijilBerbayar } from '@/lib/sijil/pelanSijil';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
 import { itemTerkunci, type ItemPustaka, type ItemPustakaApi, type JenisAset } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -111,34 +112,28 @@ export async function POST(req: NextRequest) {
   const classId = typeof body.class_id === 'string' ? body.class_id : '';
 
   if (!UUID.test(fromTemplateId) || !UUID.test(classId)) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
 
   if (!dalamHad(`cert-lib-save:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   // Pemanggil mesti pendidik kelas asal (templat hanya boleh dibaca pendidik
   // kelas melalui RLS qm_certificate_templates).
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const template = await bacaTemplatKelas(auth.supa, fromTemplateId, classId);
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
 
   // Pelan berkesan PEMANGGIL (bukan pemilik kelas): "Templat saya" milik
   // educator, boleh diguna merentas semua kelas yang dia urus.
   const pelan = await pelanPemanggil(auth.supa, userId);
   if (!pelanSijilBerbayar(pelan)) {
-    return NextResponse.json(
-      { error: 'My templates are available on Pro, Institution and Unlimited plans.' },
-      { status: 402 },
-    );
+    return ralatJson('My templates are available on Pro, Institution and Unlimited plans.', 402);
   }
 
   const tajukAsal =
@@ -165,18 +160,12 @@ export async function POST(req: NextRequest) {
   if (insErr || !item) {
     const msg = insErr?.message ?? '';
     if (msg.includes('LIBRARY_LIMIT')) {
-      return NextResponse.json(
-        { error: 'You can keep up to 50 personal templates. Delete one first.', code: 'LIBRARY_LIMIT' },
-        { status: 409 },
-      );
+      return ralatJson('You can keep up to 50 personal templates. Delete one first.', 409, { code: 'LIBRARY_LIMIT' });
     }
     if (msg.includes('MY_TEMPLATE_PLAN')) {
-      return NextResponse.json(
-        { error: 'My templates are available on Pro, Institution and Unlimited plans.' },
-        { status: 402 },
-      );
+      return ralatJson('My templates are available on Pro, Institution and Unlimited plans.', 402);
     }
-    return NextResponse.json({ error: 'Could not save the template.' }, { status: 400 });
+    return ralatJson('Could not save the template.', 400);
   }
 
   const idItem = (item as ItemPustaka).id;
@@ -203,7 +192,7 @@ export async function POST(req: NextRequest) {
     }
   } catch {
     await auth.supa.from('qm_certificate_library').delete().eq('id', idItem).then(() => undefined, () => undefined);
-    return NextResponse.json({ error: 'Could not copy the template images.' }, { status: 500 });
+    return ralatJson('Could not copy the template images.', 500);
   }
 
   if (laluanBaharu.background || laluanBaharu.logo) {
@@ -218,7 +207,7 @@ export async function POST(req: NextRequest) {
       .select(LAJUR_ITEM)
       .single();
     if (updErr || !itemKini) {
-      return NextResponse.json({ error: 'Could not attach the template images.' }, { status: 500 });
+      return ralatJson('Could not attach the template images.', 500);
     }
     return NextResponse.json({ item: await binaItemApi(svc, itemKini as ItemPustaka, pelan) }, { status: 201 });
   }
