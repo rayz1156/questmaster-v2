@@ -22,6 +22,7 @@ import { authHeader } from "@/lib/peer-client";
 import { listMyEducatorClasses } from "@/lib/data";
 import type { EducatorClassRow } from "@/lib/types";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { Button, Card, CardSection, EmptyState, Input, PageHead } from "@/components/ui";
 
@@ -30,6 +31,7 @@ const A4_NISBAH = "841.89 / 595.28";
 
 export default function MyCertificateTemplatesPage() {
   const confirm = useConfirm();
+  const { t } = useBahasa();
 
   const [mine, setMine] = useState<ItemPustakaApi[]>([]);
   const [kelas, setKelas] = useState<EducatorClassRow[]>([]);
@@ -50,12 +52,12 @@ export default function MyCertificateTemplatesPage() {
     ]);
     const j = await resPustaka.json().catch(() => ({}));
     if (!resPustaka.ok) {
-      setMsg(j.error ?? "Could not load your templates.");
+      setMsg(j.error ?? t("certificates.list.loadFailed"));
       return;
     }
     setMine(j.mine ?? []);
     setKelas(((senaraiKelas as EducatorClassRow[]) ?? []).filter((k) => k.id));
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let alive = true;
@@ -84,7 +86,7 @@ export default function MyCertificateTemplatesPage() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not rename the template.");
+        setMsg(j.error ?? t("certificates.list.renameFailed"));
         return;
       }
       setMsg(null);
@@ -98,9 +100,9 @@ export default function MyCertificateTemplatesPage() {
   /** Padam item peribadi dengan pengesahan. */
   const padam = async (item: ItemPustakaApi) => {
     const ok = await confirm({
-      title: "Delete template",
-      description: `Delete "${item.title}" from My templates? Classes already using it keep their certificate templates.`,
-      confirmLabel: "Delete",
+      title: t("certificates.list.deleteTitle"),
+      description: t("certificates.list.deleteDesc", { tajuk: item.title }),
+      confirmLabel: t("certificates.list.deleteConfirm"),
       tone: "danger",
     });
     if (!ok) return;
@@ -112,7 +114,7 @@ export default function MyCertificateTemplatesPage() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not delete the template.");
+        setMsg(j.error ?? t("certificates.list.deleteFailed"));
         return;
       }
       setMsg(null);
@@ -134,11 +136,11 @@ export default function MyCertificateTemplatesPage() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not use the template.");
+        setMsg(j.error ?? t("certificates.list.useFailed"));
         return;
       }
-      const nama = kelas.find((k) => k.id === classId)?.name ?? "the class";
-      setMsg(`Added "${item.title}" to ${nama}.`);
+      const nama = kelas.find((k) => k.id === classId)?.name ?? t("certificates.list.classFallback");
+      setMsg(t("certificates.list.addedTo", { tajuk: item.title, kelas: nama }));
       setGunaBuka(null);
     } finally {
       setBusy(false);

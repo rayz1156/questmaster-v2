@@ -12,9 +12,11 @@ import { Bot, ChevronRight } from "lucide-react";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
 import { listMyClasses, type Klass } from "@/lib/data";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import { Alert, Card, CardHead, EmptyState, PageHead } from "@/components/ui";
 
 export default function SenaraiKelasBilikAi() {
+  const { t } = useBahasa();
   const [kelas, setKelas] = useState<Klass[]>([]);
   const [err, setErr] = useState("");
   const [sedia, setSedia] = useState(false);
@@ -27,7 +29,7 @@ export default function SenaraiKelasBilikAi() {
         if (!hidup) return;
         setKelas(senarai);
       } catch {
-        if (hidup) setErr("Senarai kelas tidak dapat dibaca.");
+        if (hidup) setErr(t("aiRooms.list.loadFailed"));
       } finally {
         if (hidup) setSedia(true);
       }
@@ -36,15 +38,15 @@ export default function SenaraiKelasBilikAi() {
     return () => {
       hidup = false;
     };
-  }, []);
+  }, [t]);
 
   return (
     <Shell tabs={EDU_TABS}>
       <div className="max-w-4xl mx-auto">
         <PageHead
-          crumb="Teaching"
-          name="AI Chatroom"
-          description="Sembang kelas masa nyata dan tanya AI dalam chatroom yang sama."
+          crumb={t("aiRooms.list.crumb")}
+          name={t("aiRooms.list.name")}
+          description={t("aiRooms.list.description")}
         />
         <div className="mt-6">
           {err ? (
@@ -56,16 +58,16 @@ export default function SenaraiKelasBilikAi() {
             <Card>
               <EmptyState
                 icon={<Bot className="w-6 h-6" />}
-                title="Tiada kelas lagi"
-                text="Cipta kelas dahulu, kemudian buka AI Chatroom dalam kelas itu."
+                title={t("aiRooms.list.emptyTitle")}
+                text={t("aiRooms.list.emptyText")}
               />
             </Card>
           ) : null}
           {kelas.length > 0 ? (
             <Card padat>
               <CardHead
-                title="Pilih kelas"
-                subtitle="AI Chatroom wujud dalam satu kelas pada satu masa."
+                title={t("aiRooms.list.chooseTitle")}
+                subtitle={t("aiRooms.list.chooseSubtitle")}
                 className="px-6 pt-6 pb-4"
               />
               <div className="divide-y divide-hairline">
