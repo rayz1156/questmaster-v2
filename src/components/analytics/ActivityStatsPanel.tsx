@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabaseClient';
 import { ListChecks } from 'lucide-react';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 type Quest = {
   id: string;
@@ -21,6 +22,7 @@ type Quest = {
 type Resp = { memberCount: number; quests: Quest[] };
 
 export default function ActivityStatsPanel({ classId }: { classId: string | null }) {
+  const { t } = useBahasa();
   const [data, setData] = useState<Resp | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -37,22 +39,22 @@ export default function ActivityStatsPanel({ classId }: { classId: string | null
         if (session?.access_token) headers['Authorization'] = `Bearer ${session.access_token}`;
         const r = await fetch(`/api/analytics/activity-stats?classId=${encodeURIComponent(classId)}`, { headers });
         const j = await r.json();
-        if (!r.ok) throw new Error(j.error ?? 'Failed to load');
+        if (!r.ok) throw new Error(j.error ?? t('analytics.loadFailed'));
         if (!cancelled) setData(j as Resp);
       } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : 'Failed');
+        if (!cancelled) setError(e instanceof Error ? e.message : t('analytics.failed'));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [classId]);
+  }, [classId, t]);
 
   if (!classId || classId === 'all') {
     return (
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
-        <h2 className="font-bold text-gray-900 flex items-center gap-2"><ListChecks className="w-5 h-5 text-purple-600"/> Per-quest performance</h2>
-        <p className="text-xs text-gray-500 mt-2">Pick a specific class to see per-quest completion and points.</p>
+        <h2 className="font-bold text-gray-900 flex items-center gap-2"><ListChecks className="w-5 h-5 text-purple-600"/> {t('analytics.activity.title')}</h2>
+        <p className="text-xs text-gray-500 mt-2">{t('analytics.activity.pickHint')}</p>
       </div>
     );
   }
@@ -68,19 +70,24 @@ export default function ActivityStatsPanel({ classId }: { classId: string | null
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-bold text-gray-900 flex items-center gap-2">
-          <ListChecks className="w-5 h-5 text-purple-600"/> Per-quest performance <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 2">2</span>
+          <ListChecks className="w-5 h-5 text-purple-600"/> {t('analytics.activity.title')} <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 2">2</span>
         </h2>
         <div className="text-xs text-gray-500">
-          {data?.memberCount ?? 0} members • avg completion {avgCompletion}% • {totalEarned}/{totalMax} pts earned
+          {t('analytics.activity.summary', {
+            ahli: data?.memberCount ?? 0,
+            siap: avgCompletion,
+            dapat: totalEarned,
+            maks: totalMax,
+          })}
         </div>
       </div>
-      <p className="text-xs text-gray-500 mt-1">Completion = unique members with at least one approved submission ÷ class size.</p>
+      <p className="text-xs text-gray-500 mt-1">{t('analytics.activity.completionNote')}</p>
 
-      {loading && <div className="mt-4 text-sm text-gray-500">Loading…</div>}
+      {loading && <div className="mt-4 text-sm text-gray-500">{t('common.loadingDots')}</div>}
       {error && <div className="mt-4 text-sm text-red-600">{error}</div>}
 
       {!loading && quests.length === 0 && !error && (
-        <div className="mt-4 text-sm text-gray-500">No quests created in this class yet.</div>
+        <div className="mt-4 text-sm text-gray-500">{t('analytics.activity.noQuests')}</div>
       )}
 
       {quests.length > 0 && (
@@ -88,14 +95,14 @@ export default function ActivityStatsPanel({ classId }: { classId: string | null
           <table className="w-full text-sm">
             <thead className="text-xs uppercase tracking-wide text-gray-500">
               <tr className="border-b">
-                <th className="text-left py-2 pr-3">Quest</th>
-                <th className="text-left py-2 pr-3">Status</th>
-                <th className="text-right py-2 pr-3">Submissions</th>
-                <th className="text-right py-2 pr-3">Approved</th>
-                <th className="text-right py-2 pr-3">Pending</th>
-                <th className="text-right py-2 pr-3">Students</th>
-                <th className="text-left py-2 pr-3 w-48">Completion</th>
-                <th className="text-right py-2">Points</th>
+                <th className="text-left py-2 pr-3">{t('analytics.activity.colQuest')}</th>
+                <th className="text-left py-2 pr-3">{t('analytics.activity.colStatus')}</th>
+                <th className="text-right py-2 pr-3">{t('analytics.activity.colSubmissions')}</th>
+                <th className="text-right py-2 pr-3">{t('analytics.activity.colApproved')}</th>
+                <th className="text-right py-2 pr-3">{t('analytics.activity.colPending')}</th>
+                <th className="text-right py-2 pr-3">{t('analytics.activity.colStudents')}</th>
+                <th className="text-left py-2 pr-3 w-48">{t('analytics.activity.colCompletion')}</th>
+                <th className="text-right py-2">{t('analytics.activity.colPoints')}</th>
               </tr>
             </thead>
             <tbody>

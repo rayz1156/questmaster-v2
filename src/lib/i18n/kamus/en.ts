@@ -1428,4 +1428,42 @@ export const en = {
       downloadCsv: 'Download CSV',
     },
   },
+  // Analitik kelas (src/components/analytics/*, larian C KZ-041).
+  analytics: {
+    loadFailed: 'Failed to load',
+    failed: 'Failed',
+    // Panel prestasi setiap aktiviti (src/components/analytics/ActivityStatsPanel.tsx).
+    activity: {
+      title: 'Per-quest performance',
+      pickHint: 'Pick a specific class to see per-quest completion and points.',
+      summary: '{ahli} members • avg completion {siap}% • {dapat}/{maks} pts earned',
+      completionNote: 'Completion = unique members with at least one approved submission ÷ class size.',
+      noQuests: 'No quests created in this class yet.',
+      colQuest: 'Quest',
+      colStatus: 'Status',
+      colSubmissions: 'Submissions',
+      colApproved: 'Approved',
+      colPending: 'Pending',
+      colStudents: 'Students',
+      colCompletion: 'Completion',
+      colPoints: 'Points',
+    },
+    // Panel sumbangan & keseimbangan pasukan (src/components/analytics/TeamStatsPanel.tsx).
+    team: {
+      title: 'Team contribution & balance',
+      pickHint: 'Pick a specific class to see team contribution and balance.',
+      summary: '{n} teams • avg balance {purata}% • {senget} skewed',
+      balanceNote: 'Balance = 1 − Gini of approved-submission counts across members. Higher = more even contribution.',
+      noTeams: 'No quests with teams in this class yet.',
+      membersPtsSubs: '{penuh}/{maks} members • {mata} pts • {siap} approved subs',
+      balanced: 'Balanced',
+      mixed: 'Mixed',
+      skewed: 'Skewed',
+      topShare: 'top {n}%',
+      hideMembers: 'Hide members',
+      showMembers: 'Show {n} members',
+      subCount: '{n} sub',
+      noMembers: 'No members',
+    },
+  },
 };

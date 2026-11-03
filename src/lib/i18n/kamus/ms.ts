@@ -1392,4 +1392,42 @@ export const ms: Kamus = {
       downloadCsv: 'Muat Turun CSV',
     },
   },
+  // Analitik kelas (src/components/analytics/*, larian C KZ-041).
+  analytics: {
+    loadFailed: 'Gagal dimuatkan',
+    failed: 'Gagal',
+    // Panel prestasi setiap aktiviti (src/components/analytics/ActivityStatsPanel.tsx).
+    activity: {
+      title: 'Prestasi setiap aktiviti',
+      pickHint: 'Pilih satu kelas tertentu untuk melihat penyiapan dan mata setiap aktiviti.',
+      summary: '{ahli} ahli • penyiapan purata {siap}% • {dapat}/{maks} mata diperoleh',
+      completionNote: 'Penyiapan = ahli unik dengan sekurang-kurangnya satu hantaran diluluskan ÷ saiz kelas.',
+      noQuests: 'Tiada aktiviti dicipta dalam kelas ini lagi.',
+      colQuest: 'Aktiviti',
+      colStatus: 'Status',
+      colSubmissions: 'Hantaran',
+      colApproved: 'Diluluskan',
+      colPending: 'Belum semak',
+      colStudents: 'Pelajar',
+      colCompletion: 'Penyiapan',
+      colPoints: 'Mata',
+    },
+    // Panel sumbangan & keseimbangan pasukan (src/components/analytics/TeamStatsPanel.tsx).
+    team: {
+      title: 'Sumbangan & keseimbangan pasukan',
+      pickHint: 'Pilih satu kelas tertentu untuk melihat sumbangan dan keseimbangan pasukan.',
+      summary: '{n} pasukan • purata keseimbangan {purata}% • {senget} tidak seimbang',
+      balanceNote: 'Keseimbangan = 1 − Gini bilangan hantaran diluluskan merentas ahli. Lebih tinggi = sumbangan lebih sekata.',
+      noTeams: 'Tiada aktiviti dengan pasukan dalam kelas ini lagi.',
+      membersPtsSubs: '{penuh}/{maks} ahli • {mata} mata • {siap} hantaran diluluskan',
+      balanced: 'Seimbang',
+      mixed: 'Bercampur',
+      skewed: 'Tidak seimbang',
+      topShare: 'teratas {n}%',
+      hideMembers: 'Sembunyi ahli',
+      showMembers: 'Tunjuk {n} ahli',
+      subCount: '{n} hantaran',
+      noMembers: 'Tiada ahli',
+    },
+  },
 };
