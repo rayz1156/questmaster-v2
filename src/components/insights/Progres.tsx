@@ -12,6 +12,7 @@ import { TrendingUp } from "lucide-react";
 import type { PelajarInsights, TrendTitik } from "@/lib/insightsKelas";
 import { formatMata } from "@/lib/markahPeserta";
 import { kiraMostImproved, laluanSparkline } from "@/lib/insightsUi";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 type KunciSusun = "nama" | "total" | "accuracy";
 
@@ -31,6 +32,7 @@ export default function Progres({
 }: {
   students: readonly PelajarInsights[];
 }) {
+  const { t } = useBahasa();
   const [susun, setSusun] = useState<{ kunci: KunciSusun; arah: 1 | -1 }>({
     kunci: "total",
     arah: -1,
@@ -74,16 +76,16 @@ export default function Progres({
     <section className="space-y-4">
       {improved.length > 0 && (
         <div className="surface p-5">
-          <h2 className="section-title">Most improved</h2>
+          <h2 className="section-title">{t("insights.progres.mostImproved")}</h2>
           <p className="text-sm text-ink-muted mt-0.5">
-            Second half of Live Quiz history compared with the first.
+            {t("insights.progres.mostImprovedDesc")}
           </p>
           <ul className="mt-3 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             {improved.map(({ pelajar, delta }) => (
               <li key={pelajar.user_id} className="border border-hairline rounded-xl p-3">
-                <div className="text-sm text-ink truncate">{pelajar.name ?? "Unnamed learner"}</div>
+                <div className="text-sm text-ink truncate">{pelajar.name ?? t("insights.unnamed")}</div>
                 <div className="flex items-center gap-1 text-xs font-semibold text-[#2E7D4F] mt-0.5">
-                  <TrendingUp className="w-3.5 h-3.5" /> +{delta.toFixed(0)}% average score
+                  <TrendingUp className="w-3.5 h-3.5" /> {t("insights.progres.improvedBy", { n: delta.toFixed(0) })}
                 </div>
                 <div className="mt-1.5">
                   <Sparkline titik={pelajar.trend} />
@@ -95,33 +97,33 @@ export default function Progres({
       )}
 
       <div className="surface p-5 overflow-x-auto">
-        <h2 className="section-title">Trend by learner</h2>
+        <h2 className="section-title">{t("insights.progres.trendByLearner")}</h2>
         <table className="w-full text-sm mt-3 min-w-[480px]">
           <thead>
             <tr className="text-left text-ink-faint">
               <th className="py-2 pr-3 font-medium">
                 <button type="button" className="hover:text-ink" onClick={() => klikKepala("nama")}>
-                  Name <Panah kunci="nama" />
+                  {t("educator.people.colName")} <Panah kunci="nama" />
                 </button>
               </th>
               <th className="py-2 px-3 font-medium text-right">
                 <button type="button" className="hover:text-ink" onClick={() => klikKepala("total")}>
-                  Total <Panah kunci="total" />
+                  {t("educator.people.colTotal")} <Panah kunci="total" />
                 </button>
               </th>
               <th className="py-2 px-3 font-medium text-right">
                 <button type="button" className="hover:text-ink" onClick={() => klikKepala("accuracy")}>
-                  Accuracy <Panah kunci="accuracy" />
+                  {t("insights.progres.accuracy")} <Panah kunci="accuracy" />
                 </button>
               </th>
-              <th className="py-2 pl-3 font-medium text-right">Trend</th>
+              <th className="py-2 pl-3 font-medium text-right">{t("insights.progres.trend")}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-hairline">
             {baris.map((s) => (
               <tr key={s.user_id}>
                 <td className="py-2.5 pr-3 text-ink truncate max-w-[180px]">
-                  {s.name ?? "Unnamed learner"}
+                  {s.name ?? t("insights.unnamed")}
                 </td>
                 <td className="py-2.5 px-3 text-right tabular-nums text-ink">
                   {formatMata(s.total_score)}
