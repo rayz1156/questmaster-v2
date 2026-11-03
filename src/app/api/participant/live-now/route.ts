@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
 import { SESI_BOLEH_MASUK } from '@/lib/papanPemukaPeserta';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -54,10 +55,7 @@ export async function GET(req: NextRequest) {
   // Had kadar ringan: tinjauan 30 saat klien = 2 permintaan seminit;
   // had 30 seminit masih jauh di atas dan menghalang klien rosak.
   if (!dalamHad(`live-now:${callerId}`, 30)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // 1. Kelas yang pengguna ini ahli; dari pangkalan data, bukan parameter.
@@ -67,7 +65,7 @@ export async function GET(req: NextRequest) {
     .eq('user_id', callerId);
   if (errKeahlian) {
     console.error('live-now membership read failed', errKeahlian.message);
-    return NextResponse.json({ error: 'Failed to load live sessions.' }, { status: 500 });
+    return ralatJson('Failed to load live sessions.', 500);
   }
   const idsKelas = Array.from(
     new Set(((keahlian || []) as Array<{ class_id: string }>).map((m) => m.class_id)),
@@ -85,7 +83,7 @@ export async function GET(req: NextRequest) {
     .in('class_id', idsKelas);
   if (errKuiz) {
     console.error('live-now quiz read failed', errKuiz.message);
-    return NextResponse.json({ error: 'Failed to load live sessions.' }, { status: 500 });
+    return ralatJson('Failed to load live sessions.', 500);
   }
   const kuiz = (kuizData || []) as BarisKuiz[];
   if (kuiz.length === 0) {
@@ -108,7 +106,7 @@ export async function GET(req: NextRequest) {
     .order('created_at', { ascending: false });
   if (errSesi) {
     console.error('live-now session read failed', errSesi.message);
-    return NextResponse.json({ error: 'Failed to load live sessions.' }, { status: 500 });
+    return ralatJson('Failed to load live sessions.', 500);
   }
   const sesi = (sesiData || []) as BarisSesi[];
   if (sesi.length === 0) {
@@ -123,7 +121,7 @@ export async function GET(req: NextRequest) {
     .in('session_id', sesi.map((s) => s.id));
   if (errPemain) {
     console.error('live-now player read failed', errPemain.message);
-    return NextResponse.json({ error: 'Failed to load live sessions.' }, { status: 500 });
+    return ralatJson('Failed to load live sessions.', 500);
   }
   const pemainPerSesi = new Map<string, number>();
   for (const p of (pemainData || []) as Array<{ session_id: string }>) {
@@ -142,7 +140,7 @@ export async function GET(req: NextRequest) {
       .in('id', idsNamaKelas);
     if (errKelas) {
       console.error('live-now class name read failed', errKelas.message);
-      return NextResponse.json({ error: 'Failed to load live sessions.' }, { status: 500 });
+      return ralatJson('Failed to load live sessions.', 500);
     }
     for (const k of (kelasData || []) as Array<{ id: string; name: string | null }>) {
       petaNamaKelas.set(String(k.id), String(k.name ?? ''));
