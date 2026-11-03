@@ -12,6 +12,8 @@ import { useCallback, useEffect, useState } from "react";
 import { Lock, Mail, ExternalLink } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { pelanBerbayar } from "@/lib/pelan";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, type Bahasa } from "@/lib/i18n";
 
 // Pelan berkesan dari GET /api/integrations/email; 'unlimited' dipaparkan
 // sebagai 'pro' oleh pelayan, jadi jenis ini cukup.
@@ -24,10 +26,10 @@ type StatusIntegrasi = {
   last_sync_at: string | null;
 };
 
-function tarikhRingkas(iso: string | null): string {
+function tarikhRingkas(iso: string | null, bahasa: Bahasa): string {
   if (!iso) return "";
   try {
-    return new Date(iso).toLocaleString(undefined, {
+    return new Date(iso).toLocaleString(LOKAL[bahasa], {
       day: "numeric",
       month: "short",
       year: "numeric",
@@ -40,6 +42,7 @@ function tarikhRingkas(iso: string | null): string {
 }
 
 export default function EmailIntegrationCard() {
+  const { t, bahasa } = useBahasa();
   const [status, setStatus] = useState<StatusIntegrasi | null>(null);
   const [kunci, setKunci] = useState("");
   const [busy, setBusy] = useState(false);
@@ -56,14 +59,14 @@ export default function EmailIntegrationCard() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setRalat(data.error || "Could not load the email integration.");
+        setRalat(data.error || t('email.integration.loadFailed'));
         return;
       }
       setStatus(data as StatusIntegrasi);
     } catch {
-      setRalat("Could not load the email integration.");
+      setRalat(t('email.integration.loadFailed'));
     }
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     muat();
@@ -85,13 +88,13 @@ export default function EmailIntegrationCard() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setRalat(data.error || "Could not connect Encharge.");
+        setRalat(data.error || t('email.integration.connectFailed'));
         return;
       }
       setKunci("");
       await muat();
     } catch {
-      setRalat("Could not connect Encharge.");
+      setRalat(t('email.integration.connectFailed'));
     } finally {
       setBusy(false);
     }
@@ -109,10 +112,10 @@ export default function EmailIntegrationCard() {
       });
       const data = await res.json();
       if (!res.ok) {
-        setRalat(data.error || "Could not disconnect.");
+        setRalat(data.error || t('email.integration.disconnectFailed'));
         return;
       }
-      setMaklum("Encharge disconnected.");
+      setMaklum(t('email.integration.disconnected'));
       await muat();
     } finally {
       setBusy(false);
@@ -123,18 +126,18 @@ export default function EmailIntegrationCard() {
     <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6">
       <div className="flex items-center justify-between gap-3 mb-1">
         <div className="flex items-center gap-2 text-ink font-semibold">
-          <Mail className="w-4 h-4 text-brand-purple" /> Email integration
+          <Mail className="w-4 h-4 text-brand-purple" /> {t('email.integration.title')}
         </div>
         {status && !pelanBerbayar(status.plan) && (
           <span className="text-[11px] font-bold uppercase tracking-wide text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full px-2.5 py-1">
-            Pro
+            {t('email.integration.proBadge')}
           </span>
         )}
       </div>
 
       {/* Belum log masuk atau masih memuat */}
       {!status && (
-        <p className="text-sm text-ink-muted">{ralat || "Loading..."}</p>
+        <p className="text-sm text-ink-muted">{ralat || t('common.loadingDots')}</p>
       )}
 
       {/* Bukan pelan berbayar: terkunci, tiada medan (V2-008). */}
@@ -142,7 +145,7 @@ export default function EmailIntegrationCard() {
         <div className="flex items-start gap-2 text-sm text-ink-muted">
           <Lock className="w-4 h-4 mt-0.5 shrink-0" />
           <span>
-            Send your students to your email marketing tool. This is part of the Pro plan.
+            {t('email.integration.lockedText')}
           </span>
         </div>
       )}
@@ -151,20 +154,20 @@ export default function EmailIntegrationCard() {
       {status && pelanBerbayar(status.plan) && !status.connected && (
         <div>
           <p className="text-sm text-ink-muted mb-3">
-            Connect your email marketing provider, then send a whole class to it in one click from the People page.
+            {t('email.integration.connectHint')}
           </p>
           <div className="flex items-center gap-3 border border-violet-200 bg-white rounded-lg px-3 py-2.5 mb-3 w-fit">
             <span className="w-8 h-8 rounded-lg bg-[#EAE6FC] text-brand-purple flex items-center justify-center font-bold text-sm">E</span>
             <span className="text-sm font-medium text-ink">Encharge</span>
           </div>
           <label className="block text-sm text-ink-muted mb-1" htmlFor="encharge-api-key">
-            Encharge API key
+            {t('email.integration.apiKeyLabel')}
           </label>
           <input
             id="encharge-api-key"
             type="password"
             className="input mb-1"
-            placeholder="Paste your API key"
+            placeholder={t('email.integration.apiKeyPlaceholder')}
             value={kunci}
             onChange={(e) => setKunci(e.target.value)}
             autoComplete="off"
@@ -175,7 +178,7 @@ export default function EmailIntegrationCard() {
             target="_blank"
             rel="noreferrer"
           >
-            Where do I find my API key? <ExternalLink className="w-3 h-3 inline" />
+            {t('email.integration.whereKey')} <ExternalLink className="w-3 h-3 inline" />
           </a>
           <div className="flex items-center gap-3">
             <button
@@ -184,7 +187,7 @@ export default function EmailIntegrationCard() {
               onClick={sambung}
               className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50"
             >
-              {busy ? "Connecting..." : "Connect"}
+              {busy ? t('email.integration.connecting') : t('email.integration.connect')}
             </button>
           </div>
         </div>
@@ -194,9 +197,9 @@ export default function EmailIntegrationCard() {
       {status && pelanBerbayar(status.plan) && status.connected && (
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="text-sm text-ink">
-            Connected to Encharge · ••••{status.hint || "••••"}
+            {t('email.integration.connectedTo', { petunjuk: status.hint || "••••" })}
             {status.last_sync_at && (
-              <span className="text-ink-muted"> · last sync {tarikhRingkas(status.last_sync_at)}</span>
+              <span className="text-ink-muted">{t('email.integration.lastSync', { tarikh: tarikhRingkas(status.last_sync_at, bahasa) })}</span>
             )}
           </div>
           <button
@@ -205,7 +208,7 @@ export default function EmailIntegrationCard() {
             onClick={putus}
             className="btn-quiet text-sm text-ink-muted disabled:opacity-50"
           >
-            {busy ? "Disconnecting..." : "Disconnect"}
+            {busy ? t('email.integration.disconnecting') : t('email.integration.disconnect')}
           </button>
         </div>
       )}

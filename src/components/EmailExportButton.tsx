@@ -13,6 +13,8 @@ import Link from "next/link";
 import { Lock, Send, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { pelanBerbayar } from "@/lib/pelan";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { terjemahBilangan } from "@/lib/i18n";
 
 // Pelan berkesan dari GET /api/integrations/email; 'unlimited' dipaparkan
 // sebagai 'pro' oleh pelayan, jadi jenis ini cukup.
@@ -21,6 +23,7 @@ type DryRun = { total: number; withEmail: number; withoutEmail: number; tags: st
 type Hasil = { sent: number; skipped: number; failed: number; errors: string[] };
 
 export default function EmailExportButton({ classId }: { classId: string }) {
+  const { t, bahasa } = useBahasa();
   const [status, setStatus] = useState<Status | null>(null);
   const [buka, setBuka] = useState(false);
   const [pratonton, setPratonton] = useState<DryRun | null>(null);
@@ -66,12 +69,12 @@ export default function EmailExportButton({ classId }: { classId: string }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setRalat(data.error || "Could not prepare the export.");
+        setRalat(data.error || t('email.export.prepareFailed'));
         return;
       }
       setPratonton(data as DryRun);
     } catch {
-      setRalat("Could not prepare the export.");
+      setRalat(t('email.export.prepareFailed'));
     }
   };
 
@@ -90,13 +93,13 @@ export default function EmailExportButton({ classId }: { classId: string }) {
       });
       const data = await res.json();
       if (!res.ok) {
-        setRalat(data.error || "Sending failed.");
+        setRalat(data.error || t('email.export.sendFailed'));
         return;
       }
       setHasil(data as Hasil);
       muatStatus();
     } catch {
-      setRalat("Sending failed.");
+      setRalat(t('email.export.sendFailed'));
     } finally {
       setHantarBusy(false);
     }
@@ -111,12 +114,12 @@ export default function EmailExportButton({ classId }: { classId: string }) {
       <button
         type="button"
         disabled
-        title="This feature is part of the Pro plan."
+        title={t('email.export.lockedTitle')}
         className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-3.5 py-2 bg-violet-50 border border-violet-200 text-ink-muted cursor-not-allowed"
       >
-        <Lock className="w-4 h-4" /> Send to Encharge
+        <Lock className="w-4 h-4" /> {t('email.export.sendToEncharge')}
         <span className="text-[10px] font-bold uppercase tracking-wide text-white bg-gradient-to-r from-violet-600 to-indigo-600 rounded-full px-1.5 py-0.5">
-          Pro
+          {t('email.export.proBadge')}
         </span>
       </button>
     );
@@ -129,7 +132,7 @@ export default function EmailExportButton({ classId }: { classId: string }) {
         href="/educator/profile"
         className="inline-flex items-center gap-1.5 text-sm font-medium rounded-lg px-3.5 py-2 bg-violet-50 border border-violet-200 text-brand-purple"
       >
-        Connect Encharge in your profile first
+        {t('email.export.connectFirst')}
       </Link>
     );
   }
@@ -141,34 +144,34 @@ export default function EmailExportButton({ classId }: { classId: string }) {
         onClick={bukaModal}
         className="inline-flex items-center gap-1.5 text-sm font-semibold rounded-lg px-3.5 py-2 text-white bg-gradient-to-r from-violet-600 to-indigo-600"
       >
-        <Send className="w-4 h-4" /> Send to Encharge
+        <Send className="w-4 h-4" /> {t('email.export.sendToEncharge')}
       </button>
 
       {buka && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40">
           <div className="bg-white rounded-xl border border-violet-200 w-full max-w-md p-5">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="font-semibold text-ink">Send to Encharge</h3>
-              <button type="button" onClick={() => setBuka(false)} className="text-ink-muted" aria-label="Close">
+              <h3 className="font-semibold text-ink">{t('email.export.modalTitle')}</h3>
+              <button type="button" onClick={() => setBuka(false)} className="text-ink-muted" aria-label={t('email.export.closeAria')}>
                 <X className="w-4 h-4" />
               </button>
             </div>
 
-            {!pratonton && !ralat && <p className="text-sm text-ink-muted">Counting students...</p>}
+            {!pratonton && !ralat && <p className="text-sm text-ink-muted">{t('email.export.counting')}</p>}
 
             {pratonton && (
               <div className="text-sm text-ink space-y-2">
                 <p>
-                  {pratonton.withEmail} student{pratonton.withEmail === 1 ? "" : "s"} will be added to
-                  Encharge with tag{pratonton.tags.length > 1 ? "s" : ""} {pratonton.tags.join(", ")}.
+                  {terjemahBilangan(bahasa, 'email.export.willBeAddedOne', 'email.export.willBeAddedOther', pratonton.withEmail, { n: pratonton.withEmail })}
+                  {terjemahBilangan(bahasa, 'email.export.withTagOne', 'email.export.withTagOther', pratonton.tags.length, { tag: pratonton.tags.join(", ") })}
                 </p>
                 {pratonton.withoutEmail > 0 && (
                   <p className="text-ink-muted">
-                    {pratonton.withoutEmail} without email will be skipped.
+                    {t('email.export.withoutEmailSkipped', { n: pratonton.withoutEmail })}
                   </p>
                 )}
                 {pratonton.withEmail === 0 && (
-                  <p className="text-ink-muted">Nothing to send: no students have an email address.</p>
+                  <p className="text-ink-muted">{t('email.export.nothingToSend')}</p>
                 )}
               </div>
             )}
@@ -181,7 +184,7 @@ export default function EmailExportButton({ classId }: { classId: string }) {
                   checked={setuju}
                   onChange={(e) => setSetuju(e.target.checked)}
                 />
-                <span>I confirm these students agreed to receive emails from me</span>
+                <span>{t('email.export.confirmText')}</span>
               </label>
             )}
 
@@ -190,14 +193,14 @@ export default function EmailExportButton({ classId }: { classId: string }) {
             {hasil && (
               <div className="flex flex-wrap items-center gap-2 mt-4">
                 <span className="text-sm rounded-lg bg-[#E3F5EA] text-[#2E7D4F] px-2.5 py-1 font-medium">
-                  Sent {hasil.sent}
+                  {t('email.export.sentCount', { n: hasil.sent })}
                 </span>
                 <span className="text-sm rounded-lg bg-[#FAFAFB] text-ink-muted px-2.5 py-1 font-medium">
-                  Skipped {hasil.skipped}
+                  {t('email.export.skippedCount', { n: hasil.skipped })}
                 </span>
                 {hasil.failed > 0 && (
                   <span className="text-sm rounded-lg bg-[#FCE8E4] text-[#B4552F] px-2.5 py-1 font-medium">
-                    Failed {hasil.failed}
+                    {t('email.export.failedCount', { n: hasil.failed })}
                   </span>
                 )}
               </div>
@@ -205,7 +208,7 @@ export default function EmailExportButton({ classId }: { classId: string }) {
 
             <div className="flex justify-end gap-2 mt-5">
               <button type="button" onClick={() => setBuka(false)} className="btn-quiet text-sm text-ink-muted">
-                Close
+                {t('email.export.close')}
               </button>
               {pratonton && pratonton.withEmail > 0 && (
                 <button
@@ -215,8 +218,8 @@ export default function EmailExportButton({ classId }: { classId: string }) {
                   className="bg-gradient-to-r from-violet-600 to-indigo-600 text-white text-sm font-semibold rounded-lg px-4 py-2 disabled:opacity-50"
                 >
                   {hantarBusy
-                    ? "Sending..."
-                    : `Send ${pratonton.withEmail} student${pratonton.withEmail === 1 ? "" : "s"}`}
+                    ? t('email.export.sending')
+                    : terjemahBilangan(bahasa, 'email.export.sendOne', 'email.export.sendOther', pratonton.withEmail, { n: pratonton.withEmail })}
                 </button>
               )}
             </div>
