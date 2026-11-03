@@ -1373,6 +1373,9 @@ export const en = {
       histogramAria: 'Histogram of learner scores',
       tooltipOne: '{dari}-{hingga}: {n} learner',
       tooltipOther: '{dari}-{hingga}: {n} learners',
+      segTotal: 'Total',
+      segActivities: 'Activities',
+      segLive: 'Live Quiz',
     },
     susar: {
       questions: 'Hardest questions',

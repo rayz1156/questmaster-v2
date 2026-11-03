@@ -7,6 +7,7 @@
  * setiap lajur: "Not enough answers yet."
  */
 import type { CabaranSusar, SoalanSusar } from "@/lib/insightsKelas";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /** Bar peratus nipis; NULL (tiada data) dipapar sebagai tiada bar. */
 function BarPeratus({ pct, warna }: { pct: number | null; warna: string }) {
@@ -40,13 +41,14 @@ export default function Susar({
   questions: readonly SoalanSusar[];
   challenges: readonly CabaranSusar[];
 }) {
+  const { t } = useBahasa();
   return (
     <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
       {/* Kiri: soalan Live Quiz susar. */}
       <div className="surface p-5">
-        <h2 className="section-title">Hardest questions</h2>
+        <h2 className="section-title">{t("insights.susar.questions")}</h2>
         {questions.length === 0 ? (
-          <p className="text-sm text-ink-muted mt-3">Not enough answers yet.</p>
+          <p className="text-sm text-ink-muted mt-3">{t("insights.susar.notEnough")}</p>
         ) : (
           <ul className="mt-3 space-y-3">
             {questions.map((q) => (
@@ -55,14 +57,14 @@ export default function Susar({
                 <div className="text-xs text-ink-faint mt-0.5">{q.quiz_title}</div>
                 <div className="mt-2">
                   <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
-                    <span>{PERATUS(q.correct_pct)} correct</span>
-                    <span>avg {DETIK(q.avg_ms)}</span>
+                    <span>{t("insights.susar.pctCorrect", { nilai: PERATUS(q.correct_pct) })}</span>
+                    <span>{t("insights.susar.avgTime", { masa: DETIK(q.avg_ms) })}</span>
                   </div>
                   <BarPeratus pct={q.correct_pct} warna="bg-[#7057D9]" />
                 </div>
                 {q.top_wrong_choice && (
                   <div className="text-xs text-ink-faint mt-1.5">
-                    Most picked wrong answer:{" "}
+                    {t("insights.susar.mostPicked")}{" "}
                     {q.top_wrong_choice.label ?? q.top_wrong_choice.key} ({q.top_wrong_choice.count})
                   </div>
                 )}
@@ -74,9 +76,9 @@ export default function Susar({
 
       {/* Kanan: cabaran aktiviti paling kerap ditolak. */}
       <div className="surface p-5">
-        <h2 className="section-title">Hardest challenges</h2>
+        <h2 className="section-title">{t("insights.susar.challenges")}</h2>
         {challenges.length === 0 ? (
-          <p className="text-sm text-ink-muted mt-3">Not enough answers yet.</p>
+          <p className="text-sm text-ink-muted mt-3">{t("insights.susar.notEnough")}</p>
         ) : (
           <ul className="mt-3 space-y-3">
             {challenges.map((c) => (
@@ -85,8 +87,8 @@ export default function Susar({
                 <div className="text-xs text-ink-faint mt-0.5">{c.hunt_title}</div>
                 <div className="mt-2">
                   <div className="flex items-center justify-between text-xs text-ink-muted mb-1">
-                    <span>{PERATUS(c.rejected_pct)} rejected</span>
-                    <span>{c.pending} pending</span>
+                    <span>{t("insights.susar.pctRejected", { nilai: PERATUS(c.rejected_pct) })}</span>
+                    <span>{t("insights.susar.pendingCount", { n: c.pending })}</span>
                   </div>
                   <BarPeratus pct={c.rejected_pct} warna="bg-[#C0392B]" />
                 </div>

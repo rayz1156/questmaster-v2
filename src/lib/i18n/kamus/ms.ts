@@ -1337,6 +1337,9 @@ export const ms: Kamus = {
       histogramAria: 'Histogram markah pelajar',
       tooltipOne: '{dari}-{hingga}: {n} pelajar',
       tooltipOther: '{dari}-{hingga}: {n} pelajar',
+      segTotal: 'Jumlah',
+      segActivities: 'Aktiviti',
+      segLive: 'Kuiz Langsung',
     },
     susar: {
       questions: 'Soalan paling susah',

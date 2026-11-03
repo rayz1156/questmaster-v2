@@ -7,17 +7,22 @@
  * supaya bentuk agihan tidak berubah antara segmen.
  */
 import { useState } from "react";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { terjemahBilangan } from "@/lib/i18n";
 import type { AgihanInsights } from "@/lib/insightsKelas";
 
 type Segmen = "total" | "task" | "live";
 
-const SEGMEN: { kunci: Segmen; label: string }[] = [
-  { kunci: "total", label: "Total" },
-  { kunci: "task", label: "Activities" },
-  { kunci: "live", label: "Live Quiz" },
-];
+// Label segmen datang daripada kamus supaya ikut bahasa pengguna.
+const SEGMEN: Segmen[] = ["total", "task", "live"];
 
 export default function Agihan({ agihan }: { agihan: AgihanInsights }) {
+  const { t, bahasa } = useBahasa();
+  const LABEL_SEGMEN: Record<Segmen, string> = {
+    total: t("insights.agihan.segTotal"),
+    task: t("insights.agihan.segActivities"),
+    live: t("insights.agihan.segLive"),
+  };
   const [segmen, setSegmen] = useState<Segmen>("total");
   const bins = agihan[segmen];
   const max = Math.max(1, ...bins.map((b) => b.count));
@@ -31,40 +36,48 @@ export default function Agihan({ agihan }: { agihan: AgihanInsights }) {
   return (
     <section className="surface p-5">
       <div className="flex items-center justify-between gap-3 flex-wrap">
-        <h2 className="section-title">Score distribution</h2>
+        <h2 className="section-title">{t("insights.agihan.title")}</h2>
         <div className="flex items-center gap-1 border border-hairline rounded-full p-1">
           {SEGMEN.map((s) => (
             <button
-              key={s.kunci}
+              key={s}
               type="button"
-              onClick={() => setSegmen(s.kunci)}
+              onClick={() => setSegmen(s)}
               className={`text-sm px-3 py-1 rounded-full ${
-                segmen === s.kunci
+                segmen === s
                   ? "bg-[#EAE6FC] text-brand-purple"
                   : "text-ink-muted hover:text-ink"
               }`}
             >
-              {s.label}
+              {LABEL_SEGMEN[s]}
             </button>
           ))}
         </div>
       </div>
 
       {bins.length === 0 ? (
-        <p className="text-sm text-ink-muted mt-3">No scores yet.</p>
+        <p className="text-sm text-ink-muted mt-3">{t("insights.agihan.noScores")}</p>
       ) : (
         <svg
           viewBox={`0 0 ${w} ${h}`}
           className="w-full h-48 mt-3"
           role="img"
-          aria-label="Histogram of learner scores"
+          aria-label={t("insights.agihan.histogramAria")}
         >
           {bins.map((b, i) => {
             const tinggi = (b.count / max) * (h - 2 * pad);
             const x = pad + i * ((w - 2 * pad) / bins.length) + 3;
             return (
               <g key={`${b.from}-${b.to}`}>
-                <title>{`${b.from}-${b.to}: ${b.count} ${b.count === 1 ? "learner" : "learners"}`}</title>
+                <title>
+                  {terjemahBilangan(
+                    bahasa,
+                    "insights.agihan.tooltipOne",
+                    "insights.agihan.tooltipOther",
+                    b.count,
+                    { dari: b.from, hingga: b.to, n: b.count },
+                  )}
+                </title>
                 <rect
                   x={x}
                   y={h - pad - tinggi}
