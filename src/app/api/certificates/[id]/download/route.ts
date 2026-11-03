@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -27,11 +28,11 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('id', certId)
     .maybeSingle();
   if (!cert) {
-    return NextResponse.json({ error: 'Certificate not found.' }, { status: 404 });
+    return ralatJson('Certificate not found.', 404);
   }
 
   if (!cert.pdf_path) {
-    return NextResponse.json({ error: 'Certificate PDF is not ready.' }, { status: 409 });
+    return ralatJson('Certificate PDF is not ready.', 409);
   }
 
   // Service role HANYA untuk menandatangani URL storage (bucket peribadi,
@@ -41,7 +42,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .from('certificates')
     .createSignedUrl(cert.pdf_path, 300);
   if (error || !data) {
-    return NextResponse.json({ error: 'Could not sign the download URL.' }, { status: 500 });
+    return ralatJson('Could not sign the download URL.', 500);
   }
   return NextResponse.redirect(data.signedUrl, 302);
 }

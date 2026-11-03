@@ -6,6 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -16,7 +17,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json().catch(() => ({}));
   const reason = typeof body.reason === 'string' ? body.reason.trim() : '';
   if (!reason) {
-    return NextResponse.json({ error: 'A revocation reason is required.' }, { status: 400 });
+    return ralatJson('A revocation reason is required.', 400);
   }
 
   // Baris sijil dibaca melalui klien Bearer supaya RLS peserta tidak bocor.
@@ -26,12 +27,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq('id', params.id)
     .maybeSingle();
   if (!cert) {
-    return NextResponse.json({ error: 'Certificate not found.' }, { status: 404 });
+    return ralatJson('Certificate not found.', 404);
   }
 
   const ok = await semakPendidikKelas(auth.supa, cert.class_id, auth.user!.id);
   if (!ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   const { error } = await auth.supa.rpc('qm_revoke_certificate', {
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     p_reason: reason,
   });
   if (error) {
-    return NextResponse.json({ error: error.message }, { status: 400 });
+    return ralatJson(error.message, 400);
   }
   return NextResponse.json({ revoked: true });
 }
