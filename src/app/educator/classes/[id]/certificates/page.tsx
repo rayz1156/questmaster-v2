@@ -65,6 +65,8 @@ import {
 import { normaliseSusunAtur } from "@/lib/sijil/susunAtur";
 import { normaliseMedan, type MedanSijil } from "@/lib/sijil/medan";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
+import { LOKAL, terjemahBilangan } from "@/lib/i18n";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import LayoutEditor from "./layout-editor";
 
 type Templat = {
@@ -118,24 +120,25 @@ function adaSigner(t: Templat): boolean {
  *  Templat tanpa background_path tidak memaparkan apa-apa. */
 function LakaranLatar({
   classId,
-  t,
+  templat,
   onBuka,
 }: {
   classId: string;
-  t: Templat;
-  onBuka: (t: Templat) => void;
+  templat: Templat;
+  onBuka: (templat: Templat) => void;
 }) {
+  const { t } = useBahasa();
   const [url, setUrl] = useState<string | null>(null);
   const [gagal, setGagal] = useState(false);
 
   useEffect(() => {
-    if (!t.background_path) return;
+    if (!templat.background_path) return;
     let alive = true;
     setUrl(null);
     setGagal(false);
     (async () => {
       const res = await fetch(
-        `/api/classes/${classId}/certificates/templates/${t.id}/background-url`,
+        `/api/classes/${classId}/certificates/templates/${templat.id}/background-url`,
         { headers: await authHeader() },
       );
       const j = await res.json().catch(() => ({}));
@@ -149,21 +152,21 @@ function LakaranLatar({
     return () => {
       alive = false;
     };
-  }, [classId, t.id, t.background_path]);
+  }, [classId, templat.id, templat.background_path]);
 
-  if (!t.background_path) return null;
+  if (!templat.background_path) return null;
   return (
     <button
       type="button"
       className="shrink-0 block w-[120px]"
-      title="Edit layout"
-      onClick={() => onBuka(t)}
+      title={t("certificates.classPage.editLayout")}
+      onClick={() => onBuka(templat)}
     >
       {url ? (
         // eslint-disable-next-line @next/next/no-img-element
         <img
           src={url}
-          alt={`Background of ${t.title}`}
+          alt={t("certificates.classPage.bgAlt", { tajuk: templat.title })}
           className="block w-[120px] rounded-lg border border-hairline"
           style={{ aspectRatio: "841.89 / 595.28" }}
           draggable={false}
@@ -173,7 +176,7 @@ function LakaranLatar({
           className="flex w-[120px] items-center justify-center rounded-lg border border-hairline bg-slate-100 text-[10px] text-slate-500"
           style={{ aspectRatio: "841.89 / 595.28" }}
         >
-          {gagal ? "No preview" : "Loading..."}
+          {gagal ? t("certificates.classPage.noPreview") : t("common.loadingDots")}
         </div>
       )}
     </button>
@@ -195,6 +198,7 @@ export default function CertificatesPage() {
   const params = useParams<{ id: string }>();
   const classId = params.id;
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
 
   const [klass, setKlass] = useState<Klass | null>(null);
   const [templat, setTemplat] = useState<Templat[]>([]);
@@ -314,11 +318,11 @@ export default function CertificatesPage() {
     const res = await fetch("/api/certificate-library", { headers: await authHeader() });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(j.error ?? "Could not load the template library.");
+      setMsg(j.error ?? t("certificates.classPage.loadFailedLibrary"));
       return;
     }
     setPustaka({ gallery: j.gallery ?? [], mine: j.mine ?? [] });
-  }, []);
+  }, [t]);
 
   /** Buka dialog cipta dan muat pustaka sekali setiap pembukaan. */
   const bukaDialog = async (tab: "gallery" | "mine" | "blank") => {
@@ -338,7 +342,7 @@ export default function CertificatesPage() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not use the template.");
+        setMsg(j.error ?? t("certificates.list.useFailed"));
         return;
       }
       setMsg(null);
@@ -360,33 +364,33 @@ export default function CertificatesPage() {
   };
 
   /** Simpan templat kelas ini ke Templat saya (V2-016a). */
-  const simpanKePustaka = async (t: Templat) => {
+  const simpanKePustaka = async (tpl: Templat) => {
     if (!pro || pustakaBusy) return;
     setPustakaBusy(true);
     try {
       const res = await fetch("/api/certificate-library", {
         method: "POST",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ from_template_id: t.id, class_id: classId }),
+        body: JSON.stringify({ from_template_id: tpl.id, class_id: classId }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not save the template.");
+        setMsg(j.error ?? t("certificates.classPage.saveFailed"));
         return;
       }
-      setMsg(`Saved "${t.title}" to My templates.`);
+      setMsg(t("certificates.classPage.savedToMine", { tajuk: tpl.title }));
     } finally {
       setPustakaBusy(false);
     }
   };
 
   /** Salin templat kelas ini ke kelas lain yang pemanggil pendidiknya. */
-  const salinKeKelasLain = async (t: Templat, targetClassId: string) => {
+  const salinKeKelasLain = async (tpl: Templat, targetClassId: string) => {
     if (!targetClassId || pustakaBusy) return;
     setPustakaBusy(true);
     try {
       const res = await fetch(
-        `/api/classes/${classId}/certificates/templates/${t.id}/copy`,
+        `/api/classes/${classId}/certificates/templates/${tpl.id}/copy`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(await authHeader()) },
@@ -395,14 +399,14 @@ export default function CertificatesPage() {
       );
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not copy the template.");
+        setMsg(j.error ?? t("certificates.classPage.copyFailed"));
         return;
       }
-      const nama = kelasPemanggil.find((k) => k.id === targetClassId)?.name ?? "the other class";
+      const nama = kelasPemanggil.find((k) => k.id === targetClassId)?.name ?? t("certificates.classPage.otherClass");
       setMsg(
         j.background_removed === true
-          ? `Copied to ${nama}. The background was removed because that class is on the Free plan.`
-          : `Copied to ${nama}.`,
+          ? t("certificates.classPage.copiedBgRemoved", { kelas: nama })
+          : t("certificates.classPage.copiedTo", { kelas: nama }),
       );
       setSalinBuka(null);
     } finally {
@@ -423,15 +427,15 @@ export default function CertificatesPage() {
 
   const simpanTemplat = async () => {
     if (!tajuk.trim()) {
-      setMsg("Title is required.");
+      setMsg(t("certificates.classPage.titleRequired"));
       return;
     }
     if (jenis === "hunt_completed" && !huntId) {
-      setMsg("Choose an activity for this criteria.");
+      setMsg(t("certificates.classPage.chooseActivity"));
       return;
     }
     if (jenis === "live_attended" && !quizId) {
-      setMsg("Choose a live quiz for this criteria.");
+      setMsg(t("certificates.classPage.chooseQuiz"));
       return;
     }
     const criteria: Templat["criteria"] = { type: jenis };
@@ -451,7 +455,7 @@ export default function CertificatesPage() {
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(j.error ?? "Could not save the template.");
+      setMsg(j.error ?? t("certificates.classPage.saveFailed"));
       return;
     }
     setMsg(null);
@@ -462,14 +466,14 @@ export default function CertificatesPage() {
     await muatSemula();
   };
 
-  const muatNaikAset = async (t: Templat, jenisAset: "background" | "logo", fail: File | null) => {
+  const muatNaikAset = async (tpl: Templat, jenisAset: "background" | "logo", fail: File | null) => {
     if (!fail) return;
     if (!fail.type.startsWith("image/")) {
-      setMsg("Only image files are allowed.");
+      setMsg(t("certificates.classPage.onlyImages"));
       return;
     }
     if (fail.size > MAX_ASET) {
-      setMsg("Image must be 8 MB or smaller.");
+      setMsg(t("certificates.classPage.maxAsset"));
       return;
     }
     const laluan = `${classId}/${crypto.randomUUID()}-${fail.name.replace(/[^a-zA-Z0-9._-]/g, "_")}`;
@@ -480,7 +484,7 @@ export default function CertificatesPage() {
       setMsg(error.message);
       return;
     }
-    const body: Record<string, unknown> = { template_id: t.id };
+    const body: Record<string, unknown> = { template_id: tpl.id };
     body[jenisAset === "background" ? "background_path" : "logo_path"] = laluan;
     const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
       method: "PATCH",
@@ -490,17 +494,17 @@ export default function CertificatesPage() {
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
       // Pencetus pelan menolak latar/logo untuk pelan free.
-      setMsg(j.error ?? "Could not attach the image.");
+      setMsg(j.error ?? t("certificates.classPage.attachFailed"));
     } else {
       setMsg(null);
       // KZ-009: latar dimuat naik pada templat mod standard menghidupkan
       // "Complete design" secara automatik supaya sempadan dan tajuk
       // lalai tidak bertindih dengan latar reka bentuk lengkap; Boss
       // masih boleh nyahtanda suis selepas ini.
-      if (jenisAset === "background" && (t.layout?.mode as string) !== "full_background") {
-        const berjaya = await togolMod(t, true);
+      if (jenisAset === "background" && (tpl.layout?.mode as string) !== "full_background") {
+        const berjaya = await togolMod(tpl, true);
         if (berjaya) {
-          setMsg('Background added. "Complete design" is on, so only the name, details, signature and QR are printed on top.');
+          setMsg(t("certificates.classPage.bgAdded"));
         }
       }
     }
@@ -514,16 +518,16 @@ export default function CertificatesPage() {
    * berjaya/gagal supaya pemanggil (muatNaikAset) tahu bila mesej
    * "Background added" wajar dipapar.
    */
-  const togolMod = async (t: Templat, penuh: boolean): Promise<boolean> => {
-    const susun = { ...normaliseSusunAtur(t.layout), mode: penuh ? ("full_background" as const) : ("standard" as const) };
+  const togolMod = async (tpl: Templat, penuh: boolean): Promise<boolean> => {
+    const susun = { ...normaliseSusunAtur(tpl.layout), mode: penuh ? ("full_background" as const) : ("standard" as const) };
     const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
       method: "PATCH",
       headers: { "Content-Type": "application/json", ...(await authHeader()) },
-      body: JSON.stringify({ template_id: t.id, layout: susun }),
+      body: JSON.stringify({ template_id: tpl.id, layout: susun }),
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(j.error ?? "Could not save the mode.");
+      setMsg(j.error ?? t("certificates.classPage.saveModeFailed"));
       return false;
     }
     setMsg(null);
@@ -537,20 +541,20 @@ export default function CertificatesPage() {
    * di pangkalan data; klien tidak boleh menulis lajur itu terus).
    * Selepas muat semula, templat itu menjadi pilihan bahagian Issue.
    */
-  const tetapAktif = async (t: Templat) => {
+  const tetapAktif = async (tpl: Templat) => {
     if (aktifBusy) return;
-    setAktifBusy(t.id);
+    setAktifBusy(tpl.id);
     try {
       const { error } = await supabase.rpc("qm_set_active_certificate_template", {
-        p_template: t.id,
+        p_template: tpl.id,
       });
       if (error) {
         setMsg(error.message);
         return;
       }
       await muatSemula();
-      setPilihTemplat(t.id);
-      setMsg(`"${t.title}" is now the active certificate.`);
+      setPilihTemplat(tpl.id);
+      setMsg(t("certificates.classPage.nowActive", { tajuk: tpl.title }));
     } finally {
       setAktifBusy(null);
     }
@@ -563,7 +567,7 @@ export default function CertificatesPage() {
     });
     if (!res.ok) {
       const j = await res.json().catch(() => ({}));
-      setMsg(j.error ?? "Preview failed.");
+      setMsg(j.error ?? t("certificates.classPage.previewFailed"));
       return;
     }
     const blob = await res.blob();
@@ -581,7 +585,7 @@ export default function CertificatesPage() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not read eligibility.");
+        setMsg(j.error ?? t("certificates.classPage.readEligibilityFailed"));
         return;
       }
       setLayak(j.preview ?? []);
@@ -595,9 +599,15 @@ export default function CertificatesPage() {
     const ids = tickLayak(layak, tick);
     if (ids.length === 0) return;
     const ok = await confirm({
-      title: "Issue certificates",
-      description: `Issue certificates to ${ids.length} student${ids.length === 1 ? "" : "s"}? This cannot be undone except by revoking.`,
-      confirmLabel: "Issue",
+      title: t("certificates.classPage.issueTitle"),
+      description: terjemahBilangan(
+        bahasa,
+        "certificates.classPage.issueDescOne",
+        "certificates.classPage.issueDescOther",
+        ids.length,
+        { n: ids.length },
+      ),
+      confirmLabel: t("certificates.classPage.issueConfirm"),
     });
     if (!ok) return;
     // KZ-011: pengeluaran berkelompok, 10 peserta setiap permintaan, berurutan.
@@ -619,7 +629,7 @@ export default function CertificatesPage() {
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
-          ralatKeluarkan = j.error ?? "Could not issue certificates.";
+          ralatKeluarkan = j.error ?? t("certificates.classPage.issueFailed");
           break;
         }
         const bilangan = typeof (j as { issued?: unknown }).issued === "number"
@@ -636,12 +646,26 @@ export default function CertificatesPage() {
     // bilangan yang sudah dikeluarkan sebelum berhenti.
     if (ralatKeluarkan) {
       setMsg(
-        `Issued ${jumlahDikeluarkan} certificate${jumlahDikeluarkan === 1 ? "" : "s"} before stopping: ${ralatKeluarkan}`,
+        terjemahBilangan(
+          bahasa,
+          "certificates.classPage.issuedBeforeOne",
+          "certificates.classPage.issuedBeforeOther",
+          jumlahDikeluarkan,
+          { n: jumlahDikeluarkan, ralat: ralatKeluarkan },
+        ),
       );
     } else if (jumlahDikeluarkan === 0) {
-      setMsg("No new certificates were issued. Everyone selected already has a certificate or has no name.");
+      setMsg(t("certificates.classPage.noneIssued"));
     } else {
-      setMsg(`Issued ${jumlahDikeluarkan} certificate${jumlahDikeluarkan === 1 ? "" : "s"}.`);
+      setMsg(
+        terjemahBilangan(
+          bahasa,
+          "certificates.classPage.issuedDoneOne",
+          "certificates.classPage.issuedDoneOther",
+          jumlahDikeluarkan,
+          { n: jumlahDikeluarkan },
+        ),
+      );
     }
     // KZ-011: segar semula sekali sahaja selepas semua kelompok tamat
     // (termasuk apabila satu kelompok gagal), bukan selepas setiap kelompok.
@@ -671,9 +695,9 @@ export default function CertificatesPage() {
 
   const emelPukal = async () => {
     const ok = await confirm({
-      title: "Email certificates",
-      description: "Send certificate emails to students who have not received one yet? The certificate PDF will be attached.",
-      confirmLabel: "Send",
+      title: t("certificates.classPage.emailAllTitle"),
+      description: t("certificates.classPage.emailAllDesc"),
+      confirmLabel: t("certificates.classPage.send"),
     });
     if (!ok) return;
     await hantarEmel(null, false);
@@ -683,9 +707,15 @@ export default function CertificatesPage() {
   const emelTerpilih = async () => {
     if (bilanganPilihEmel === 0) return;
     const ok = await confirm({
-      title: "Email selected certificates",
-      description: `Send certificate emails to ${bilanganPilihEmel} selected student${bilanganPilihEmel === 1 ? "" : "s"}? Anyone already emailed will receive it again. The certificate PDF will be attached.`,
-      confirmLabel: "Send",
+      title: t("certificates.classPage.emailSelectedTitle"),
+      description: terjemahBilangan(
+        bahasa,
+        "certificates.classPage.emailSelectedDescOne",
+        "certificates.classPage.emailSelectedDescOther",
+        bilanganPilihEmel,
+        { n: bilanganPilihEmel },
+      ),
+      confirmLabel: t("certificates.classPage.send"),
     });
     if (!ok) return;
     await hantarEmel(terpilihEmel.map((s) => s.id), true);
@@ -694,9 +724,9 @@ export default function CertificatesPage() {
   /** KZ-007: emel satu sijil daripada baris jadual (Send atau Resend). */
   const emelSatu = async (s: Sijil) => {
     const ok = await confirm({
-      title: s.emailed_at ? "Resend certificate email" : "Send certificate email",
-      description: `Send the certificate email to ${s.name_snapshot}? The certificate PDF will be attached.`,
-      confirmLabel: "Send",
+      title: s.emailed_at ? t("certificates.classPage.resendEmailTitle") : t("certificates.classPage.sendEmailTitle"),
+      description: t("certificates.classPage.emailOneDesc", { nama: s.name_snapshot }),
+      confirmLabel: t("certificates.classPage.send"),
     });
     if (!ok) return;
     await hantarEmel([s.id], true);
@@ -734,7 +764,7 @@ export default function CertificatesPage() {
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
-          setMsg(j.error ?? "Could not send certificate emails.");
+          setMsg(j.error ?? t("certificates.classPage.emailFailed"));
           return;
         }
         const gagal = (j.failed ?? []) as { error?: string }[];
@@ -743,7 +773,7 @@ export default function CertificatesPage() {
         jumlahTanpaLampiran += j.no_attachment ?? 0;
         ralatPertama = ralatPertama ?? gagal[0]?.error;
         // Kemajuan semasa gelung kelompok; diganti oleh mesej akhir.
-        setMsg(`Sending... ${jumlahSent} sent so far.`);
+        setMsg(t("certificates.classPage.sending", { n: jumlahSent }));
         // Tanpa ids: ulang selagi pelayan masih ada sasaran (more) dan ada
         // yang berjaya dihantar; maksimum 10 pusingan (pusingan < 9).
         if (senaraiIds === null && j.more === true && (j.sent ?? 0) > 0 && pusingan < 9) {
@@ -751,9 +781,9 @@ export default function CertificatesPage() {
         }
       }
       setMsg(
-        `Emails sent: ${jumlahSent}. Failed: ${jumlahGagal}.` +
+        t("certificates.classPage.emailsSent", { hantar: jumlahSent, gagal: jumlahGagal }) +
           (jumlahTanpaLampiran > 0
-            ? ` ${jumlahTanpaLampiran} sent without the PDF attached (file missing or too large).`
+            ? ` ${t("certificates.classPage.emailsNoPdf", { n: jumlahTanpaLampiran })}`
             : "") +
           (ralatPertama ? ` ${ralatPertama}` : ""),
       );
@@ -776,9 +806,15 @@ export default function CertificatesPage() {
   const kemasKiniReka = async (ids: string[]) => {
     if (!templatAktif || ids.length === 0 || regenBusy) return;
     const ok = await confirm({
-      title: "Update certificate design",
-      description: `Regenerate ${ids.length} certificate PDF${ids.length === 1 ? "" : "s"} with the active template "${templatAktif.title}"? Codes and names stay the same. Use Resend afterwards to email the new PDF.`,
-      confirmLabel: "Update design",
+      title: t("certificates.classPage.updateDesignTitle"),
+      description: terjemahBilangan(
+        bahasa,
+        "certificates.classPage.updateDesignDescOne",
+        "certificates.classPage.updateDesignDescOther",
+        ids.length,
+        { n: ids.length, templat: templatAktif.title },
+      ),
+      confirmLabel: t("certificates.classPage.updateDesignConfirm"),
     });
     if (!ok) return;
     setRegenBusy(true);
@@ -795,7 +831,7 @@ export default function CertificatesPage() {
         });
         const j = await res.json().catch(() => ({}));
         if (!res.ok) {
-          ralatRegen = j.error ?? "Could not update the certificate design.";
+          ralatRegen = j.error ?? t("certificates.classPage.updateFailed");
           break;
         }
         jumlahDikemas += j.updated ?? 0;
@@ -807,10 +843,16 @@ export default function CertificatesPage() {
     }
     if (ralatRegen) {
       setMsg(
-        `Updated ${jumlahDikemas} certificate${jumlahDikemas === 1 ? "" : "s"} before stopping: ${ralatRegen}`,
+        terjemahBilangan(
+          bahasa,
+          "certificates.classPage.updatedBeforeOne",
+          "certificates.classPage.updatedBeforeOther",
+          jumlahDikemas,
+          { n: jumlahDikemas, ralat: ralatRegen },
+        ),
       );
     } else {
-      setMsg(`Updated ${jumlahDikemas} certificates. Skipped ${jumlahLangkau}.`);
+      setMsg(t("certificates.classPage.updatedDone", { kemas: jumlahDikemas, langkau: jumlahLangkau }));
     }
     setPilihEmel({});
     await muatSemula();
@@ -823,19 +865,19 @@ export default function CertificatesPage() {
    * Issue, pilih templat aktif.
    */
   const [padamBusy, setPadamBusy] = useState<string | null>(null);
-  const padamTemplat = async (t: Templat) => {
+  const padamTemplat = async (tpl: Templat) => {
     if (padamBusy) return;
     const ok = await confirm({
-      title: "Delete template",
-      description: `Delete template "${t.title}"? This cannot be undone.`,
-      confirmLabel: "Delete",
+      title: t("certificates.list.deleteTitle"),
+      description: t("certificates.classPage.deleteDesc", { tajuk: tpl.title }),
+      confirmLabel: t("certificates.list.deleteConfirm"),
       tone: "danger",
     });
     if (!ok) return;
-    setPadamBusy(t.id);
+    setPadamBusy(tpl.id);
     try {
       const { error } = await supabase.rpc("qm_delete_certificate_template", {
-        p_template: t.id,
+        p_template: tpl.id,
       });
       if (error) {
         setMsg(error.message);
@@ -843,7 +885,7 @@ export default function CertificatesPage() {
       }
       setMsg(null);
       const senarai = await muatSemula();
-      if (pilihTemplat === t.id) {
+      if (pilihTemplat === tpl.id) {
         const aktif = senarai.find((x) => x.is_active) ?? senarai[0] ?? null;
         setPilihTemplat(aktif ? aktif.id : "");
       }
@@ -871,40 +913,40 @@ export default function CertificatesPage() {
   const [medanBusy, setMedanBusy] = useState(false);
 
   /** Buka panel Certificate details dan isikan borang daripada templat. */
-  const bukaMedan = async (t: Templat) => {
-    if (medanBuka === t.id) {
+  const bukaMedan = async (tpl: Templat) => {
+    if (medanBuka === tpl.id) {
       setMedanBuka(null);
       return;
     }
-    setBorangMedan(normaliseMedan(t.fields));
-    setMedanBuka(t.id);
+    setBorangMedan(normaliseMedan(tpl.fields));
+    setMedanBuka(tpl.id);
     setMsg(null);
     // Pratonton imej tandatangan melalui URL bertandatangan pelayan.
-    if (t.signature_path) {
+    if (tpl.signature_path) {
       const res = await fetch(
-        `/api/classes/${classId}/certificates/templates/${t.id}/signature-url`,
+        `/api/classes/${classId}/certificates/templates/${tpl.id}/signature-url`,
         { headers: await authHeader() },
       );
       const j = await res.json().catch(() => ({}));
       if (res.ok && typeof j.url === "string") {
-        setSigUrl((p) => ({ ...p, [t.id]: j.url }));
+        setSigUrl((p) => ({ ...p, [tpl.id]: j.url }));
       } else {
-        setSigUrl((p) => ({ ...p, [t.id]: "" }));
+        setSigUrl((p) => ({ ...p, [tpl.id]: "" }));
       }
     } else {
-      setSigUrl((p) => ({ ...p, [t.id]: "" }));
+      setSigUrl((p) => ({ ...p, [tpl.id]: "" }));
     }
   };
 
   /** Simpan medan isian templat melalui PATCH templates (semantik ganti). */
-  const simpanMedan = async (t: Templat) => {
+  const simpanMedan = async (tpl: Templat) => {
     if (medanBusy) return;
     // Tarikh tamat mesti sama hari atau lebih lewat daripada tarikh mula.
     if (
       borangMedan.date_start && borangMedan.date_end
       && borangMedan.date_end < borangMedan.date_start
     ) {
-      setMsg("End date must be on or after the start date.");
+      setMsg(t("certificates.classPage.dateOrder"));
       return;
     }
     setMedanBusy(true);
@@ -912,11 +954,11 @@ export default function CertificatesPage() {
       const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ template_id: t.id, fields: borangMedan }),
+        body: JSON.stringify({ template_id: tpl.id, fields: borangMedan }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not save the certificate details.");
+        setMsg(j.error ?? t("certificates.classPage.saveDetailsFailed"));
         return;
       }
       setMsg(null);
@@ -931,20 +973,20 @@ export default function CertificatesPage() {
    * Muat naik imej tandatangan melalui aliran tiket (V2-016b):
    * asset-ticket kind signature, PUT terus ke storan, kemudian asset-finalize.
    */
-  const muatNaikTandatangan = async (t: Templat, fail: File | null) => {
+  const muatNaikTandatangan = async (tpl: Templat, fail: File | null) => {
     if (!fail || medanBusy) return;
     if (fail.type !== "image/png" && fail.type !== "image/jpeg") {
-      setMsg("The signature must be a PNG or JPEG image.");
+      setMsg(t("certificates.classPage.sigFormat"));
       return;
     }
     if (fail.size > MAX_SIG) {
-      setMsg("The signature image must be 1 MB or smaller.");
+      setMsg(t("certificates.classPage.sigMax"));
       return;
     }
     setMedanBusy(true);
     try {
       const tiketRes = await fetch(
-        `/api/classes/${classId}/certificates/templates/${t.id}/asset-ticket`,
+        `/api/classes/${classId}/certificates/templates/${tpl.id}/asset-ticket`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(await authHeader()) },
@@ -953,7 +995,7 @@ export default function CertificatesPage() {
       );
       const tiket = await tiketRes.json().catch(() => ({}));
       if (!tiketRes.ok || typeof tiket.upload_url !== "string") {
-        setMsg(tiket.error ?? "Could not start the signature upload.");
+        setMsg(tiket.error ?? t("certificates.classPage.sigStartFailed"));
         return;
       }
       const put = await fetch(tiket.upload_url, {
@@ -962,11 +1004,11 @@ export default function CertificatesPage() {
         body: fail,
       });
       if (!put.ok) {
-        setMsg("Could not upload the signature image.");
+        setMsg(t("certificates.classPage.sigUploadFailed"));
         return;
       }
       const finRes = await fetch(
-        `/api/classes/${classId}/certificates/templates/${t.id}/asset-finalize`,
+        `/api/classes/${classId}/certificates/templates/${tpl.id}/asset-finalize`,
         {
           method: "POST",
           headers: { "Content-Type": "application/json", ...(await authHeader()) },
@@ -975,7 +1017,7 @@ export default function CertificatesPage() {
       );
       const fin = await finRes.json().catch(() => ({}));
       if (!finRes.ok) {
-        setMsg(fin.error ?? "Could not attach the signature image.");
+        setMsg(fin.error ?? t("certificates.classPage.sigAttachFailed"));
         return;
       }
       setMsg(null);
@@ -986,22 +1028,22 @@ export default function CertificatesPage() {
   };
 
   /** Buang imej tandatangan templat (PATCH clear_signature). */
-  const buangTandatangan = async (t: Templat) => {
+  const buangTandatangan = async (tpl: Templat) => {
     if (medanBusy) return;
     setMedanBusy(true);
     try {
       const res = await fetch(`/api/classes/${classId}/certificates/templates`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json", ...(await authHeader()) },
-        body: JSON.stringify({ template_id: t.id, clear_signature: true }),
+        body: JSON.stringify({ template_id: tpl.id, clear_signature: true }),
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not remove the signature image.");
+        setMsg(j.error ?? t("certificates.classPage.sigRemoveFailed"));
         return;
       }
       setMsg(null);
-      setSigUrl((p) => ({ ...p, [t.id]: "" }));
+      setSigUrl((p) => ({ ...p, [tpl.id]: "" }));
       await muatSemula();
     } finally {
       setMedanBusy(false);
@@ -1010,14 +1052,14 @@ export default function CertificatesPage() {
 
   const batalkan = async (s: Sijil) => {
     const ok = await confirm({
-      title: "Revoke certificate",
-      description: `Revoke the certificate for ${s.name_snapshot}? The public page will show it as Revoked.`,
-      confirmLabel: "Revoke",
+      title: t("certificates.classPage.revokeTitle"),
+      description: t("certificates.classPage.revokeDesc", { nama: s.name_snapshot }),
+      confirmLabel: t("certificates.classPage.revokeConfirm"),
       tone: "danger",
     });
     if (!ok) return;
     if (!sebabBatalkan.trim()) {
-      setMsg("A revocation reason is required.");
+      setMsg(t("certificates.classPage.revokeReasonRequired"));
       return;
     }
     const res = await fetch(`/api/certificates/${s.id}/revoke`, {
@@ -1027,7 +1069,7 @@ export default function CertificatesPage() {
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(j.error ?? "Could not revoke the certificate.");
+      setMsg(j.error ?? t("certificates.classPage.revokeFailed"));
       return;
     }
     setRevokeSijil(null);
@@ -1038,7 +1080,7 @@ export default function CertificatesPage() {
   const muatTurun = async (s: Sijil) => {
     const res = await fetch(`/api/certificates/${s.id}/download`, { headers: await authHeader() });
     if (!res.ok) {
-      setMsg("Download is not ready yet.");
+      setMsg(t("certificates.classPage.downloadNotReady"));
       return;
     }
     const blob = await res.blob();
@@ -1053,7 +1095,7 @@ export default function CertificatesPage() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <div className="p-8 text-slate-500">Loading...</div>
+        <div className="p-8 text-slate-500">{t("common.loadingDots")}</div>
       </Shell>
     );
   }
@@ -1073,7 +1115,7 @@ export default function CertificatesPage() {
           ref={kepalaTickRef}
           type="checkbox"
           className="h-4 w-4 accent-brand-purple"
-          title="Select all eligible students"
+          title={t("certificates.classPage.selectAllEligibleTitle")}
           disabled={barisBolehPilih.length === 0 || issueBusy}
           checked={semuaBolehPilihTicked}
           onChange={(e) => {
@@ -1100,7 +1142,7 @@ export default function CertificatesPage() {
     },
     {
       key: "nama",
-      header: "Name",
+      header: t("certificates.classPage.colName"),
       render: (r, i) => (
         <span className="flex items-center gap-3 min-w-0">
           <Avatar name={r.display_name} size="sm" index={i} />
@@ -1110,7 +1152,7 @@ export default function CertificatesPage() {
     },
     {
       key: "nama_sijil",
-      header: "Certificate name",
+      header: t("certificates.classPage.colCertName"),
       render: (r) =>
         /* KZ-007: nama sandaran (display name) dipapar dengan label kecil
            kelabu bila nama sijil belum disahkan. */
@@ -1119,29 +1161,29 @@ export default function CertificatesPage() {
         ) : r.certificate_name ? (
           <span>
             {r.certificate_name}{" "}
-            <span className="text-[12px] text-ink-faint">(display name)</span>
+            <span className="text-[12px] text-ink-faint">{t("certificates.classPage.displayNameLabel")}</span>
           </span>
         ) : (
-          <span className="text-amber-600">Waiting for name confirmation</span>
+          <span className="text-amber-600">{t("certificates.classPage.waitingName")}</span>
         ),
     },
     {
       key: "layak",
-      header: "Eligible",
+      header: t("certificates.classPage.colEligible"),
       render: (r) =>
-        r.eligible ? <Badge warna="green">Yes</Badge> : <Badge warna="red">No</Badge>,
+        r.eligible ? <Badge warna="green">{t("certificates.classPage.yes")}</Badge> : <Badge warna="red">{t("certificates.classPage.no")}</Badge>,
     },
     {
       key: "sebab",
-      header: "Reason",
+      header: t("certificates.classPage.colReason"),
       hideOnMobile: true,
       render: (r) => <span className="text-ink-faint">{r.reason}</span>,
     },
     {
       key: "dikeluarkan",
-      header: "Issued",
+      header: t("certificates.classPage.colIssued"),
       render: (r) =>
-        r.already_issued ? <Badge warna="green">Yes</Badge> : <Badge warna="gray">No</Badge>,
+        r.already_issued ? <Badge warna="green">{t("certificates.classPage.yes")}</Badge> : <Badge warna="gray">{t("certificates.classPage.no")}</Badge>,
     },
   ];
 
@@ -1156,7 +1198,7 @@ export default function CertificatesPage() {
         <input
           type="checkbox"
           className="h-4 w-4 accent-brand-purple"
-          title="Select all certificates that can be emailed"
+          title={t("certificates.classPage.selectAllEmailableTitle")}
           disabled={!pro}
           checked={semuaPilihEmel}
           onChange={(e) => {
@@ -1184,53 +1226,53 @@ export default function CertificatesPage() {
     },
     {
       key: "kod",
-      header: "Code",
+      header: t("certificates.classPage.colCode"),
       render: (s) => <span className="font-mono text-[13px]">{s.code}</span>,
     },
     {
       key: "nama",
-      header: "Name",
+      header: t("certificates.classPage.colName"),
       render: (s) => <span className="text-[13px] font-bold text-ink">{s.name_snapshot}</span>,
     },
     {
       key: "tarikh",
-      header: "Date",
+      header: t("certificates.classPage.colDate"),
       hideOnMobile: true,
       render: (s) => (
-        <span className="text-ink-faint">{new Date(s.issued_at).toLocaleDateString()}</span>
+        <span className="text-ink-faint">{new Date(s.issued_at).toLocaleDateString(LOKAL[bahasa])}</span>
       ),
     },
     {
       /* KZ-029: tajuk templat sijil dan lencana Old design bila templatnya
          bukan templat aktif kelas. */
       key: "templat",
-      header: "Template",
+      header: t("certificates.classPage.templateLabel"),
       hideOnMobile: true,
       render: (s) => (
         <span className="inline-flex items-center gap-2 min-w-0">
           <span className="text-[13px] text-ink truncate max-w-[180px]">
-            {templat.find((t) => t.id === s.template_id)?.title ?? "Unknown template"}
+            {templat.find((x) => x.id === s.template_id)?.title ?? t("certificates.classPage.unknownTemplate")}
           </span>
           {!s.revoked_at && templatAktif && s.template_id !== templatAktif.id && (
-            <Badge warna="yellow">Old design</Badge>
+            <Badge warna="yellow">{t("certificates.classPage.oldDesign")}</Badge>
           )}
         </span>
       ),
     },
     {
       key: "status",
-      header: "Status",
+      header: t("certificates.classPage.colStatus"),
       render: (s) =>
-        s.revoked_at ? <Badge warna="red">Revoked</Badge> : <Badge warna="green">Active</Badge>,
+        s.revoked_at ? <Badge warna="red">{t("certificates.classPage.revoked")}</Badge> : <Badge warna="green">{t("certificates.classPage.active")}</Badge>,
     },
     {
       key: "emel",
-      header: "Email",
+      header: t("certificates.classPage.colEmail"),
       hideOnMobile: true,
       render: (s) => (
         /* KZ-007: tarikh penghantaran emel atau Not sent. */
         <span className="text-ink-faint">
-          {s.emailed_at ? new Date(s.emailed_at).toLocaleString() : "Not sent"}
+          {s.emailed_at ? new Date(s.emailed_at).toLocaleString(LOKAL[bahasa]) : t("certificates.classPage.notSent")}
         </span>
       ),
     },
@@ -1245,14 +1287,14 @@ export default function CertificatesPage() {
               size="sm"
               variant="ghost"
               disabled={!pro || emelBusy}
-              title={pro ? (s.emailed_at ? "Send the certificate email again" : "Send the certificate email") : "Available on Pro"}
+              title={pro ? (s.emailed_at ? t("certificates.classPage.resendTitle") : t("certificates.classPage.sendTitle")) : t("certificates.classPage.proOnly")}
               onClick={() => emelSatu(s)}
             >
-              <Mail className="w-4 h-4" /> {s.emailed_at ? "Resend" : "Send"}
+              <Mail className="w-4 h-4" /> {s.emailed_at ? t("certificates.classPage.resend") : t("certificates.classPage.send")}
             </Button>
           )}
           <Button size="sm" variant="ghost" onClick={() => muatTurun(s)}>
-            <Download className="w-4 h-4" /> Download
+            <Download className="w-4 h-4" /> {t("common.download")}
           </Button>
           {!s.revoked_at && (
             <Button
@@ -1264,7 +1306,7 @@ export default function CertificatesPage() {
                 setSebabBatalkan("");
               }}
             >
-              Revoke
+              {t("certificates.classPage.revokeConfirm")}
             </Button>
           )}
           {revokeSijil?.id === s.id && (
@@ -1273,14 +1315,14 @@ export default function CertificatesPage() {
                 <Input
                   value={sebabBatalkan}
                   onChange={(e) => setSebabBatalkan(e.target.value)}
-                  placeholder="Reason for revocation"
+                  placeholder={t("certificates.classPage.revokeReasonPlaceholder")}
                 />
               </span>
               <Button size="sm" onClick={() => batalkan(s)}>
-                Confirm
+                {t("common.confirm")}
               </Button>
               <Button size="sm" variant="outline" onClick={() => setRevokeSijil(null)}>
-                Cancel
+                {t("common.cancel")}
               </Button>
             </span>
           )}
@@ -1302,11 +1344,11 @@ export default function CertificatesPage() {
             templat tinggal di dalamnya supaya aliran keadaan tidak berubah. */}
         <Card className="mb-8">
           <CardHead
-            title="Certificate templates"
+            title={t("certificates.classPage.templatesTitle")}
             right={
               <>
                 <Button variant="outline" href="/educator/certificates">
-                  My templates
+                  {t("certificates.classPage.myTemplates")}
                 </Button>
                 <Button
                   onClick={() => {
@@ -1316,7 +1358,7 @@ export default function CertificatesPage() {
                     bukaDialog("gallery");
                   }}
                 >
-                  <Plus className="w-4 h-4" /> New certificate
+                  <Plus className="w-4 h-4" /> {t("certificates.classPage.newCert")}
                 </Button>
               </>
             }
@@ -1329,7 +1371,7 @@ export default function CertificatesPage() {
               <Tabs
                 items={[
                   {
-                    label: "Kuizen gallery",
+                    label: t("certificates.classPage.galleryTab"),
                     aktif: dialogTab === "gallery",
                     onSelect: () => {
                       setBorangTerbuka(false);
@@ -1338,7 +1380,7 @@ export default function CertificatesPage() {
                     },
                   },
                   {
-                    label: "My templates",
+                    label: t("certificates.classPage.myTemplates"),
                     aktif: dialogTab === "mine",
                     onSelect: () => {
                       setBorangTerbuka(false);
@@ -1347,7 +1389,7 @@ export default function CertificatesPage() {
                     },
                   },
                   {
-                    label: "Blank",
+                    label: t("certificates.classPage.blankTab"),
                     aktif: dialogTab === "blank",
                     onSelect: () => {
                       setSunting(null);
@@ -1367,7 +1409,7 @@ export default function CertificatesPage() {
                   setSunting(null);
                 }}
               >
-                Close
+                {t("common.close")}
               </Button>
             </div>
 
@@ -1390,16 +1432,16 @@ export default function CertificatesPage() {
                         />
                       ) : (
                         <div className="absolute inset-0 flex items-center justify-center text-xs text-slate-500">
-                          Text only
+                          {t("certificates.list.textOnly")}
                         </div>
                       )}
                       {item.locked && (
                         <Link
                           href="/#harga"
-                          title="Available on Pro"
+                          title={t("certificates.classPage.proOnly")}
                           className="absolute top-2 right-2 rounded-md bg-amber-400 text-black text-[10px] font-bold px-2 py-0.5"
                         >
-                          Pro
+                          {t("certificates.classPage.proBadge")}
                         </Link>
                       )}
                     </div>
@@ -1408,11 +1450,11 @@ export default function CertificatesPage() {
                         {item.title}
                       </div>
                       <div className="text-xs text-slate-500">
-                        {item.text_tone === "light" ? "Light text" : "Dark text"}
+                        {item.text_tone === "light" ? t("certificates.list.lightText") : t("certificates.list.darkText")}
                         {item.kind === "participation"
-                          ? " · Participation"
+                          ? t("certificates.classPage.participationKind")
                           : item.kind === "achievement"
-                            ? " · Achievement"
+                            ? t("certificates.classPage.achievementKind")
                             : ""}
                       </div>
                       <div className="mt-auto">
@@ -1420,10 +1462,10 @@ export default function CertificatesPage() {
                           <Button
                             variant="outline"
                             href="/#harga"
-                            title="Available on Pro"
+                            title={t("certificates.classPage.proOnly")}
                             className="w-full"
                           >
-                            Pro plan required
+                            {t("certificates.classPage.proPlanRequired")}
                           </Button>
                         ) : (
                           <Button
@@ -1431,7 +1473,7 @@ export default function CertificatesPage() {
                             disabled={pustakaBusy}
                             onClick={() => gunaItemPustaka(item)}
                           >
-                            Use in class
+                            {t("certificates.list.useInClass")}
                           </Button>
                         )}
                       </div>
@@ -1442,7 +1484,7 @@ export default function CertificatesPage() {
                   <div className="col-span-full">
                     <EmptyState
                       icon={<Award className="h-8 w-8" />}
-                      title="No templates yet"
+                      title={t("certificates.classPage.noTemplates")}
                     />
                   </div>
                 )}
@@ -1453,24 +1495,24 @@ export default function CertificatesPage() {
 
         {borangTerbuka && (
           <CardSection className="mt-6 space-y-4">
-            <Field label="Title">
+            <Field label={t("certificates.classPage.titleLabel")}>
               <Input
                 value={tajuk}
                 onChange={(e) => setTajuk(e.target.value)}
-                placeholder="Certificate of Completion"
+                placeholder={t("certificates.classPage.titlePlaceholder")}
               />
             </Field>
-            <Field label="Criteria">
+            <Field label={t("certificates.classPage.criteria")}>
               <Select value={jenis} onChange={(e) => setJenis(e.target.value)}>
-                <option value="all_members">All members</option>
-                <option value="hunt_completed">Completed a specific activity</option>
-                <option value="min_score">Minimum score</option>
-                <option value="live_attended">Attended a live quiz</option>
+                <option value="all_members">{t("certificates.classPage.optAll")}</option>
+                <option value="hunt_completed">{t("certificates.classPage.optHunt")}</option>
+                <option value="min_score">{t("certificates.classPage.optMinScore")}</option>
+                <option value="live_attended">{t("certificates.classPage.optLive")}</option>
               </Select>
             </Field>
             {jenis === "hunt_completed" && (
               <Select value={huntId} onChange={(e) => setHuntId(e.target.value)}>
-                <option value="">Choose an activity...</option>
+                <option value="">{t("certificates.classPage.chooseActivityOption")}</option>
                 {hunts.map((h) => (
                   <option key={h.id} value={h.id}>{h.title}</option>
                 ))}
@@ -1478,7 +1520,7 @@ export default function CertificatesPage() {
             )}
             {jenis === "live_attended" && (
               <Select value={quizId} onChange={(e) => setQuizId(e.target.value)}>
-                <option value="">Choose a live quiz...</option>
+                <option value="">{t("certificates.classPage.chooseQuizOption")}</option>
                 {kuiz.map((q) => (
                   <option key={q.id} value={q.id}>{q.title}</option>
                 ))}
@@ -1490,16 +1532,16 @@ export default function CertificatesPage() {
                 min={0}
                 value={minSkor}
                 onChange={(e) => setMinSkor(e.target.value)}
-                placeholder="Minimum score"
+                placeholder={t("certificates.classPage.optMinScore")}
               />
             )}
             <div className="flex gap-2">
-              <Button onClick={simpanTemplat}>Save template</Button>
+              <Button onClick={simpanTemplat}>{t("certificates.classPage.saveTemplate")}</Button>
               <Button
                 variant="outline"
                 onClick={() => { setBorangTerbuka(false); setSunting(null); }}
               >
-                Cancel
+                {t("common.cancel")}
               </Button>
             </div>
           </CardSection>
@@ -1509,115 +1551,115 @@ export default function CertificatesPage() {
           <EmptyState
             className="mt-2"
             icon={<Award className="h-8 w-8" />}
-            title="No certificate templates yet"
-            text="Create one to start issuing certificates."
+            title={t("certificates.classPage.noTemplatesYet")}
+            text={t("certificates.classPage.createToStart")}
           />
         ) : (
           <div className="mt-6">
-            {templat.map((t) => (
-              <CardSection key={t.id} baris className="first:border-t-0">
+            {templat.map((tpl) => (
+              <CardSection key={tpl.id} baris className="first:border-t-0">
                 <div className="flex items-start justify-between gap-4 flex-wrap">
-                <LakaranLatar classId={classId} t={t} onBuka={setEditor} />
+                <LakaranLatar classId={classId} templat={tpl} onBuka={setEditor} />
                 <div className="min-w-0">
                   <div className="flex items-center gap-2">
-                    <span className="text-[14px] font-bold text-ink truncate" title={t.title}>
-                      {t.title}
+                    <span className="text-[14px] font-bold text-ink truncate" title={tpl.title}>
+                      {tpl.title}
                     </span>
                     {/* KZ-009: lencana kit pada templat aktif kelas. */}
-                    {t.is_active && <Badge variant="solid" warna="purple">Active</Badge>}
+                    {tpl.is_active && <Badge variant="solid" warna="purple">{t("certificates.classPage.active")}</Badge>}
                     {/* KZ-030: petunjuk butiran kurang (bukan penghalang). */}
-                    {!adaSigner(t) && <Badge warna="yellow">Missing signer</Badge>}
-                    {!t.signature_path && <Badge warna="yellow">No signature</Badge>}
+                    {!adaSigner(tpl) && <Badge warna="yellow">{t("certificates.classPage.missingSigner")}</Badge>}
+                    {!tpl.signature_path && <Badge warna="yellow">{t("certificates.classPage.noSignature")}</Badge>}
                   </div>
                   <div className="text-[13px] text-ink-faint">
-                    {t.criteria?.type === "all_members" && "All members"}
-                    {t.criteria?.type === "hunt_completed" && "Completed a specific activity"}
-                    {t.criteria?.type === "min_score" && `Minimum score: ${t.criteria.min_score ?? 0}`}
-                    {t.criteria?.type === "live_attended" && "Attended a live quiz"}
+                    {tpl.criteria?.type === "all_members" && t("certificates.classPage.optAll")}
+                    {tpl.criteria?.type === "hunt_completed" && t("certificates.classPage.optHunt")}
+                    {tpl.criteria?.type === "min_score" && t("certificates.classPage.minScoreValue", { n: tpl.criteria.min_score ?? 0 })}
+                    {tpl.criteria?.type === "live_attended" && t("certificates.classPage.optLive")}
                   </div>
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
                   {/* KZ-009: tukar templat aktif melalui RPC; tiada pada
                       templat yang sudah aktif (ia memakai lencana). */}
-                  {!t.is_active && (
+                  {!tpl.is_active && (
                     <Button
                       size="sm"
                       variant="ghost"
-                      disabled={aktifBusy === t.id}
-                      title="Use this template by default when opening this page"
-                      onClick={() => tetapAktif(t)}
+                      disabled={aktifBusy === tpl.id}
+                      title={t("certificates.classPage.setActiveTitle")}
+                      onClick={() => tetapAktif(tpl)}
                     >
-                      Set as active
+                      {t("certificates.classPage.setActive")}
                     </Button>
                   )}
-                  <label className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? "Upload background image" : "Available on Pro"}>
+                  <label className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? t("certificates.classPage.uploadBgTitle") : t("certificates.classPage.proOnly")}>
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
                       disabled={!pro}
-                      onChange={(e) => muatNaikAset(t, "background", e.target.files?.[0] ?? null)}
+                      onChange={(e) => muatNaikAset(tpl, "background", e.target.files?.[0] ?? null)}
                     />
-                    Background {pro ? "" : "(Pro)"}
+                    {t("certificates.classPage.background")}{pro ? "" : t("certificates.classPage.proSuffix")}
                   </label>
-                  <label className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? "Upload logo" : "Available on Pro"}>
+                  <label className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`} title={pro ? t("certificates.classPage.uploadLogoTitle") : t("certificates.classPage.proOnly")}>
                     <input
                       type="file"
                       accept="image/*"
                       className="hidden"
                       disabled={!pro}
-                      onChange={(e) => muatNaikAset(t, "logo", e.target.files?.[0] ?? null)}
+                      onChange={(e) => muatNaikAset(tpl, "logo", e.target.files?.[0] ?? null)}
                     />
-                    Logo {pro ? "" : "(Pro)"}
+                    {t("certificates.classPage.logo")}{pro ? "" : t("certificates.classPage.proSuffix")}
                   </label>
-                  {t.background_path && (
+                  {tpl.background_path && (
                     <CheckRadio
-                      label="Complete design"
-                      title="When on, the background is a complete design: only the name, QR and code are printed over it"
-                      checked={(t.layout?.mode as string) === "full_background"}
-                      onChange={(e) => togolMod(t, e.target.checked)}
+                      label={t("certificates.classPage.completeDesign")}
+                      title={t("certificates.classPage.completeDesignTitle")}
+                      checked={(tpl.layout?.mode as string) === "full_background"}
+                      onChange={(e) => togolMod(tpl, e.target.checked)}
                     />
                   )}
-                  {t.background_path && (
-                    <Button size="sm" variant="ghost" onClick={() => setEditor(t)}>
-                      Edit layout
+                  {tpl.background_path && (
+                    <Button size="sm" variant="ghost" onClick={() => setEditor(tpl)}>
+                      {t("certificates.classPage.editLayout")}
                     </Button>
                   )}
                   <Button
                     size="sm"
                     variant="ghost"
                     onClick={() => {
-                      setSunting(t.id);
-                      setTajuk(t.title);
-                      setJenis(t.criteria?.type ?? "all_members");
-                      setHuntId(t.criteria?.hunt_id ?? "");
-                      setQuizId(t.criteria?.quiz_id ?? "");
-                      setMinSkor(String(t.criteria?.min_score ?? 0));
+                      setSunting(tpl.id);
+                      setTajuk(tpl.title);
+                      setJenis(tpl.criteria?.type ?? "all_members");
+                      setHuntId(tpl.criteria?.hunt_id ?? "");
+                      setQuizId(tpl.criteria?.quiz_id ?? "");
+                      setMinSkor(String(tpl.criteria?.min_score ?? 0));
                       setBorangTerbuka(true);
                     }}
                   >
-                    Edit
+                    {t("certificates.classPage.edit")}
                   </Button>
                   <Button
                     size="sm"
                     variant="ghost"
                     className={pro ? "" : "opacity-50 cursor-not-allowed"}
-                    title={pro ? "Save this template to My templates" : "Available on Pro"}
+                    title={pro ? t("certificates.classPage.saveToMineTitle") : t("certificates.classPage.proOnly")}
                     disabled={!pro || pustakaBusy}
-                    onClick={() => simpanKePustaka(t)}
+                    onClick={() => simpanKePustaka(tpl)}
                   >
-                    Save to My templates
+                    {t("certificates.classPage.saveToMine")}
                   </Button>
-                  {salinBuka === t.id ? (
+                  {salinBuka === tpl.id ? (
                     <span className="block w-56">
                       <Select
                         value=""
                         disabled={pustakaBusy}
                         onChange={(e) => {
-                          if (e.target.value) salinKeKelasLain(t, e.target.value);
+                          if (e.target.value) salinKeKelasLain(tpl, e.target.value);
                         }}
                       >
-                        <option value="">Choose a class...</option>
+                        <option value="">{t("certificates.list.chooseClass")}</option>
                         {kelasPemanggil
                           .filter((k) => k.id !== classId)
                           .map((k) => (
@@ -1631,76 +1673,75 @@ export default function CertificatesPage() {
                     <Button
                       size="sm"
                       variant="ghost"
-                      title="Copy this template to another class you teach"
+                      title={t("certificates.classPage.copyTitle")}
                       disabled={kelasPemanggil.filter((k) => k.id !== classId).length === 0}
-                      onClick={() => setSalinBuka(salinBuka === t.id ? null : t.id)}
+                      onClick={() => setSalinBuka(salinBuka === tpl.id ? null : tpl.id)}
                     >
-                      Copy to another class
+                      {t("certificates.classPage.copyToClass")}
                     </Button>
                   )}
-                  <Button size="sm" variant="ghost" onClick={() => bukaMedan(t)}>
-                    Certificate details
+                  <Button size="sm" variant="ghost" onClick={() => bukaMedan(tpl)}>
+                    {t("certificates.classPage.details")}
                   </Button>
                   {/* KZ-029: padam templat; merah lembut, hujung baris tindakan. */}
                   <Button
                     size="sm"
                     variant="ghost"
                     className="text-kz-down"
-                    disabled={padamBusy === t.id}
-                    title="Delete this template"
-                    onClick={() => padamTemplat(t)}
+                    disabled={padamBusy === tpl.id}
+                    title={t("certificates.classPage.deleteThisTitle")}
+                    onClick={() => padamTemplat(tpl)}
                   >
-                    <Trash2 className="w-4 h-4" /> Delete
+                    <Trash2 className="w-4 h-4" /> {t("certificates.list.deleteLabel")}
                   </Button>
                 </div>
                 </div>
 
                 {/* Panel medan isian (V2-016b) */}
-                {medanBuka === t.id && (
+                {medanBuka === tpl.id && (
                   <div className="mt-4 rounded-[4px] border border-kz-line bg-canvas p-6 space-y-4">
                     <div>
-                      <h4 className="text-[16.8px] font-bold text-ink">Certificate details</h4>
+                      <h4 className="text-[16.8px] font-bold text-ink">{t("certificates.classPage.details")}</h4>
                       <p className="text-[13px] text-ink-faint mt-1">
-                        These values are printed on every certificate of this template. Empty
-                        fields are never printed.
+                        {t("certificates.classPage.detailsNote")}
                       </p>
                     </div>
                     <div className="grid gap-4 md:grid-cols-2">
                       {/* KZ-010: medan kosong guna nama kelas pada sijil. */}
                       <Field
-                        label="Course / programme"
-                        note="Leave empty to use the class name."
+                        label={t("certificates.classPage.course")}
+                        note={t("certificates.classPage.courseNote")}
                       >
                         <Input
                           value={borangMedan.course ?? ""}
                           maxLength={160}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, course: e.target.value }))}
-                          placeholder={klass?.name ?? "Bengkel Robotik 2026"}
+                          placeholder={klass?.name ?? t("certificates.classPage.coursePlaceholder")}
                         />
                       </Field>
-                      <Field label="Location">
+                      <Field label={t("certificates.classPage.location")}>
                         <Input
                           value={borangMedan.location ?? ""}
                           maxLength={120}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, location: e.target.value }))}
-                          placeholder="Dewan Kuliah FKMT, UPSI"
+                          placeholder={t("certificates.classPage.locationPlaceholder")}
                         />
                       </Field>
-                      <Field label="Start date">
+                      <Field label={t("certificates.classPage.startDate")}>
                         <Input
                           type="date"
                           value={borangMedan.date_start ?? ""}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, date_start: e.target.value || undefined }))}
                         />
                       </Field>
-                      <Field label="End date (optional)">
+                      <Field label={t("certificates.classPage.endDate")}>
                         <Input
                           type="date"
                           value={borangMedan.date_end ?? ""}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, date_end: e.target.value || undefined }))}
                         />
                       </Field>
-                      <Field label="Signer name">
+                      <Field label={t("certificates.classPage.signerName")}>
                         <Input
                           value={borangMedan.signer_name ?? ""}
                           maxLength={100}
@@ -1708,59 +1749,59 @@ export default function CertificatesPage() {
                           placeholder="Dr Hariz"
                         />
                       </Field>
-                      <Field label="Signer title">
+                      <Field label={t("certificates.classPage.signerTitle")}>
                         <Input
                           value={borangMedan.signer_title ?? ""}
                           maxLength={120}
                           onChange={(e) => setBorangMedan((p) => ({ ...p, signer_title: e.target.value }))}
-                          placeholder="Pensyarah"
+                          placeholder={t("certificates.classPage.signerTitlePlaceholder")}
                         />
                       </Field>
                     </div>
                     <div className="flex items-center gap-3 flex-wrap">
                       <label
                         className={`${LABEL_FAIL} ${pro ? "" : "opacity-50 cursor-not-allowed"}`}
-                        title={pro ? "Upload signature image (PNG or JPEG, max 1 MB)" : "Available on Pro"}
+                        title={pro ? t("certificates.classPage.uploadSigTitle") : t("certificates.classPage.proOnly")}
                       >
                         <input
                           type="file"
                           accept="image/png,image/jpeg"
                           className="hidden"
                           disabled={!pro || medanBusy}
-                          onChange={(e) => muatNaikTandatangan(t, e.target.files?.[0] ?? null)}
+                          onChange={(e) => muatNaikTandatangan(tpl, e.target.files?.[0] ?? null)}
                         />
-                        Upload signature {pro ? "" : "(Pro)"}
+                        {t("certificates.classPage.uploadSig")} {pro ? "" : t("certificates.classPage.proSuffix")}
                       </label>
-                      {sigUrl[t.id] ? (
+                      {sigUrl[tpl.id] ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
-                          src={sigUrl[t.id]}
-                          alt="Signature"
+                          src={sigUrl[tpl.id]}
+                          alt={t("certificates.classPage.sigAlt")}
                           className="h-10 rounded border border-hairline bg-white px-1"
                         />
                       ) : (
                         <span className="text-[12px] text-ink-faint">
-                          {t.signature_path ? "Loading signature..." : "No signature image yet"}
+                          {tpl.signature_path ? t("certificates.classPage.loadingSig") : t("certificates.classPage.noSig")}
                         </span>
                       )}
-                      {t.signature_path && (
+                      {tpl.signature_path && (
                         <Button
                           size="sm"
                           variant="ghost"
                           className="text-kz-down"
                           disabled={medanBusy}
-                          onClick={() => buangTandatangan(t)}
+                          onClick={() => buangTandatangan(tpl)}
                         >
-                          Remove signature
+                          {t("certificates.classPage.removeSig")}
                         </Button>
                       )}
                     </div>
                     <div className="flex gap-2">
-                      <Button onClick={() => simpanMedan(t)} disabled={medanBusy}>
-                        Save
+                      <Button onClick={() => simpanMedan(tpl)} disabled={medanBusy}>
+                        {t("certificates.list.save")}
                       </Button>
                       <Button variant="outline" onClick={() => setMedanBuka(null)}>
-                        Cancel
+                        {t("common.cancel")}
                       </Button>
                     </div>
                   </div>
@@ -1774,7 +1815,7 @@ export default function CertificatesPage() {
         {editor && (() => {
           // Templat segar daripada senarai supaya mode terkini digunakan
           // walaupun suis di baris templat diketik semasa editor terbuka.
-          const t = templat.find((x) => x.id === editor.id) ?? editor;
+          const tpl = templat.find((x) => x.id === editor.id) ?? editor;
           return (
             // KZ-025b: editor susun atur hanya dibingkai kad; kanvas,
             // koordinat dan fon sijil di dalam LayoutEditor tidak diubah.
@@ -1783,18 +1824,18 @@ export default function CertificatesPage() {
                 <LayoutEditor
                 // key: mulakan semula keadaan dalaman (susun, latar)
                 // bila templat bertukar.
-                key={t.id}
+                key={tpl.id}
                 classId={classId}
-                templateId={t.id}
-                title={t.title}
+                templateId={tpl.id}
+                title={tpl.title}
                 mode={
-                  (t.layout?.mode as string) === "full_background"
+                  (tpl.layout?.mode as string) === "full_background"
                     ? "full_background"
                     : "standard"
                 }
-                layout={t.layout}
-                backgroundPath={t.background_path ?? ""}
-                medan={t.fields}
+                layout={tpl.layout}
+                backgroundPath={tpl.background_path ?? ""}
+                medan={tpl.fields}
                 namaKelas={klass?.name}
                 onClose={() => setEditor(null)}
                 onSaved={async () => {
@@ -1808,41 +1849,41 @@ export default function CertificatesPage() {
 
         {/* Pengeluaran */}
         <Card className="mb-8">
-          <CardHead title="Issue certificates" />
+          <CardHead title={t("certificates.classPage.issueTitle")} />
           <div className="mt-6 flex items-end gap-2 flex-wrap">
             <div className="w-64">
               {/* KZ-009: jelaskan beza pilihan semasa dengan templat aktif. */}
               <Field
-                label="Template"
-                note="Issuing uses the selected template. The active template is selected by default."
+                label={t("certificates.classPage.templateLabel")}
+                note={t("certificates.classPage.templateNote")}
               >
                 <Select value={pilihTemplat} onChange={(e) => setPilihTemplat(e.target.value)}>
-                  {templat.map((t) => (
-                    // KZ-009: label templat aktif berakhir " (active)".
-                    <option key={t.id} value={t.id}>{t.title}{t.is_active ? " (active)" : ""}</option>
+                  {templat.map((tpl) => (
+                    // KZ-009: label templat aktif berakhir " (aktif)".
+                    <option key={tpl.id} value={tpl.id}>{tpl.title}{tpl.is_active ? t("certificates.classPage.activeSuffix") : ""}</option>
                   ))}
                 </Select>
               </Field>
             </div>
             <Button onClick={bacaKelayakan} disabled={sedangHantar || !pilihTemplat}>
-              <RefreshCw className="w-4 h-4" /> Check eligibility
+              <RefreshCw className="w-4 h-4" /> {t("certificates.classPage.checkEligibility")}
             </Button>
             <Button variant="outline" onClick={pratontonPdf} disabled={!pilihTemplat}>
-              <Eye className="w-4 h-4" /> Preview PDF
+              <Eye className="w-4 h-4" /> {t("certificates.classPage.previewPdf")}
             </Button>
             <Button
               onClick={pro ? emelPukal : undefined}
               disabled={!pro}
-              title={pro ? "Send certificate emails to everyone who has not received one yet" : "Available on Pro"}
+              title={pro ? t("certificates.classPage.emailAllUnsentTitle") : t("certificates.classPage.proOnly")}
             >
-              <Mail className="w-4 h-4" /> Email all unsent{pro ? "" : " (Pro)"}
+              <Mail className="w-4 h-4" /> {t("certificates.classPage.emailAllUnsent")}{pro ? "" : t("certificates.classPage.proSuffix")}
             </Button>
             <Button
               onClick={pro ? emelTerpilih : undefined}
               disabled={!pro || bilanganPilihEmel === 0}
-              title={pro ? "Send certificate emails to the selected certificates" : "Available on Pro"}
+              title={pro ? t("certificates.classPage.emailSelectedTitle2") : t("certificates.classPage.proOnly")}
             >
-              <Mail className="w-4 h-4" /> Email selected ({bilanganPilihEmel}){pro ? "" : " (Pro)"}
+              <Mail className="w-4 h-4" /> {t("certificates.classPage.emailSelected", { n: bilanganPilihEmel })}{pro ? "" : t("certificates.classPage.proSuffix")}
             </Button>
           </div>
 
@@ -1851,7 +1892,7 @@ export default function CertificatesPage() {
               {/* KZ-011: ringkasan kecil dan butang pilih semua di atas jadual. */}
               <div className="flex flex-wrap items-center gap-2 mt-6 mb-3">
                 <span className="text-[13px] text-ink-faint">
-                  {bilanganLayak} eligible, {bilanganSudahDikeluarkan} already issued, {bilanganTidakLayak} not eligible.
+                  {t("certificates.classPage.eligibilitySummary", { layak: bilanganLayak, dikeluarkan: bilanganSudahDikeluarkan, tidak: bilanganTidakLayak })}
                 </span>
                 <Button
                   size="sm"
@@ -1865,7 +1906,7 @@ export default function CertificatesPage() {
                   }}
                   disabled={barisBolehPilih.length === 0 || issueBusy}
                 >
-                  Select all eligible ({barisBolehPilih.length})
+                  {t("certificates.classPage.selectAllEligibleBtn", { n: barisBolehPilih.length })}
                 </Button>
                 <Button
                   size="sm"
@@ -1873,11 +1914,11 @@ export default function CertificatesPage() {
                   onClick={() => setTick({})}
                   disabled={bilanganTick === 0 || issueBusy}
                 >
-                  Clear
+                  {t("certificates.classPage.clear")}
                 </Button>
               </div>
               <DataTable
-                label="Certificate eligibility"
+                label={t("certificates.classPage.eligibilityTable")}
                 rows={layak}
                 rowKey={(r) => r.participant_id}
                 columns={lajurLayak}
@@ -1889,8 +1930,14 @@ export default function CertificatesPage() {
               >
                 <Plus className="w-4 h-4" />
                 {kemajuan
-                  ? `Issuing ${kemajuan.semasa} of ${kemajuan.jumlah}...`
-                  : `Issue to ${bilanganTick} student${bilanganTick === 1 ? "" : "s"}`}
+                  ? t("certificates.classPage.issuing", { semasa: kemajuan.semasa, jumlah: kemajuan.jumlah })
+                  : terjemahBilangan(
+                      bahasa,
+                      "certificates.classPage.issueToOne",
+                      "certificates.classPage.issueToOther",
+                      bilanganTick,
+                      { n: bilanganTick },
+                    )}
               </Button>
             </div>
           )}
@@ -1899,7 +1946,7 @@ export default function CertificatesPage() {
         {/* Sijil dikeluarkan */}
         <Card>
           <CardHead
-            title="Issued certificates"
+            title={t("certificates.classPage.issuedTitle")}
             right={
               <div className="flex items-center gap-2 flex-wrap">
                 {/* KZ-029: kemas kini reka bentuk sijil terpilih dengan
@@ -1910,15 +1957,15 @@ export default function CertificatesPage() {
                   disabled={!templatAktif || idsTerpilihReka.length === 0 || regenBusy || emelBusy}
                   title={
                     templatAktif
-                      ? "Regenerate the selected certificates with the active template"
-                      : "No active certificate template"
+                      ? t("certificates.classPage.regenSelectedTitle")
+                      : t("certificates.classPage.noActive")
                   }
                   onClick={() => kemasKiniReka(idsTerpilihReka)}
                 >
                   <RefreshCw className="w-4 h-4" />
                   {kemajuanRegen
-                    ? `Updating ${kemajuanRegen.semasa} of ${kemajuanRegen.jumlah}...`
-                    : `Update design (${idsTerpilihReka.length} selected)`}
+                    ? t("certificates.classPage.updating", { semasa: kemajuanRegen.semasa, jumlah: kemajuanRegen.jumlah })
+                    : t("certificates.classPage.updateDesignSelected", { n: idsTerpilihReka.length })}
                 </Button>
                 {/* KZ-029: semua sijil tidak dibatalkan yang reka bentuknya
                     bukan templat aktif. */}
@@ -1927,15 +1974,15 @@ export default function CertificatesPage() {
                   disabled={!templatAktif || idsRekaLama.length === 0 || regenBusy || emelBusy}
                   title={
                     templatAktif
-                      ? "Regenerate every active certificate with the active template"
-                      : "No active certificate template"
+                      ? t("certificates.classPage.regenAllTitle")
+                      : t("certificates.classPage.noActive")
                   }
                   onClick={() => kemasKiniReka(idsRekaLama)}
                 >
                   <RefreshCw className="w-4 h-4" />
                   {kemajuanRegen
-                    ? `Updating ${kemajuanRegen.semasa} of ${kemajuanRegen.jumlah}...`
-                    : `Update all to active design (${idsRekaLama.length})`}
+                    ? t("certificates.classPage.updating", { semasa: kemajuanRegen.semasa, jumlah: kemajuanRegen.jumlah })
+                    : t("certificates.classPage.updateAllDesign", { n: idsRekaLama.length })}
                 </Button>
               </div>
             }
@@ -1944,12 +1991,12 @@ export default function CertificatesPage() {
             <EmptyState
               className="mt-2"
               icon={<Award className="h-8 w-8" />}
-              title="No certificates issued yet"
+              title={t("certificates.classPage.noIssued")}
             />
           ) : (
             <div className="mt-6">
               <DataTable
-                label="Issued certificates"
+                label={t("certificates.classPage.issuedTitle")}
                 rows={sijil}
                 rowKey={(s) => s.id}
                 columns={lajurSijil}
