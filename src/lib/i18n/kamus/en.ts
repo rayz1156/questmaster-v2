@@ -2096,4 +2096,12 @@ export const en = {
       saveFirstNote: 'Save first, then preview: the preview shows the saved template.',
     },
   },
+  // Lightbox video/imej papan pembelajaran (learning-board/VideoLightbox.tsx dan ImageLightbox.tsx).
+  boards: {
+    lightbox: {
+      loadFailed: 'Failed to load video',
+      loadingVideo: 'Loading video…',
+      videoFallback: 'Video',
+    },
+  },
 };

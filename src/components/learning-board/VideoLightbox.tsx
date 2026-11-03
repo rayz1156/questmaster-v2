@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { supabase } from '@/lib/supabase';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 /**
  * Full-screen lightbox that plays an Adilo-hosted video inside an iframe.
@@ -20,6 +21,7 @@ export default function VideoLightbox({
 }) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useBahasa();
 
   useEffect(() => {
     let alive = true;
@@ -32,14 +34,14 @@ export default function VideoLightbox({
         const r = await fetch(`/api/learning-boards/${classId}/embed/${fileId}`, { headers });
         const data = await r.json();
         if (!alive) return;
-        if (!r.ok) setError(data.error || 'Failed to load video');
+        if (!r.ok) setError(data.error || t('boards.lightbox.loadFailed'));
         else setEmbedUrl(data.embedUrl);
       } catch (e: any) {
         if (alive) setError(e?.message || String(e));
       }
     })();
     return () => { alive = false; };
-  }, [classId, fileId]);
+  }, [classId, fileId, t]);
 
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -56,7 +58,7 @@ export default function VideoLightbox({
         onClick={(e) => e.stopPropagation()}
       >
         <button
-          aria-label="Close"
+          aria-label={t('common.close')}
           onClick={onClose}
           className="absolute top-3 right-3 z-10 rounded-full bg-black/60 hover:bg-black/80 text-white w-9 h-9 flex items-center justify-center"
         >
@@ -74,7 +76,7 @@ export default function VideoLightbox({
         )}
         {!error && !embedUrl && (
           <div className="w-full h-full flex items-center justify-center text-slate-300 text-sm">
-            Loading video…
+            {t('boards.lightbox.loadingVideo')}
           </div>
         )}
         {embedUrl && (
@@ -84,7 +86,7 @@ export default function VideoLightbox({
             allow="autoplay; fullscreen; picture-in-picture"
             allowFullScreen
             referrerPolicy="no-referrer"
-            title={title || 'Video'}
+            title={title || t('boards.lightbox.videoFallback')}
           />
         )}
       </div>

@@ -2060,4 +2060,12 @@ export const ms: Kamus = {
       saveFirstNote: 'Simpan dahulu, kemudian pratonton: pratonton memaparkan templat yang disimpan.',
     },
   },
+  // Lightbox video/imej papan pembelajaran (learning-board/VideoLightbox.tsx dan ImageLightbox.tsx).
+  boards: {
+    lightbox: {
+      loadFailed: 'Video tidak dapat dimuatkan',
+      loadingVideo: 'Memuatkan video…',
+      videoFallback: 'Video',
+    },
+  },
 };
