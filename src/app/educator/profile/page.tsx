@@ -11,13 +11,15 @@ import { EDU_TABS } from '@/lib/eduTabs';
 import ProfileView from "@/components/ProfileView";
 import EmailIntegrationCard from "@/components/EmailIntegrationCard";
 import { PageHead } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 export default function Page() {
+  const { t } = useBahasa();
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        title="Profile"
-        description="Your account details, educator intro card and email integration."
+        title={t('nav.profile')}
+        description={t('educator.profile.desc')}
       />
       <EmailIntegrationCard />
       <ProfileView role="educator" />

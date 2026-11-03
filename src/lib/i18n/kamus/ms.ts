@@ -693,5 +693,31 @@ export const ms: Kamus = {
       learningTitle: 'Segalanya untuk sesi anda seterusnya.',
       learningDesc: 'Atur kandungan anda, kongsi sumber dan pastikan kelas anda sentiasa di landasan.',
     },
+    // Halaman profil pendidik (src/app/educator/profile/page.tsx).
+    profile: {
+      desc: 'Butiran akaun anda, kad pengenalan pendidik dan integrasi e-mel.',
+    },
+    // Halaman jemputan pendidik (src/app/educator/invites/page.tsx).
+    invites: {
+      loadFailed: 'Gagal memuatkan jemputan',
+      accepted: 'Jemputan diterima! Mengalihkan anda ke kelas anda...',
+      acceptFailed: 'Gagal menerima jemputan',
+      colClass: 'Kelas',
+      colExpires: 'Tamat Tempoh',
+      colCode: 'Kod',
+      accept: 'Terima',
+      invitedBy: 'Dijemput oleh {nama}',
+      backToClasses: 'Kelas',
+      title: 'Jemputan pendidik',
+      desc: 'Terima jemputan pendidik.',
+      cardTitle: 'Terima jemputan pendidik',
+      cardSubtitle: 'Tampal kod jemputan 8 aksara yang dikongsi oleh rakan sekerja anda. Jemputan mesti dialamatkan kepada e-mel yang anda guna untuk log masuk.',
+      codeLabel: 'Kod jemputan',
+      codePlaceholder: 'cth. K7M9P3X2',
+      pendingTitle: 'Jemputan tertunggak untuk anda ({n})',
+      pendingSubtitle: 'Jemputan dialamatkan kepada e-mel anda yang belum anda terima.',
+      tableLabel: 'Jemputan pendidik tertunggak',
+      empty: 'Anda tiada jemputan pendidik tertunggak.',
+    },
   },
 };

@@ -729,5 +729,31 @@ export const en = {
       learningTitle: 'Everything for your next session.',
       learningDesc: 'Organise your content, share resources and keep your class on track.',
     },
+    // Halaman profil pendidik (src/app/educator/profile/page.tsx).
+    profile: {
+      desc: 'Your account details, educator intro card and email integration.',
+    },
+    // Halaman jemputan pendidik (src/app/educator/invites/page.tsx).
+    invites: {
+      loadFailed: 'Failed to load invites',
+      accepted: 'Invite accepted! Redirecting to your class...',
+      acceptFailed: 'Failed to accept invite',
+      colClass: 'Class',
+      colExpires: 'Expires',
+      colCode: 'Code',
+      accept: 'Accept',
+      invitedBy: 'Invited by {nama}',
+      backToClasses: 'Classes',
+      title: 'Educator invites',
+      desc: 'Accept an educator invite.',
+      cardTitle: 'Accept an educator invite',
+      cardSubtitle: 'Paste the 8-character invite code your colleague shared with you. The invite must be addressed to the email you signed in with.',
+      codeLabel: 'Invite code',
+      codePlaceholder: 'e.g. K7M9P3X2',
+      pendingTitle: 'Pending invites for you ({n})',
+      pendingSubtitle: 'Invites addressed to your email that you have not accepted yet.',
+      tableLabel: 'Pending educator invites',
+      empty: 'You have no pending educator invites.',
+    },
   },
 };

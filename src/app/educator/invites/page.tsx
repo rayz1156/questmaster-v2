@@ -29,9 +29,12 @@ import {
   PageHead,
   type DataColumn,
 } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL } from "@/lib/i18n";
 
 function EducatorInvitesPageInner() {
   const router = useRouter();
+  const { t, bahasa } = useBahasa();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState<{ type: "ok" | "err"; text: string } | null>(null);
@@ -44,7 +47,7 @@ function EducatorInvitesPageInner() {
       const list = await listMyClassEducatorInvites();
       setInvites(list);
     } catch (err: unknown) {
-      setMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to load invites" });
+      setMsg({ type: "err", text: err instanceof Error ? err.message : t('educator.invites.loadFailed') });
     } finally {
       setLoading(false);
     }
@@ -67,10 +70,10 @@ function EducatorInvitesPageInner() {
     setMsg(null);
     try {
       const classId = await acceptClassEducatorInviteByCode(c.trim());
-      setMsg({ type: "ok", text: "Invite accepted! Redirecting to your class..." });
+      setMsg({ type: "ok", text: t('educator.invites.accepted') });
       setTimeout(() => router.push(`/educator/classes/${classId}`), 600);
     } catch (err: unknown) {
-      setMsg({ type: "err", text: err instanceof Error ? err.message : "Failed to accept invite" });
+      setMsg({ type: "err", text: err instanceof Error ? err.message : t('educator.invites.acceptFailed') });
     } finally {
       setBusy(false);
     }
@@ -79,7 +82,7 @@ function EducatorInvitesPageInner() {
   const lajur: DataColumn<MyClassEducatorInvite>[] = [
     {
       key: "class",
-      header: "Class",
+      header: t('educator.invites.colClass'),
       render: (i) => (
         <span className="flex items-center gap-3 py-3">
           <span
@@ -90,7 +93,7 @@ function EducatorInvitesPageInner() {
           <span className="min-w-0">
             <span className="block text-[13px] font-bold text-ink truncate">{i.class_name}</span>
             <span className="block text-[12px] text-ink-faint truncate">
-              Invited by {i.inviter_name || "another educator"}
+              {t('educator.invites.invitedBy', { nama: i.inviter_name || t('educator.classes.anotherEducator') })}
             </span>
           </span>
         </span>
@@ -98,17 +101,17 @@ function EducatorInvitesPageInner() {
     },
     {
       key: "expires",
-      header: "Expires",
+      header: t('educator.invites.colExpires'),
       hideOnMobile: true,
       render: (i) => (
         <span className="text-[13px] text-ink-faint">
-          {new Date(i.expires_at).toLocaleDateString()}
+          {new Date(i.expires_at).toLocaleDateString(LOKAL[bahasa])}
         </span>
       ),
     },
     {
       key: "code",
-      header: "Code",
+      header: t('educator.invites.colCode'),
       render: (i) => (
         <code className="font-mono text-[12px] bg-canvas border border-hairline rounded-[4px] px-2 py-1 text-ink-muted">
           {i.code}
@@ -121,7 +124,7 @@ function EducatorInvitesPageInner() {
       className: "text-right",
       render: (i) => (
         <Button size="sm" disabled={busy} onClick={() => accept(i.code)}>
-          <Check className="w-4 h-4" /> Accept
+          <Check className="w-4 h-4" /> {t('educator.invites.accept')}
         </Button>
       ),
     },
@@ -130,18 +133,18 @@ function EducatorInvitesPageInner() {
   return (
     <Shell tabs={EDU_TABS}>
       <div className="flex items-center gap-2 mb-3">
-        <Link href="/educator/classes" className="text-sm text-ink-faint hover:text-ink transition">← Classes</Link>
+        <Link href="/educator/classes" className="text-sm text-ink-faint hover:text-ink transition">← {t('educator.invites.backToClasses')}</Link>
       </div>
 
       <PageHead
-        title="Educator invites"
-        description="Accept an educator invite."
+        title={t('educator.invites.title')}
+        description={t('educator.invites.desc')}
       />
 
       <Card className="mb-4">
         <CardHead
-          title="Accept an educator invite"
-          subtitle="Paste the 8-character invite code your colleague shared with you. The invite must be addressed to the email you signed in with."
+          title={t('educator.invites.cardTitle')}
+          subtitle={t('educator.invites.cardSubtitle')}
         />
         <form
           onSubmit={(e) => {
@@ -150,19 +153,19 @@ function EducatorInvitesPageInner() {
           }}
           className="flex flex-wrap items-end gap-3 mt-4"
         >
-          <Field label="Invite code" htmlFor="kod-jemputan" className="flex-1 min-w-[220px]">
+          <Field label={t('educator.invites.codeLabel')} htmlFor="kod-jemputan" className="flex-1 min-w-[220px]">
             <Input
               id="kod-jemputan"
               value={code}
               onChange={(e) => setCode(e.target.value.toUpperCase())}
-              placeholder="e.g. K7M9P3X2"
+              placeholder={t('educator.invites.codePlaceholder')}
               className="font-mono uppercase tracking-wider"
               maxLength={12}
               autoFocus
             />
           </Field>
           <Button type="submit" disabled={busy || !code.trim()}>
-            <Check className="w-4 h-4" /> Accept
+            <Check className="w-4 h-4" /> {t('educator.invites.accept')}
           </Button>
         </form>
         {msg && (
@@ -171,15 +174,15 @@ function EducatorInvitesPageInner() {
       </Card>
 
       <CardHead
-        title={`Pending invites for you (${invites.length})`}
-        subtitle="Invites addressed to your email that you have not accepted yet."
+        title={t('educator.invites.pendingTitle', { n: invites.length })}
+        subtitle={t('educator.invites.pendingSubtitle')}
         className="mb-3"
       />
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading...</p>
+        <p className="text-sm text-ink-muted">{t('common.loadingDots')}</p>
       ) : (
         <DataTable
-          label="Pending educator invites"
+          label={t('educator.invites.tableLabel')}
           columns={lajur}
           rows={invites}
           rowKey={(i) => i.id}
@@ -189,7 +192,7 @@ function EducatorInvitesPageInner() {
           empty={
             <div className="py-8 text-center">
               <Mail className="w-6 h-6 mx-auto mb-2 text-ink-faint" aria-hidden="true" />
-              <p className="text-[14px] text-ink-faint">You have no pending educator invites.</p>
+              <p className="text-[14px] text-ink-faint">{t('educator.invites.empty')}</p>
             </div>
           }
         />
