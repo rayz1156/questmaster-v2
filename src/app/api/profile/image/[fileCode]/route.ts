@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { fileluDirectLink } from '@/lib/filelu';
 import { s5PresignGet } from '@/lib/s5';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,7 +18,7 @@ export async function GET(
   { params }: { params: { fileCode: string } },
 ) {
   const { fileCode } = params;
-  if (!fileCode) return NextResponse.json({ error: 'fileCode required' }, { status: 400 });
+  if (!fileCode) return ralatJson('fileCode required', 400);
 
   // S5-stored files: fileCode is "s5__" + base64url(key). Serve via presigned GET.
   if (fileCode.startsWith('s5__')) {
@@ -25,7 +26,7 @@ export async function GET(
       const key = Buffer.from(fileCode.slice(4).replace(/-/g,'+').replace(/_/g,'/'), 'base64').toString('utf8');
       const signed = await s5PresignGet(key, 3600);
       const up = await fetch(signed, { cache: 'no-store' });
-      if (!up.ok || !up.body) return NextResponse.json({ error: `Upstream ${up.status}` }, { status: 502 });
+      if (!up.ok || !up.body) return ralatJson(`Upstream ${up.status}`, 502);
       const extM: Record<string,string> = { pdf:'application/pdf', png:'image/png', jpg:'image/jpeg', jpeg:'image/jpeg', gif:'image/gif', webp:'image/webp', svg:'image/svg+xml', mp4:'video/mp4', webm:'video/webm', mp3:'audio/mpeg', txt:'text/plain; charset=utf-8', csv:'text/csv; charset=utf-8', json:'application/json' };
       const kext = (key.split('.').pop() || '').toLowerCase();
       const upct = up.headers.get('content-type') || '';
@@ -40,14 +41,14 @@ export async function GET(
       h.set('Cache-Control', 'private, max-age=120');
       return new NextResponse(up.body, { status: 200, headers: h });
     } catch (e) {
-      return NextResponse.json({ error: 'Could not resolve file' }, { status: 502 });
+      return ralatJson('Could not resolve file', 502);
     }
   }
   let direct;
   try { direct = await fileluDirectLink(fileCode); } catch { direct = null; }
-  if (!direct?.url) return NextResponse.json({ error: 'Could not resolve file' }, { status: 502 });
+  if (!direct?.url) return ralatJson('Could not resolve file', 502);
   const upstream = await fetch(direct.url, { cache: 'no-store' });
-  if (!upstream.ok || !upstream.body) return NextResponse.json({ error: `Upstream ${upstream.status}` }, { status: 502 });
+  if (!upstream.ok || !upstream.body) return ralatJson(`Upstream ${upstream.status}`, 502);
   const url = new URL(direct.url);
   const pathname = decodeURIComponent(url.pathname);
   const ext = (pathname.split('.').pop() || '').toLowerCase();

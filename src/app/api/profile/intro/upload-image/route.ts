@@ -3,6 +3,7 @@ import { fileluUpload, fileluDelete } from '@/lib/filelu';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { reserveMuatNaik, rekodMuatNaik } from '@/lib/kuotaStoran';
 import { failVideo, MESEJ_SEKAT_VIDEO } from '@/lib/sekatVideo';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,17 +17,17 @@ export async function POST(req: NextRequest) {
   const admin = getServiceSupabase();
 
   const form = await req.formData().catch(() => null);
-  if (!form) return NextResponse.json({ error: 'multipart/form-data expected' }, { status: 400 });
+  if (!form) return ralatJson('multipart/form-data expected', 400);
   const file = form.get('file');
-  if (!(file instanceof File)) return NextResponse.json({ error: 'file field missing' }, { status: 400 });
-  if (file.size <= 0) return NextResponse.json({ error: 'empty file' }, { status: 400 });
+  if (!(file instanceof File)) return ralatJson('file field missing', 400);
+  if (file.size <= 0) return ralatJson('empty file', 400);
   const mime = file.type || 'application/octet-stream';
   // KZ-039: fail video tidak dibenarkan walau MIME dipalsukan sebagai imej;
   // sambungan nama fail turut disemak oleh failVideo.
   if (failVideo(file.name, file.type)) {
-    return NextResponse.json({ error: MESEJ_SEKAT_VIDEO }, { status: 400 });
+    return ralatJson(MESEJ_SEKAT_VIDEO, 400);
   }
-  if (!mime.startsWith('image/')) return NextResponse.json({ error: `Unsupported file type: ${mime}` }, { status: 415 });
+  if (!mime.startsWith('image/')) return ralatJson(`Unsupported file type: ${mime}`, 415);
 
   // Kuota foto profil dikira dalam kuota PENGGUNA SENDIRI, bukan kelas
   // mana-mana (p_class NULL). Disemak SEBELUM bait dihantar dan SEBELUM
@@ -35,14 +36,14 @@ export async function POST(req: NextRequest) {
   const kuota = await reserveMuatNaik(auth.supa, null, file.size, mime);
   if (kuota) return NextResponse.json(kuota.body, { status: kuota.status });
 
-  if (file.size > MAX_BYTES) return NextResponse.json({ error: `File too large. Max ${Math.round(MAX_BYTES/1024/1024)} MB` }, { status: 413 });
+  if (file.size > MAX_BYTES) return ralatJson(`File too large. Max ${Math.round(MAX_BYTES/1024/1024)} MB`, 413);
 
   const buf = Buffer.from(await file.arrayBuffer());
   let uploaded;
   try {
     uploaded = await fileluUpload(buf, file.name || `profile.${(mime.split('/')[1]||'jpg')}`, mime);
   } catch (e: any) {
-    return NextResponse.json({ error: e?.message || 'FileLu upload failed' }, { status: 502 });
+    return ralatJson(e?.message || 'FileLu upload failed', 502);
   }
 
   const rekod = await rekodMuatNaik(auth.supa, null, uploaded.fileCode, uploaded.sizeBytes ?? file.size, mime, 'profile_intro');
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
     intro_image_path: uploaded.fileCode,
     intro_media_updated_at: new Date().toISOString(),
   }).eq('id', auth.user!.id);
-  if (upErr) return NextResponse.json({ error: upErr.message }, { status: 500 });
+  if (upErr) return ralatJson(upErr.message, 500);
 
   const url = `/api/profile/image/${uploaded.fileCode}`;
   return NextResponse.json({ url, fileCode: uploaded.fileCode });
