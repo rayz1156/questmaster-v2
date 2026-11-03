@@ -2289,6 +2289,7 @@ export const en = {
       noTopic: 'No topic',
       uncategorized: '(Uncategorized)',
       uncategorizedPlain: 'Uncategorized',
+      createColumnFailed: 'Could not create the column.',
       untitled: 'Untitled',
       aiBatchTitle: 'Generate AI thumbnails for cards without a real image',
       aiBatchBtn: 'AI thumbnails',

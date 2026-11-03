@@ -1457,7 +1457,7 @@ function MoodBoardGrid({
         body: JSON.stringify({ title: t('boards.learning.uncategorizedPlain') }),
       });
       const data = await r.json();
-      if (!r.ok || !data?.column?.id) throw new Error(data?.error || 'Could not create column');
+      if (!r.ok || !data?.column?.id) throw new Error(data?.error || t('boards.learning.createColumnFailed'));
       return data.column.id as string;
     } catch (e) {
       console.error(e);

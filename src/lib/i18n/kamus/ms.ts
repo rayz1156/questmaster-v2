@@ -2253,6 +2253,7 @@ export const ms: Kamus = {
       noTopic: 'Tiada topik',
       uncategorized: '(Tanpa kategori)',
       uncategorizedPlain: 'Tanpa kategori',
+      createColumnFailed: 'Lajur tidak dapat dicipta.',
       untitled: 'Tanpa tajuk',
       aiBatchTitle: 'Jana lakaran kecil AI untuk kad tanpa imej sebenar',
       aiBatchBtn: 'Lakaran kecil AI',
