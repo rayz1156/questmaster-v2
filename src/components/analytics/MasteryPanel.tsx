@@ -2,6 +2,8 @@
 import { useEffect, useState } from "react";
 import { Target, ChevronDown, ChevronUp, Settings } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { terjemahBilangan } from "@/lib/i18n";
 import Link from "next/link";
 
 type Bucket = "mastered" | "developing" | "struggling" | "not_attempted";
@@ -52,18 +54,19 @@ function bucketStyle(b: Bucket | undefined) {
   return "bg-gray-200 text-gray-500";
 }
 
-function bucketLabel(b: Bucket | undefined) {
-  if (b === "mastered") return "Mastered";
-  if (b === "developing") return "Developing";
-  if (b === "struggling") return "Struggling";
-  return "Not attempted";
-}
-
 export default function MasteryPanel({ classId }: { classId: string | null }) {
+  const { t, bahasa } = useBahasa();
   const [data, setData] = useState<Payload | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
+
+  // Label bucket mengikut bahasa pengguna.
+  const bucketLabel = (b: Bucket | undefined) =>
+    b === "mastered" ? t("analytics.mastery.bucketMastered")
+    : b === "developing" ? t("analytics.mastery.bucketDeveloping")
+    : b === "struggling" ? t("analytics.mastery.bucketStruggling")
+    : t("analytics.mastery.bucketNotAttempted");
 
   useEffect(() => {
     let cancelled = false;
@@ -80,13 +83,13 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
         if (!res.ok) throw new Error(j.error || `HTTP ${res.status}`);
         if (!cancelled) setData(j.data as Payload);
       } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+        if (!cancelled) setError(e instanceof Error ? e.message : t("analytics.loadFailed"));
       } finally {
         if (!cancelled) setLoading(false);
       }
     })();
     return () => { cancelled = true; };
-  }, [classId]);
+  }, [classId, t]);
 
   const outcomes = data?.outcomes ?? [];
   const students = data?.students ?? [];
@@ -96,12 +99,12 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
       <div className="flex items-center justify-between gap-3 p-4 border-b border-gray-100">
         <div>
           <div className="flex items-center gap-2 text-sm font-semibold text-gray-900">
-            <Target className="w-4 h-4 text-indigo-500" /> Learning outcomes &amp; mastery <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 4">4</span>
+            <Target className="w-4 h-4 text-indigo-500" /> {t("analytics.mastery.title")} <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 4">4</span>
           </div>
           <div className="text-xs text-gray-500 mt-0.5">
-            {loading ? "Loading\u2026" : data
-              ? `${data.totals.outcomes} outcomes \u00b7 ${data.totals.tagged_challenges} tagged challenges \u00b7 ${data.totals.students} students`
-              : "Select a class to view mastery"}
+            {loading ? t("common.loadingDots") : data
+              ? t("analytics.mastery.summary", { hasil: data.totals.outcomes, tag: data.totals.tagged_challenges, pelajar: data.totals.students })
+              : t("analytics.mastery.selectClass")}
           </div>
         </div>
         {classId && (
@@ -109,7 +112,7 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
             href={`/educator/outcomes?class_id=${encodeURIComponent(classId)}`}
             className="inline-flex items-center gap-1.5 text-xs font-medium px-2.5 py-1.5 rounded-md ring-1 ring-inset ring-gray-200 text-gray-700 hover:bg-gray-50"
           >
-            <Settings className="w-3.5 h-3.5" /> Manage outcomes
+            <Settings className="w-3.5 h-3.5" /> {t("analytics.mastery.manage")}
           </Link>
         )}
       </div>
@@ -117,14 +120,14 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
 
       {data && data.totals.outcomes === 0 && (
         <div className="p-6 text-center">
-          <div className="text-sm text-gray-600">No outcomes defined yet for this class.</div>
-          <div className="text-xs text-gray-500 mt-1">Create outcomes and tag challenges to start tracking mastery.</div>
+          <div className="text-sm text-gray-600">{t("analytics.mastery.noOutcomes")}</div>
+          <div className="text-xs text-gray-500 mt-1">{t("analytics.mastery.noOutcomesHint")}</div>
           {classId && (
             <Link
               href={`/educator/outcomes?class_id=${encodeURIComponent(classId)}`}
               className="inline-flex items-center gap-1.5 mt-3 text-xs font-medium px-3 py-1.5 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
             >
-              <Settings className="w-3.5 h-3.5" /> Set up outcomes
+              <Settings className="w-3.5 h-3.5" /> {t("analytics.mastery.setUp")}
             </Link>
           )}
         </div>
@@ -133,7 +136,7 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
       {data && data.totals.outcomes > 0 && (
         <>
           <div className="p-4 border-b border-gray-100">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Outcomes overview</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t("analytics.mastery.overviewTitle")}</div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
               {outcomes.map((o) => (
                 <div key={o.outcome_id} className="rounded-xl border border-gray-200 bg-white p-3">
@@ -142,11 +145,11 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
                       <div className="text-sm font-semibold text-gray-900 truncate">
                         {o.code ? <span className="text-gray-500 mr-1">{o.code}</span> : null}{o.label}
                       </div>
-                      <div className="text-xs text-gray-500 mt-0.5">{o.tagged_challenges} tagged challenge{o.tagged_challenges === 1 ? "" : "s"}</div>
+                      <div className="text-xs text-gray-500 mt-0.5">{terjemahBilangan(bahasa, "analytics.mastery.taggedOne", "analytics.mastery.taggedOther", o.tagged_challenges, { n: o.tagged_challenges })}</div>
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-lg font-semibold text-gray-900">{o.avg_mastery_pct ?? "\u2014"}{o.avg_mastery_pct !== null ? "%" : ""}</div>
-                      <div className="text-[10px] text-gray-500">avg mastery</div>
+                      <div className="text-lg font-semibold text-gray-900">{o.avg_mastery_pct ?? "-"}{o.avg_mastery_pct !== null ? "%" : ""}</div>
+                      <div className="text-[10px] text-gray-500">{t("analytics.mastery.avgMastery")}</div>
                     </div>
                   </div>
                   <div className="mt-2 flex h-1.5 w-full rounded-full overflow-hidden bg-gray-100">
@@ -165,10 +168,10 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
                     })()}
                   </div>
                   <div className="mt-1 flex items-center gap-3 text-[10px] text-gray-500">
-                    <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1 align-middle" />{o.mastered_students} mastered</span>
-                    <span><span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1 align-middle" />{o.developing_students} dev.</span>
-                    <span><span className="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1 align-middle" />{o.struggling_students} strug.</span>
-                    <span><span className="inline-block w-2 h-2 rounded-full bg-gray-300 mr-1 align-middle" />{o.not_attempted_students} n/a</span>
+                    <span><span className="inline-block w-2 h-2 rounded-full bg-emerald-500 mr-1 align-middle" />{t("analytics.mastery.legendMastered", { n: o.mastered_students })}</span>
+                    <span><span className="inline-block w-2 h-2 rounded-full bg-amber-400 mr-1 align-middle" />{t("analytics.mastery.legendDeveloping", { n: o.developing_students })}</span>
+                    <span><span className="inline-block w-2 h-2 rounded-full bg-rose-500 mr-1 align-middle" />{t("analytics.mastery.legendStruggling", { n: o.struggling_students })}</span>
+                    <span><span className="inline-block w-2 h-2 rounded-full bg-gray-300 mr-1 align-middle" />{t("analytics.mastery.legendNotAttempted", { n: o.not_attempted_students })}</span>
                   </div>
                 </div>
               ))}
@@ -176,18 +179,18 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
           </div>
 
           <div className="p-4">
-            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">Per-student matrix</div>
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500 mb-2">{t("analytics.mastery.matrixTitle")}</div>
             <div className="overflow-x-auto">
               <table className="min-w-full text-xs">
                 <thead>
                   <tr>
-                    <th className="text-left px-2 py-1.5 text-gray-500 font-medium sticky left-0 bg-white">Student</th>
+                    <th className="text-left px-2 py-1.5 text-gray-500 font-medium sticky left-0 bg-white">{t("analytics.mastery.colStudent")}</th>
                     {outcomes.map((o) => (
                       <th key={o.outcome_id} className="px-2 py-1.5 text-gray-500 font-medium text-center min-w-[5rem]" title={o.label}>
                         {o.code || o.label.slice(0, 14)}
                       </th>
                     ))}
-                    <th className="px-2 py-1.5 text-gray-500 font-medium text-right">Mastered</th>
+                    <th className="px-2 py-1.5 text-gray-500 font-medium text-right">{t("analytics.mastery.colMastered")}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
@@ -211,10 +214,15 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
                             return (
                               <td key={o.outcome_id} className="px-1 py-1.5 text-center">
                                 <span
-                                  title={`${bucketLabel(c?.bucket)}${c && c.mastery_pct !== null ? ` \u00b7 ${c.mastery_pct}%` : ""}${c ? ` \u00b7 ${c.approved}/${c.scored} approved` : ""}`}
+                                  title={t("analytics.mastery.cellTitle", {
+                                    bucket: bucketLabel(c?.bucket),
+                                    pct: c && c.mastery_pct !== null ? c.mastery_pct : 0,
+                                    lulus: c?.approved ?? 0,
+                                    jumlah: c?.scored ?? 0,
+                                  })}
                                   className={`inline-flex items-center justify-center w-8 h-5 rounded text-[10px] font-semibold ${bucketStyle(c?.bucket)}`}
                                 >
-                                  {c && c.mastery_pct !== null ? `${c.mastery_pct}` : "\u2014"}
+                                  {c && c.mastery_pct !== null ? `${c.mastery_pct}` : "-"}
                                 </span>
                               </td>
                             );
@@ -231,7 +239,12 @@ export default function MasteryPanel({ classId }: { classId: string | null }) {
                                     <div key={o.outcome_id} className="flex items-center justify-between gap-2">
                                       <span className="truncate text-gray-700">{o.code ? `${o.code} ` : ""}{o.label}</span>
                                       <span className="text-gray-500 shrink-0">
-                                        {c ? `${c.approved}/${c.scored} approved \u00b7 ${c.mastery_pct ?? "\u2014"}${c.mastery_pct !== null ? "%" : ""} \u00b7 ${bucketLabel(c.bucket)}` : "\u2014"}
+                                        {c ? t("analytics.mastery.detailLine", {
+                                          lulus: c.approved,
+                                          jumlah: c.scored,
+                                          penguasaan: `${c.mastery_pct ?? "-"}${c.mastery_pct !== null ? "%" : ""}`,
+                                          bucket: bucketLabel(c.bucket),
+                                        }) : "-"}
                                       </span>
                                     </div>
                                   );
