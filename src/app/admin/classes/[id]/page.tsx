@@ -26,6 +26,8 @@ import {
 } from "@/components/ui";
 import { useConfirm } from "@/components/ui/ConfirmProvider";
 import { mesejHad } from "@/lib/pelan";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL } from "@/lib/i18n";
 import {
   adminListAllClasses,
   adminListAllHunts,
@@ -56,10 +58,11 @@ import { petikCsv, lindungFormula, tarikhKl, slugFail } from "@/lib/csvPeserta";
 
 type MukaTab = "overview" | "members" | "activities" | "teams" | "ranking";
 
-function fmt(d: string | null | undefined) {
+// Format tarikh; lokal pilihan supaya paparan ikut bahasa semasa.
+function fmt(d: string | null | undefined, lokal?: string) {
   if (!d) return "-";
   try {
-    return new Date(d).toLocaleString();
+    return new Date(d).toLocaleString(lokal);
   } catch {
     return String(d);
   }
@@ -68,6 +71,7 @@ function fmt(d: string | null | undefined) {
 export default function Page({ params }: { params: { id: string } }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
   const { id } = params;
 
   const [muat, setMuat] = useState(true);
@@ -126,7 +130,7 @@ export default function Page({ params }: { params: { id: string } }) {
         setAhliPasukan({});
       }
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to load this class.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.classDetail.loadFailed")) });
     } finally {
       setMuat(false);
     }
@@ -146,9 +150,9 @@ export default function Page({ params }: { params: { id: string } }) {
   }, [pasukanDipilih, butiranAhli]);
 
   const namaProfil = (uid: string | null | undefined) => {
-    if (!uid) return "Unnamed user";
+    if (!uid) return t("admin.unnamedUser");
     const p = profiles.find((u) => u.id === uid);
-    return p?.display_name || "Unnamed user";
+    return p?.display_name || t("admin.unnamedUser");
   };
 
   // ===== Data terbitan kelas ini =====
@@ -208,11 +212,11 @@ export default function Page({ params }: { params: { id: string } }) {
     try {
       await adminUpdateClass(id, selepas);
       await logAudit("class_edit", "class", id, { before: sebelum, after: selepas });
-      setMesej({ baik: true, teks: "Class updated." });
+      setMesej({ baik: true, teks: t("admin.classDetail.updated") });
       setEdit(null);
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to update the class.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.classDetail.updateFailed")) });
       reload();
     }
   };
@@ -223,18 +227,18 @@ export default function Page({ params }: { params: { id: string } }) {
     const mengarkib = !kelas.is_archived;
     const ok = await confirm({
       title: mengarkib
-        ? `Archive "${kelas.name}"? Students lose access until it is restored.`
-        : `Restore "${kelas.name}"?`,
+        ? t("admin.classDetail.archiveConfirm", { nama: kelas.name })
+        : t("admin.classDetail.restoreConfirm", { nama: kelas.name }),
       tone: mengarkib ? "danger" : "default",
     });
     if (!ok) return;
     try {
       await adminUpdateClass(id, { is_archived: mengarkib });
       await logAudit(mengarkib ? "class_archive" : "class_unarchive", "class", id, { name: kelas.name });
-      setMesej({ baik: true, teks: mengarkib ? "Class archived." : "Class restored." });
+      setMesej({ baik: true, teks: mengarkib ? t("admin.classDetail.archivedMsg") : t("admin.classDetail.restoredMsg") });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to update the class.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.classDetail.updateFailed")) });
       reload();
     }
   };
@@ -247,7 +251,7 @@ export default function Page({ params }: { params: { id: string } }) {
       await logAudit("class_delete", "class", id, { name: kelas.name });
       router.push("/admin/classes");
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Delete failed.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.classDetail.deleteFailed")) });
       reload();
     }
   };
@@ -255,7 +259,7 @@ export default function Page({ params }: { params: { id: string } }) {
   /** Eksport CSV ahli: Name, Email, Joined. */
   const exportAhli = async () => {
     const ok = await confirm({
-      title: `Export ${ahli.length} members with their email addresses? This is recorded in Audit.`,
+      title: t("admin.classDetail.exportMembersConfirm", { n: ahli.length }),
     });
     if (!ok) return;
     await logAudit("members_export", "class", id, { count: ahli.length });
@@ -326,30 +330,30 @@ export default function Page({ params }: { params: { id: string } }) {
         before: { name: editPasukan.lama },
         after: { name: baharu },
       });
-      setMesej({ baik: true, teks: "Team renamed." });
+      setMesej({ baik: true, teks: t("admin.classDetail.teamRenamed") });
       setEditPasukan(null);
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to rename the team.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.classDetail.renameFailed")) });
       reload();
     }
   };
 
   /** Buang pasukan dengan pengesahan; audit membawa nama pasukan. */
-  const buangPasukan = async (t: Team) => {
+  const buangPasukan = async (pas: Team) => {
     const ok = await confirm({
-      title: `Delete team "${t.name}"? Members stay in the class but lose their team.`,
+      title: t("admin.classDetail.deleteTeamConfirm", { nama: pas.name }),
       tone: "danger",
     });
     if (!ok) return;
     try {
-      await adminDeleteTeam(t.id);
-      await logAudit("team_delete", "team", t.id, { name: t.name });
-      if (pasukanDipilih === t.id) setPasukanDipilih(null);
-      setMesej({ baik: true, teks: "Team deleted." });
+      await adminDeleteTeam(pas.id);
+      await logAudit("team_delete", "team", pas.id, { name: pas.name });
+      if (pasukanDipilih === pas.id) setPasukanDipilih(null);
+      setMesej({ baik: true, teks: t("admin.classDetail.teamDeleted") });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to delete the team.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.classDetail.teamDeleteFailed")) });
       reload();
     }
   };
@@ -359,20 +363,20 @@ export default function Page({ params }: { params: { id: string } }) {
   if (muat) {
     return (
       <AdminShell>
-        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
       </AdminShell>
     );
   }
 
   if (!kelas) {
     return (
-      <AdminShell title="Class not found">
+      <AdminShell title={t("admin.classDetail.notFoundTitle")}>
         <Card>
           <EmptyState
             icon={<MapIcon className="w-6 h-6" />}
-            title="Class not found."
-            text="This class may have been deleted."
-            actionLabel="Back to Classes"
+            title={`${t("admin.classDetail.notFoundTitle")}.`}
+            text={t("admin.classDetail.notFoundText")}
+            actionLabel={t("admin.classDetail.backToClasses")}
             href="/admin/classes"
           />
         </Card>
@@ -383,11 +387,18 @@ export default function Page({ params }: { params: { id: string } }) {
   const namaKelas = kelas.name;
   const status = statusKelas(kelas);
 
+  // Label paparan status kelas daripada kunci status teknikal.
+  const labelStatus = () => {
+    if (status === "archived") return t("admin.archived");
+    if (status === "ended") return t("admin.ended");
+    return t("admin.active");
+  };
+
   const ahliDitapis = ahli.filter((a) => {
     const jarum = carianAhli.trim().toLowerCase();
     if (!jarum) return true;
     return (
-      (a.nama || "Unnamed user").toLowerCase().includes(jarum) ||
+      (a.nama || t("admin.unnamedUser")).toLowerCase().includes(jarum) ||
       (a.emel || "").toLowerCase().includes(jarum)
     );
   });
@@ -396,16 +407,16 @@ export default function Page({ params }: { params: { id: string } }) {
   const lajurAhli: DataColumn<AhliKelasAdmin>[] = [
     {
       key: "nama",
-      header: "Member",
+      header: t("admin.classDetail.colMember"),
       render: (a, i) => (
         <span className="flex items-center gap-3 py-3">
-          <Avatar name={a.nama || "Unnamed user"} size="sm" index={i} />
+          <Avatar name={a.nama || t("admin.unnamedUser")} size="sm" index={i} />
           <span className="min-w-0">
             <Link
               href={`/admin/users/${a.user_id}`}
               className="block text-[13px] font-bold text-ink hover:text-brand-purple transition truncate"
             >
-              {a.nama || "Unnamed user"}
+              {a.nama || t("admin.unnamedUser")}
             </Link>
           </span>
         </span>
@@ -413,14 +424,14 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "emel",
-      header: "Email",
+      header: t("admin.classDetail.colEmail"),
       hideOnMobile: true,
-      render: (a) => <span className="text-[13px] text-ink-faint">{a.emel || "No email"}</span>,
+      render: (a) => <span className="text-[13px] text-ink-faint">{a.emel || t("admin.noEmail")}</span>,
     },
     {
       key: "joined",
-      header: "Joined",
-      render: (a) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{fmt(a.joined_at)}</span>,
+      header: t("admin.classDetail.colJoined"),
+      render: (a) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{fmt(a.joined_at, LOKAL[bahasa])}</span>,
     },
   ];
 
@@ -428,7 +439,7 @@ export default function Page({ params }: { params: { id: string } }) {
   const lajurAktiviti: DataColumn<Hunt>[] = [
     {
       key: "tajuk",
-      header: "Title",
+      header: t("admin.classDetail.colTitle"),
       render: (h) => (
         <Link
           href={`/admin/hunts/${h.id}`}
@@ -440,25 +451,25 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "status",
-      header: "Status",
+      header: t("admin.classDetail.colStatus"),
       render: (h) =>
         h.status === "active" ? (
           <Badge variant="dot" warna="green">
-            {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+            {t("admin.classDetail.statusActive")}
           </Badge>
         ) : h.status === "draft" ? (
           <Badge variant="dim" warna="yellow">
-            {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+            {t("admin.classDetail.statusDraft")}
           </Badge>
         ) : (
           <Badge variant="dim" warna="gray">
-            {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+            {h.status === "archived" ? t("admin.archived") : h.status}
           </Badge>
         ),
     },
     {
       key: "cabaran",
-      header: "Challenges",
+      header: t("admin.classDetail.colChallenges"),
       render: (h) => (
         <span className="text-[13px] text-ink-faint">
           {challengesKelas.filter((c) => c.hunt_id === h.id).length}
@@ -467,7 +478,7 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "hantaran",
-      header: "Submissions",
+      header: t("admin.classDetail.colSubmissions"),
       render: (h) => (
         <span className="text-[13px] text-ink-faint">
           {subsKelas.filter((s) =>
@@ -478,18 +489,18 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "mula",
-      header: "Start",
+      header: t("admin.classDetail.colStart"),
       hideOnMobile: true,
       render: (h) => (
-        <span className="text-[13px] text-ink-faint whitespace-nowrap">{h.start_at ? fmt(h.start_at) : "-"}</span>
+        <span className="text-[13px] text-ink-faint whitespace-nowrap">{h.start_at ? fmt(h.start_at, LOKAL[bahasa]) : "-"}</span>
       ),
     },
     {
       key: "tamat",
-      header: "End",
+      header: t("admin.classDetail.colEnd"),
       hideOnMobile: true,
       render: (h) => (
-        <span className="text-[13px] text-ink-faint whitespace-nowrap">{h.end_at ? fmt(h.end_at) : "-"}</span>
+        <span className="text-[13px] text-ink-faint whitespace-nowrap">{h.end_at ? fmt(h.end_at, LOKAL[bahasa]) : "-"}</span>
       ),
     },
   ];
@@ -497,12 +508,13 @@ export default function Page({ params }: { params: { id: string } }) {
   return (
     <AdminShell>
       <PageHead
-        crumb="Classes"
+        crumb={t("nav.adminClasses")}
         name={namaKelas}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
             <span>
-              by{" "}
+              {t("admin.classDetail.by")}
+              {" "}
               <Link
                 href={`/admin/users/${kelas.owner_id}`}
                 className="text-brand-purple font-medium hover:underline"
@@ -513,38 +525,38 @@ export default function Page({ params }: { params: { id: string } }) {
             <span className="font-mono">{kelas.join_code || "-"}</span>
             {status === "active" ? (
               <Badge variant="dot" warna="green">
-                {labelStatusKelas(kelas)}
+                {labelStatus()}
               </Badge>
             ) : status === "ended" ? (
               <Badge variant="dim" warna="yellow">
-                {labelStatusKelas(kelas)}
+                {labelStatus()}
               </Badge>
             ) : (
               <Badge variant="dim" warna="gray">
-                {labelStatusKelas(kelas)}
+                {labelStatus()}
               </Badge>
             )}
           </span>
         }
         secondaryActions={[
           {
-            label: "Edit",
+            label: t("admin.classDetail.edit"),
             icon: <Pencil className="w-4 h-4" />,
             onSelect: () => setEdit({ name: kelas.name, join_code: kelas.join_code || "" }),
           },
           kelas.is_archived
-            ? { label: "Restore", icon: <RotateCcw className="w-4 h-4" />, onSelect: tukarArkib }
-            : { label: "Archive", icon: <Archive className="w-4 h-4" />, onSelect: tukarArkib },
-          { label: "Delete", icon: <Trash2 className="w-4 h-4" />, onSelect: () => setZonBahaya((v) => !v) },
+            ? { label: t("admin.classDetail.restore"), icon: <RotateCcw className="w-4 h-4" />, onSelect: tukarArkib }
+            : { label: t("admin.classDetail.archive"), icon: <Archive className="w-4 h-4" />, onSelect: tukarArkib },
+          { label: t("admin.classDetail.delete"), icon: <Trash2 className="w-4 h-4" />, onSelect: () => setZonBahaya((v) => !v) },
         ]}
       />
 
       {/* Zon bahaya buang kelas: pengesahan menaip nama kelas tepat */}
       {zonBahaya && (
         <Card className="mb-6">
-          <div className="text-[13px] font-bold text-red-600 mb-1">Danger zone</div>
+          <div className="text-[13px] font-bold text-red-600 mb-1">{t("admin.dangerZone")}</div>
           <p className="text-[14px] text-ink-muted mb-4">
-            Deleting this class removes its activities, submissions and teams permanently. Type the class name exactly to enable the button.
+            {t("admin.classDetail.deleteClassDesc")}
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Input
@@ -552,7 +564,7 @@ export default function Page({ params }: { params: { id: string } }) {
               placeholder={namaKelas}
               value={pengesahanHapus}
               onChange={(e) => setPengesahanHapus(e.target.value)}
-              aria-label="Type the class name to confirm deletion"
+              aria-label={t("admin.classDetail.typeClassNameAria")}
             />
             <button
               type="button"
@@ -560,10 +572,10 @@ export default function Page({ params }: { params: { id: string } }) {
               onClick={hapus}
               className="inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none h-9 px-[18px] py-[7px] text-[13px] bg-red-600 text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Trash2 className="w-4 h-4" /> Delete class
+              <Trash2 className="w-4 h-4" /> {t("admin.classDetail.deleteClass")}
             </button>
             <Button variant="outline" onClick={() => { setZonBahaya(false); setPengesahanHapus(""); }}>
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </Card>
@@ -571,11 +583,11 @@ export default function Page({ params }: { params: { id: string } }) {
 
       <Tabs
         items={[
-          { label: "Overview", onSelect: () => setTab("overview"), aktif: tab === "overview" },
-          { label: "Members", onSelect: () => setTab("members"), aktif: tab === "members" },
-          { label: "Activities", onSelect: () => setTab("activities"), aktif: tab === "activities" },
-          { label: "Teams", onSelect: () => setTab("teams"), aktif: tab === "teams" },
-          { label: "Ranking", onSelect: () => setTab("ranking"), aktif: tab === "ranking" },
+          { label: t("nav.adminOverview"), onSelect: () => setTab("overview"), aktif: tab === "overview" },
+          { label: t("common.members"), onSelect: () => setTab("members"), aktif: tab === "members" },
+          { label: t("nav.activities"), onSelect: () => setTab("activities"), aktif: tab === "activities" },
+          { label: t("nav.teams"), onSelect: () => setTab("teams"), aktif: tab === "teams" },
+          { label: t("nav.ranking"), onSelect: () => setTab("ranking"), aktif: tab === "ranking" },
         ]}
       />
 
@@ -591,42 +603,42 @@ export default function Page({ params }: { params: { id: string } }) {
           <Card>
             <StatGroup
               stats={[
-                { label: "Members", value: ahli.length },
-                { label: "Activities", value: hunts.length },
-                { label: "Teams", value: teams.length },
-                { label: "Submissions", value: kiraanSubs.jumlah },
+                { label: t("common.members"), value: ahli.length },
+                { label: t("nav.activities"), value: hunts.length },
+                { label: t("nav.teams"), value: teams.length },
+                { label: t("admin.classDetail.colSubmissions"), value: kiraanSubs.jumlah },
               ]}
             />
           </Card>
           <Card className="mt-4">
-            <CardHead title="Class details" />
+            <CardHead title={t("admin.classDetail.details")} />
             <div className="mt-4">
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
-                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Description</div>
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">{t("admin.classDetail.description")}</div>
                 <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted text-right sm:text-left">
                   {kelas.description || "-"}
                 </div>
               </div>
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
-                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Created</div>
-                <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">{fmt(kelas.created_at)}</div>
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">{t("admin.classDetail.created")}</div>
+                <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">{fmt(kelas.created_at, LOKAL[bahasa])}</div>
               </div>
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
-                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Scoring mode</div>
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">{t("admin.classDetail.scoringMode")}</div>
                 <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">
-                  {kelas.scoring_mode === "individual" ? "Individual" : "Team"}
+                  {kelas.scoring_mode === "individual" ? t("admin.classDetail.individual") : t("admin.classDetail.team")}
                 </div>
               </div>
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3 border-b border-kz-line">
-                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Leaderboard visible to students</div>
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">{t("admin.classDetail.leaderboardVisible")}</div>
                 <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">
-                  {kelas.leaderboard_visible === false ? "No" : "Yes"}
+                  {kelas.leaderboard_visible === false ? t("admin.no") : t("admin.yes")}
                 </div>
               </div>
               <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 py-3">
-                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">Submissions</div>
+                <div className="w-full sm:w-1/3 text-[14px] text-ink-faint shrink-0">{t("admin.classDetail.colSubmissions")}</div>
                 <div className="flex-1 min-w-0 text-[14px] font-medium text-ink-muted">
-                  {kiraanSubs.approved} approved, {kiraanSubs.rejected} rejected, {kiraanSubs.pending} pending
+                  {t("admin.classDetail.subsCounts", { lulus: kiraanSubs.approved, tolak: kiraanSubs.rejected, menunggu: kiraanSubs.pending })}
                 </div>
               </div>
             </div>
@@ -638,7 +650,7 @@ export default function Page({ params }: { params: { id: string } }) {
       {tab === "members" && (
         <DataTable
           className="mt-4"
-          label="Class members"
+          label={t("admin.classDetail.membersTable")}
           columns={lajurAhli}
           rows={ahliDitapis}
           rowKey={(a) => a.user_id}
@@ -647,22 +659,22 @@ export default function Page({ params }: { params: { id: string } }) {
               <span className="w-full sm:w-64">
                 <Input
                   ikonKiri={<Search className="w-4 h-4" />}
-                  placeholder="Search name or email"
-                  aria-label="Search members"
+                  placeholder={t("admin.classDetail.searchMembersPlaceholder")}
+                  aria-label={t("admin.classDetail.searchMembersAria")}
                   value={carianAhli}
                   onChange={(e) => setCarianAhli(e.target.value)}
                 />
               </span>
               <Button variant="outline" onClick={exportAhli}>
-                <Download className="w-4 h-4" /> Export CSV
+                <Download className="w-4 h-4" /> {t("admin.exportCsv")}
               </Button>
             </>
           }
           empty={
             <EmptyState
               icon={<UsersIcon className="w-6 h-6" />}
-              title="No members."
-              text="Nobody has joined this class yet."
+              title={t("admin.classDetail.noMembers")}
+              text={t("admin.classDetail.noMembersText")}
             />
           }
         />
@@ -672,15 +684,15 @@ export default function Page({ params }: { params: { id: string } }) {
       {tab === "activities" && (
         <DataTable
           className="mt-4"
-          label="Class activities"
+          label={t("admin.classDetail.activitiesTable")}
           columns={lajurAktiviti}
           rows={hunts}
           rowKey={(h) => h.id}
           empty={
             <EmptyState
               icon={<MapIcon className="w-6 h-6" />}
-              title="No activities."
-              text="This class has no activities yet."
+              title={t("admin.classDetail.noActivities")}
+              text={t("admin.classDetail.noActivitiesText")}
             />
           }
         />
@@ -692,29 +704,29 @@ export default function Page({ params }: { params: { id: string } }) {
           {/* Senarai kiri */}
           <Card padat>
             <div className="px-6 py-4 border-b border-kz-line text-[16.8px] font-bold tracking-[-0.17px] text-ink">
-              Teams
+              {t("admin.classDetail.teamsHeading")}
             </div>
             {teams.length === 0 ? (
               <EmptyState
                 icon={<UsersIcon className="w-6 h-6" />}
-                title="No teams."
-                text="Teams appear here once an educator creates them."
+                title={t("admin.classDetail.noTeams")}
+                text={t("admin.classDetail.noTeamsText")}
               />
             ) : (
-              teamsSusun.map((t) => (
+              teamsSusun.map((pas) => (
                 <button
-                  key={t.id}
+                  key={pas.id}
                   type="button"
-                  onClick={() => setPasukanDipilih(t.id)}
+                  onClick={() => setPasukanDipilih(pas.id)}
                   className={`w-full flex items-center gap-3 px-6 py-4 border-t border-kz-line text-left transition ${
-                    pasukanDipilih === t.id ? "bg-[#F1EEFC]" : "hover:bg-[#f8f9fc]"
+                    pasukanDipilih === pas.id ? "bg-[#F1EEFC]" : "hover:bg-[#f8f9fc]"
                   }`}
                 >
                   <span className="min-w-0 flex-1">
-                    <span className="block text-[14px] font-bold text-ink truncate">{t.name}</span>
-                    <span className="block text-[12px] text-ink-faint">{ahliPasukan[t.id]?.length ?? 0} members</span>
+                    <span className="block text-[14px] font-bold text-ink truncate">{pas.name}</span>
+                    <span className="block text-[12px] text-ink-faint">{t("admin.classDetail.membersCount", { n: ahliPasukan[pas.id]?.length ?? 0 })}</span>
                   </span>
-                  <span className="text-[14px] font-semibold text-brand-purple shrink-0">{Number(t.score) || 0}</span>
+                  <span className="text-[14px] font-semibold text-brand-purple shrink-0">{Number(pas.score) || 0}</span>
                 </button>
               ))
             )}
@@ -725,68 +737,68 @@ export default function Page({ params }: { params: { id: string } }) {
             {pasukanDipilih === null ? (
               <EmptyState
                 icon={<UsersIcon className="w-6 h-6" />}
-                title="Select a team."
-                text="Pick a team on the left to see its members."
+                title={t("admin.classDetail.selectTeam")}
+                text={t("admin.classDetail.selectTeamText")}
               />
             ) : (
               (() => {
-                const t = teams.find((x) => x.id === pasukanDipilih);
-                if (!t)
+                const pas = teams.find((x) => x.id === pasukanDipilih);
+                if (!pas)
                   return (
                     <EmptyState
                       icon={<UsersIcon className="w-6 h-6" />}
-                      title="Team not found."
-                      text="It may have been deleted."
+                      title={t("admin.classDetail.teamNotFound")}
+                      text={t("admin.classDetail.teamNotFoundText")}
                     />
                   );
-                const senarai = butiranAhli[t.id];
+                const senarai = butiranAhli[pas.id];
                 return (
                   <>
                     <div className="flex flex-wrap items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <div className="text-[16.8px] font-bold tracking-[-0.17px] text-ink truncate">{t.name}</div>
-                        <div className="text-[12px] text-ink-faint">Score {Number(t.score) || 0}</div>
+                        <div className="text-[16.8px] font-bold tracking-[-0.17px] text-ink truncate">{pas.name}</div>
+                        <div className="text-[12px] text-ink-faint">{t("admin.classDetail.score", { n: Number(pas.score) || 0 })}</div>
                       </div>
                       <div className="flex items-center gap-2">
                         <Button
                           variant="outline"
                           size="sm"
-                          onClick={() => setEditPasukan({ id: t.id, nama: t.name, lama: t.name })}
+                          onClick={() => setEditPasukan({ id: pas.id, nama: pas.name, lama: pas.name })}
                         >
-                          <Pencil className="w-4 h-4" /> Rename
+                          <Pencil className="w-4 h-4" /> {t("admin.classDetail.rename")}
                         </Button>
                         <button
                           type="button"
-                          onClick={() => buangPasukan(t)}
+                          onClick={() => buangPasukan(pas)}
                           className="inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none h-8 px-3 text-[12px] bg-white border border-red-200 text-red-600 hover:bg-[#fce4e2]"
                         >
-                          <Trash2 className="w-4 h-4" /> Delete
+                          <Trash2 className="w-4 h-4" /> {t("admin.classDetail.deleteTeam")}
                         </button>
                       </div>
                     </div>
                     {senarai === undefined ? (
-                      <div className="text-[14px] text-ink-faint py-4">Loading members...</div>
+                      <div className="text-[14px] text-ink-faint py-4">{t("admin.classDetail.loadingMembers")}</div>
                     ) : senarai.length === 0 ? (
                       <EmptyState
                         icon={<UsersIcon className="w-6 h-6" />}
-                        title="No members."
-                        text="Nobody is in this team yet."
+                        title={t("admin.classDetail.noTeamMembers")}
+                        text={t("admin.classDetail.noTeamMembersText")}
                       />
                     ) : (
                       <div className="mt-2 space-y-1">
                         {senarai.map((m) => (
                           <div key={m.user_id} className="flex items-center gap-2 text-[14px] py-1">
-                            <span className="text-ink truncate">{m.nama || "Unnamed user"}</span>
+                            <span className="text-ink truncate">{m.nama || t("admin.unnamedUser")}</span>
                             {m.role === "leader" && (
                               <Badge variant="dim" warna="purple">
-                                Leader
+                                {t("admin.leader")}
                               </Badge>
                             )}
                           </div>
                         ))}
                       </div>
                     )}
-                    <p className="text-[12px] text-ink-faint mt-4">Team changes are recorded in Audit.</p>
+                    <p className="text-[12px] text-ink-faint mt-4">{t("admin.classDetail.teamAuditNote")}</p>
                   </>
                 );
               })()
@@ -807,7 +819,7 @@ export default function Page({ params }: { params: { id: string } }) {
                   modRanking === "teams" ? "bg-white shadow text-brand-purple" : "text-ink-muted hover:text-ink"
                 }`}
               >
-                Teams
+                {t("admin.classDetail.teamsHeading")}
               </button>
               <button
                 type="button"
@@ -816,11 +828,11 @@ export default function Page({ params }: { params: { id: string } }) {
                   modRanking === "individuals" ? "bg-white shadow text-brand-purple" : "text-ink-muted hover:text-ink"
                 }`}
               >
-                Individuals
+                {t("admin.classDetail.individualsMode")}
               </button>
             </div>
             <Button variant="outline" onClick={exportRanking}>
-              <Download className="w-4 h-4" /> Export CSV
+              <Download className="w-4 h-4" /> {t("admin.exportCsv")}
             </Button>
           </div>
 
@@ -829,8 +841,8 @@ export default function Page({ params }: { params: { id: string } }) {
               teamsSusun.length === 0 ? (
                 <EmptyState
                   icon={<UsersIcon className="w-6 h-6" />}
-                  title="No team scores yet."
-                  text="Teams appear here once an educator creates them."
+                  title={t("admin.classDetail.noTeamScores")}
+                  text={t("admin.classDetail.noTeamsText")}
                 />
               ) : (
                 teamsSusun.map((t, i) => (

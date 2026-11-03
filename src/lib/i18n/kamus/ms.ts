@@ -2683,6 +2683,9 @@ export const ms: Kamus = {
       colJoined: 'Sertai',
       colTitle: 'Tajuk',
       colStatus: 'Status',
+      statusDraft: 'Draf',
+      statusActive: 'Aktif',
+      statusEnded: 'Tamat',
       colChallenges: 'Cabaran',
       colSubmissions: 'Hantaran',
       colStart: 'Mula',
@@ -2737,6 +2740,7 @@ export const ms: Kamus = {
       renameFailed: 'Gagal menamakan semula pasukan.',
       teamDeleteFailed: 'Gagal memadam pasukan.',
       deleteTeamConfirm: 'Padam pasukan "{nama}"? Ahli kekal dalam kelas tetapi hilang pasukan mereka.',
+      by: 'oleh',
     },
   },
 };

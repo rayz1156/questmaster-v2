@@ -2719,6 +2719,9 @@ export const en = {
       colJoined: 'Joined',
       colTitle: 'Title',
       colStatus: 'Status',
+      statusDraft: 'Draft',
+      statusActive: 'Active',
+      statusEnded: 'Ended',
       colChallenges: 'Challenges',
       colSubmissions: 'Submissions',
       colStart: 'Start',
@@ -2773,6 +2776,7 @@ export const en = {
       renameFailed: 'Failed to rename the team.',
       teamDeleteFailed: 'Failed to delete the team.',
       deleteTeamConfirm: 'Delete team "{nama}"? Members stay in the class but lose their team.',
+      by: 'by',
     },
   },
 };
