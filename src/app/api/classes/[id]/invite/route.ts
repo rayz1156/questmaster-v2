@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { createServerClient } from "@supabase/ssr";
 import { cookies } from "next/headers";
+import { emelJemputanKelas } from "@/lib/i18n/emel";
+import { bahasaPelayan } from "@/lib/i18n/pelayan";
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   try {
@@ -25,14 +27,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const sender = process.env.BREVO_SENDER_EMAIL || 'noreply@airiz.tech';
     const senderName = process.env.BREVO_SENDER_NAME || 'Kuizen';
     if (apiKey) {
+      // KZ-043 A6: templat dwibahasa mengikut bahasa penghantar (penerima
+      // mungkin belum ada akaun). Nama kelas di-escape dalam templat,
+      // satu peningkatan berbanding HTML mentah sebelum ini.
+      const { subject, html } = emelJemputanKelas(bahasaPelayan(), {
+        namaKelas: klass.name,
+        pautan: link,
+      });
       const r = await fetch('https://api.brevo.com/v3/smtp/email', {
         method: 'POST',
         headers: { 'api-key': apiKey, 'content-type': 'application/json', accept: 'application/json' },
         body: JSON.stringify({
           sender: { email: sender, name: senderName },
           to: [{ email }],
-          subject: `You\'re invited to join "${klass.name}" on Kuizen`,
-          htmlContent: `<p>Hello!</p><p>You\'ve been invited to join the class <b>${klass.name}</b> on Kuizen.</p><p><a href="${link}" style="display:inline-block;background:#6366f1;color:#fff;padding:10px 18px;border-radius:8px;text-decoration:none">Accept invite</a></p><p>Or open this link: <a href="${link}">${link}</a></p>`
+          subject,
+          htmlContent: html
         })
       });
       if (!r.ok) { const t = await r.text(); return NextResponse.json({ error: `Brevo: ${t}` }, { status: 500 }); }

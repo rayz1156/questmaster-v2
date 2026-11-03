@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
+import { emelJemputanPendidik } from '@/lib/i18n/emel';
+import { bahasaPelayan } from '@/lib/i18n/pelayan';
 
 export async function POST(req: NextRequest) {
   try {
@@ -74,40 +76,16 @@ export async function POST(req: NextRequest) {
       host, port, secure: false, auth: { user: smtpUser, pass: smtpPass },
     });
 
-    const subject = `[Kuizen] You're invited to co-teach "${klass.name}"`;
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f9fafb;">
-        <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
-          <h2 style="margin:0 0 12px;color:#111827;">Educator invite</h2>
-          <p style="color:#374151;line-height:1.5;">Hello,</p>
-          <p style="color:#374151;line-height:1.5;">
-            <b>${escapeHtml(inviterName)}</b> has invited you to co-teach the class
-            <b>${escapeHtml(klass.name)}</b> on Kuizen.
-          </p>
-          <p style="text-align:center;margin:24px 0;">
-            <a href="${acceptUrl}" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
-              Accept invite
-            </a>
-          </p>
-          <p style="color:#374151;line-height:1.5;font-size:13px;">
-            If the button doesn't work, sign in to Kuizen using
-            <b>${escapeHtml(email)}</b> and paste this 8-character code at
-            <a href="${siteUrl}/educator/invites">${siteUrl}/educator/invites</a>:
-          </p>
-          <div style="text-align:center;margin:16px 0;">
-            <code style="display:inline-block;font-family:monospace;font-size:22px;letter-spacing:4px;background:#f3f4f6;color:#111827;padding:12px 20px;border-radius:8px;border:1px solid #e5e7eb;">${escapeHtml(code)}</code>
-          </div>
-          <p style="color:#6b7280;font-size:12px;margin-top:24px;">
-            You received this because someone invited you as an educator on Kuizen.
-            If this wasn't expected, you can ignore this email.
-          </p>
-        </div>
-      </div>`;
-    const text =
-      `${inviterName} invited you to co-teach "${klass.name}" on Kuizen.\n\n` +
-      `Accept link: ${acceptUrl}\n\n` +
-      `If the link doesn't work, sign in with ${email} and paste this code at ${siteUrl}/educator/invites :\n` +
-      `${code}\n`;
+    // KZ-043 A6: templat dwibahasa mengikut bahasa penghantar (laluan ini
+    // tidak mengenal pasti user_id penerima). Nilai di-escape dalam templat.
+    const { subject, html, text } = emelJemputanPendidik(bahasaPelayan(), {
+      namaPenghantar: inviterName,
+      namaKelas: klass.name,
+      emelPenerima: email,
+      kod: code,
+      pautanTerima: acceptUrl,
+      pautanSesi: `${siteUrl}/educator/invites`,
+    });
 
     await transporter.sendMail({
       from: `"${fromName}" <${fromEmail}>`,
@@ -122,13 +100,4 @@ export async function POST(req: NextRequest) {
     console.error('educator-invites/notify error', e);
     return NextResponse.json({ error: e?.message || 'failed' }, { status: 500 });
   }
-}
-
-function escapeHtml(s: string): string {
-  return String(s)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#39;');
 }

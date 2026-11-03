@@ -34,18 +34,12 @@ import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { tapiskanIdSijil } from '@/lib/sijil/keluarkan';
 import { MAKS_SEKALI, MAKS_LAMPIRAN, pathSelamat, untukSetiap } from '@/lib/sijil/emelSijil';
+import { emelSijil } from '@/lib/i18n/emel';
+import { bahasaPelayan } from '@/lib/i18n/pelayan';
+import type { Bahasa } from '@/lib/i18n';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
-
-/** Escape HTML untuk badan emel (corak sedia ada dalam notify). */
-function escapeHtml(s: string): string {
-  return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireUser(req);
@@ -161,11 +155,37 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const svc = getServiceSupabase();
   const { data: barisPdf } = await svc
     .from('qm_certificates')
-    .select('id, pdf_path, class_id')
+    .select('id, pdf_path, class_id, participant_id')
     .in('id', ids);
   const petaPdf = new Map<string, string | null>();
-  for (const r of (barisPdf ?? []) as { id: string; pdf_path: string | null; class_id: string }[]) {
-    if (r.class_id === classId) petaPdf.set(r.id, r.pdf_path);
+  const petaPeserta = new Map<string, string>();
+  const idsPeserta = new Set<string>();
+  for (const r of (barisPdf ?? []) as { id: string; pdf_path: string | null; class_id: string; participant_id: string | null }[]) {
+    if (r.class_id === classId) {
+      petaPdf.set(r.id, r.pdf_path);
+      if (r.participant_id) {
+        petaPeserta.set(r.id, r.participant_id);
+        idsPeserta.add(r.participant_id);
+      }
+    }
+  }
+
+  // KZ-043 A6: bahasa setiap penerima diambil daripada profil peserta
+  // (service role sedia ada, lajur bahasa sahaja); sandaran bahasa penghantar.
+  const bahasaPenghantar = bahasaPelayan();
+  const petaBahasa = new Map<string, Bahasa>();
+  if (idsPeserta.size > 0) {
+    try {
+      const { data: barisBahasa } = await svc
+        .from('qm_profiles')
+        .select('id, bahasa')
+        .in('id', Array.from(idsPeserta));
+      for (const p of (barisBahasa ?? []) as { id: string; bahasa?: string }[]) {
+        petaBahasa.set(p.id, p.bahasa === 'ms' ? 'ms' : 'en');
+      }
+    } catch {
+      // Lajur bahasa belum ada (migrasi belum diterapkan): guna sandaran.
+    }
   }
 
   let sent = 0;
@@ -183,7 +203,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   await untukSetiap(hantar, 3, async (b) => {
     const sahUrl = `${siteUrl}/sijil/${encodeURIComponent(b.code)}`;
     const senaraiUrl = `${siteUrl}/participant/certificates`;
-    const subject = `Your certificate: ${b.program_snapshot}`;
 
     // Muat turun PDF hanya jika pdf_path selamat untuk kelas ini
     // (folder kelas, berakhir .pdf, tiada ..). Selebihnya: tanpa lampiran.
@@ -208,39 +227,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       }
     }
 
-    // Ayat badan bergantung kepada lampiran; butang dan pautan sah kekal.
-    const ayatLampiran = lampiran
-      ? 'Your certificate is attached to this email as a PDF.'
-      : 'Download your certificate from Kuizen using the button below.';
-    const html = `
-      <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f9fafb;">
-        <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
-          <h2 style="margin:0 0 12px;color:#111827;">Your certificate is ready</h2>
-          <p style="color:#374151;line-height:1.5;">
-            Congratulations! Your certificate for
-            <b>${escapeHtml(b.program_snapshot)}</b> has been issued.
-          </p>
-          <p style="color:#374151;line-height:1.5;">${ayatLampiran}</p>
-          <p style="text-align:center;margin:24px 0;">
-            <a href="${senaraiUrl}" style="display:inline-block;background:#6366f1;color:#fff;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;">
-              Download your certificate
-            </a>
-          </p>
-          <p style="color:#374151;line-height:1.5;font-size:13px;">
-            Anyone can verify this certificate with its code
-            <b>${escapeHtml(b.code)}</b> at
-            <a href="${sahUrl}">${sahUrl}</a>.
-          </p>
-          <p style="color:#6b7280;font-size:12px;margin-top:24px;">
-            You received this because a certificate was issued to you on Kuizen.
-          </p>
-        </div>
-      </div>`;
-    const text =
-      `Congratulations! Your certificate for "${b.program_snapshot}" has been issued.\n\n` +
-      `${ayatLampiran}\n` +
-      `Download your certificate: ${senaraiUrl}\n` +
-      `Verify online with code ${b.code}: ${sahUrl}\n`;
+    // KZ-043 A6: badan e-mel dalam bahasa penerima (profil peserta;
+    // sandaran bahasa penghantar). Nilai di-escape di dalam templat.
+    const bahasaPenerima = petaBahasa.get(petaPeserta.get(b.certificate_id) ?? '') ?? bahasaPenghantar;
+    const { subject, html, text } = emelSijil(bahasaPenerima, {
+      program: b.program_snapshot,
+      kod: b.code,
+      senaraiUrl,
+      sahUrl,
+      adaLampiran: !!lampiran,
+    });
 
     try {
       await transporter.sendMail({
