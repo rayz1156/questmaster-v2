@@ -1,6 +1,22 @@
 "use client";
 import { createRoot, type Root } from 'react-dom/client';
 import { useEffect, useRef, useState } from 'react';
+import { terjemah, sahBahasa, NAMA_STORAN, NAMA_KUKI, type Bahasa } from '@/lib/i18n';
+
+/**
+ * Modal ini dirender dengan createRoot di luar pokok BahasaProvider, jadi
+ * useBahasa() tidak melihat penyedia; bahasa dibaca terus dari storan/kuki
+ * ketika modal dibuka.
+ */
+function bahasaModal(): Bahasa {
+  if (typeof window === 'undefined') return 'en';
+  try {
+    const st = window.localStorage.getItem(NAMA_STORAN);
+    if (st) return sahBahasa(st);
+  } catch { /* storan disekat: terus ke kuki */ }
+  const cocok = document.cookie.match(new RegExp(`(?:^|;\\s*)${NAMA_KUKI}=([^;]*)`));
+  return sahBahasa(cocok?.[1]);
+}
 
 type PromptOptions = {
   title: string;
@@ -22,6 +38,8 @@ type ConfirmOptions = {
 
 function PromptModal({ opts, onDone }: { opts: PromptOptions; onDone: (v: string | null) => void }) {
   const [value, setValue] = useState(opts.initialValue ?? '');
+  // Bahasa disimpan sekali ketika modal dibuka, bukan semasa setiap render.
+  const [bahasa] = useState(bahasaModal);
   const inputRef = useRef<HTMLInputElement | null>(null);
   useEffect(() => {
     const t = setTimeout(() => { inputRef.current?.focus(); inputRef.current?.select(); }, 30);
@@ -45,8 +63,8 @@ function PromptModal({ opts, onDone }: { opts: PromptOptions; onDone: (v: string
           className="mt-3 w-full rounded-xl border border-slate-300 px-3 py-2 text-sm outline-none focus:border-indigo-500 focus:ring-2 focus:ring-indigo-200"
         />
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onDone(null)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">{opts.cancelLabel ?? 'Cancel'}</button>
-          <button type="button" onClick={() => onDone(value)} className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">{opts.confirmLabel ?? 'OK'}</button>
+          <button type="button" onClick={() => onDone(null)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">{opts.cancelLabel ?? terjemah(bahasa, 'common.cancel')}</button>
+          <button type="button" onClick={() => onDone(value)} className="rounded-lg bg-indigo-600 px-4 py-1.5 text-sm font-semibold text-white hover:bg-indigo-700">{opts.confirmLabel ?? terjemah(bahasa, 'ui.ok')}</button>
         </div>
       </div>
     </div>
@@ -54,6 +72,8 @@ function PromptModal({ opts, onDone }: { opts: PromptOptions; onDone: (v: string
 }
 
 function ConfirmModal({ opts, onDone }: { opts: ConfirmOptions; onDone: (ok: boolean) => void }) {
+  // Bahasa disimpan sekali ketika modal dibuka, bukan semasa setiap render.
+  const [bahasa] = useState(bahasaModal);
   const confirmClass = (opts.tone ?? 'default') === 'danger' ? 'bg-red-600 hover:bg-red-700' : 'bg-indigo-600 hover:bg-indigo-700';
   return (
     <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-black/40 px-4" onMouseDown={() => onDone(false)}>
@@ -61,8 +81,8 @@ function ConfirmModal({ opts, onDone }: { opts: ConfirmOptions; onDone: (ok: boo
         <div className="text-base font-semibold text-slate-900">{opts.title}</div>
         {opts.description && <div className="mt-1 text-sm text-slate-500">{opts.description}</div>}
         <div className="mt-4 flex justify-end gap-2">
-          <button type="button" onClick={() => onDone(false)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">{opts.cancelLabel ?? 'Cancel'}</button>
-          <button type="button" onClick={() => onDone(true)} className={`rounded-lg ${confirmClass} px-4 py-1.5 text-sm font-semibold text-white`}>{opts.confirmLabel ?? 'Confirm'}</button>
+          <button type="button" onClick={() => onDone(false)} className="rounded-lg px-3 py-1.5 text-sm font-medium text-slate-600 hover:bg-slate-100">{opts.cancelLabel ?? terjemah(bahasa, 'common.cancel')}</button>
+          <button type="button" onClick={() => onDone(true)} className={`rounded-lg ${confirmClass} px-4 py-1.5 text-sm font-semibold text-white`}>{opts.confirmLabel ?? terjemah(bahasa, 'common.confirm')}</button>
         </div>
       </div>
     </div>

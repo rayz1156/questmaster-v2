@@ -407,6 +407,10 @@ export const ms: Kamus = {
     next: 'Seterusnya',
     pageOf: 'Muka surat',
     pageOfJoin: 'daripada',
+    // RowMenu / promptModal / HadPelanNotis (larian C KZ-041).
+    ok: 'OK',
+    moreActions: 'Lagi tindakan',
+    upgrade: 'Naik taraf',
   },
   kelas: {
     crumb: 'Kelas',

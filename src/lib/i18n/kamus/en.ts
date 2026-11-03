@@ -436,6 +436,10 @@ export const en = {
     next: 'Next',
     pageOf: 'Page',
     pageOfJoin: 'of',
+    // RowMenu / promptModal / HadPelanNotis (larian C KZ-041).
+    ok: 'OK',
+    moreActions: 'More actions',
+    upgrade: 'Upgrade',
   },
   kelas: {
     // Kepala kelas (src/components/ClassShell.tsx).

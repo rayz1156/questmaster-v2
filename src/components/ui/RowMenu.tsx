@@ -11,6 +11,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { MoreHorizontal } from "lucide-react";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 export type RowMenuItem = {
   label: string;
@@ -23,11 +24,12 @@ export type RowMenuItem = {
 
 export default function RowMenu({
   items,
-  label = "More actions",
+  label,
 }: {
   items: RowMenuItem[];
   label?: string;
 }) {
+  const { t } = useBahasa();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement | null>(null);
 
@@ -67,7 +69,7 @@ export default function RowMenu({
         onClick={(e) => { e.preventDefault(); e.stopPropagation(); setOpen((v) => !v); }}
         aria-haspopup="menu"
         aria-expanded={open}
-        aria-label={label}
+        aria-label={label ?? t('ui.moreActions')}
         className="w-8 h-8 rounded-lg flex items-center justify-center text-ink-faint hover:text-ink hover:bg-[#F4F4F6] transition"
       >
         <MoreHorizontal className="w-4 h-4" />
