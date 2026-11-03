@@ -26,6 +26,7 @@ import { Eye, Save, X } from "lucide-react";
 import { authHeader } from "@/lib/peer-client";
 import { normaliseSusunAtur, type SusunAturSijil } from "@/lib/sijil/susunAtur";
 import { normaliseMedan, barisButiran } from "@/lib/sijil/medan";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 // Nisbah halaman A4 landskap, sama dengan janaPdf.ts.
 const A4_W = 841.89;
@@ -144,6 +145,7 @@ export default function LayoutEditor({
   onClose: () => void;
   onSaved: () => void | Promise<void>;
 }) {
+  const { t } = useBahasa();
   const [susun, setSusun] = useState<Susun>(() => bacaSusun(layout));
   const [latar, setLatar] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
@@ -168,7 +170,7 @@ export default function LayoutEditor({
   useEffect(() => {
     if (latarUrl !== undefined) {
       setLatar(latarUrl);
-      if (!latarUrl) setMsg("Could not load the background image.");
+      if (!latarUrl) setMsg(t("certificates.layoutEditor.loadBgFailed"));
       return;
     }
     let alive = true;
@@ -180,7 +182,7 @@ export default function LayoutEditor({
       const j = await res.json().catch(() => ({}));
       if (!alive) return;
       if (!res.ok || typeof j.url !== "string") {
-        setMsg(j.error ?? "Could not load the background image.");
+        setMsg(j.error ?? t("certificates.layoutEditor.loadBgFailed"));
         return;
       }
       setLatar(j.url);
@@ -189,7 +191,7 @@ export default function LayoutEditor({
       alive = false;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [backgroundPath]);
+  }, [backgroundPath, t]);
 
   // Ukur lebar bekas supaya saiz fon dan kotak mengikut skala sebenar
   // (WYSIWYG: pt PDF dipetakan kepada piksel bekas).
@@ -262,7 +264,7 @@ export default function LayoutEditor({
       if (onSimpan) {
         const ok = await onSimpan({ ...susun, mode });
         if (!ok) {
-          setMsg("Could not save the layout.");
+          setMsg(t("certificates.layoutEditor.saveFailed"));
           return;
         }
         setMsg(null);
@@ -276,7 +278,7 @@ export default function LayoutEditor({
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not save the layout.");
+        setMsg(j.error ?? t("certificates.layoutEditor.saveFailed"));
         return;
       }
       setMsg(null);
@@ -284,14 +286,14 @@ export default function LayoutEditor({
     } finally {
       setMenyimpan(false);
     }
-  }, [classId, templateId, susun, mode, onSaved, onSimpan]);
+  }, [classId, templateId, susun, mode, onSaved, onSimpan, t]);
 
   const pratonton = useCallback(async () => {
     // Hala admin (galeri): URL pratonton daripada pemanggil luar.
     if (onPratonton) {
       const url = await onPratonton();
       if (url) window.open(url, "_blank");
-      else setMsg("Preview failed.");
+      else setMsg(t("certificates.classPage.previewFailed"));
       return;
     }
     const res = await fetch(
@@ -304,11 +306,11 @@ export default function LayoutEditor({
     );
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(j.error ?? "Preview failed.");
+      setMsg(j.error ?? t("certificates.classPage.previewFailed"));
       return;
     }
     if (typeof j.url === "string") window.open(j.url, "_blank");
-  }, [classId, templateId, onPratonton]);
+  }, [classId, templateId, onPratonton, t]);
 
   const namaKiri =
     susun.name.align === "left"
@@ -318,16 +320,13 @@ export default function LayoutEditor({
   return (
     <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6 space-y-3">
       <div className="flex items-center justify-between gap-2 flex-wrap">
-        <h3 className="font-semibold">{title ? `Edit layout: ${title}` : "Layout editor"}</h3>
+        <h3 className="font-semibold">{title ? t("certificates.layoutEditor.editTitle", { tajuk: title }) : t("certificates.layoutEditor.title")}</h3>
         <button className="btn-quiet" onClick={onClose}>
-          <X className="w-4 h-4" /> Close
+          <X className="w-4 h-4" /> {t("common.close")}
         </button>
       </div>
       <p className="text-sm text-slate-500">
-        Drag the name, QR, course, date and location, signer and signature boxes onto the
-        background. The course uses the class name when the Course field is empty. Positions
-        are saved as page fractions. Boxes with empty fields show sample
-        values; empty fields are never printed on the certificate.
+        {t("certificates.layoutEditor.note")}
       </p>
       {msg && <div className="text-sm text-red-600">{msg}</div>}
 
@@ -340,10 +339,10 @@ export default function LayoutEditor({
         >
           {latar ? (
             // eslint-disable-next-line @next/next/no-img-element
-            <img src={latar} alt="Certificate background" className="absolute inset-0 w-full h-full object-fill" draggable={false} />
+            <img src={latar} alt={t("certificates.layoutEditor.bgAlt")} className="absolute inset-0 w-full h-full object-fill" draggable={false} />
           ) : (
             <div className="absolute inset-0 flex items-center justify-center text-sm text-slate-500">
-              Loading background...
+              {t("certificates.layoutEditor.loadingBg")}
             </div>
           )}
 
@@ -367,7 +366,7 @@ export default function LayoutEditor({
               touchAction: "none",
             }}
           >
-            Student Name
+            {t("certificates.layoutEditor.studentName")}
           </div>
 
           {/* Kotak QR */}
@@ -420,9 +419,9 @@ export default function LayoutEditor({
                 transform: "translateY(-80%)",
                 touchAction: "none",
               }}
-              title="Course or programme printed on the certificate"
+              title={t("certificates.layoutEditor.courseTitle")}
             >
-              {medanSijil.course || namaKelas || "Course / programme"}
+              {medanSijil.course || namaKelas || t("certificates.classPage.course")}
             </div>
           )}
 
@@ -450,9 +449,9 @@ export default function LayoutEditor({
                 transform: "translateY(-80%)",
                 touchAction: "none",
               }}
-              title="Date and location line"
+              title={t("certificates.layoutEditor.detailsTitle")}
             >
-              {barisButiran(medanSijil) || "1 hingga 3 Oktober 2026 | Location"}
+              {barisButiran(medanSijil) || t("certificates.layoutEditor.detailsSample")}
             </div>
           )}
 
@@ -480,11 +479,11 @@ export default function LayoutEditor({
                 transform: "translateY(-80%)",
                 touchAction: "none",
               }}
-              title="Signer name and title"
+              title={t("certificates.layoutEditor.signerBoxTitle")}
             >
-              <div className="font-bold truncate">{medanSijil.signer_name || "Signer name"}</div>
+              <div className="font-bold truncate">{medanSijil.signer_name || t("certificates.classPage.signerName")}</div>
               <div className="truncate" style={{ fontSize: "85%" }}>
-                {medanSijil.signer_title || "Signer title"}
+                {medanSijil.signer_title || t("certificates.classPage.signerTitle")}
               </div>
             </div>
           )}
@@ -508,9 +507,9 @@ export default function LayoutEditor({
                   : 24,
                 touchAction: "none",
               }}
-              title="Signature image"
+              title={t("certificates.layoutEditor.sigBoxTitle")}
             >
-              Signature
+              {t("certificates.classPage.sigAlt")}
             </div>
           )}
         </div>
@@ -518,7 +517,7 @@ export default function LayoutEditor({
         {/* Kawalan */}
         <div className="space-y-3 text-sm w-full lg:w-64 shrink-0">
           <div>
-            <label className="block font-medium mb-1">Name font size ({susun.name.size}pt)</label>
+            <label className="block font-medium mb-1">{t("certificates.layoutEditor.nameFontSize", { n: susun.name.size })}</label>
             <input
               className="w-full"
               type="range"
@@ -531,7 +530,7 @@ export default function LayoutEditor({
             />
           </div>
           <div>
-            <label className="block font-medium mb-1">Name color</label>
+            <label className="block font-medium mb-1">{t("certificates.layoutEditor.nameColor")}</label>
             <input
               type="color"
               value={susun.name.color}
@@ -541,7 +540,7 @@ export default function LayoutEditor({
             />
           </div>
           <div>
-            <label className="block font-medium mb-1">Max width ({Math.round(susun.name.maxWidth * 100)}%)</label>
+            <label className="block font-medium mb-1">{t("certificates.layoutEditor.maxWidth", { n: Math.round(susun.name.maxWidth * 100) })}</label>
             <input
               className="w-full"
               type="range"
@@ -558,7 +557,7 @@ export default function LayoutEditor({
             />
           </div>
           <div>
-            <label className="block font-medium mb-1">Alignment</label>
+            <label className="block font-medium mb-1">{t("certificates.layoutEditor.alignment")}</label>
             <select
               className="input w-full"
               value={susun.name.align}
@@ -569,8 +568,8 @@ export default function LayoutEditor({
                 }))
               }
             >
-              <option value="center">Center</option>
-              <option value="left">Left</option>
+              <option value="center">{t("certificates.layoutEditor.center")}</option>
+              <option value="left">{t("certificates.layoutEditor.left")}</option>
             </select>
           </div>
           <label className="flex items-center gap-2">
@@ -579,7 +578,7 @@ export default function LayoutEditor({
               checked={susun.qr !== false}
               onChange={(e) => setSusun((p) => ({ ...p, qr: e.target.checked ? { ...QR_LALAI } : false }))}
             />
-            Print QR code
+            {t("certificates.layoutEditor.printQr")}
           </label>
           {/* KZ-009: kotak semak "Print certificate code" dibuang; kod
               sijil tidak dicetak lagi (QR sahaja). */}
@@ -589,7 +588,7 @@ export default function LayoutEditor({
               checked={susun.course !== false}
               onChange={(e) => setSusun((p) => ({ ...p, course: e.target.checked ? { ...KURSUS_LALAI } : false }))}
             />
-            Print course
+            {t("certificates.layoutEditor.printCourse")}
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -597,7 +596,7 @@ export default function LayoutEditor({
               checked={susun.details !== false}
               onChange={(e) => setSusun((p) => ({ ...p, details: e.target.checked ? { ...BUTIRAN_LALAI } : false }))}
             />
-            Print date and location
+            {t("certificates.layoutEditor.printDetails")}
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -605,7 +604,7 @@ export default function LayoutEditor({
               checked={susun.signer !== false}
               onChange={(e) => setSusun((p) => ({ ...p, signer: e.target.checked ? { ...PENA_LALAI } : false }))}
             />
-            Print signer
+            {t("certificates.layoutEditor.printSigner")}
           </label>
           <label className="flex items-center gap-2">
             <input
@@ -613,18 +612,18 @@ export default function LayoutEditor({
               checked={susun.signature !== false}
               onChange={(e) => setSusun((p) => ({ ...p, signature: e.target.checked ? { ...SIG_LALAI } : false }))}
             />
-            Print signature image
+            {t("certificates.layoutEditor.printSignature")}
           </label>
           <div className="flex gap-2 pt-2">
             <button className="btn-primary" onClick={simpan} disabled={menyimpan}>
-              <Save className="w-4 h-4" /> Save layout
+              <Save className="w-4 h-4" /> {t("certificates.layoutEditor.saveLayout")}
             </button>
             <button className="btn-quiet" onClick={pratonton}>
-              <Eye className="w-4 h-4" /> Preview PDF
+              <Eye className="w-4 h-4" /> {t("certificates.classPage.previewPdf")}
             </button>
           </div>
           <p className="text-xs text-slate-500">
-            Save first, then preview: the preview shows the saved template.
+            {t("certificates.layoutEditor.saveFirstNote")}
           </p>
         </div>
       </div>
