@@ -11,6 +11,8 @@ import {
   listTeamsForHunt, getHuntSubmissionLink, HuntSubmissionLink,
 } from "@/lib/boards";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
+import { LOKAL } from '@/lib/i18n';
 
 interface Team { id: string; name: string; score: number; }
 
@@ -20,11 +22,7 @@ interface Props {
   currentUserId: string | null;
 }
 
-const STATUS_LABEL: Record<SubmissionStatus, string> = {
-  in_review: "In Review",
-  needs_revision: "Needs Revision",
-  complete: "Complete",
-};
+// Label status dialihkan ke t() dalam komponen (kunci boards.quest.status*).
 const STATUS_COLOR: Record<SubmissionStatus, string> = {
   in_review: "bg-amber-100 text-amber-800",
   needs_revision: "bg-rose-100 text-rose-800",
@@ -34,6 +32,13 @@ const STATUS_COLOR: Record<SubmissionStatus, string> = {
 export default function QuestBoardView({ board, canManage, currentUserId }: Props) {
   const [teams, setTeams] = useState<Team[]>([]);
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
+
+  /** Label status hantaran ikut bahasa semasa. */
+  const labelStatus = (s: SubmissionStatus) =>
+    s === 'in_review' ? t('boards.quest.statusInReview')
+    : s === 'needs_revision' ? t('boards.quest.statusNeedsRevision')
+    : t('boards.quest.statusComplete');
   const [subs, setSubs] = useState<GroupSubmission[]>([]);
   const [myTeamId, setMyTeamId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -45,13 +50,13 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
   const reload = async () => {
     setLoading(true);
     try {
-      const [t, s, my, link] = await Promise.all([
+      const [sen, s, my, link] = await Promise.all([
         board.hunt_id ? listTeamsForHunt(board.hunt_id) : Promise.resolve([] as Team[]),
         listGroupSubmissions(board.id),
         getMyTeamForBoard(board.id),
         board.hunt_id ? getHuntSubmissionLink(board.hunt_id) : Promise.resolve({ url: null, label: null, embed: false } as HuntSubmissionLink),
       ]);
-      setTeams(t);
+      setTeams(sen);
       setSubs(s);
       setMyTeamId(my);
       setSubLink(link);
@@ -80,26 +85,26 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
           {board.due_date && (
             <p className={`text-xs mt-1 inline-flex items-center gap-1 ${overdue ? 'text-rose-600' : 'text-gray-500'}`}>
               <Clock className="w-3.5 h-3.5" />
-              Due date: {new Date(board.due_date).toLocaleString()}
+              {t('boards.quest.dueDate', { tarikh: new Date(board.due_date).toLocaleString(LOKAL[bahasa]) })}
             </p>
           )}
         </div>
         <div className="flex items-center gap-3 text-sm text-gray-500">
-          {board.max_score != null && <span>Score penuh: <b>{board.max_score}</b></span>}
+          {board.max_score != null && <span>{t('boards.quest.maxScore')} <b>{board.max_score}</b></span>}
           <button
             type="button"
             onClick={() => reload()}
             disabled={loading}
             className="inline-flex items-center gap-1 px-2.5 py-1 rounded border border-gray-300 text-gray-700 hover:bg-gray-50 disabled:opacity-50"
-            title="Refresh teams and submissions"
+            title={t('boards.quest.refreshTitle')}
           >
-            <span aria-hidden>↻</span> Refresh
+            <span aria-hidden>↻</span> {t('common.refresh')}
           </button>
         </div>
       </div>
 
       {err && <div className="p-3 rounded bg-red-50 text-red-700 text-sm">{err}</div>}
-      {loading && <div className="text-sm text-gray-500">Memuatkan…</div>}
+      {loading && <div className="text-sm text-gray-500">{t('common.loading')}</div>}
 
       {!loading && subLink.url && (
         <a
@@ -110,10 +115,10 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
         >
           <div className="p-3 bg-purple-50 flex items-center justify-between gap-2 flex-wrap">
             <div className="font-semibold text-purple-900 text-sm">
-              Submission Link
+              {t('boards.quest.submissionLink')}
             </div>
             <span className="inline-flex items-center gap-1 px-3 py-1.5 rounded bg-purple-600 hover:bg-purple-700 text-white text-sm">
-              Open in new tab ↗
+              {t('boards.quest.openNewTab')}
             </span>
           </div>
         </a>
@@ -121,8 +126,8 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
 
       {!loading && !subLink.url && teams.length === 0 && (
         <div className="p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
-          <p className="text-gray-600">No teams found for this activity.</p>
-          <p className="text-xs text-gray-500 mt-1">Please add a team first in the Teams tab.</p>
+          <p className="text-gray-600">{t('boards.quest.noTeams')}</p>
+          <p className="text-xs text-gray-500 mt-1">{t('boards.quest.addTeamFirst')}</p>
         </div>
       )}
 
@@ -137,7 +142,7 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                 <div className="font-semibold truncate">{team.name}</div>
                 {sub && (
                   <span className={`text-xs px-2 py-1 rounded ${STATUS_COLOR[sub.status]}`}>
-                    {STATUS_LABEL[sub.status]}
+                    {labelStatus(sub.status)}
                   </span>
                 )}
               </div>
@@ -147,16 +152,16 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                     {isMyTeam ? (
                       <button onClick={() => setUploadFor({ teamId: team.id, existing: null })}
                         className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50">
-                        <Plus className="w-4 h-4" /> Submit for team
+                        <Plus className="w-4 h-4" /> {t('boards.quest.submitForTeam')}
                       </button>
                     ) : canManage ? (
                       <button onClick={() => setUploadFor({ teamId: team.id, existing: null })}
                         className="w-full inline-flex items-center justify-center gap-1.5 px-3 py-2 rounded-lg border-2 border-dashed border-indigo-300 text-indigo-700 hover:bg-indigo-50"
-                        title="Submit on behalf of this team">
-                        <Plus className="w-4 h-4" /> Submit on behalf
+                        title={t('boards.quest.submitBehalfTitle')}>
+                        <Plus className="w-4 h-4" /> {t('boards.quest.submitBehalf')}
                       </button>
                     ) : (
-                      <span className="text-gray-400">Only team members can submit</span>
+                      <span className="text-gray-400">{t('boards.quest.onlyMembers')}</span>
                     )}
                   </div>
                 )}
@@ -182,37 +187,37 @@ export default function QuestBoardView({ board, canManage, currentUserId }: Prop
                     </div>
                     {sub.is_late && (
                       <div className="text-[11px] inline-flex items-center gap-1 text-rose-600">
-                        <AlertTriangle className="w-3 h-3" /> Lewat
+                        <AlertTriangle className="w-3 h-3" /> {t('boards.quest.late')}
                       </div>
                     )}
                     {sub.status === 'complete' && (board.show_scores_publicly || canManage || isMyTeam) && sub.score != null && (
                       <div className="text-sm inline-flex items-center gap-1 text-emerald-700">
-                        <Award className="w-4 h-4" /> Score: <b>{sub.score}</b>{board.max_score ? ` / ${board.max_score}` : ''}
+                        <Award className="w-4 h-4" /> {t('boards.quest.scoreInline')}<b>{sub.score}</b>{board.max_score ? ` / ${board.max_score}` : ''}
                       </div>
                     )}
                     {sub.feedback && (canManage || isMyTeam) && (
                       <div className="text-xs text-gray-700 bg-gray-50 rounded p-2">
-                        <b>Feedback:</b> {sub.feedback}
+                        <b>{t('boards.quest.feedbackLabel')}</b> {sub.feedback}
                       </div>
                     )}
                     <div className="flex flex-wrap gap-2 pt-1">
                       {canManage && (
                         <button onClick={() => setGradeFor(sub)}
                           className="text-xs px-2.5 py-1 rounded bg-indigo-600 text-white hover:bg-indigo-700 inline-flex items-center gap-1">
-                          <CheckCircle2 className="w-3.5 h-3.5" /> Give Score
+                          <CheckCircle2 className="w-3.5 h-3.5" /> {t('boards.quest.giveScore')}
                         </button>
                       )}
                       {((isMyTeam && (sub.status === 'in_review' || sub.status === 'needs_revision')) || canManage) && (
                         <button onClick={() => setUploadFor({ teamId: team.id, existing: sub })}
                           className="text-xs px-2.5 py-1 rounded border hover:bg-gray-50 inline-flex items-center gap-1"
-                          title={canManage && !isMyTeam ? 'Edit submission on behalf of this team' : 'Resubmit'}>
-                          <RefreshCcw className="w-3.5 h-3.5" /> {canManage && !isMyTeam ? 'Edit' : 'Resubmit'}
+                          title={canManage && !isMyTeam ? t('boards.quest.editBehalfTitle') : t('boards.quest.resubmitTitle')}>
+                          <RefreshCcw className="w-3.5 h-3.5" /> {canManage && !isMyTeam ? t('boards.intro.edit') : t('boards.quest.resubmit')}
                         </button>
                       )}
                       {(canManage || isMyTeam) && (
-                        <button onClick={async () => { if ((await confirm({ title: 'Delete this submission?', tone: 'danger' }))) { await deleteGroupSubmission(sub.id); reload(); } }}
+                        <button onClick={async () => { if ((await confirm({ title: t('boards.quest.deleteConfirm'), tone: 'danger' }))) { await deleteGroupSubmission(sub.id); reload(); } }}
                           className="text-xs px-2.5 py-1 rounded border text-rose-600 hover:bg-rose-50 inline-flex items-center gap-1"
-                          title="Delete submission">
+                          title={t('boards.quest.deleteTitle')}>
                           <Trash2 className="w-3.5 h-3.5" />
                         </button>
                       )}
@@ -257,11 +262,12 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
   const [desc, setDesc] = useState(existing?.description || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { t } = useBahasa();
 
   const submit = async () => {
     setErr(null);
-    if (!title.trim()) { setErr("Please enter a title."); return; }
-    if (!file && !existing) { setErr("Please choose a file."); return; }
+    if (!title.trim()) { setErr(t('boards.quest.titleRequired')); return; }
+    if (!file && !existing) { setErr(t('boards.quest.fileRequired')); return; }
     setBusy(true);
     try {
       await createOrUpdateGroupSubmission({
@@ -279,7 +285,7 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-auto">
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{existing ? "Resubmit" : "Submit Team Assignment"}</h3>
+          <h3 className="font-semibold">{existing ? t('boards.quest.resubmit') : t('boards.quest.submitTitle')}</h3>
           <button onClick={onClose}><X className="w-5 h-5" /></button>
         </div>
         <div className="p-4 space-y-3">
@@ -293,14 +299,14 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
               </div>
             ) : existing ? (
               <div className="text-sm text-gray-600">
-                <FileText className="w-6 h-6 mx-auto mb-1" />Current file: {existing.file_name}
-                <div className="text-xs">Click to replace</div>
+                <FileText className="w-6 h-6 mx-auto mb-1" />{t('boards.quest.currentFile', { nama: existing.file_name })}
+                <div className="text-xs">{t('boards.quest.clickToReplace')}</div>
               </div>
             ) : (
               <div className="py-4 text-gray-500">
                 <Upload className="w-8 h-8 mx-auto mb-1" />
-                <p className="text-sm">Click or drop a file</p>
-                <p className="text-xs">PDF/Word/Excel/PowerPoint/Imej · Max 50MB</p>
+                <p className="text-sm">{t('boards.quest.dropFile')}</p>
+                <p className="text-xs">{t('boards.quest.fileFormats')}</p>
               </div>
             )}
             <input ref={fi} type="file" className="hidden"
@@ -308,24 +314,24 @@ function SubmissionUploadModal({ boardId, teamId, existing, onClose, onSaved }: 
               onChange={e => setFile(e.target.files?.[0] || null)} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Title</label>
+            <label className="block text-sm font-medium mb-1">{t('certificates.classPage.titleLabel')}</label>
             <input value={title} onChange={e => setTitle(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="e.g., Group Project Report" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder={t('boards.quest.titlePlaceholder')} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Description</label>
+            <label className="block text-sm font-medium mb-1">{t('boards.quest.descLabel')}</label>
             <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Brief description of this submission…" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder={t('boards.quest.descPlaceholder')} />
           </div>
           {err && <div className="p-2 bg-red-50 text-red-700 text-sm rounded">{err}</div>}
           <p className="text-xs text-gray-500">
-            Score & feedback will be received by all team members.
+            {t('boards.quest.scoreFeedbackNote')}
           </p>
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border">{t('common.cancel')}</button>
           <button onClick={submit} disabled={busy} className="px-4 py-2 rounded-lg bg-indigo-600 text-white disabled:opacity-50 inline-flex items-center gap-2">
-            {busy && <Loader2 className="w-4 h-4 animate-spin" />}Submit
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('boards.quest.submitBtn')}
           </button>
         </div>
       </div>
@@ -342,13 +348,14 @@ function GradeModal({ submission, maxScore, onClose, onSaved }: {
   const [feedback, setFeedback] = useState(submission.feedback || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { t } = useBahasa();
 
   const submit = async () => {
     setErr(null); setBusy(true);
     try {
       const numScore = score === "" ? null : Number(score);
       if (status === 'complete' && (numScore == null || isNaN(numScore))) {
-        setErr("Please enter a score for status 'Complete'."); setBusy(false); return;
+        setErr(t('boards.quest.scoreRequired')); setBusy(false); return;
       }
       await gradeSubmission(submission.id, { status, score: numScore, feedback });
       onSaved();
@@ -360,48 +367,48 @@ function GradeModal({ submission, maxScore, onClose, onSaved }: {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-md w-full">
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">Give Score</h3>
+          <h3 className="font-semibold">{t('boards.quest.giveScore')}</h3>
           <button onClick={onClose}><X className="w-5 h-5" /></button>
         </div>
         <div className="p-4 space-y-3">
           <div className="text-sm text-gray-600">
-            <b>Title:</b> {submission.title}<br />
+            <b>{t('boards.quest.titleLabel')}</b> {submission.title}<br />
             <a href={submission.file_url} target="_blank" rel="noreferrer"
               className="text-indigo-600 hover:underline inline-flex items-center gap-1 mt-1">
               <Download className="w-3.5 h-3.5" /> {submission.file_name}
             </a>
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Status</label>
+            <label className="block text-sm font-medium mb-1">{t('certificates.classPage.colStatus')}</label>
             <select value={status} onChange={e => setStatus(e.target.value as SubmissionStatus)}
               className="w-full px-3 py-2 border rounded-lg">
-              <option value="in_review">In Review</option>
-              <option value="needs_revision">Needs Revision</option>
-              <option value="complete">Complete</option>
+              <option value="in_review">{t('boards.quest.statusInReview')}</option>
+              <option value="needs_revision">{t('boards.quest.statusNeedsRevision')}</option>
+              <option value="complete">{t('boards.quest.statusComplete')}</option>
             </select>
           </div>
           <div>
             <label className="block text-sm font-medium mb-1">
-              Score {maxScore != null && <span className="text-gray-500">(0-{maxScore})</span>}
+              {t('boards.quest.scoreLabel')} {maxScore != null && <span className="text-gray-500">(0-{maxScore})</span>}
             </label>
             <input type="number" value={score} onChange={e => setScore(e.target.value)}
               min={0} max={maxScore || undefined}
               className="w-full px-3 py-2 border rounded-lg"
               disabled={status !== 'complete'}
-              placeholder={status === 'complete' ? "Enter score" : "Only for status 'Complete'"} />
+              placeholder={status === 'complete' ? t('boards.quest.enterScore') : t('boards.quest.onlyComplete')} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">Feedback</label>
+            <label className="block text-sm font-medium mb-1">{t('boards.quest.feedbackTitle')}</label>
             <textarea value={feedback} onChange={e => setFeedback(e.target.value)} rows={4}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Feedback for the team…" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder={t('boards.quest.feedbackPlaceholder')} />
           </div>
           {err && <div className="p-2 bg-red-50 text-red-700 text-sm rounded">{err}</div>}
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border">{t('common.cancel')}</button>
           <button onClick={submit} disabled={busy}
             className="px-4 py-2 rounded-lg bg-indigo-600 text-white disabled:opacity-50 inline-flex items-center gap-2">
-            {busy && <Loader2 className="w-4 h-4 animate-spin" />}Save
+            {busy && <Loader2 className="w-4 h-4 animate-spin" />}{t('certificates.list.save')}
           </button>
         </div>
       </div>

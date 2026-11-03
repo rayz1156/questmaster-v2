@@ -12,6 +12,7 @@ import { parseYouTubeId } from "@/lib/video-embed";
 import ImageLightbox from "@/components/learning-board/ImageLightbox";
 import { mampatImej } from "@/lib/mampatImej";
 import { useConfirm } from '@/components/ui/ConfirmProvider';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 interface Props {
   board: Board;
@@ -29,6 +30,7 @@ async function authedFetch(input: RequestInfo, init?: RequestInit): Promise<Resp
 export default function IntroBoardView({ board, canManage, currentUserId }: Props) {
   const [posts, setPosts] = useState<IntroPost[]>([]);
   const confirm = useConfirm();
+  const { t } = useBahasa();
   const [mine, setMine] = useState<IntroPost | null>(null);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
@@ -51,7 +53,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
   useEffect(() => { reload(); /* eslint-disable-next-line */ }, [board.id]);
 
   const handleDelete = async (p: IntroPost) => {
-    if (!(await confirm({ title: "Delete this post?", tone: 'danger' }))) return;
+    if (!(await confirm({ title: t('boards.intro.deleteConfirm'), tone: 'danger' }))) return;
     try { await deleteIntroPost(p.id); await reload(); }
     catch (e: any) { alert(e.message || String(e)); }
   };
@@ -61,18 +63,18 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-semibold">{board.title}</h2>
-          <p className="text-sm text-gray-600">Ice-breaking board: introduce yourself with a photo and short bio in your profile page)</p>
+          <p className="text-sm text-gray-600">{t('boards.intro.subtitle')}</p>
         </div>
         {/* Auto-populated from class members’ profiles */}
       </div>
 
       {err && <div className="p-3 rounded bg-red-50 text-red-700 text-sm">{err}</div>}
-      {loading && <div className="text-sm text-gray-500">Memuatkan…</div>}
+      {loading && <div className="text-sm text-gray-500">{t('common.loading')}</div>}
 
       {!loading && posts.length === 0 && (
         <div className="p-8 rounded-lg border-2 border-dashed border-gray-300 text-center">
           <ImageIcon className="w-10 h-10 mx-auto text-gray-400 mb-2" />
-          <p className="text-gray-600">No class members yet. Once members join, their introductions will appear here automatically.</p>
+          <p className="text-gray-600">{t('boards.intro.emptyText')}</p>
         </div>
       )}
 
@@ -105,7 +107,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
                   }
                 }}
                 className="block w-full aspect-square bg-gray-100 cursor-zoom-in"
-                aria-label={isVideo ? 'Play video' : 'View photo'}
+                aria-label={isVideo ? t('boards.intro.playVideo') : t('boards.intro.viewPhoto')}
               >
                 {thumb ? (
                   /* eslint-disable-next-line @next/next/no-img-element */
@@ -126,18 +128,18 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
               <div className="p-3">
                 <div className="font-semibold text-sm truncate">{cardName}</div>
               {(p as any).is_educator && (
-                <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold uppercase tracking-wide">Educator</div>
+                <div className="inline-flex items-center gap-1 mt-1 px-2 py-0.5 rounded-full bg-indigo-100 text-indigo-700 text-[10px] font-semibold uppercase tracking-wide">{t('boards.intro.educatorBadge')}</div>
               )}
                 {(p.author_bio || p.description) && <div className="text-xs text-gray-600 mt-1 whitespace-pre-wrap break-words">{p.author_bio || p.description}</div>}
               </div>
               {(canManage || p.author_id === currentUserId) && (
                 <div className="absolute top-2 right-2 flex gap-1 opacity-0 group-hover:opacity-100 transition">
                   {p.author_id === currentUserId && (
-                    <button onClick={() => setShowModal(true)} title="Edit" className="p-1.5 bg-white/90 rounded shadow hover:bg-white">
+                    <button onClick={() => setShowModal(true)} title={t('boards.intro.edit')} className="p-1.5 bg-white/90 rounded shadow hover:bg-white">
                       <Pencil className="w-3.5 h-3.5" />
                     </button>
                   )}
-                  <button onClick={() => handleDelete(p)} title="Delete" className="p-1.5 bg-white/90 rounded shadow hover:bg-white text-red-600">
+                  <button onClick={() => handleDelete(p)} title={t('boards.intro.delete')} className="p-1.5 bg-white/90 rounded shadow hover:bg-white text-red-600">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
@@ -176,6 +178,7 @@ export default function IntroBoardView({ board, canManage, currentUserId }: Prop
 export function IntroVideoLightbox({ boardId, fileId, title, onClose }: { boardId: string; fileId: string; title: string | null; onClose: () => void }) {
   const [embedUrl, setEmbedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const { t } = useBahasa();
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -183,14 +186,15 @@ export function IntroVideoLightbox({ boardId, fileId, title, onClose }: { boardI
         const r = await authedFetch(`/api/intro-boards/${boardId}/embed/${fileId}`);
         const data = await r.json();
         if (!alive) return;
-        if (!r.ok) setError(data.error || 'Failed to load video');
+        if (!r.ok) setError(data.error || t('boards.lightbox.loadFailed'));
         else setEmbedUrl(data.embedUrl);
       } catch (e: any) {
         if (alive) setError(e?.message || String(e));
       }
     })();
     return () => { alive = false; };
-  }, [boardId, fileId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boardId, fileId, t]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
     window.addEventListener('keydown', onKey);
@@ -199,7 +203,7 @@ export function IntroVideoLightbox({ boardId, fileId, title, onClose }: { boardI
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 p-4" onClick={onClose}>
       <div className="relative w-full max-w-5xl aspect-video bg-black rounded-xl overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-        <button aria-label="Close" onClick={onClose} className="absolute top-2 right-2 z-10 p-1.5 bg-white/10 hover:bg-white/20 rounded-md text-white"><X className="w-5 h-5" /></button>
+        <button aria-label={t('common.close')} onClick={onClose} className="absolute top-2 right-2 z-10 p-1.5 bg-white/10 hover:bg-white/20 rounded-md text-white"><X className="w-5 h-5" /></button>
         {title && <div className="absolute top-2 left-2 z-10 text-white text-sm bg-black/40 px-2 py-1 rounded">{title}</div>}
         {error ? (
           <div className="w-full h-full flex items-center justify-center text-red-200 text-sm p-4 text-center">{error}</div>
@@ -231,6 +235,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
   const [desc, setDesc] = useState(existing?.description || "");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
+  const { t } = useBahasa();
 
   const onPickImage = (f: File | null) => {
     setFile(f);
@@ -243,8 +248,8 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
 
   const submitImage = async () => {
     setErr(null);
-    if (!name.trim()) { setErr("Please enter your name."); return; }
-    if (!previewUrl && !file) { setErr("Please choose an image."); return; }
+    if (!name.trim()) { setErr(t('boards.intro.nameRequired')); return; }
+    if (!previewUrl && !file) { setErr(t('boards.intro.imageRequired')); return; }
     setBusy(true);
     try {
       // 1) If a NEW file was chosen, upload it to FileLu first via our intro upload route.
@@ -256,7 +261,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
         const r = await fetch(`/api/intro-boards/${boardId}/upload-image`, { method: 'POST', body: fd, credentials: 'include' });
         if (!r.ok) {
           const j = await r.json().catch(() => ({}));
-          throw new Error(j?.error || `Upload failed (${r.status})`);
+          throw new Error(j?.error || t('boards.intro.uploadFailed', { status: r.status }));
         }
         const j = await r.json();
         imageUrl = j.url as string;
@@ -278,12 +283,12 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
 
   const submitVideo = async () => {
     setErr(null);
-    if (!name.trim()) { setErr("Please enter your name."); return; }
+    if (!name.trim()) { setErr(t('boards.intro.nameRequired')); return; }
     // KZ-039: muat naik video terus dibuang. Video intro hanya melalui
     // pautan YouTube, dan laluan ini terbuka untuk semua ahli kelas.
     const raw = ytUrl.trim();
-    if (!raw) { setErr("Please paste a YouTube link."); return; }
-    if (!parseYouTubeId(raw)) { setErr("That doesn't look like a valid YouTube link."); return; }
+    if (!raw) { setErr(t('boards.intro.pasteYoutube')); return; }
+    if (!parseYouTubeId(raw)) { setErr(t('boards.intro.invalidYoutube')); return; }
     setBusy(true);
     try {
       const compRes = await authedFetch(`/api/intro-boards/${boardId}/video/complete`, {
@@ -292,7 +297,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
         body: JSON.stringify({ provider: 'youtube', youtubeUrl: raw, displayName: name, description: desc }),
       });
       const compData = await compRes.json();
-      if (!compRes.ok) throw new Error(compData.error || 'Save failed');
+      if (!compRes.ok) throw new Error(compData.error || t('boards.intro.saveFailed'));
       onSaved();
     } catch (e: any) { setErr(e.message || String(e)); }
     finally { setBusy(false); }
@@ -302,7 +307,7 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl max-w-lg w-full max-h-[90vh] overflow-auto">
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-semibold">{existing ? "Edit Introduction" : "Add Introduction"}</h3>
+          <h3 className="font-semibold">{existing ? t('boards.intro.editTitle') : t('boards.intro.addTitle')}</h3>
           <button onClick={onClose}><X className="w-5 h-5" /></button>
         </div>
         <div className="p-4 space-y-3">
@@ -312,12 +317,12 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
               type="button"
               onClick={() => setMediaType('image')}
               className={`px-3 py-1 rounded ${mediaType === 'image' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-            >Image</button>
+            >{t('boards.intro.imageTab')}</button>
             <button
               type="button"
               onClick={() => setMediaType('video')}
               className={`px-3 py-1 rounded ${mediaType === 'video' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:text-gray-900'}`}
-            >Video</button>
+            >{t('boards.intro.videoTab')}</button>
           </div>
 
           {mediaType === 'image' && (
@@ -329,12 +334,12 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
             >
               {previewUrl ? (
                 /* eslint-disable-next-line @next/next/no-img-element */
-                <img src={previewUrl} alt="preview" className="max-h-48 mx-auto rounded" />
+                <img src={previewUrl} alt={t('boards.intro.previewAlt')} className="max-h-48 mx-auto rounded" />
               ) : (
                 <div className="py-6 text-gray-500">
                   <Upload className="w-8 h-8 mx-auto mb-1" />
-                  <p className="text-sm">Click or drop an image here</p>
-                  <p className="text-xs">JPG/PNG/WebP/GIF · Max 10MB</p>
+                  <p className="text-sm">{t('boards.intro.dropImage')}</p>
+                  <p className="text-xs">{t('boards.intro.imageFormats')}</p>
                 </div>
               )}
               <input ref={fileInput} type="file" accept="image/*" className="hidden"
@@ -351,27 +356,27 @@ function IntroUploadModal({ boardId, existing, onClose, onSaved }: {
                 className="w-full px-3 py-2 border rounded-lg"
               />
               {/* KZ-039: muat naik terus dibuang; video hanya melalui pautan YouTube. */}
-              <p className="text-xs text-gray-500">Video mesti dikongsi melalui pautan YouTube (unlisted is fine). It will play right on the board.</p>
+              <p className="text-xs text-gray-500">{t('boards.intro.youtubeNote')}</p>
             </div>
           )}
 
           <div>
-            <label className="block text-sm font-medium mb-1">Name</label>
+            <label className="block text-sm font-medium mb-1">{t('boards.intro.nameLabel')}</label>
             <input value={name} onChange={e => setName(e.target.value)}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Your name" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder={t('boards.intro.namePlaceholder')} />
           </div>
           <div>
-            <label className="block text-sm font-medium mb-1">About You</label>
+            <label className="block text-sm font-medium mb-1">{t('boards.intro.aboutLabel')}</label>
             <textarea value={desc} onChange={e => setDesc(e.target.value)} rows={4}
-              className="w-full px-3 py-2 border rounded-lg" placeholder="Tell us a bit about yourself…" />
+              className="w-full px-3 py-2 border rounded-lg" placeholder={t('boards.intro.aboutPlaceholder')} />
           </div>
           {err && <div className="p-2 bg-red-50 text-red-700 text-sm rounded">{err}</div>}
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="px-4 py-2 rounded-lg border">Cancel</button>
+          <button onClick={onClose} className="px-4 py-2 rounded-lg border">{t('common.cancel')}</button>
           <button onClick={mediaType === 'image' ? submitImage : submitVideo} disabled={busy} className="px-4 py-2 rounded-lg bg-indigo-600 text-white disabled:opacity-50 inline-flex items-center gap-2">
             {busy && <Loader2 className="w-4 h-4 animate-spin" />}
-            Save
+            {t('certificates.list.save')}
           </button>
         </div>
       </div>
