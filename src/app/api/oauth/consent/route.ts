@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { admin, mintIndependentSession } from "@/lib/mcp/db";
 import { randomToken, sha256, encrypt } from "@/lib/mcp/crypto";
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -32,7 +33,7 @@ export async function POST(req: NextRequest) {
   const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
   if (!accessToken) {
-    return NextResponse.json({ error: "Tiada token Bearer" }, { status: 401 });
+    return ralatJson("Tiada token Bearer", 401);
   }
 
   const supa = createClient(
@@ -46,11 +47,11 @@ export async function POST(req: NextRequest) {
 
   const { data: userData, error: userErr } = await supa.auth.getUser(accessToken);
   if (userErr || !userData?.user?.email) {
-    return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+    return ralatJson("Not authenticated", 401);
   }
 
   const body = await req.json().catch(() => null);
-  if (!body) return NextResponse.json({ error: "Badan bukan JSON" }, { status: 400 });
+  if (!body) return ralatJson("Badan bukan JSON", 400);
 
   const {
     action,
@@ -64,7 +65,7 @@ export async function POST(req: NextRequest) {
   } = body;
 
   if (!client_id || !redirect_uri) {
-    return NextResponse.json({ error: "Parameter tidak lengkap" }, { status: 400 });
+    return ralatJson("Parameter tidak lengkap", 400);
   }
 
   // Sahkan semula: /oauth/consent boleh dicapai terus, jadi ini juga menutup
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!client || !client.redirect_uris.includes(redirect_uri)) {
-    return NextResponse.json({ error: "Klien atau redirect_uri tidak sah" }, { status: 400 });
+    return ralatJson("Klien atau redirect_uri tidak sah", 400);
   }
 
   if (action === "deny") {
@@ -88,13 +89,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (!code_challenge) {
-    return NextResponse.json({ error: "code_challenge diperlukan" }, { status: 400 });
+    return ralatJson("code_challenge diperlukan", 400);
   }
   if (code_challenge_method !== "S256") {
-    return NextResponse.json({ error: "code_challenge_method mesti S256" }, { status: 400 });
+    return ralatJson("code_challenge_method mesti S256", 400);
   }
   if (resource && resource !== `${BASE}/api/mcp`) {
-    return NextResponse.json({ error: "resource tidak sepadan dengan pelayan ini" }, { status: 400 });
+    return ralatJson("resource tidak sepadan dengan pelayan ini", 400);
   }
 
   let minted;
@@ -102,12 +103,12 @@ export async function POST(req: NextRequest) {
     minted = await mintIndependentSession(userData.user.email);
   } catch (e: any) {
     console.error("[mcp/consent] gagal menjana sesi:", e.message);
-    return NextResponse.json({ error: "Gagal mencipta sesi sambungan" }, { status: 500 });
+    return ralatJson("Gagal mencipta sesi sambungan", 500);
   }
 
   if (minted.userId !== userData.user.id) {
     console.error("[mcp/consent] ketidakpadanan identiti semasa mint sesi");
-    return NextResponse.json({ error: "Ketidakpadanan identiti" }, { status: 500 });
+    return ralatJson("Ketidakpadanan identiti", 500);
   }
 
   const code = randomToken(32);
@@ -127,7 +128,7 @@ export async function POST(req: NextRequest) {
 
   if (insertErr) {
     console.error("[mcp/consent] gagal menyimpan kod:", insertErr.message);
-    return NextResponse.json({ error: "Gagal mengeluarkan kod" }, { status: 500 });
+    return ralatJson("Gagal mengeluarkan kod", 500);
   }
 
   const redirect = new URL(redirect_uri);

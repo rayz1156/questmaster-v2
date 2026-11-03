@@ -4,6 +4,7 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { admin } from "@/lib/mcp/db";
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = "force-dynamic";
 export const runtime = "nodejs";
@@ -37,10 +38,7 @@ export async function GET(req: NextRequest) {
   const resource = p.get("resource");
 
   if (!clientId || !redirectUri) {
-    return NextResponse.json(
-      { error: "invalid_request", error_description: "client_id dan redirect_uri diperlukan" },
-      { status: 400 }
-    );
+    return ralatJson("invalid_request", 400, { error_description: "client_id dan redirect_uri diperlukan" });
   }
 
   // Padanan tepat redirect_uri menghalang serangan pengalihan terbuka.
@@ -51,17 +49,11 @@ export async function GET(req: NextRequest) {
     .maybeSingle();
 
   if (!client) {
-    return NextResponse.json(
-      { error: "invalid_client", error_description: "client_id tidak dikenali" },
-      { status: 400 }
-    );
+    return ralatJson("invalid_client", 400, { error_description: "client_id tidak dikenali" });
   }
 
   if (!client.redirect_uris.includes(redirectUri)) {
-    return NextResponse.json(
-      { error: "invalid_request", error_description: "redirect_uri tidak sepadan dengan pendaftaran" },
-      { status: 400 }
-    );
+    return ralatJson("invalid_request", 400, { error_description: "redirect_uri tidak sepadan dengan pendaftaran" });
   }
 
   if (responseType !== "code") {
