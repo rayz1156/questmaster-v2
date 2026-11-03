@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaJsonKecil } from '@/lib/bilikAi';
 import { aksesRound, ralatLna } from '@/lib/lnaAkses';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -48,10 +49,7 @@ export async function POST(
   const user = akses.user!;
 
   if (!dalamHad(`lna:${user.id}`, 10)) {
-    return NextResponse.json(
-      { error: 'Terlalu banyak permintaan. Cuba lagi sebentar.' },
-      { status: 429 },
-    );
+    return ralatJson('Terlalu banyak permintaan. Cuba lagi sebentar.', 429);
   }
 
   const hasil = await bacaJsonKecil(req);
@@ -59,10 +57,7 @@ export async function POST(
   const body = hasil.body;
 
   if (!Array.isArray(body.answers) || body.answers.length === 0) {
-    return NextResponse.json(
-      { error: 'answers mesti senarai tidak kosong.' },
-      { status: 400 },
-    );
+    return ralatJson('answers mesti senarai tidak kosong.', 400);
   }
 
   // Muat item LNA dahulu supaya keserasian outcomeId (klien lama dalam
@@ -82,16 +77,13 @@ export async function POST(
   const jawapan: JawapanMasuk[] = [];
   for (const a of body.answers) {
     if (!a || typeof a !== 'object') {
-      return NextResponse.json({ error: 'Format jawapan tidak sah.' }, { status: 400 });
+      return ralatJson('Format jawapan tidak sah.', 400);
     }
     const o = a as Record<string, unknown>;
     // Pembetulan CTO (kzsec #3): mesti nombor JSON sebenar; boole,
     // rentetan atau tatasusunan ditolak sebelum dipaksa.
     if (typeof o.importance !== 'number' || typeof o.currentLevel !== 'number') {
-      return NextResponse.json(
-        { error: 'Kepentingan dan tahap semasa mesti integer 1 hingga 5.' },
-        { status: 400 },
-      );
+      return ralatJson('Kepentingan dan tahap semasa mesti integer 1 hingga 5.', 400);
     }
     const importance = o.importance;
     const currentLevel = o.currentLevel;
@@ -99,10 +91,7 @@ export async function POST(
       !Number.isInteger(importance) || importance < 1 || importance > 5
       || !Number.isInteger(currentLevel) || currentLevel < 1 || currentLevel > 5
     ) {
-      return NextResponse.json(
-        { error: 'Kepentingan dan tahap semasa mesti integer 1 hingga 5.' },
-        { status: 400 },
-      );
+      return ralatJson('Kepentingan dan tahap semasa mesti integer 1 hingga 5.', 400);
     }
     if (typeof o.itemId === 'string') {
       jawapan.push({ itemId: o.itemId, importance, currentLevel });
@@ -113,54 +102,36 @@ export async function POST(
     if (typeof o.outcomeId === 'string') {
       const item = itemByOutcome.get(o.outcomeId);
       if (!item) {
-        return NextResponse.json(
-          { error: 'Outcome bukan item LNA ini.' },
-          { status: 400 },
-        );
+        return ralatJson('Outcome bukan item LNA ini.', 400);
       }
       jawapan.push({ itemId: item.id, importance, currentLevel });
       continue;
     }
-    return NextResponse.json({ error: 'itemId mesti teks.' }, { status: 400 });
+    return ralatJson('itemId mesti teks.', 400);
   }
 
   // Jawapan selepas pusingan ditutup ditolak 409.
   if (round.status !== 'open') {
-    return NextResponse.json(
-      { error: 'Pusingan ini sudah ditutup.' },
-      { status: 409 },
-    );
+    return ralatJson('Pusingan ini sudah ditutup.', 409);
   }
 
   // Jawapan mesti meliputi SEMUA item LNA ini, tanpa item asing dan
   // tanpa duplikat (kzsec: itemId daripada LNA kelas lain ditolak).
   if (items.length === 0) {
-    return NextResponse.json(
-      { error: 'LNA ini tiada item.' },
-      { status: 400 },
-    );
+    return ralatJson('LNA ini tiada item.', 400);
   }
   const dilihat = new Set<string>();
   for (const j of jawapan) {
     if (!itemById.has(j.itemId)) {
-      return NextResponse.json(
-        { error: 'Item bukan item LNA ini.' },
-        { status: 400 },
-      );
+      return ralatJson('Item bukan item LNA ini.', 400);
     }
     if (dilihat.has(j.itemId)) {
-      return NextResponse.json(
-        { error: 'Ada item dijawab lebih daripada sekali.' },
-        { status: 400 },
-      );
+      return ralatJson('Ada item dijawab lebih daripada sekali.', 400);
     }
     dilihat.add(j.itemId);
   }
   if (dilihat.size !== items.length) {
-    return NextResponse.json(
-      { error: 'Jawapan mesti meliputi semua item.' },
-      { status: 400 },
-    );
+    return ralatJson('Jawapan mesti meliputi semua item.', 400);
   }
 
   // Upsert: pelajar boleh mengemas kini selagi pusingan dibuka.
@@ -180,7 +151,7 @@ export async function POST(
     .upsert(baris, { onConflict: 'round_id,user_id,item_id' });
   if (error) {
     console.error('[lna] simpan jawapan gagal:', error.message);
-    return NextResponse.json({ error: 'Jawapan tidak dapat disimpan.' }, { status: 500 });
+    return ralatJson('Jawapan tidak dapat disimpan.', 500);
   }
 
   return NextResponse.json({ ok: true, count: baris.length });

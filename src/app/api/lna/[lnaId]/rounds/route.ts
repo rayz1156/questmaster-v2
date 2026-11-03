@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { bacaJsonKecil } from '@/lib/bilikAi';
 import { aksesLna, ralatLna } from '@/lib/lnaAkses';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,10 +33,7 @@ export async function POST(
 
   const kind = String(body.kind ?? '');
   if (kind !== 'pre' && kind !== 'post') {
-    return NextResponse.json(
-      { error: 'kind mesti pre atau post.' },
-      { status: 400 },
-    );
+    return ralatJson('kind mesti pre atau post.', 400);
   }
 
   const { data: sedia } = await supa
@@ -45,19 +43,13 @@ export async function POST(
   const pusingan = (sedia ?? []) as { id: string; kind: string; status: string }[];
 
   if (pusingan.some((r) => r.kind === kind)) {
-    return NextResponse.json(
-      { error: 'Pusingan ini sudah wujud untuk LNA.' },
-      { status: 409 },
-    );
+    return ralatJson('Pusingan ini sudah wujud untuk LNA.', 409);
   }
 
   if (kind === 'post') {
     const pra = pusingan.find((r) => r.kind === 'pre');
     if (!pra || pra.status !== 'closed') {
-      return NextResponse.json(
-        { error: 'Pusingan PASCA hanya boleh dibuka selepas pusingan PRA ditutup.' },
-        { status: 409 },
-      );
+      return ralatJson('Pusingan PASCA hanya boleh dibuka selepas pusingan PRA ditutup.', 409);
     }
   }
 
@@ -68,7 +60,7 @@ export async function POST(
     .single();
   if (error || !round) {
     console.error('[lna] buka pusingan gagal:', error?.message);
-    return NextResponse.json({ error: 'Pusingan tidak dapat dibuka.' }, { status: 500 });
+    return ralatJson('Pusingan tidak dapat dibuka.', 500);
   }
 
   return NextResponse.json({ round }, { status: 201 });

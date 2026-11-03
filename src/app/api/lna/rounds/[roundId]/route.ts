@@ -15,6 +15,7 @@ import { getRouteSupabase } from '@/lib/supabase-route';
 import { bacaJsonKecil } from '@/lib/bilikAi';
 import { aksesRound, ralatLna, labelOutcome } from '@/lib/lnaAkses';
 import { senaraiMasteryDaripadaSummary } from '@/lib/lna';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 // Pembetulan CTO (kzsec #2): simpan hanya medan yang diperlukan enjin skor
 // (user_id, outcome_id, mastery_pct, scored), tanpa nama pelajar. Bentuk
@@ -55,7 +56,7 @@ export async function GET(
     .order('position', { ascending: true });
   if (errItem) {
     console.error('[lna] baca item gagal:', errItem.message);
-    return NextResponse.json({ error: 'Pusingan tidak dapat dibaca.' }, { status: 500 });
+    return ralatJson('Pusingan tidak dapat dibaca.', 500);
   }
 
   // Jawapan pemanggil sendiri sahaja (pelajar atau guru), dikunci item.
@@ -66,7 +67,7 @@ export async function GET(
     .eq('user_id', akses.user!.id);
   if (errMine) {
     console.error('[lna] baca jawapan sendiri gagal:', errMine.message);
-    return NextResponse.json({ error: 'Pusingan tidak dapat dibaca.' }, { status: 500 });
+    return ralatJson('Pusingan tidak dapat dibaca.', 500);
   }
 
   return NextResponse.json({
@@ -127,16 +128,10 @@ export async function PATCH(
 
   const status = String(body.status ?? '');
   if (status !== 'closed') {
-    return NextResponse.json(
-      { error: 'status mesti closed.' },
-      { status: 400 },
-    );
+    return ralatJson('status mesti closed.', 400);
   }
   if (round.status === 'closed') {
-    return NextResponse.json(
-      { error: 'Pusingan ini sudah ditutup.' },
-      { status: 409 },
-    );
+    return ralatJson('Pusingan ini sudah ditutup.', 409);
   }
 
   // Snapshot penguasaan semasa pusingan ditutup: RPC dengan klien Bearer
@@ -148,10 +143,7 @@ export async function PATCH(
   );
   if (errRpc || !snapshot) {
     console.error('[lna] mastery_snapshot gagal:', errRpc?.message);
-    return NextResponse.json(
-      { error: 'Pusingan tidak dapat ditutup.' },
-      { status: 500 },
-    );
+    return ralatJson('Pusingan tidak dapat ditutup.', 500);
   }
 
   const { data: roundTutup, error } = await supa
@@ -166,7 +158,7 @@ export async function PATCH(
     .single();
   if (error || !roundTutup) {
     console.error('[lna] tutup pusingan gagal:', error?.message);
-    return NextResponse.json({ error: 'Pusingan tidak dapat ditutup.' }, { status: 500 });
+    return ralatJson('Pusingan tidak dapat ditutup.', 500);
   }
 
   return NextResponse.json({ round: roundTutup });
