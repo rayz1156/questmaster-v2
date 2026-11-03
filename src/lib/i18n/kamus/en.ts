@@ -2540,6 +2540,9 @@ export const en = {
     showingOf: 'Showing {mula}-{akhir} of {jumlah}',
     tryDifferentSearch: 'Try a different search or filter.',
     auditNote: 'Account changes are recorded in Audit.',
+    // Dialog alasan tindakan admin (src/components/admin/ui.tsx ReasonDialog).
+    reasonPlaceholder: 'Explain what happened and why this action is needed',
+    reasonAuditNote: 'This is recorded in Audit.',
     selectUser: 'Select {nama}',
     users: {
       title: 'Users',

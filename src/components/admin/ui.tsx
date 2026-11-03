@@ -9,6 +9,9 @@
 
 import Link from 'next/link';
 import { useEffect, useState, type ReactNode } from 'react';
+// KZ-043: terjemah tulen (kamus sahaja, tiada klien Supabase/modul pelayan)
+// supaya selftest-admin-ui terus boleh mengimport fail ini melalui tsx.
+import { terjemah, type Bahasa } from '../../lib/i18n';
 
 /* =========================================================
  * Fungsi tulen
@@ -168,6 +171,7 @@ export function ReasonDialog({
   open,
   title,
   confirmLabel,
+  bahasa = 'en',
   tone = 'default',
   onConfirm,
   onClose,
@@ -175,6 +179,8 @@ export function ReasonDialog({
   open: boolean;
   title: string;
   confirmLabel: string;
+  /** Bahasa paparan dialog (KZ-043); pemanggil hantar nilai useBahasa(). */
+  bahasa?: Bahasa;
   tone?: 'default' | 'danger';
   onConfirm: (reason: string) => void;
   onClose: () => void;
@@ -201,12 +207,12 @@ export function ReasonDialog({
           maxLength={500}
           value={alasan}
           onChange={(e) => setAlasan(e.target.value)}
-          placeholder="Explain what happened and why this action is needed"
+          placeholder={terjemah(bahasa, 'admin.reasonPlaceholder')}
           className="w-full mt-3 border border-hairline rounded-[4px] p-3 text-sm text-ink resize-none focus:outline-none focus:ring-2 focus:ring-brand-purple/30"
         />
         <div className="flex items-center justify-between mt-1">
           <span className="text-xs text-ink-faint">{bersih.length}/500</span>
-          <span className="text-xs text-ink-faint">This is recorded in Audit.</span>
+          <span className="text-xs text-ink-faint">{terjemah(bahasa, 'admin.reasonAuditNote')}</span>
         </div>
         <div className="flex justify-end gap-2 mt-4">
           <button
@@ -214,7 +220,7 @@ export function ReasonDialog({
             onClick={onClose}
             className="bg-white border border-hairline rounded-[4px] px-4 py-2 text-sm font-medium text-ink-muted hover:text-ink"
           >
-            Cancel
+            {terjemah(bahasa, 'common.cancel')}
           </button>
           <button
             type="button"

@@ -865,6 +865,7 @@ export default function Page({ params }: { params: { id: string } }) {
         open={dialogGantung !== null}
         title={dialogGantung === "restore" ? t("admin.userDetail.restoreConfirm", { nama: namaPaparan }) : t("admin.userDetail.suspendConfirm", { nama: namaPaparan })}
         confirmLabel={dialogGantung === "restore" ? t("admin.userDetail.restoreAccount") : t("admin.userDetail.suspendAccount")}
+        bahasa={bahasa}
         tone={dialogGantung === "restore" ? "default" : "danger"}
         onConfirm={sahkanGantung}
         onClose={() => setDialogGantung(null)}

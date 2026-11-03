@@ -2504,6 +2504,9 @@ export const ms: Kamus = {
     showingOf: 'Memaparkan {mula}-{akhir} daripada {jumlah}',
     tryDifferentSearch: 'Cuba carian atau penapis lain.',
     auditNote: 'Perubahan akaun direkodkan dalam Audit.',
+    // Dialog alasan tindakan admin (src/components/admin/ui.tsx ReasonDialog).
+    reasonPlaceholder: 'Terangkan apa yang berlaku dan mengapa tindakan ini diperlukan',
+    reasonAuditNote: 'Perkara ini direkodkan dalam Audit.',
     selectUser: 'Pilih {nama}',
     users: {
       title: 'Pengguna',
