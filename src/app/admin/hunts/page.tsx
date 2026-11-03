@@ -31,6 +31,16 @@ import {
 } from "@/lib/data";
 import { TAB_AKTIVITI, tapisAktiviti, kiraTabAktiviti, type TabAktiviti } from "@/lib/adminHunts";
 import type { KelasAdmin } from "@/lib/adminClasses";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import type { KunciKamus } from "@/lib/i18n";
+
+// Kunci kamus bagi tab aktiviti (label lib kekal English untuk ujian).
+const KUNCI_TAB_AKTIVITI: Record<TabAktiviti, KunciKamus> = {
+  all: "admin.hunts.tabAll",
+  active: "admin.hunts.tabActive",
+  draft: "admin.hunts.tabDraft",
+  archived: "admin.hunts.tabArchived",
+};
 
 function SenaraiAktiviti({
   hunts,
@@ -48,6 +58,7 @@ function SenaraiAktiviti({
   disemakSub: Record<string, number>;
 }) {
   const router = useRouter();
+  const { t } = useBahasa();
   const [tab, setTab] = useState<TabAktiviti>("all");
   const [q, setQ] = useState("");
   const [classId, setClassId] = useState("");
@@ -55,12 +66,12 @@ function SenaraiAktiviti({
   const namaKelas = (id: string | null | undefined) => {
     if (!id) return "-";
     const k = kelas.find((x) => x.id === id);
-    return k?.name || "Unnamed class";
+    return k?.name || t("admin.hunts.unnamedClass");
   };
   const namaProfil = (id: string | null | undefined) => {
-    if (!id) return "Unnamed user";
+    if (!id) return t("admin.unnamedUser");
     const p = profiles.find((u) => u.id === id);
-    return p?.display_name || "Unnamed user";
+    return p?.display_name || t("admin.unnamedUser");
   };
 
   const ditapis = useMemo(
@@ -73,14 +84,14 @@ function SenaraiAktiviti({
   const lajur: DataColumn<Hunt>[] = [
     {
       key: "aktiviti",
-      header: "Activity",
+      header: t("admin.hunts.colActivity"),
       render: (h) => (
         <span className="block text-[13px] font-bold text-ink truncate max-w-[220px]">{h.title}</span>
       ),
     },
     {
       key: "kelas",
-      header: "Class",
+      header: t("admin.hunts.colClass"),
       hideOnMobile: true,
       render: (h) => (
         <span className="text-[13px] text-ink-faint truncate block max-w-[180px]">{namaKelas(h.class_id)}</span>
@@ -88,7 +99,7 @@ function SenaraiAktiviti({
     },
     {
       key: "pendidik",
-      header: "Educator",
+      header: t("admin.hunts.colEducator"),
       hideOnMobile: true,
       render: (h) => (
         <span className="text-[13px] text-ink-faint truncate block max-w-[160px]">{namaProfil(h.owner_id)}</span>
@@ -96,26 +107,26 @@ function SenaraiAktiviti({
     },
     {
       key: "cabaran",
-      header: "Challenges",
+      header: t("admin.hunts.colChallenges"),
       render: (h) => <span className="text-[13px] text-ink-faint tabular-nums">{kiraanCh[h.id] ?? 0}</span>,
     },
     {
       key: "penghantaran",
-      header: "Submissions",
+      header: t("admin.hunts.colSubmissions"),
       render: (h) => <span className="text-[13px] text-ink-faint tabular-nums">{kiraanSub[h.id] ?? 0}</span>,
     },
     {
       key: "kemajuan",
-      header: "Review progress",
+      header: t("admin.hunts.colProgress"),
       hideOnMobile: true,
       render: (h) => {
         const total = kiraanSub[h.id] ?? 0;
         const disemak = disemakSub[h.id] ?? 0;
         return (
           <span className="flex items-center gap-2 min-w-[120px]">
-            <ProgressBar value={disemak} max={total} label={`Review progress for ${h.title}`} className="flex-1" />
+            <ProgressBar value={disemak} max={total} label={t("admin.hunts.progressLabel", { nama: h.title })} className="flex-1" />
             <span className="text-[12px] text-ink-faint whitespace-nowrap">
-              {disemak} of {total}
+              {t("admin.hunts.ofCount", { disemak, jumlah: total })}
             </span>
           </span>
         );
@@ -123,10 +134,14 @@ function SenaraiAktiviti({
     },
     {
       key: "status",
-      header: "Status",
+      header: t("admin.hunts.colStatus"),
       render: (h) => (
         <Badge variant="dim" warna={h.status === "active" ? "green" : h.status === "draft" ? "yellow" : "gray"}>
-          {h.status.charAt(0).toUpperCase() + h.status.slice(1)}
+          {h.status === "active"
+            ? t("admin.hunts.statusActive")
+            : h.status === "draft"
+              ? t("admin.hunts.statusDraft")
+              : t("admin.hunts.statusArchived")}
         </Badge>
       ),
     },
@@ -135,14 +150,14 @@ function SenaraiAktiviti({
   return (
     <div>
       <Tabs
-        items={TAB_AKTIVITI.map((t) => ({ ...t, count: kiraan[t.key] }))}
+        items={TAB_AKTIVITI.map((tabItem) => ({ ...tabItem, label: t(KUNCI_TAB_AKTIVITI[tabItem.key]), count: kiraan[tabItem.key] }))}
         value={tab}
         onChange={(k) => setTab(k as TabAktiviti)}
       />
 
       <DataTable
         className="mt-4"
-        label="Activities"
+        label={t("admin.hunts.title")}
         columns={lajur}
         rows={ditapis}
         rowKey={(h) => h.id}
@@ -152,8 +167,8 @@ function SenaraiAktiviti({
             <span className="w-full sm:w-64">
               <Input
                 ikonKiri={<Search className="w-4 h-4" />}
-                placeholder="Search title"
-                aria-label="Search activities"
+                placeholder={t("admin.hunts.searchPlaceholder")}
+                aria-label={t("admin.hunts.searchAria")}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
               />
@@ -161,10 +176,10 @@ function SenaraiAktiviti({
             <Select
               value={classId}
               onChange={(e) => setClassId(e.target.value)}
-              aria-label="Filter by class"
+              aria-label={t("admin.hunts.filterClassAria")}
               className="w-auto"
             >
-              <option value="">All classes</option>
+              <option value="">{t("admin.hunts.allClasses")}</option>
               {kelas.map((k) => (
                 <option key={k.id} value={k.id}>
                   {k.name}
@@ -176,8 +191,8 @@ function SenaraiAktiviti({
         empty={
           <EmptyState
             icon={<MapIcon className="w-6 h-6" />}
-            title="No activities match"
-            text="Try a different search or filter."
+            title={t("admin.hunts.emptyTitle")}
+            text={t("admin.tryDifferentSearch")}
           />
         }
       />
@@ -186,6 +201,7 @@ function SenaraiAktiviti({
 }
 
 export default function Page() {
+  const { t } = useBahasa();
   const [hunts, setHunts] = useState<Hunt[] | null>(null);
   const [kelas, setKelas] = useState<KelasAdmin[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -234,9 +250,9 @@ export default function Page() {
 
   return (
     <AdminShell>
-      <PageHead title="Activities" />
+      <PageHead title={t("admin.hunts.title")} />
       {hunts === null ? (
-        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
       ) : (
         <SenaraiAktiviti
           hunts={hunts}

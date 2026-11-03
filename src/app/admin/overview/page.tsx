@@ -30,9 +30,13 @@ import {
 import { labelTindakan } from "@/lib/adminAudit";
 import { pendingPendidik, emelBelumSah, pelanTamatDalam, HARI_TAMAT_PELAN } from "@/lib/adminUsers";
 import { supabase } from "@/lib/supabaseClient";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import type { KunciKamus } from "@/lib/i18n";
 
 interface BarisPerhatian {
-  label: string;
+  kunci: KunciKamus;
+  /** Pemboleh ubah interpolasi untuk kunci (contoh {hari}). */
+  pembolehubah?: Record<string, string | number>;
   kiraan: number;
   href: string;
   ikon: React.ComponentType<{ className?: string }>;
@@ -48,6 +52,7 @@ interface KelasRingkas {
 }
 
 export default function Page() {
+  const { t, bahasa } = useBahasa();
   const [muat, setMuat] = useState(true);
   const [users, setUsers] = useState<Profile[]>([]);
   const [meta, setMeta] = useState<Record<string, UserMeta>>({});
@@ -135,39 +140,46 @@ export default function Page() {
   const digantung = users.filter((u) => u.suspended).length;
 
   const namaProfil = (id: string | null | undefined) => {
-    if (!id) return "Unnamed user";
+    if (!id) return t("admin.unnamedUser");
     const p = users.find((u) => u.id === id);
-    return p?.display_name || "Unnamed user";
+    return p?.display_name || t("admin.unnamedUser");
   };
 
-  const perhatian: BarisPerhatian[] = [
-    { label: "Educators waiting for approval", kiraan: menunggu, href: "/admin/users?tab=pending", ikon: UserCheck },
-    { label: "Unverified email addresses", kiraan: belumSah, href: "/admin/users?status=unverified", ikon: Mail },
-    { label: "Submissions pending review", kiraan: pendingSemak, href: "/admin/moderation", ikon: ClipboardList },
-    { label: "New feedback", kiraan: maklumbalas, href: "/admin/feedback", ikon: MessageSquare },
-    { label: `Plans expiring in ${HARI_TAMAT_PELAN} days`, kiraan: pelanTamat, href: "/admin/users?status=expiring", ikon: CalendarClock },
-  ].filter((r) => r.kiraan > 0);
+  const semuaPerhatian: BarisPerhatian[] = [
+    { kunci: "admin.overview.attEducators", kiraan: menunggu, href: "/admin/users?tab=pending", ikon: UserCheck },
+    { kunci: "admin.overview.attUnverified", kiraan: belumSah, href: "/admin/users?status=unverified", ikon: Mail },
+    { kunci: "admin.overview.attPending", kiraan: pendingSemak, href: "/admin/moderation", ikon: ClipboardList },
+    { kunci: "admin.overview.attFeedback", kiraan: maklumbalas, href: "/admin/feedback", ikon: MessageSquare },
+    {
+      kunci: "admin.overview.attExpiring",
+      pembolehubah: { hari: HARI_TAMAT_PELAN },
+      kiraan: pelanTamat,
+      href: "/admin/users?status=expiring",
+      ikon: CalendarClock,
+    },
+  ];
+  const perhatian = semuaPerhatian.filter((r) => r.kiraan > 0);
 
   return (
     <AdminShell>
-      <PageHead title="Overview" description="What needs your attention across Kuizen today." />
+      <PageHead title={t("admin.overview.title")} description={t("admin.overview.description")} />
 
       {/* Empat nombor sebenar; tiada data perubahan, jadi tiada anak panah. */}
       <Card className="mb-5">
         <StatGroup
           stats={[
-            { label: "Total users", value: users.length },
-            { label: "Educators", value: pendidik },
+            { label: t("admin.overview.statUsers"), value: users.length },
+            { label: t("admin.overview.statEducators"), value: pendidik },
             {
               label: (
                 <>
-                  Activities{" "}
-                  <span className="text-ink-faint font-normal">({aktif} active)</span>
+                  {t("admin.overview.statActivities")}{" "}
+                  <span className="text-ink-faint font-normal">{t("admin.overview.activeCount", { n: aktif })}</span>
                 </>
               ),
               value: jumlahAktiviti,
             },
-            { label: "Pending reviews", value: pendingSemak },
+            { label: t("admin.overview.statPending"), value: pendingSemak },
           ]}
         />
       </Card>
@@ -176,15 +188,15 @@ export default function Page() {
         {/* Perlu perhatian */}
         <Card padat>
           <div className="px-6 py-4 border-b border-kz-line">
-            <CardHead title="Needs attention" subtitle="Rows appear only when something needs you." />
+            <CardHead title={t("admin.overview.needsAttention")} subtitle={t("admin.overview.needsAttentionSub")} />
           </div>
           {muat ? (
-            <p className="px-6 py-8 text-[14px] text-ink-faint">Loading...</p>
+            <p className="px-6 py-8 text-[14px] text-ink-faint">{t("common.loadingDots")}</p>
           ) : perhatian.length === 0 ? (
             <EmptyState
               icon={<ShieldCheck className="w-6 h-6" />}
-              title="All clear"
-              text="Nothing needs you right now."
+              title={t("admin.overview.allClear")}
+              text={t("admin.overview.allClearText")}
             />
           ) : (
             <div className="divide-y divide-kz-line">
@@ -197,7 +209,7 @@ export default function Page() {
                     className="flex items-center gap-3 px-6 py-4 hover:bg-[#f8f9fc] transition"
                   >
                     <Ikon className="w-4 h-4 text-brand-purple shrink-0" />
-                    <span className="text-[14px] text-ink flex-1 min-w-0 truncate">{r.label}</span>
+                    <span className="text-[14px] text-ink flex-1 min-w-0 truncate">{t(r.kunci, r.pembolehubah)}</span>
                     <span className="text-[14px] font-medium text-ink tabular-nums">{r.kiraan}</span>
                     <ChevronRight className="w-4 h-4 text-ink-faint shrink-0" />
                   </Link>
@@ -209,7 +221,7 @@ export default function Page() {
 
         {/* Kesihatan akaun: nisbah sebenar, tiada nombor rekaan. */}
         <Card>
-          <CardHead title="Account health" subtitle="Email verification and suspensions." />
+          <CardHead title={t("admin.overview.accountHealth")} subtitle={t("admin.overview.accountHealthSub")} />
           <div className="mt-4 flex h-1.5 rounded-full overflow-hidden bg-kz-line">
             <div className="bg-kz-up" style={{ width: `${(verifikasi / jumlah) * 100}%` }} />
             <div className="bg-kz-warn" style={{ width: `${(belumSah / jumlah) * 100}%` }} />
@@ -217,9 +229,9 @@ export default function Page() {
           </div>
           <div className="mt-4 space-y-2.5">
             {[
-              { label: "Verified", nilai: verifikasi, warna: "green" as const },
-              { label: "Unverified", nilai: belumSah, warna: "yellow" as const },
-              { label: "Suspended", nilai: digantung, warna: "red" as const },
+              { label: t("admin.verified"), nilai: verifikasi, warna: "green" as const },
+              { label: t("admin.unverified"), nilai: belumSah, warna: "yellow" as const },
+              { label: t("admin.suspended"), nilai: digantung, warna: "red" as const },
             ].map((r) => (
               <div key={r.label} className="flex items-center gap-2 text-[14px]">
                 <span
@@ -242,8 +254,8 @@ export default function Page() {
             ))}
           </div>
           <div className="text-[12px] text-ink-faint border-t border-kz-line mt-3 pt-3">
-            Total users: {users.length}
-            {baharuMinggu > 0 ? ` (+${baharuMinggu} this week)` : ""}
+            {t("admin.overview.totalUsers", { n: users.length })}
+            {baharuMinggu > 0 ? ` (${t("admin.overview.thisWeek", { n: baharuMinggu })})` : ""}
           </div>
         </Card>
       </div>
@@ -252,13 +264,13 @@ export default function Page() {
         {/* Kelas terbaru */}
         <Card padat>
           <div className="px-6 py-4 border-b border-kz-line">
-            <CardHead title="Recent classes" right={<CardLink href="/admin/classes">View all</CardLink>} />
+            <CardHead title={t("admin.overview.recentClasses")} right={<CardLink href="/admin/classes">{t("admin.overview.viewAll")}</CardLink>} />
           </div>
           {kelas.length === 0 ? (
             <EmptyState
               icon={<GraduationCap className="w-6 h-6" />}
-              title="No classes yet"
-              text="Classes created by educators appear here."
+              title={t("admin.overview.noClasses")}
+              text={t("admin.overview.noClassesText")}
             />
           ) : (
             <div className="px-6 divide-y divide-kz-line">
@@ -267,8 +279,8 @@ export default function Page() {
                   key={k.id}
                   index={i}
                   title={k.name}
-                  subtitle={`${namaProfil(k.owner_id)} · ${ahliKelas[k.id] ?? 0} members`}
-                  value={relTime(k.created_at)}
+                  subtitle={`${namaProfil(k.owner_id)} · ${t("admin.overview.membersCount", { n: ahliKelas[k.id] ?? 0 })}`}
+                  value={relTime(k.created_at, undefined, bahasa)}
                   href={`/admin/classes/${k.id}`}
                 />
               ))}
@@ -279,13 +291,13 @@ export default function Page() {
         {/* Aktiviti admin terbaru */}
         <Card padat>
           <div className="px-6 py-4 border-b border-kz-line">
-            <CardHead title="Recent admin activity" right={<CardLink href="/admin/audit">View all</CardLink>} />
+            <CardHead title={t("admin.overview.recentActivity")} right={<CardLink href="/admin/audit">{t("admin.overview.viewAll")}</CardLink>} />
           </div>
           {audit.length === 0 ? (
             <EmptyState
               icon={<ScrollText className="w-6 h-6" />}
-              title="No admin activity yet"
-              text="Actions taken by admins appear here."
+              title={t("admin.overview.noActivity")}
+              text={t("admin.overview.noActivityText")}
             />
           ) : (
             <div className="px-6 divide-y divide-kz-line">
@@ -294,8 +306,8 @@ export default function Page() {
                   key={r.id}
                   index={i}
                   name={namaProfil(r.actor_id)}
-                  subtitle={labelTindakan(r.action).label}
-                  value={relTime(r.created_at)}
+                  subtitle={labelTindakan(r.action, bahasa).label}
+                  value={relTime(r.created_at, undefined, bahasa)}
                 />
               ))}
             </div>
