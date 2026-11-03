@@ -150,20 +150,20 @@ export default function MyCertificateTemplatesPage() {
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        title="My certificate templates"
-        description="Reuse your own designs in every class you teach."
+        title={t("certificates.list.title")}
+        description={t("certificates.list.description")}
       />
 
       {msg && <div className="mb-4 rounded-[4px] border border-violet-200 bg-violet-50 p-4 text-sm text-ink-muted">{msg}</div>}
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading...</p>
+        <p className="text-sm text-ink-muted">{t("common.loadingDots")}</p>
       ) : mine.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Award className="w-6 h-6" />}
-            title="No templates yet."
-            text="Open a class, create a certificate template and use the Save to My templates action."
+            title={t("certificates.list.emptyTitle")}
+            text={t("certificates.list.emptyText")}
           />
         </Card>
       ) : (
@@ -180,7 +180,7 @@ export default function MyCertificateTemplatesPage() {
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-xs text-ink-faint">
-                    Text only
+                    {t("certificates.list.textOnly")}
                   </div>
                 )}
               </div>
@@ -193,7 +193,7 @@ export default function MyCertificateTemplatesPage() {
                       maxLength={120}
                     />
                     <Button size="sm" disabled={busy || !namaBaru.tajuk.trim()} onClick={() => simpanNama(item.id)}>
-                      <Check className="w-4 h-4" /> Save
+                      <Check className="w-4 h-4" /> {t("certificates.list.save")}
                     </Button>
                   </div>
                 ) : (
@@ -202,7 +202,7 @@ export default function MyCertificateTemplatesPage() {
                   </div>
                 )}
                 <div className="text-xs text-ink-faint">
-                  {item.text_tone === "light" ? "Light text" : "Dark text"}
+                  {item.text_tone === "light" ? t("certificates.list.lightText") : t("certificates.list.darkText")}
                 </div>
                 <div className="mt-auto flex items-center gap-2 flex-wrap pt-2">
                   {gunaBuka === item.id ? (
@@ -214,7 +214,7 @@ export default function MyCertificateTemplatesPage() {
                         if (e.target.value) gunaDalamKelas(item, e.target.value);
                       }}
                     >
-                      <option value="">Choose a class...</option>
+                      <option value="">{t("certificates.list.chooseClass")}</option>
                       {kelas.map((k) => (
                         <option key={k.id} value={k.id}>
                           {k.name}
@@ -223,14 +223,14 @@ export default function MyCertificateTemplatesPage() {
                     </select>
                   ) : (
                     <Button size="sm" disabled={busy || kelas.length === 0} onClick={() => setGunaBuka(gunaBuka === item.id ? null : item.id)}>
-                      Use in class
+                      {t("certificates.list.useInClass")}
                     </Button>
                   )}
                   <Button variant="outline" size="sm" disabled={busy} onClick={() => setNamaBaru({ id: item.id, tajuk: item.title })}>
-                    Rename
+                    {t("certificates.list.rename")}
                   </Button>
-                  <Button variant="outline" size="sm" disabled={busy} ariaLabel="Delete this template from My templates" onClick={() => padam(item)}>
-                    <Trash2 className="w-4 h-4" /> Delete
+                  <Button variant="outline" size="sm" disabled={busy} ariaLabel={t("certificates.list.deleteAria")} onClick={() => padam(item)}>
+                    <Trash2 className="w-4 h-4" /> {t("certificates.list.deleteLabel")}
                   </Button>
                 </div>
               </CardSection>
@@ -240,10 +240,9 @@ export default function MyCertificateTemplatesPage() {
       )}
 
       <p className="mt-6 text-sm text-ink-muted">
-        Need a shared design for all educators? Ask your administrator to publish it in
-        the Kuizen gallery from{" "}
+        {t("certificates.list.galleryPrefix")}
         <Link href="/educator/classes" className="text-brand-purple hover:underline">
-          your classes
+          {t("certificates.list.yourClasses")}
         </Link>
         .
       </p>
