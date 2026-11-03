@@ -11,38 +11,7 @@ import { useEffect, useRef, useState } from "react";
 import { Download, X } from "lucide-react";
 import { supabase } from "@/lib/supabaseClient";
 import { BAHAGIAN_INSIGHTS, type BahagianInsights } from "@/lib/insightsKelas";
-
-/** Label UI dan penerangan satu baris bagi setiap bahagian eksport. */
-const PENERANGAN: Record<BahagianInsights, { label: string; huraian: string }> = {
-  students: {
-    label: "Learners (full)",
-    huraian: "Every learner with scores, accuracy, activity counts and flags.",
-  },
-  attention: {
-    label: "Needs attention",
-    huraian: "Only learners who currently need your attention.",
-  },
-  questions: {
-    label: "Hardest questions",
-    huraian: "Live Quiz questions learners get wrong the most.",
-  },
-  challenges: {
-    label: "Hardest challenges",
-    huraian: "Activity challenges with the most rejections.",
-  },
-  teams: {
-    label: "Teams",
-    huraian: "Team totals, averages and balance.",
-  },
-  trend: {
-    label: "Progress by session",
-    huraian: "One row per learner per ended Live Quiz session.",
-  },
-  lna: {
-    label: "Learning Needs Analysis",
-    huraian: "One row per learner per outcome per LNA round, with mastery and confidence flags.",
-  },
-};
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 export default function DialogEksport({
   classId,
@@ -51,6 +20,39 @@ export default function DialogEksport({
   classId: string;
   tutup: () => void;
 }) {
+  const { t } = useBahasa();
+
+  /** Label UI dan penerangan satu baris bagi setiap bahagian eksport. */
+  const PENERANGAN: Record<BahagianInsights, { label: string; huraian: string }> = {
+    students: {
+      label: t("insights.export.studentsLabel"),
+      huraian: t("insights.export.studentsDesc"),
+    },
+    attention: {
+      label: t("insights.export.attentionLabel"),
+      huraian: t("insights.export.attentionDesc"),
+    },
+    questions: {
+      label: t("insights.export.questionsLabel"),
+      huraian: t("insights.export.questionsDesc"),
+    },
+    challenges: {
+      label: t("insights.export.challengesLabel"),
+      huraian: t("insights.export.challengesDesc"),
+    },
+    teams: {
+      label: t("insights.export.teamsLabel"),
+      huraian: t("insights.export.teamsDesc"),
+    },
+    trend: {
+      label: t("insights.export.trendLabel"),
+      huraian: t("insights.export.trendDesc"),
+    },
+    lna: {
+      label: t("insights.export.lnaLabel"),
+      huraian: t("insights.export.lnaDesc"),
+    },
+  };
   const [pilihan, setPilihan] = useState<Set<BahagianInsights>>(new Set());
   const [sibuk, setSibuk] = useState(false);
   const [ralat, setRalat] = useState<string | null>(null);
@@ -119,7 +121,7 @@ export default function DialogEksport({
         },
       );
       if (!res.ok) {
-        let msg = "Export failed.";
+        let msg = t("insights.export.exportFailed");
         try {
           const j = await res.json();
           if (j?.error) msg = j.error;
@@ -143,7 +145,7 @@ export default function DialogEksport({
       URL.revokeObjectURL(url);
       tutup();
     } catch {
-      setRalat("Export failed.");
+      setRalat(t("insights.export.exportFailed"));
     } finally {
       setSibuk(false);
     }
@@ -157,23 +159,23 @@ export default function DialogEksport({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label="Export insights"
+        aria-label={t("insights.export.title")}
         className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-full sm:w-[520px] max-h-full sm:max-h-[85vh] overflow-y-auto bg-white border border-hairline rounded-2xl shadow-raised p-6"
       >
         <div className="flex items-start justify-between gap-3 mb-1">
-          <h2 className="text-lg font-semibold text-ink">Export insights</h2>
+          <h2 className="text-lg font-semibold text-ink">{t("insights.export.title")}</h2>
           <button
             ref={butangTutupRef}
             type="button"
             onClick={tutup}
-            aria-label="Close"
+            aria-label={t("common.close")}
             className="w-9 h-9 rounded-xl border border-hairline flex items-center justify-center text-ink-muted hover:text-ink shrink-0"
           >
             <X className="w-4 h-4" />
           </button>
         </div>
         <p className="text-sm text-ink-muted mb-4">
-          Pick the sections you want in the CSV.
+          {t("insights.export.pickSections")}
         </p>
 
         <div className="space-y-1.5">
@@ -184,7 +186,7 @@ export default function DialogEksport({
               onChange={toggleSemua}
               className="accent-[#5B42C4]"
             />
-            <span className="text-sm font-semibold text-ink">Everything</span>
+            <span className="text-sm font-semibold text-ink">{t("insights.export.everything")}</span>
           </label>
           {BAHAGIAN_INSIGHTS.map((b) => (
             <label
@@ -208,14 +210,14 @@ export default function DialogEksport({
         </div>
 
         <p className="text-xs text-ink-faint mt-4">
-          Multiple sections download as one CSV with a heading for each section.
+          {t("insights.export.multiNote")}
         </p>
 
         {ralat && <div className="text-sm text-red-600 mt-3">{ralat}</div>}
 
         <div className="flex items-center justify-end gap-3 mt-5">
           <button type="button" className="btn-quiet" onClick={tutup}>
-            Cancel
+            {t("common.cancel")}
           </button>
           <button
             type="button"
@@ -224,7 +226,7 @@ export default function DialogEksport({
             disabled={sibuk || pilihan.size === 0}
           >
             <Download className="w-4 h-4" />
-            {sibuk ? "Exporting…" : "Download CSV"}
+            {sibuk ? t("insights.export.exporting") : t("insights.export.downloadCsv")}
           </button>
         </div>
       </div>

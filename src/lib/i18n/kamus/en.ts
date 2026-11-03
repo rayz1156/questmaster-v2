@@ -24,6 +24,7 @@ export const en = {
     backToActivities: 'Back to Activities',
     backToSignIn: 'Back to sign in',
     cancel: 'Cancel',
+    close: 'Close',
     confirm: 'Confirm',
     signOut: 'Sign out',
     signIn: 'Sign in',

@@ -22,6 +22,7 @@ export const ms: Kamus = {
     backToActivities: 'Kembali ke Aktiviti',
     backToSignIn: 'Kembali ke log masuk',
     cancel: 'Batal',
+    close: 'Tutup',
     confirm: 'Sahkan',
     signOut: 'Log keluar',
     signIn: 'Log masuk',
