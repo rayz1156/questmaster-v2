@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { buildAdiloEmbedUrl, getAdiloFile } from '@/lib/adilo';
 import { buildSignedBunnyEmbedUrl } from '@/lib/bunny';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -15,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: { params: { boardId: st
   const auth = await requireUser(_req);
   if (auth.response) return auth.response;
   if (!/^[A-Za-z0-9_-]{5,64}$/.test(params.fileId)) {
-    return NextResponse.json({ error: 'Bad id' }, { status: 400 });
+    return ralatJson('Bad id', 400);
   }
   const admin = getServiceSupabase();
 
@@ -25,16 +26,16 @@ export async function GET(_req: NextRequest, { params }: { params: { boardId: st
     .eq('board_id', params.boardId)
     .or(`video_provider_id.eq.${params.fileId},video_adilo_file_id.eq.${params.fileId}`)
     .maybeSingle();
-  if (!post) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+  if (!post) return ralatJson('Not found', 404);
   const classId = (post as any)?.qm_boards?.class_id || (post as any)?.qm_boards?.[0]?.class_id;
-  if (!classId) return NextResponse.json({ error: 'Board has no class' }, { status: 400 });
+  if (!classId) return ralatJson('Board has no class', 400);
 
   const { data: klass } = await admin.from('qm_classes').select('id, owner_id').eq('id', classId).single();
-  if (!klass) return NextResponse.json({ error: 'Class not found' }, { status: 404 });
+  if (!klass) return ralatJson('Class not found', 404);
   if (klass.owner_id !== auth.user!.id) {
     const { data: member } = await admin.from('qm_class_members').select('user_id')
       .eq('class_id', classId).eq('user_id', auth.user!.id).maybeSingle();
-    if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!member) return ralatJson('Forbidden', 403);
   }
 
   const provider: string = (post as any).video_provider

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { parseYouTubeId, youtubeThumbnail } from '@/lib/video-embed';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -21,22 +22,22 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   const provider = body?.provider === 'youtube' ? 'youtube' : 'bunny';
   const { displayName, description } = body || {};
   if (!displayName || typeof displayName !== 'string' || !displayName.trim()) {
-    return NextResponse.json({ error: 'displayName required' }, { status: 400 });
+    return ralatJson('displayName required', 400);
   }
 
   // Verify board + class membership
   const { data: board } = await admin
     .from('qm_boards').select('id, class_id').eq('id', params.boardId).single();
-  if (!board) return NextResponse.json({ error: 'Board not found' }, { status: 404 });
+  if (!board) return ralatJson('Board not found', 404);
   const { data: klass } = await admin
     .from('qm_classes').select('id, owner_id').eq('id', board.class_id).single();
-  if (!klass) return NextResponse.json({ error: 'Class not found' }, { status: 404 });
+  if (!klass) return ralatJson('Class not found', 404);
   const isOwner = klass.owner_id === auth.user!.id;
   if (!isOwner) {
     const { data: member } = await admin
       .from('qm_class_members').select('user_id')
       .eq('class_id', board.class_id).eq('user_id', auth.user!.id).maybeSingle();
-    if (!member) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    if (!member) return ralatJson('Forbidden', 403);
   }
 
   let providerId: string;
@@ -45,14 +46,11 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   if (provider !== 'youtube') {
     // KZ-039: muat naik terus (bunny) dibuang. Hanya pautan YouTube diterima,
     // dan ia boleh digunakan oleh ahli kelas biasa, bukan pemilik sahaja.
-    return NextResponse.json(
-      { error: 'Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.' },
-      { status: 410 },
-    );
+    return ralatJson('Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.', 410);
   }
 
   const ytId = parseYouTubeId(String(body?.youtubeUrl || ''));
-  if (!ytId) return NextResponse.json({ error: 'Please provide a valid YouTube link' }, { status: 400 });
+  if (!ytId) return ralatJson('Please provide a valid YouTube link', 400);
   providerId = ytId;
   thumbnailUrl = youtubeThumbnail(ytId);
 
@@ -78,6 +76,6 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
     .upsert(row, { onConflict: 'board_id,author_id' })
     .select('*')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 });
+  if (error) return ralatJson(error.message, 500);
   return NextResponse.json({ post: data });
 }
