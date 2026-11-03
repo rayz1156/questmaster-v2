@@ -25,6 +25,7 @@ import {
   Select,
   type DataColumn,
 } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 type Outcome = { id: string; class_id: string; code: string | null; label: string; description: string | null };
 type Hunt = { id: string; title: string };
@@ -41,6 +42,7 @@ async function authedFetch(input: string, init: RequestInit = {}) {
 
 function OutcomesPageInner() {
   const sp = useSearchParams();
+  const { t } = useBahasa();
   const initialClassId = sp.get("class_id");
   const [classes, setClasses] = useState<Klass[]>([]);
   const confirm = useConfirm();
@@ -96,8 +98,8 @@ function OutcomesPageInner() {
       ]);
       const outcomesJ = await outcomesRes.json();
       const challengesJ = await challengesRes.json();
-      if (!outcomesRes.ok) throw new Error(outcomesJ.error || "Failed to load outcomes");
-      if (!challengesRes.ok) throw new Error(challengesJ.error || "Failed to load challenges");
+      if (!outcomesRes.ok) throw new Error(outcomesJ.error || t('educator.outcomes.loadFailed'));
+      if (!challengesRes.ok) throw new Error(challengesJ.error || t('educator.outcomes.loadChallengesFailed'));
       setOutcomes(outcomesJ.data ?? []);
       setHunts(challengesJ.data?.hunts ?? []);
       setChallenges(challengesJ.data?.challenges ?? []);
@@ -112,7 +114,7 @@ function OutcomesPageInner() {
       }));
       setTagsByOutcome(tagMap);
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : "Failed");
+      setError(e instanceof Error ? e.message : t('educator.outcomes.loadError'));
     } finally {
       setLoading(false);
     }
@@ -137,7 +139,7 @@ function OutcomesPageInner() {
       body: JSON.stringify({ class_id: classId, code: newCode.trim() || null, label: newLabel.trim(), description: newDescription.trim() || null }),
     });
     const j = await r.json();
-    if (!r.ok) { setError(j.error || "Create failed"); return; }
+    if (!r.ok) { setError(j.error || t('educator.outcomes.createFailed')); return; }
     setNewCode(""); setNewLabel(""); setNewDescription("");
     void loadData();
   }
@@ -148,28 +150,28 @@ function OutcomesPageInner() {
       body: JSON.stringify({ code: editForm.code || null, label: editForm.label, description: editForm.description || null }),
     });
     const j = await r.json();
-    if (!r.ok) { setError(j.error || "Save failed"); return; }
+    if (!r.ok) { setError(j.error || t('educator.outcomes.saveFailed')); return; }
     setEditing(null);
     void loadData();
   }
 
   async function deleteOutcome(id: string) {
-    if (!(await confirm({ title: "Delete this outcome and all its tags?", tone: 'danger' }))) return;
+    if (!(await confirm({ title: t('educator.outcomes.deleteConfirm'), tone: 'danger' }))) return;
     const r = await authedFetch(`/api/outcomes/${id}`, { method: "DELETE" });
-    if (!r.ok) { const j = await r.json(); setError(j.error || "Delete failed"); return; }
+    if (!r.ok) { const j = await r.json(); setError(j.error || t('educator.outcomes.deleteFailed')); return; }
     void loadData();
   }
 
   async function toggleTag(outcomeId: string, challengeId: string, currentlyTagged: boolean) {
     if (currentlyTagged) {
       const r = await authedFetch(`/api/outcomes/${outcomeId}/tags?challenge_id=${encodeURIComponent(challengeId)}`, { method: "DELETE" });
-      if (!r.ok) { const j = await r.json(); setError(j.error || "Untag failed"); return; }
+      if (!r.ok) { const j = await r.json(); setError(j.error || t('educator.outcomes.untagFailed')); return; }
     } else {
       const r = await authedFetch(`/api/outcomes/${outcomeId}/tags`, {
         method: "POST",
         body: JSON.stringify({ challenge_id: challengeId }),
       });
-      if (!r.ok) { const j = await r.json(); setError(j.error || "Tag failed"); return; }
+      if (!r.ok) { const j = await r.json(); setError(j.error || t('educator.outcomes.tagFailed')); return; }
     }
     setTagsByOutcome((prev) => {
       const next = { ...prev };
@@ -183,7 +185,7 @@ function OutcomesPageInner() {
   const lajur: DataColumn<Outcome>[] = [
     {
       key: "outcome",
-      header: "Outcome",
+      header: t('educator.outcomes.colOutcome'),
       render: (o) => (
         <span className="block min-w-0 py-2">
           <span className="flex items-baseline gap-1.5">
@@ -196,7 +198,7 @@ function OutcomesPageInner() {
     },
     {
       key: "tagged",
-      header: "Tagged challenges",
+      header: t('educator.outcomes.colTagged'),
       render: (o) => {
         const n = tagsByOutcome[o.id]?.size ?? 0;
         return <span className="text-[13px] text-ink-faint tabular-nums">{n}</span>;
@@ -207,18 +209,18 @@ function OutcomesPageInner() {
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        title="Learning outcomes"
-        description="Define what you want students to learn, then tag the challenges that address each outcome. Mastery is computed from approved/rejected submissions on those tagged challenges."
+        title={t('educator.outcomes.title')}
+        description={t('educator.outcomes.desc')}
       />
 
       <div className="flex items-center gap-2 mb-4">
         <Select
           value={classId ?? ""}
           onChange={(e) => setClassId(e.target.value || null)}
-          aria-label="Select class"
+          aria-label={t('educator.outcomes.selectClassAria')}
           className="w-auto"
         >
-          <option value="">Select a class…</option>
+          <option value="">{t('educator.outcomes.selectClass')}</option>
           {classes.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
         </Select>
       </div>
@@ -227,20 +229,20 @@ function OutcomesPageInner() {
 
       {classId && (
         <Card className="mb-4">
-          <CardHead title="Add a new outcome" subtitle="Code is optional; the label is required." />
+          <CardHead title={t('educator.outcomes.addTitle')} subtitle={t('educator.outcomes.addSubtitle')} />
           <div className="grid grid-cols-1 md:grid-cols-12 gap-3 mt-4">
-            <Field label="Code" htmlFor="outcome-kode">
-              <Input id="outcome-kode" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder="e.g. LO1" />
+            <Field label={t('educator.outcomes.codeLabel')} htmlFor="outcome-kode">
+              <Input id="outcome-kode" value={newCode} onChange={(e) => setNewCode(e.target.value)} placeholder={t('educator.outcomes.codePlaceholder')} />
             </Field>
-            <Field label="Label" htmlFor="outcome-label" className="md:col-span-4">
-              <Input id="outcome-label" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder="Label (required)" />
+            <Field label={t('educator.outcomes.labelLabel')} htmlFor="outcome-label" className="md:col-span-4">
+              <Input id="outcome-label" value={newLabel} onChange={(e) => setNewLabel(e.target.value)} placeholder={t('educator.outcomes.labelPlaceholder')} />
             </Field>
-            <Field label="Description" htmlFor="outcome-desc" className="md:col-span-5">
-              <Input id="outcome-desc" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder="Description (optional)" />
+            <Field label={t('educator.outcomes.descLabel')} htmlFor="outcome-desc" className="md:col-span-5">
+              <Input id="outcome-desc" value={newDescription} onChange={(e) => setNewDescription(e.target.value)} placeholder={t('educator.outcomes.descPlaceholder')} />
             </Field>
             <div className="md:col-span-2 flex items-end">
               <Button onClick={createOutcome} disabled={!newLabel.trim()} className="w-full">
-                <Plus className="w-4 h-4" /> Add
+                <Plus className="w-4 h-4" /> {t('educator.outcomes.add')}
               </Button>
             </div>
           </div>
@@ -249,13 +251,13 @@ function OutcomesPageInner() {
 
       {classId && (
         <DataTable
-          label={`Learning outcomes (${outcomes.length})${loading ? " · loading…" : ""}`}
+          label={loading ? t('educator.outcomes.tableLabelLoading', { n: outcomes.length }) : t('educator.outcomes.tableLabel', { n: outcomes.length })}
           columns={lajur}
           rows={outcomes}
           rowKey={(o) => o.id}
           menuItems={(o) => [
             {
-              label: editing === o.id ? "Close editor" : "Edit",
+              label: editing === o.id ? t('educator.outcomes.menuCloseEditor') : t('educator.outcomes.menuEdit'),
               icon: <Pencil className="w-4 h-4" />,
               onSelect: () => {
                 if (editing === o.id) { setEditing(null); return; }
@@ -264,18 +266,18 @@ function OutcomesPageInner() {
               },
             },
             {
-              label: tagOpen === o.id ? "Close tagging" : "Tag challenges",
+              label: tagOpen === o.id ? t('educator.outcomes.menuCloseTagging') : t('educator.outcomes.menuTag'),
               icon: <Tag className="w-4 h-4" />,
               onSelect: () => setTagOpen(tagOpen === o.id ? null : o.id),
             },
             {
-              label: "Delete",
+              label: t('educator.outcomes.menuDelete'),
               icon: <Trash2 className="w-4 h-4" />,
               danger: true,
               onSelect: () => deleteOutcome(o.id),
             },
           ]}
-          menuLabel="Outcome actions"
+          menuLabel={t('educator.outcomes.menuLabel')}
           renderRowExtra={(o) => {
             const isEditing = editing === o.id;
             const isTagging = tagOpen === o.id;
@@ -287,35 +289,35 @@ function OutcomesPageInner() {
                   <div>
                     <div className="grid grid-cols-1 md:grid-cols-12 gap-3">
                       <div className="md:col-span-2">
-                        <Field label="Code" htmlFor={`sunting-kode-${o.id}`}>
-                          <Input id={`sunting-kode-${o.id}`} value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} placeholder="Code" />
+                        <Field label={t('educator.outcomes.codeLabel')} htmlFor={`sunting-kode-${o.id}`}>
+                          <Input id={`sunting-kode-${o.id}`} value={editForm.code} onChange={(e) => setEditForm({ ...editForm, code: e.target.value })} placeholder={t('educator.outcomes.codeLabel')} />
                         </Field>
                       </div>
                       <div className="md:col-span-4">
-                        <Field label="Label" htmlFor={`sunting-label-${o.id}`}>
-                          <Input id={`sunting-label-${o.id}`} value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} placeholder="Label" />
+                        <Field label={t('educator.outcomes.labelLabel')} htmlFor={`sunting-label-${o.id}`}>
+                          <Input id={`sunting-label-${o.id}`} value={editForm.label} onChange={(e) => setEditForm({ ...editForm, label: e.target.value })} placeholder={t('educator.outcomes.labelLabel')} />
                         </Field>
                       </div>
                       <div className="md:col-span-6">
-                        <Field label="Description" htmlFor={`sunting-desc-${o.id}`}>
-                          <Input id={`sunting-desc-${o.id}`} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder="Description" />
+                        <Field label={t('educator.outcomes.descLabel')} htmlFor={`sunting-desc-${o.id}`}>
+                          <Input id={`sunting-desc-${o.id}`} value={editForm.description} onChange={(e) => setEditForm({ ...editForm, description: e.target.value })} placeholder={t('educator.outcomes.descLabel')} />
                         </Field>
                       </div>
                     </div>
                     <div className="flex items-center gap-2 mt-3">
                       <Button onClick={() => saveEdit(o.id)}>
-                        <Save className="w-4 h-4" /> Save
+                        <Save className="w-4 h-4" /> {t('educator.outcomes.save')}
                       </Button>
                       <Button variant="outline" onClick={() => setEditing(null)}>
-                        <X className="w-4 h-4" /> Cancel
+                        <X className="w-4 h-4" /> {t('common.cancel')}
                       </Button>
                     </div>
                   </div>
                 )}
                 {isTagging && (
                   <div className="rounded-[4px] border border-hairline p-3 bg-canvas">
-                    <div className="text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint mb-2">Tag challenges</div>
-                    {hunts.length === 0 && <div className="text-xs text-ink-faint">No hunts in this class yet.</div>}
+                    <div className="text-[11px] font-bold uppercase tracking-[2.2px] text-ink-faint mb-2">{t('educator.outcomes.tagTitle')}</div>
+                    {hunts.length === 0 && <div className="text-xs text-ink-faint">{t('educator.outcomes.noHunts')}</div>}
                     {hunts.map((h) => {
                       const list = challengesByHunt.get(h.id) ?? [];
                       if (list.length === 0) return null;
@@ -325,7 +327,7 @@ function OutcomesPageInner() {
                           <div className="flex flex-wrap gap-1">
                             {list.map((c) => {
                               const tagged = tagSet.has(c.id);
-                              const preview = (c.prompt || "Challenge").slice(0, 60);
+                              const preview = (c.prompt || t('educator.outcomes.challenge')).slice(0, 60);
                               return (
                                 <button
                                   key={c.id}
@@ -356,8 +358,8 @@ function OutcomesPageInner() {
           empty={
             <EmptyState
               icon={<Tag className="w-6 h-6" />}
-              title="No outcomes yet."
-              text="Add one above to start tagging challenges."
+              title={t('educator.outcomes.emptyTitle')}
+              text={t('educator.outcomes.emptyText')}
             />
           }
         />
@@ -367,8 +369,9 @@ function OutcomesPageInner() {
 }
 
 export default function Page() {
+  const { t } = useBahasa();
   return (
-    <Suspense fallback={<div className="p-6 text-sm text-ink-muted">Loading…</div>}>
+    <Suspense fallback={<div className="p-6 text-sm text-ink-muted">{t('common.loading')}</div>}>
       <OutcomesPageInner />
     </Suspense>
   );
