@@ -861,8 +861,8 @@ export default function Page({ params }: { params: { id: string } }) {
             ) : markahIndividu.length === 0 ? (
               <EmptyState
                 icon={<UsersIcon className="w-6 h-6" />}
-                title="No students ranked yet."
-                text="Scores appear here once students join activities."
+                title={t("admin.classDetail.noStudentsRanked")}
+                text={t("admin.classDetail.noStudentsRankedText")}
               />
             ) : (
               markahIndividu.map((r, i) => (
@@ -878,12 +878,16 @@ export default function Page({ params }: { params: { id: string } }) {
                       href={`/admin/users/${r.user_id}`}
                       className="text-[14px] font-bold text-ink hover:text-brand-purple transition truncate"
                     >
-                      {r.display_name || namaById[r.user_id] || "Unnamed user"}
+                      {r.display_name || namaById[r.user_id] || t("admin.unnamedUser")}
                     </Link>
                     {/* V2-012: pecahan markah individu daripada view
                         qm_class_individual_scores (migrasi 0049). */}
                     <span className="block text-[12px] text-ink-faint truncate">
-                      Activities {r.task_score ?? 0} · Live Quiz {r.live_score ?? 0} · Adjustments {r.adjustment_score ?? 0}
+                      {t("admin.classDetail.breakdown", {
+                        aktiviti: r.task_score ?? 0,
+                        kuiz: r.live_score ?? 0,
+                        penyesuaian: r.adjustment_score ?? 0,
+                      })}
                     </span>
                   </span>
                   <span className="text-[14px] font-semibold text-brand-purple shrink-0">{Number(r.total_score) || 0}</span>
@@ -892,7 +896,7 @@ export default function Page({ params }: { params: { id: string } }) {
             )}
           </Card>
           <p className="text-[12px] text-ink-faint mt-3">
-            Team scores come from the live scoring engine. Individual totals combine activities, live quizzes and adjustments.
+            {t("admin.classDetail.rankingNote")}
           </p>
         </div>
       )}
@@ -901,27 +905,27 @@ export default function Page({ params }: { params: { id: string } }) {
       <Modal
         open={edit !== null}
         onClose={() => setEdit(null)}
-        title="Edit class"
+        title={t("admin.classDetail.editTitle")}
         footer={
           <>
             <Button variant="outline" onClick={() => setEdit(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={simpanEdit} disabled={!edit || edit.name.trim().length === 0}>
-              Save changes
+              {t("admin.classDetail.saveChanges")}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
-          <Field label="Name" htmlFor="edit-nama-kelas">
+          <Field label={t("admin.classDetail.nameField")} htmlFor="edit-nama-kelas">
             <Input
               id="edit-nama-kelas"
               value={edit?.name ?? ""}
               onChange={(e) => setEdit(edit ? { ...edit, name: e.target.value } : null)}
             />
           </Field>
-          <Field label="Join code" htmlFor="edit-kod-kelas">
+          <Field label={t("admin.classDetail.joinCodeField")} htmlFor="edit-kod-kelas">
             <Input
               id="edit-kod-kelas"
               className="font-mono"
@@ -929,7 +933,7 @@ export default function Page({ params }: { params: { id: string } }) {
               onChange={(e) => setEdit(edit ? { ...edit, join_code: e.target.value } : null)}
             />
           </Field>
-          <p className="text-[12px] text-ink-faint">Class changes are recorded in Audit.</p>
+          <p className="text-[12px] text-ink-faint">{t("admin.classDetail.classAuditNote")}</p>
         </div>
       </Modal>
 
@@ -937,27 +941,27 @@ export default function Page({ params }: { params: { id: string } }) {
       <Modal
         open={editPasukan !== null}
         onClose={() => setEditPasukan(null)}
-        title="Rename team"
+        title={t("admin.classDetail.renameTeamTitle")}
         footer={
           <>
             <Button variant="outline" onClick={() => setEditPasukan(null)}>
-              Cancel
+              {t("common.cancel")}
             </Button>
             <Button onClick={simpanNamaPasukan} disabled={!editPasukan || editPasukan.nama.trim().length === 0}>
-              Save changes
+              {t("admin.classDetail.saveChanges")}
             </Button>
           </>
         }
       >
         <div className="space-y-4">
-          <Field label="New team name" htmlFor="edit-nama-pasukan">
+          <Field label={t("admin.classDetail.newTeamName")} htmlFor="edit-nama-pasukan">
             <Input
               id="edit-nama-pasukan"
               value={editPasukan?.nama ?? ""}
               onChange={(e) => setEditPasukan(editPasukan ? { ...editPasukan, nama: e.target.value } : null)}
             />
           </Field>
-          <p className="text-[12px] text-ink-faint">Team changes are recorded in Audit.</p>
+          <p className="text-[12px] text-ink-faint">{t("admin.classDetail.teamAuditNote")}</p>
         </div>
       </Modal>
     </AdminShell>
