@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import { X } from "lucide-react";
 import { formatMata } from "@/lib/markahPeserta";
 import { supabase } from "@/lib/supabase";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, type Bahasa } from "@/lib/i18n";
 
 /** Markah peserta daripada GET /api/classes/[id]/members/[userId]/scores. */
 type MarkahPeserta = {
@@ -15,11 +17,11 @@ type MarkahPeserta = {
 };
 
 /** Tarikh pendek untuk senarai dalam laci; kosong jika tidak sah. */
-function tarikhPendek(iso: string | null | undefined): string {
+function tarikhPendek(iso: string | null | undefined, bahasa: Bahasa): string {
   if (!iso) return "";
   const d = new Date(iso);
   if (isNaN(d.getTime())) return "";
-  return d.toLocaleDateString(undefined, { day: "numeric", month: "short", year: "numeric" });
+  return d.toLocaleDateString(LOKAL[bahasa], { day: "numeric", month: "short", year: "numeric" });
 }
 
 /** Kad pecahan markah kecil (Activities, Live Quiz, Adjustments). */
@@ -57,6 +59,7 @@ export default function LaciMarkahPeserta({
   const [muat, setMuat] = useState(true);
   const panelRef = useRef<HTMLDivElement>(null);
   const butangTutupRef = useRef<HTMLButtonElement>(null);
+  const { t, bahasa } = useBahasa();
 
   // Muat data markah setiap kali laci dibuka untuk peserta baharu.
   useEffect(() => {
@@ -73,12 +76,12 @@ export default function LaciMarkahPeserta({
         });
         const j = await res.json().catch(() => null);
         if (!res.ok) {
-          if (alive) setRalat(j?.error || "Could not load scores.");
+          if (alive) setRalat(j?.error || t('educator.people.laciLoadFailed'));
           return;
         }
         if (alive) setData(j as MarkahPeserta);
       } catch {
-        if (alive) setRalat("Could not load scores.");
+        if (alive) setRalat(t('educator.people.laciLoadFailed'));
       } finally {
         if (alive) setMuat(false);
       }
@@ -128,7 +131,7 @@ export default function LaciMarkahPeserta({
         ref={panelRef}
         role="dialog"
         aria-modal="true"
-        aria-label={`${nama} scores`}
+        aria-label={t('educator.people.laciAria', { nama })}
         className="absolute right-0 top-0 h-full w-full sm:w-[420px] bg-white border-l border-hairline shadow-raised flex flex-col"
       >
         <div className="flex items-start justify-between gap-3 px-5 py-4 border-b border-hairline">
@@ -136,7 +139,7 @@ export default function LaciMarkahPeserta({
             <div className="text-[17px] font-semibold text-ink truncate">{nama}</div>
             {data && (
               <div className="text-sm text-ink-muted mt-0.5">
-                Rank {data.totals.rank} of {jumlahAhli}
+                {t('educator.people.laciRankOf', { pangkat: data.totals.rank, jumlah: jumlahAhli })}
               </div>
             )}
           </div>
@@ -144,7 +147,7 @@ export default function LaciMarkahPeserta({
             ref={butangTutupRef}
             type="button"
             onClick={tutup}
-            aria-label="Close"
+            aria-label={t('educator.classDetail.close')}
             className="w-9 h-9 rounded-xl border border-hairline flex items-center justify-center text-ink-muted hover:text-ink shrink-0"
           >
             <X className="w-4 h-4" />
@@ -165,22 +168,22 @@ export default function LaciMarkahPeserta({
           {!muat && data && (
             <>
               <div>
-                <div className="text-xs text-ink-faint">Total</div>
+                <div className="text-xs text-ink-faint">{t('educator.people.colTotal')}</div>
                 <div className="text-3xl font-semibold text-brand-purple tabular-nums mt-1">
                   {formatMata(jumlah)}
                 </div>
               </div>
 
               <div className="grid grid-cols-3 gap-2">
-                <KadPecahan label="Activities" nilai={formatMata(data.totals.task)} />
-                <KadPecahan label="Live Quiz" nilai={formatMata(data.totals.live)} />
-                <KadPecahan label="Adjustments" nilai={formatMata(data.totals.adjustment)} />
+                <KadPecahan label={t('educator.people.colActivities')} nilai={formatMata(data.totals.task)} />
+                <KadPecahan label={t('educator.people.colLiveQuiz')} nilai={formatMata(data.totals.live)} />
+                <KadPecahan label={t('educator.people.laciAdjustments')} nilai={formatMata(data.totals.adjustment)} />
               </div>
 
               <div>
-                <div className="section-title text-sm mb-2">Activities</div>
+                <div className="section-title text-sm mb-2">{t('educator.people.colActivities')}</div>
                 {data.activities.length === 0 ? (
-                  <p className="text-sm text-ink-muted">No activities yet.</p>
+                  <p className="text-sm text-ink-muted">{t('educator.people.laciNoActivities')}</p>
                 ) : (
                   <ul className="divide-y divide-hairline border border-hairline rounded-xl">
                     {data.activities.map((a) => (
@@ -188,7 +191,7 @@ export default function LaciMarkahPeserta({
                         <div className="min-w-0">
                           <div className="text-sm text-ink truncate">{a.title}</div>
                           <div className="text-xs text-ink-faint mt-0.5">
-                            {a.approvedCount} approved, {a.pendingCount} pending
+                            {t('educator.people.laciApprovedPending', { lulus: a.approvedCount, tunggu: a.pendingCount })}
                           </div>
                         </div>
                         <div className="text-sm font-semibold text-ink tabular-nums shrink-0">
@@ -201,9 +204,9 @@ export default function LaciMarkahPeserta({
               </div>
 
               <div>
-                <div className="section-title text-sm mb-2">Live Quiz</div>
+                <div className="section-title text-sm mb-2">{t('educator.people.colLiveQuiz')}</div>
                 {data.liveQuizzes.length === 0 ? (
-                  <p className="text-sm text-ink-muted">No live quizzes yet.</p>
+                  <p className="text-sm text-ink-muted">{t('educator.people.laciNoLiveQuizzes')}</p>
                 ) : (
                   <ul className="divide-y divide-hairline border border-hairline rounded-xl">
                     {data.liveQuizzes.map((lq) => (
@@ -211,8 +214,8 @@ export default function LaciMarkahPeserta({
                         <div className="min-w-0">
                           <div className="text-sm text-ink truncate">{lq.quizTitle}</div>
                           <div className="text-xs text-ink-faint mt-0.5">
-                            {tarikhPendek(lq.playedAt)}
-                            {lq.answered > 0 ? ` · ${lq.correct}/${lq.answered} correct` : ""}
+                            {tarikhPendek(lq.playedAt, bahasa)}
+                            {lq.answered > 0 ? ` · ${t('educator.people.laciCorrect', { betul: lq.correct, jawab: lq.answered })}` : ""}
                           </div>
                         </div>
                         <div className="text-sm font-semibold text-ink tabular-nums shrink-0">
@@ -226,13 +229,13 @@ export default function LaciMarkahPeserta({
 
               {data.adjustments.length > 0 && (
                 <div>
-                  <div className="section-title text-sm mb-2">Adjustments</div>
+                  <div className="section-title text-sm mb-2">{t('educator.people.laciAdjustments')}</div>
                   <ul className="divide-y divide-hairline border border-hairline rounded-xl">
                     {data.adjustments.map((adj, i) => (
                       <li key={i} className="px-4 py-3 flex items-start justify-between gap-3">
                         <div className="min-w-0">
-                          <div className="text-sm text-ink truncate">{adj.reason || "Adjustment"}</div>
-                          <div className="text-xs text-ink-faint mt-0.5">{tarikhPendek(adj.createdAt)}</div>
+                          <div className="text-sm text-ink truncate">{adj.reason || t('educator.people.laciAdjustmentFallback')}</div>
+                          <div className="text-xs text-ink-faint mt-0.5">{tarikhPendek(adj.createdAt, bahasa)}</div>
                         </div>
                         <div
                           className={`text-sm font-semibold tabular-nums shrink-0 ${adj.delta < 0 ? "text-red-600" : "text-ink"}`}

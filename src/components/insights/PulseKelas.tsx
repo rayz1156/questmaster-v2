@@ -9,9 +9,12 @@
 import { CheckCircle2, ClipboardCheck, Target, Zap } from "lucide-react";
 import Stat from "@/components/insights/Stat";
 import { formatMata } from "@/lib/markahPeserta";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { terjemahBilangan } from "@/lib/i18n";
 import type { PulseInsights as Pulse } from "@/lib/insightsKelas";
 
 export default function PulseKelas({ pulse }: { pulse: Pulse }) {
+  const { t, bahasa } = useBahasa();
   // Medan peratus sudah dibundarkan 1 titik perpuluhan oleh SQL.
   const peratus = (v: number | null) =>
     typeof v === "number" && Number.isFinite(v) ? `${Math.round(v)}%` : "-";
@@ -20,29 +23,29 @@ export default function PulseKelas({ pulse }: { pulse: Pulse }) {
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <Stat
         icon={<Target className="w-5 h-5" />}
-        label="Average score"
+        label={t('insights.pulse.avgScore')}
         value={pulse.avg_total === null ? "-" : formatMata(pulse.avg_total)}
         hint={
           pulse.median_total === null
             ? undefined
-            : `median ${formatMata(pulse.median_total)}`
+            : t('insights.pulse.median', { nilai: formatMata(pulse.median_total) })
         }
       />
       <Stat
         icon={<Zap className="w-5 h-5" />}
-        label="Joined a Live Quiz"
+        label={t('insights.pulse.joinedLive')}
         value={peratus(pulse.live_participation_pct)}
-        hint={pulse.live_sessions === 1 ? "1 session" : `${pulse.live_sessions} sessions`}
+        hint={terjemahBilangan(bahasa, 'insights.pulse.sessionsOne', 'insights.pulse.sessionsOther', pulse.live_sessions, { n: pulse.live_sessions })}
       />
       <Stat
         icon={<CheckCircle2 className="w-5 h-5" />}
-        label="Correct answers"
+        label={t('insights.pulse.correctAnswers')}
         value={peratus(pulse.accuracy_pct)}
         tone="green"
       />
       <Stat
         icon={<ClipboardCheck className="w-5 h-5" />}
-        label="Waiting for review"
+        label={t('insights.pulse.waitingReview')}
         value={formatMata(pulse.pending_reviews)}
         tone={pulse.pending_reviews > 0 ? "rose" : "green"}
       />

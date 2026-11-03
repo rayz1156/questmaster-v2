@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabaseClient";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import type { InsightsKelas } from "@/lib/insightsKelas";
 import PulseKelas from "@/components/insights/PulseKelas";
 import Perhatian from "@/components/insights/Perhatian";
@@ -17,9 +18,9 @@ import Progres from "@/components/insights/Progres";
 import Pasukan from "@/components/insights/Pasukan";
 
 /** Rangka kelabu semasa memuat: bentuk halaman kekal, tiada lompatan. */
-function Rangka() {
+function Rangka({ ariaLabel }: { ariaLabel: string }) {
   return (
-    <div className="space-y-4" aria-label="Loading insights">
+    <div className="space-y-4" aria-label={ariaLabel}>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         {Array.from({ length: 4 }, (_, i) => (
           <div key={i} className="card p-5">
@@ -41,6 +42,7 @@ function Rangka() {
 }
 
 export default function PanelInsights({ classId }: { classId: string }) {
+  const { t } = useBahasa();
   const [data, setData] = useState<InsightsKelas | null>(null);
   const [muat, setMuat] = useState(true);
   const [tiadaAkses, setTiadaAkses] = useState(false);
@@ -66,12 +68,12 @@ export default function PanelInsights({ classId }: { classId: string }) {
         }
         const j = await res.json().catch(() => null);
         if (!res.ok) {
-          setRalat(j?.error || "Failed to load insights.");
+          setRalat(j?.error || t('insights.panel.loadFailed'));
           return;
         }
         setData(j.data as InsightsKelas);
       } catch {
-        if (alive) setRalat("Failed to load insights.");
+        if (alive) setRalat(t('insights.panel.loadFailed'));
       } finally {
         if (alive) setMuat(false);
       }
@@ -81,13 +83,13 @@ export default function PanelInsights({ classId }: { classId: string }) {
     };
   }, [classId]);
 
-  if (muat) return <Rangka />;
+  if (muat) return <Rangka ariaLabel={t('insights.panel.loadingAria')} />;
 
   if (tiadaAkses) {
     return (
       <div className="surface p-5">
         <p className="text-sm text-ink-muted">
-          You don&apos;t have access to this class&apos;s insights.
+          {t('insights.panel.noAccess')}
         </p>
       </div>
     );

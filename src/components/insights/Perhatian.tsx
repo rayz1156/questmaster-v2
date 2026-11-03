@@ -13,18 +13,32 @@ import LaciMarkahPeserta from "@/components/people/LaciMarkahPeserta";
 import { LABEL_BENDERA, type Bendera, type PelajarInsights } from "@/lib/insightsKelas";
 import { formatMata } from "@/lib/markahPeserta";
 import { susunPerhatian } from "@/lib/insightsUi";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import type { KunciKamus } from "@/lib/i18n";
 
 const HAD_PAPARAN = 8;
 
+/** Pemetaan bendera kepada kunci kamus; bendera lain kekal Label English asal. */
+const KUNCI_BENDERA: Partial<Record<string, KunciKamus>> = {
+  bottom_20: 'insights.flags.bottom20',
+  declining: 'insights.flags.declining',
+  inactive_7d: 'insights.flags.inactive7',
+  never_live: 'insights.flags.neverLive',
+  pending_old: 'insights.flags.pendingOld',
+  improving: 'insights.flags.improving',
+};
+
 /** Pil bendera; bendera tidak dikenali kekal dipapar sebagai apa adanya. */
 function PilBendera({ flag }: { flag: string }) {
+  const { t } = useBahasa();
   const rose = flag === "bottom_20" || flag === "declining";
   const kelas = rose
     ? "bg-[#FDEBEA] text-[#C0392B]"
     : "bg-[#FDF3D7] text-[#96661A]";
+  const kunci = KUNCI_BENDERA[flag];
   return (
     <span className={`text-xs px-2 py-0.5 rounded-full ${kelas}`}>
-      {LABEL_BENDERA[flag as Bendera] ?? flag}
+      {kunci ? t(kunci) : (LABEL_BENDERA[flag as Bendera] ?? flag)}
     </span>
   );
 }
@@ -40,6 +54,7 @@ export default function Perhatian({
 }) {
   const [semua, setSemua] = useState(false);
   const [laci, setLaci] = useState<PelajarInsights | null>(null);
+  const { t } = useBahasa();
 
   const senarai = susunPerhatian(students);
   const dipapar = semua ? senarai : senarai.slice(0, HAD_PAPARAN);
@@ -47,12 +62,12 @@ export default function Perhatian({
 
   return (
     <section className="surface p-5">
-      <h2 className="section-title">Needs your attention</h2>
+      <h2 className="section-title">{t('insights.attention.title')}</h2>
 
       {senarai.length === 0 ? (
         <div className="flex items-center gap-3 mt-3">
           <CheckCircle2 className="w-5 h-5 text-[#2E7D4F]" />
-          <p className="text-sm text-ink-muted">Everyone is on track.</p>
+          <p className="text-sm text-ink-muted">{t('insights.attention.onTrack')}</p>
         </div>
       ) : (
         <>
