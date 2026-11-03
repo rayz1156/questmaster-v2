@@ -66,14 +66,14 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     return ralatBilik(403, 'MUTED', 'Anda dibisukan dalam chatroom ini.');
   }
   if (!dalamHad('bilik-ask:' + user.id, 3)) {
-    return ralatJson('Terlalu banyak soalan dalam masa singkat. Tunggu sebentar.', 429);
+    return ralatJson('Too many questions in a short time. Please wait a moment.', 429);
   }
 
   const hasil = await bacaJsonKecil(req);
   if (!hasil.ok) return hasil.response;
   const soalan = typeof hasil.body.question === 'string' ? hasil.body.question.trim() : '';
   if (soalan.length < 1 || soalan.length > 2000) {
-    return ralatJson('Soalan mesti 1 hingga 2000 aksara.', 400);
+    return ralatJson('A question must be 1 to 2000 characters.', 400);
   }
 
   // (b) penyedia mesti sedia sebelum sebarang baris dicipta. Model
@@ -82,11 +82,11 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   const model = await modelUntukBilik(supa, bilik.model_id);
   if (!model) {
     // Tiada model didayakan: AI memang tidak dapat digunakan.
-    return ralatJson('AI belum disediakan oleh pentadbir', 503, { code: 'AI_NOT_CONFIGURED' });
+    return ralatJson('AI is not configured by the administrator', 503, { code: 'AI_NOT_CONFIGURED' });
   }
   const penyedia = dapatkanPenyedia(model.provider);
   if (!penyedia) {
-    return ralatJson('AI belum disediakan oleh pentadbir', 503, { code: 'AI_NOT_CONFIGURED' });
+    return ralatJson('AI is not configured by the administrator', 503, { code: 'AI_NOT_CONFIGURED' });
   }
 
   // (c) kuota harian atomik, RPC dengan argumen bernama.
@@ -100,17 +100,17 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   })) as { data: unknown; error: { message: string } | null };
   if (errKuota) {
     console.error('[bilik-ai] reserve_ask gagal:', errKuota.message);
-    return ralatJson('Kuota AI tidak dapat disemak.', 500);
+    return ralatJson('The AI quota could not be checked.', 500);
   }
   if (kodKuota === 'USER_CAP') {
-    return ralatJson('Anda sudah mencapai had harian menanya AI dalam chatroom ini.', 429, { code: 'USER_CAP' });
+    return ralatJson('You have reached your daily limit for asking AI in this chatroom.', 429, { code: 'USER_CAP' });
   }
   if (kodKuota === 'ROOM_CAP') {
-    return ralatJson('Chatroom ini sudah mencapai had harian menanya AI.', 429, { code: 'ROOM_CAP' });
+    return ralatJson('This chatroom has reached its daily AI question limit.', 429, { code: 'ROOM_CAP' });
   }
   if (kodKuota !== 'OK') {
     console.error('[bilik-ai] reserve_ask balas tidak dikenali:', kodKuota);
-    return ralatJson('Kuota AI tidak dapat disemak.', 500);
+    return ralatJson('The AI quota could not be checked.', 500);
   }
 
   // Nama penanya, kelas dan sejarah untuk prompt.
@@ -158,7 +158,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     .single()) as { data: { id: string } | null; error: { message: string } | null };
   if (errS || !soalanRow) {
     console.error('[bilik-ai] sisip soalan gagal:', errS?.message);
-    return ralatJson('Soalan tidak dapat disimpan.', 500);
+    return ralatJson('The question could not be saved.', 500);
   }
 
   const { data: aiRow, error: errA } = (await supa
@@ -176,7 +176,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     .single()) as { data: { id: string } | null; error: { message: string } | null };
   if (errA || !aiRow) {
     console.error('[bilik-ai] sisip mesej AI gagal:', errA?.message);
-    return ralatJson('Jawapan AI tidak dapat dimulakan.', 500);
+    return ralatJson('The AI answer could not be started.', 500);
   }
 
   // Berhenti boleh berlaku semasa masih queued: semak sebelum mula strim.

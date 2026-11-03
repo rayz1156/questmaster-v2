@@ -84,22 +84,22 @@ export async function POST(
 
   // Had kadar dahulu: kos model dikuasakan sebelum badan dibaca.
   if (!dalamHad('lna-cadang:' + user.id, 5)) {
-    return ralatJson('Terlalu banyak permintaan. Cuba lagi sebentar.', 429);
+    return ralatJson('Too many requests. Please try again shortly.', 429);
   }
 
   const badan = await bacaJsonKecil(req);
   if (!badan.ok) return badan.response;
   const teks = badan.body.text;
   if (typeof teks !== 'string' || teks.length < TEKS_MIN || teks.length > TEKS_MAKS) {
-    return ralatJson('Teks mesti 30 hingga 4,000 aksara.', 400);
+    return ralatJson('The text must be 30 to 4,000 characters.', 400);
   }
 
   if (!penyediaSedia('qwen')) {
-    return ralatJson('AI belum disediakan. Taip senarai sendiri.', 503);
+    return ralatJson('AI is not configured. Type your own list.', 503);
   }
   const penyedia = dapatkanPenyedia('qwen');
   if (!penyedia) {
-    return ralatJson('AI belum disediakan. Taip senarai sendiri.', 503);
+    return ralatJson('AI is not configured. Type your own list.', 503);
   }
 
   const pemutus = new AbortController();
@@ -122,13 +122,13 @@ export async function POST(
 
     const { items, amaran } = bersihkanCadangan(jawapan);
     if (items.length < 3) {
-      return ralatJson('AI tidak memberi cadangan yang sah. Cuba lagi atau taip sendiri.', 502);
+      return ralatJson('AI did not give a valid suggestion. Try again or type it yourself.', 502);
     }
     return NextResponse.json({ items, amaran });
   } catch (e) {
     clearTimeout(pemasa);
     // Tiada teks pengguna dalam log; hanya jenis ralat dan mesej penyedia.
     console.error('[lna-cadang] panggilan penyedia gagal:', e instanceof Error ? e.message : e);
-    return ralatJson('AI tidak dapat dihubungi. Cuba lagi atau taip sendiri.', 502);
+    return ralatJson('AI could not be reached. Try again or type it yourself.', 502);
   }
 }

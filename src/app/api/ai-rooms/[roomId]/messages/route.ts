@@ -92,7 +92,7 @@ export async function GET(req: NextRequest, { params }: { params: { roomId: stri
     .limit(100)) as { data: MesejRow[] | null; error: { message: string } | null };
   if (errBaru) {
     console.error('[bilik-ai] baca mesej baharu gagal:', errBaru.message);
-    return ralatJson('Mesej tidak dapat dibaca.', 500);
+    return ralatJson('The message could not be read.', 500);
   }
 
   // Mesej lama yang berubah (AI sedang menaip, pemadaman, status).
@@ -108,7 +108,7 @@ export async function GET(req: NextRequest, { params }: { params: { roomId: stri
       .limit(100)) as { data: MesejRow[] | null; error: { message: string } | null };
     if (errU) {
       console.error('[bilik-ai] baca mesej berubah gagal:', errU.message);
-      return ralatJson('Mesej tidak dapat dibaca.', 500);
+      return ralatJson('The message could not be read.', 500);
     }
     ubah = u ?? [];
   }
@@ -170,14 +170,14 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
   }
   // Had per minit untuk mesej biasa (10 dalam tetingkap 60 saat).
   if (!dalamHad('bilik-msg:' + user.id, 10)) {
-    return ralatJson('Terlalu banyak mesej dalam masa singkat. Tunggu sebentar.', 429);
+    return ralatJson('Too many messages in a short time. Please wait a moment.', 429);
   }
 
   const hasil = await bacaJsonKecil(req);
   if (!hasil.ok) return hasil.response;
   const teks = typeof hasil.body.body === 'string' ? hasil.body.body.trim() : '';
   if (teks.length < 1 || teks.length > 2000) {
-    return ralatJson('Mesej mesti 1 hingga 2000 aksara.', 400);
+    return ralatJson('A message must be 1 to 2000 characters.', 400);
   }
 
   const { data: m, error } = (await supa
@@ -192,7 +192,7 @@ export async function POST(req: NextRequest, { params }: { params: { roomId: str
     .single()) as { data: MesejRow | null; error: { message: string } | null };
   if (error || !m) {
     console.error('[bilik-ai] hantar mesej gagal:', error?.message);
-    return ralatJson('Mesej tidak dapat dihantar.', 500);
+    return ralatJson('The message could not be sent.', 500);
   }
 
   const nama = await namaPaparanProfil(supa, [user.id]);

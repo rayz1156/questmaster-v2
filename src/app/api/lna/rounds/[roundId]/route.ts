@@ -56,7 +56,7 @@ export async function GET(
     .order('position', { ascending: true });
   if (errItem) {
     console.error('[lna] baca item gagal:', errItem.message);
-    return ralatJson('Pusingan tidak dapat dibaca.', 500);
+    return ralatJson('The round could not be read.', 500);
   }
 
   // Jawapan pemanggil sendiri sahaja (pelajar atau guru), dikunci item.
@@ -67,7 +67,7 @@ export async function GET(
     .eq('user_id', akses.user!.id);
   if (errMine) {
     console.error('[lna] baca jawapan sendiri gagal:', errMine.message);
-    return ralatJson('Pusingan tidak dapat dibaca.', 500);
+    return ralatJson('The round could not be read.', 500);
   }
 
   return NextResponse.json({
@@ -128,10 +128,10 @@ export async function PATCH(
 
   const status = String(body.status ?? '');
   if (status !== 'closed') {
-    return ralatJson('status mesti closed.', 400);
+    return ralatJson('status must be closed.', 400);
   }
   if (round.status === 'closed') {
-    return ralatJson('Pusingan ini sudah ditutup.', 409);
+    return ralatJson('This round is already closed.', 409);
   }
 
   // Snapshot penguasaan semasa pusingan ditutup: RPC dengan klien Bearer
@@ -143,7 +143,7 @@ export async function PATCH(
   );
   if (errRpc || !snapshot) {
     console.error('[lna] mastery_snapshot gagal:', errRpc?.message);
-    return ralatJson('Pusingan tidak dapat ditutup.', 500);
+    return ralatJson('The round could not be closed.', 500);
   }
 
   const { data: roundTutup, error } = await supa
@@ -158,7 +158,7 @@ export async function PATCH(
     .single();
   if (error || !roundTutup) {
     console.error('[lna] tutup pusingan gagal:', error?.message);
-    return ralatJson('Pusingan tidak dapat ditutup.', 500);
+    return ralatJson('The round could not be closed.', 500);
   }
 
   return NextResponse.json({ round: roundTutup });

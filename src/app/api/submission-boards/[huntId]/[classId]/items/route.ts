@@ -24,14 +24,14 @@ export async function POST(req: NextRequest, { params }: { params: { huntId: str
   const itemType: string = body.itemType;
   if (itemType === 'chatbot') {
     // KZ-039: pilihan chatbot dibuang daripada semua papan.
-    return ralatJson('Item chatbot tidak lagi disokong.', 400);
+    return ralatJson('The chatbot item is no longer supported.', 400);
   }
   if (itemType === 'video') {
     // KZ-039: item video HANYA melalui pautan YouTube. Provider lain
     // (bunny/adilo) ialah muat naik terus dan ditolak; URL YouTube disahkan
     // oleh parseYouTubeId dalam cabang di bawah.
     if (body.videoProvider !== 'youtube') {
-      return ralatJson('Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.', 400);
+      return ralatJson('Direct video upload is no longer supported. Share a YouTube link.', 400);
     }
   } else if (!['text', 'image', 'link', 'file'].includes(itemType)) {
     return ralatJson('Invalid itemType', 400);

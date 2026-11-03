@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
     .eq('enabled', true)
     .order('sort_order', { ascending: true });
   if (error) {
-    return ralatJson('Senarai model tidak dapat dibaca.', 500);
+    return ralatJson('The model list could not be read.', 500);
   }
   return NextResponse.json({ models: data ?? [] });
 }

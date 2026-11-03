@@ -21,7 +21,7 @@ export const fetchCache = 'force-no-store';
 export async function GET(req: NextRequest, { params }: { params: { code: string } }) {
   const kod = String(params.code || '').trim().toUpperCase();
   if (!REGEX_KOD_BILIK.test(kod)) {
-    return ralatJson('Kod chatroom mesti 6 aksara daripada abjad kod chatroom.', 400);
+    return ralatJson('The chatroom code must be 6 characters from the chatroom code alphabet.', 400);
   }
 
   // Pembetulan CTO (kzsec #1): log masuk dahulu, supaya pemanggil tanpa
@@ -37,7 +37,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .eq('join_code', kod)
     .maybeSingle();
   if (!baris) {
-    return ralatJson('Kod chatroom tidak ditemui.', 404);
+    return ralatJson('Chatroom code not found.', 404);
   }
 
   const akses = await aksesBilik(req, baris.id);

@@ -16,5 +16,5 @@ export const maxDuration = 30;
  * panggilan Bunny/Adilo, tiada bait masuk.
  */
 export async function POST() {
-  return ralatJson('Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.', 410);
+  return ralatJson('Direct video upload is no longer supported. Share a YouTube link.', 410);
 }

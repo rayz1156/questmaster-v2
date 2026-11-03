@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { boardId: st
   if (provider !== 'youtube') {
     // KZ-039: muat naik terus (bunny) dibuang. Hanya pautan YouTube diterima,
     // dan ia boleh digunakan oleh ahli kelas biasa, bukan pemilik sahaja.
-    return ralatJson('Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.', 410);
+    return ralatJson('Direct video upload is no longer supported. Share a YouTube link.', 410);
   }
 
   const ytId = parseYouTubeId(String(body?.youtubeUrl || ''));

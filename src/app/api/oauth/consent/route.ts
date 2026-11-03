@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
   const accessToken = authHeader.replace(/^Bearer\s+/i, "").trim();
 
   if (!accessToken) {
-    return ralatJson("Tiada token Bearer", 401);
+    return ralatJson("Missing Bearer token", 401);
   }
 
   const supa = createClient(
@@ -51,7 +51,7 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
-  if (!body) return ralatJson("Badan bukan JSON", 400);
+  if (!body) return ralatJson("The body is not JSON", 400);
 
   const {
     action,
@@ -65,7 +65,7 @@ export async function POST(req: NextRequest) {
   } = body;
 
   if (!client_id || !redirect_uri) {
-    return ralatJson("Parameter tidak lengkap", 400);
+    return ralatJson("Incomplete parameters", 400);
   }
 
   // Sahkan semula: /oauth/consent boleh dicapai terus, jadi ini juga menutup
@@ -77,7 +77,7 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!client || !client.redirect_uris.includes(redirect_uri)) {
-    return ralatJson("Klien atau redirect_uri tidak sah", 400);
+    return ralatJson("Invalid client or redirect_uri", 400);
   }
 
   if (action === "deny") {
@@ -89,13 +89,13 @@ export async function POST(req: NextRequest) {
   }
 
   if (!code_challenge) {
-    return ralatJson("code_challenge diperlukan", 400);
+    return ralatJson("code_challenge is required", 400);
   }
   if (code_challenge_method !== "S256") {
-    return ralatJson("code_challenge_method mesti S256", 400);
+    return ralatJson("code_challenge_method must be S256", 400);
   }
   if (resource && resource !== `${BASE}/api/mcp`) {
-    return ralatJson("resource tidak sepadan dengan pelayan ini", 400);
+    return ralatJson("resource does not match this server", 400);
   }
 
   let minted;
@@ -103,12 +103,12 @@ export async function POST(req: NextRequest) {
     minted = await mintIndependentSession(userData.user.email);
   } catch (e: any) {
     console.error("[mcp/consent] gagal menjana sesi:", e.message);
-    return ralatJson("Gagal mencipta sesi sambungan", 500);
+    return ralatJson("Failed to create the connection session", 500);
   }
 
   if (minted.userId !== userData.user.id) {
     console.error("[mcp/consent] ketidakpadanan identiti semasa mint sesi");
-    return ralatJson("Ketidakpadanan identiti", 500);
+    return ralatJson("Identity mismatch", 500);
   }
 
   const code = randomToken(32);
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
 
   if (insertErr) {
     console.error("[mcp/consent] gagal menyimpan kod:", insertErr.message);
-    return ralatJson("Gagal mengeluarkan kod", 500);
+    return ralatJson("Failed to issue the code", 500);
   }
 
   const redirect = new URL(redirect_uri);

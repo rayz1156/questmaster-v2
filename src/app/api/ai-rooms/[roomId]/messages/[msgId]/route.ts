@@ -32,7 +32,7 @@ export async function DELETE(
     .eq('room_id', params.roomId)
     .maybeSingle();
   if (!mesej) {
-    return ralatJson('Mesej tidak ditemui.', 404);
+    return ralatJson('Message not found.', 404);
   }
   if (mesej.deleted_at) {
     // Sudah dipadam; balas ok supaya klien bergerak tanpa ralat.
@@ -62,7 +62,7 @@ export async function DELETE(
     .eq('id', params.msgId);
   if (error) {
     console.error('[bilik-ai] padam mesej gagal:', error.message);
-    return ralatJson('Mesej tidak dapat dipadam.', 500);
+    return ralatJson('The message could not be deleted.', 500);
   }
   return NextResponse.json({ ok: true });
 }

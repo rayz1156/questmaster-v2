@@ -49,7 +49,7 @@ export async function GET(
     .order('position', { ascending: true });
   if (errItems) {
     console.error('[lna] baca item gagal:', errItems.message);
-    return ralatJson('Laporan tidak dapat dibina.', 500);
+    return ralatJson('The report could not be built.', 500);
   }
   const items: ItemLna[] = ((itemsData ?? []) as unknown as {
     id: string;
@@ -72,7 +72,7 @@ export async function GET(
     .order('opened_at', { ascending: true });
   if (errRounds) {
     console.error('[lna] baca pusingan gagal:', errRounds.message);
-    return ralatJson('Laporan tidak dapat dibina.', 500);
+    return ralatJson('The report could not be built.', 500);
   }
   const rounds = (roundsData ?? []) as RoundRow[];
 
@@ -82,7 +82,7 @@ export async function GET(
     .in('round_id', rounds.length > 0 ? rounds.map((r) => r.id) : ['00000000-0000-0000-0000-000000000000']);
   if (errResp) {
     console.error('[lna] baca jawapan gagal:', errResp.message);
-    return ralatJson('Laporan tidak dapat dibina.', 500);
+    return ralatJson('The report could not be built.', 500);
   }
   const semuaJawapan = (responsesData ?? []) as {
     round_id: string;
@@ -111,7 +111,7 @@ export async function GET(
   );
   if (errRpc || !masteryKini) {
     console.error('[lna] mastery rpc gagal:', errRpc?.message);
-    return ralatJson('Laporan tidak dapat dibina.', 500);
+    return ralatJson('The report could not be built.', 500);
   }
   const masterySemasa = senaraiMasteryDaripadaSummary(masteryKini);
 

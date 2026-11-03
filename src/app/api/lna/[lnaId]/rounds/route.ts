@@ -33,7 +33,7 @@ export async function POST(
 
   const kind = String(body.kind ?? '');
   if (kind !== 'pre' && kind !== 'post') {
-    return ralatJson('kind mesti pre atau post.', 400);
+    return ralatJson('kind must be pre or post.', 400);
   }
 
   const { data: sedia } = await supa
@@ -43,13 +43,13 @@ export async function POST(
   const pusingan = (sedia ?? []) as { id: string; kind: string; status: string }[];
 
   if (pusingan.some((r) => r.kind === kind)) {
-    return ralatJson('Pusingan ini sudah wujud untuk LNA.', 409);
+    return ralatJson('This round already exists for the LNA.', 409);
   }
 
   if (kind === 'post') {
     const pra = pusingan.find((r) => r.kind === 'pre');
     if (!pra || pra.status !== 'closed') {
-      return ralatJson('Pusingan PASCA hanya boleh dibuka selepas pusingan PRA ditutup.', 409);
+      return ralatJson('A POST round can only be opened after the PRE round is closed.', 409);
     }
   }
 
@@ -60,7 +60,7 @@ export async function POST(
     .single();
   if (error || !round) {
     console.error('[lna] buka pusingan gagal:', error?.message);
-    return ralatJson('Pusingan tidak dapat dibuka.', 500);
+    return ralatJson('The round could not be opened.', 500);
   }
 
   return NextResponse.json({ round }, { status: 201 });

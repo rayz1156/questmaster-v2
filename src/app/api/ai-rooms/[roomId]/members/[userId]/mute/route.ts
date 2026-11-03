@@ -27,7 +27,7 @@ export async function POST(
   const hasil = await bacaJsonKecil(req);
   if (!hasil.ok) return hasil.response;
   if (typeof hasil.body.muted !== 'boolean') {
-    return ralatJson('muted mesti boolean.', 400);
+    return ralatJson('muted must be boolean.', 400);
   }
   const muted = hasil.body.muted;
 
@@ -39,11 +39,11 @@ export async function POST(
     .eq('user_id', params.userId)
     .maybeSingle();
   if (!sasaran) {
-    return ralatJson('Ahli tidak ditemui dalam chatroom ini.', 404);
+    return ralatJson('The member was not found in this chatroom.', 404);
   }
   // Guru tidak boleh dibisukan oleh sesiapa pun.
   if (sasaran.role === 'teacher') {
-    return ralatJson('Guru tidak boleh dibisukan dalam chatroom ini.', 403);
+    return ralatJson('The teacher cannot be muted in this chatroom.', 403);
   }
 
   const { error } = await supa
@@ -53,7 +53,7 @@ export async function POST(
     .eq('user_id', params.userId);
   if (error) {
     console.error('[bilik-ai] bisu ahli gagal:', error.message);
-    return ralatJson('Bisu ahli tidak dapat diubah.', 500);
+    return ralatJson('The member mute could not be updated.', 500);
   }
   return NextResponse.json({ userId: params.userId, muted });
 }

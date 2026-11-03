@@ -51,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('class_id', params.id)
     .order('created_at', { ascending: false });
   if (error) {
-    return ralatJson('Senarai chatroom tidak dapat dibaca.', 500);
+    return ralatJson('The chatroom list could not be read.', 500);
   }
   return NextResponse.json({ rooms: data ?? [] });
 }
@@ -68,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq('id', params.id)
     .maybeSingle();
   if (!kelas) {
-    return ralatJson('Kelas tidak ditemui.', 404);
+    return ralatJson('Class not found', 404);
   }
   if (!(await guruKelas(supa, params.id, user.id))) {
     return ralatBilik(403, 'NOT_EDUCATOR', 'Hanya pendidik kelas boleh mencipta chatroom.');
@@ -80,14 +80,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   if (title.length < 1 || title.length > 80) {
-    return ralatJson('Tajuk bilik mesti 1 hingga 80 aksara.', 400);
+    return ralatJson('The room title must be 1 to 80 characters.', 400);
   }
   let description: string | null = null;
   if (typeof body.description === 'string') {
     description = body.description.trim() || null;
   }
   if (description && description.length > 300) {
-    return ralatJson('Penerangan bilik maksimum 300 aksara.', 400);
+    return ralatJson('The room description is limited to 300 characters.', 400);
   }
 
   // Model: lalai (is_default) jika tidak diberi; mesti didayakan.
@@ -100,7 +100,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .eq('enabled', true)
       .maybeSingle();
     if (!model) {
-      return ralatJson('Model tidak ditemui atau tidak didayakan.', 400);
+      return ralatJson('Model not found or not enabled.', 400);
     }
     modelId = model.id;
   } else {
@@ -140,7 +140,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   if (!room) {
     console.error('[bilik-ai] cipta bilik gagal:', ralatAkhir ?? 'kod bertembung');
-    return ralatJson('Bilik tidak dapat dicipta.', 500);
+    return ralatJson('The room could not be created.', 500);
   }
   return NextResponse.json({ room }, { status: 201 });
 }

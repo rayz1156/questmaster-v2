@@ -32,11 +32,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
 
   if (body.title !== undefined) {
     if (typeof body.title !== 'string') {
-      return ralatJson('Tajuk chatroom mesti teks.', 400);
+      return ralatJson('The chatroom title must be text.', 400);
     }
     const title = body.title.trim();
     if (title.length < 1 || title.length > 80) {
-      return ralatJson('Tajuk chatroom mesti 1 hingga 80 aksara.', 400);
+      return ralatJson('The chatroom title must be 1 to 80 characters.', 400);
     }
     set.title = title;
   }
@@ -47,11 +47,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
     } else if (typeof body.description === 'string') {
       const d = body.description.trim() || null;
       if (d && d.length > 300) {
-        return ralatJson('Penerangan chatroom maksimum 300 aksara.', 400);
+        return ralatJson('The chatroom description is limited to 300 characters.', 400);
       }
       set.description = d;
     } else {
-      return ralatJson('Penerangan chatroom mesti teks.', 400);
+      return ralatJson('The chatroom description must be text.', 400);
     }
   }
 
@@ -67,24 +67,24 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
         .eq('enabled', true)
         .maybeSingle();
       if (!model) {
-        return ralatJson('Model tidak ditemui atau tidak didayakan.', 400);
+        return ralatJson('Model not found or not enabled.', 400);
       }
       set.model_id = model.id;
     } else {
-      return ralatJson('modelId mesti teks.', 400);
+      return ralatJson('modelId must be text.', 400);
     }
   }
 
   if (body.aiEnabled !== undefined) {
     if (typeof body.aiEnabled !== 'boolean') {
-      return ralatJson('aiEnabled mesti boolean.', 400);
+      return ralatJson('aiEnabled must be boolean.', 400);
     }
     set.ai_enabled = body.aiEnabled;
   }
 
   if (body.contextEnabled !== undefined) {
     if (typeof body.contextEnabled !== 'boolean') {
-      return ralatJson('contextEnabled mesti boolean.', 400);
+      return ralatJson('contextEnabled must be boolean.', 400);
     }
     set.context_enabled = body.contextEnabled;
   }
@@ -92,20 +92,20 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
   if (body.contextWindow !== undefined) {
     const n = Number(body.contextWindow);
     if (!Number.isInteger(n) || n < 0 || n > 50) {
-      return ralatJson('Tetingkap konteks mesti integer 0 hingga 50.', 400);
+      return ralatJson('The context window must be an integer from 0 to 50.', 400);
     }
     set.context_window = n;
   }
 
   if (body.status !== undefined) {
     if (body.status !== 'open' && body.status !== 'closed') {
-      return ralatJson('Status chatroom mesti open atau closed.', 400);
+      return ralatJson('The chatroom status must be open or closed.', 400);
     }
     set.status = body.status;
   }
 
   if (Object.keys(set).length === 0) {
-    return ralatJson('Tiada medan untuk dikemas kini.', 400);
+    return ralatJson('No fields to update.', 400);
   }
 
   // updated_at sentiasa ditetapkan pada setiap kemas kini.
@@ -119,7 +119,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { roomId: st
     .single();
   if (error || !data) {
     console.error('[bilik-ai] kemas kini bilik gagal:', error?.message);
-    return ralatJson('Chatroom tidak dapat dikemas kini.', 500);
+    return ralatJson('The chatroom could not be updated.', 500);
   }
   return NextResponse.json({ room: data });
 }
@@ -139,7 +139,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { roomId: s
     .eq('id', params.roomId);
   if (error) {
     console.error('[bilik-ai] padam bilik gagal:', error.message);
-    return ralatJson('Chatroom tidak dapat dipadam.', 500);
+    return ralatJson('The chatroom could not be deleted.', 500);
   }
   return NextResponse.json({ ok: true });
 }

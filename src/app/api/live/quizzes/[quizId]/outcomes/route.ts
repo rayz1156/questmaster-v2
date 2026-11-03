@@ -152,7 +152,7 @@ export async function PUT(req: NextRequest, { params }: { params: { quizId: stri
   if (!akses.ok) return akses.response;
 
   if (akses.kuiz.class_id === null) {
-    return ralatJson('Kongsi kuiz dengan kelas dahulu untuk memilih Outcome.', 400);
+    return ralatJson('Share the quiz with a class first to pick an Outcome.', 400);
   }
   const classId = akses.kuiz.class_id;
 

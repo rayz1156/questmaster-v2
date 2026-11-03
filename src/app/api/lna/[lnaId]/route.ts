@@ -36,11 +36,11 @@ export async function PATCH(
 
   if (body.title !== undefined) {
     if (typeof body.title !== 'string') {
-      return ralatJson('Tajuk LNA mesti teks.', 400);
+      return ralatJson('The LNA title must be text.', 400);
     }
     const title = body.title.trim();
     if (title.length < 1 || title.length > 120) {
-      return ralatJson('Tajuk LNA mesti 1 hingga 120 aksara.', 400);
+      return ralatJson('The LNA title must be 1 to 120 characters.', 400);
     }
     set.title = title;
   }
@@ -52,11 +52,11 @@ export async function PATCH(
     const ids: string[] = [];
     if (body.outcomeIds !== undefined) {
       if (!Array.isArray(body.outcomeIds) || body.outcomeIds.length === 0) {
-        return ralatJson('outcomeIds mesti senarai tidak kosong.', 400);
+        return ralatJson('outcomeIds must be a non-empty list.', 400);
       }
       for (const x of body.outcomeIds) {
         if (typeof x !== 'string' || !sahUuid(x)) {
-          return ralatJson('outcomeIds mengandungi id tidak sah.', 400);
+          return ralatJson('outcomeIds contains an invalid id.', 400);
         }
         ids.push(x);
       }
@@ -64,17 +64,17 @@ export async function PATCH(
     const bebas: string[] = [];
     if (body.freeItems !== undefined) {
       if (!Array.isArray(body.freeItems)) {
-        return ralatJson('freeItems mesti senarai.', 400);
+        return ralatJson('freeItems must be a list.', 400);
       }
       // Nyah-dup tidak sensitif huruf (seperti POST cipta).
       const dilihatBebas = new Set<string>();
       for (const x of body.freeItems) {
         if (typeof x !== 'string') {
-          return ralatJson('freeItems mesti senarai teks.', 400);
+          return ralatJson('freeItems must be a list of text.', 400);
         }
         const label = x.trim();
         if (label.length < 1 || label.length > 200) {
-          return ralatJson('Setiap item bebas mesti 1 hingga 200 aksara.', 400);
+          return ralatJson('Each free item must be 1 to 200 characters.', 400);
         }
         const kunci = label.toLowerCase();
         if (dilihatBebas.has(kunci)) continue;
@@ -84,7 +84,7 @@ export async function PATCH(
     }
     const unik = Array.from(new Set(ids));
     if (unik.length + bebas.length < 3 || unik.length + bebas.length > 15) {
-      return ralatJson('Jumlah item LNA mesti 3 hingga 15.', 400);
+      return ralatJson('The LNA needs 3 to 15 items.', 400);
     }
     // Semua outcome mesti milik kelas LNA ini.
     const { data: sah } = await supa
@@ -95,7 +95,7 @@ export async function PATCH(
     const idsSah = new Set(((sah ?? []) as { id: string }[]).map((r) => r.id));
     for (const x of unik) {
       if (!idsSah.has(x)) {
-        return ralatJson('Outcome tidak ditemui dalam kelas ini.', 400);
+        return ralatJson('Outcome not found in this class.', 400);
       }
     }
     // Kunci item: tiada jawapan dalam mana-mana pusingan LNA ini.
@@ -110,7 +110,7 @@ export async function PATCH(
         .select('round_id', { count: 'exact', head: true })
         .in('round_id', idsPusingan);
       if ((count ?? 0) > 0) {
-        return ralatJson('Item tidak boleh diubah selepas ada jawapan pelajar.', 400);
+        return ralatJson('An item cannot be changed after a student answer exists.', 400);
       }
     }
 
@@ -120,7 +120,7 @@ export async function PATCH(
       .eq('lna_id', lna.id);
     if (errPadam) {
       console.error('[lna] ganti item gagal (padam):', errPadam.message);
-      return ralatJson('Item LNA tidak dapat diubah.', 500);
+      return ralatJson('The LNA item could not be updated.', 500);
     }
     // Susunan sama seperti cipta: item Outcome dahulu, item bebas
     // kemudian (KZ-038).
@@ -140,7 +140,7 @@ export async function PATCH(
     const { error: errIsi } = await supa.from('qm_lna_items').insert(baris);
     if (errIsi) {
       console.error('[lna] ganti item gagal (isi):', errIsi.message);
-      return ralatJson('Item LNA tidak dapat diubah.', 500);
+      return ralatJson('The LNA item could not be updated.', 500);
     }
   }
 
@@ -149,7 +149,7 @@ export async function PATCH(
     && body.outcomeIds === undefined
     && body.freeItems === undefined
   ) {
-    return ralatJson('Tiada medan untuk dikemas kini.', 400);
+    return ralatJson('No fields to update.', 400);
   }
 
   if (Object.keys(set).length > 0) {
@@ -160,7 +160,7 @@ export async function PATCH(
       .eq('id', lna.id);
     if (error) {
       console.error('[lna] kemas kini gagal:', error.message);
-      return ralatJson('LNA tidak dapat dikemas kini.', 500);
+      return ralatJson('The LNA could not be updated.', 500);
     }
   }
 
@@ -190,7 +190,7 @@ export async function DELETE(
     .eq('id', akses.lna!.id);
   if (error) {
     console.error('[lna] padam gagal:', error.message);
-    return ralatJson('LNA tidak dapat dipadam.', 500);
+    return ralatJson('The LNA could not be deleted.', 500);
   }
   return NextResponse.json({ ok: true });
 }

@@ -19,7 +19,7 @@ export async function POST(req: NextRequest, { params }: { params: { classId: st
   const { columnId, cardType } = body;
   if (!columnId || !cardType) return ralatJson('columnId and cardType required', 400);
   if (cardType === 'chatbot') {
-    return ralatJson('Kad chatbot tidak lagi disokong.', 400);
+    return ralatJson('The chatbot card is no longer supported.', 400);
   }
   if (!['link', 'image', 'text', 'file', 'youtube'].includes(cardType)) {
     // 'video' turut ditolak di sini: kad video hanya melalui pautan YouTube.

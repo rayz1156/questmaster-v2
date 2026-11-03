@@ -32,17 +32,17 @@ export async function POST(
     .eq('room_id', params.roomId)
     .maybeSingle();
   if (!mesej) {
-    return ralatJson('Mesej tidak ditemui.', 404);
+    return ralatJson('Message not found.', 404);
   }
   if (mesej.author_kind !== 'ai' || mesej.deleted_at) {
-    return ralatJson('Mesej ini bukan jawapan AI.', 409);
+    return ralatJson('This message is not an AI answer.', 409);
   }
   // Hanya penanya atau guru boleh menghentikan.
   if (akses.role !== 'teacher' && mesej.asked_by !== user.id) {
     return ralatBilik(403, 'NOT_ASKER', 'Hanya penanya atau guru boleh menghentikan jawapan AI.');
   }
   if (mesej.ai_status !== 'queued' && mesej.ai_status !== 'streaming') {
-    return ralatJson('Jawapan AI ini sudah tamat.', 409, { code: 'AI_DONE' });
+    return ralatJson('This AI answer is already finished.', 409, { code: 'AI_DONE' });
   }
 
   const now = new Date().toISOString();
@@ -53,7 +53,7 @@ export async function POST(
     .in('ai_status', ['queued', 'streaming']);
   if (error) {
     console.error('[bilik-ai] henti jawapan gagal:', error.message);
-    return ralatJson('Jawapan tidak dapat dihentikan.', 500);
+    return ralatJson('The answer could not be stopped.', 500);
   }
   return NextResponse.json({ status: 'stopped' });
 }

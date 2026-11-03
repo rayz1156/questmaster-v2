@@ -15,5 +15,5 @@ export const runtime = 'nodejs';
  * Balasan dihantar sebelum sebarang kerja: tiada panggilan Bunny/Adilo.
  */
 export async function POST() {
-  return ralatJson('Muat naik video terus tidak lagi disokong. Kongsi pautan YouTube.', 410);
+  return ralatJson('Direct video upload is no longer supported. Share a YouTube link.', 410);
 }
