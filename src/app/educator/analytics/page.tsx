@@ -27,6 +27,8 @@ import {
   Select,
   StatGroup,
 } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { terjemahBilangan, LOKAL } from "@/lib/i18n";
 
 type Summary = {
   class_id: string | null;
@@ -41,6 +43,7 @@ type Summary = {
  * garis dan bar div tempatan yang lama dibuang kerana kit mengambil alih.
  */
 export default function EducatorAnalyticsPage() {
+  const { t, bahasa } = useBahasa();
   const [classes, setClasses] = useState<EducatorClassRow[]>([]);
   const [classId, setClassId] = useState<string | "all">("all");
   const [summary, setSummary] = useState<Summary | null>(null);
@@ -63,10 +66,10 @@ export default function EducatorAnalyticsPage() {
         const qs = classId === "all" ? "" : `?class_id=${encodeURIComponent(classId)}`;
         const res = await fetch(`/api/analytics/engagement${qs}`, { headers });
         const j = await res.json();
-        if (!res.ok) throw new Error(j.error || "Failed to load analytics");
+        if (!res.ok) throw new Error(j.error || t('educator.analytics.loadFailed'));
         if (!cancelled) setSummary(j.data as Summary);
       } catch (e: unknown) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Failed to load");
+        if (!cancelled) setError(e instanceof Error ? e.message : t('papanKelas.failedToLoad'));
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -74,10 +77,10 @@ export default function EducatorAnalyticsPage() {
     return () => { cancelled = true; };
   }, [classId]);
 
-  const t = summary?.totals;
+  const jumlah = summary?.totals;
   const inact = summary?.inactivity;
 
-  const learners = t?.unique_users ?? 0;
+  const learners = jumlah?.unique_users ?? 0;
   const active30 = inact?.active_30d ?? 0;
   const atRisk = inact?.at_risk_inactive_7d ?? 0;
 
@@ -95,10 +98,10 @@ export default function EducatorAnalyticsPage() {
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        title="See how learning is going."
-        description="Track engagement across all your classes and spot opportunities to support your learners."
+        title={t('educator.analytics.title')}
+        description={t('educator.analytics.desc')}
         {...(classId !== "all"
-          ? { primaryAction: { label: "Export", icon: <Download className="w-4 h-4" />, onSelect: () => setDialogEksport(true) } }
+          ? { primaryAction: { label: t('educator.analytics.export'), icon: <Download className="w-4 h-4" />, onSelect: () => setDialogEksport(true) } }
           : {})}
       />
 
@@ -106,16 +109,16 @@ export default function EducatorAnalyticsPage() {
         <Select
           value={classId}
           onChange={(e) => setClassId(e.target.value as string | "all")}
-          aria-label="Choose class"
+          aria-label={t('educator.analytics.chooseClass')}
           className="w-auto"
         >
-          <option value="all">All classes</option>
+          <option value="all">{t('educator.analytics.allClasses')}</option>
           {classes.map((c) => (<option key={c.id} value={c.id}>{c.name}</option>))}
         </Select>
-        <span className="text-[13px] text-ink-faint">Last 90 days</span>
+        <span className="text-[13px] text-ink-faint">{t('educator.analytics.last90')}</span>
       </div>
 
-      {loading && <p className="text-sm text-ink-muted">Loading…</p>}
+      {loading && <p className="text-sm text-ink-muted">{t('common.loading')}</p>}
       {error && <div className="text-sm text-kz-down mb-4">{error}</div>}
 
       {summary && (
@@ -126,7 +129,7 @@ export default function EducatorAnalyticsPage() {
           {/* Bila "All classes": jemputan ringkas ke arah pilih kelas. */}
           {classId === "all" && (
             <Alert tone="info" icon={<BookOpen className="w-4 h-4" />} className="mb-5">
-              Choose a class to see scores, who needs attention and team balance.
+              {t('educator.analytics.chooseClassHint')}
             </Alert>
           )}
 
@@ -134,10 +137,10 @@ export default function EducatorAnalyticsPage() {
           <Card className="mb-5">
             <StatGroup
               stats={[
-                { label: "Learners", value: learners },
-                { label: "Active in 30 days", value: active30 },
-                { label: "Inactive over 7 days", value: atRisk },
-                { label: "Total events", value: t?.total_events ?? 0 },
+                { label: t('educator.analytics.statLearners'), value: learners },
+                { label: t('educator.analytics.statActive30'), value: active30 },
+                { label: t('educator.analytics.statInactive7'), value: atRisk },
+                { label: t('educator.analytics.statTotalEvents'), value: jumlah?.total_events ?? 0 },
               ]}
             />
           </Card>
@@ -145,43 +148,43 @@ export default function EducatorAnalyticsPage() {
           {atRisk > 0 && (
             <Alert tone="warning" icon={<AlertTriangle className="w-4 h-4" />} className="mb-5">
               <span>
-                {atRisk} {atRisk === 1 ? "learner has" : "learners have"} not visited in over a week.{" "}
-                <a href="#explore" className="text-brand-purple hover:underline">View learners →</a>
+                {terjemahBilangan(bahasa, 'educator.analytics.atRiskOne', 'educator.analytics.atRiskOther', atRisk, { n: atRisk })}{" "}
+                <a href="#explore" className="text-brand-purple hover:underline">{t('educator.analytics.viewLearners')} →</a>
               </span>
             </Alert>
           )}
 
           <Card className="mb-5">
             <CardHead
-              title="Daily active learners"
-              subtitle="Last 90 days"
+              title={t('educator.analytics.dailyTitle')}
+              subtitle={t('educator.analytics.last90')}
             />
             <div className="mt-4">
               {dataHarian.length === 0 ? (
-                <p className="text-[14px] text-ink-faint">No data yet, analytics start collecting now.</p>
+                <p className="text-[14px] text-ink-faint">{t('educator.analytics.noData')}</p>
               ) : (
-                <LineChart labelAks="Daily active learners, last 90 days" data={dataHarian} tinggi={180} />
+                <LineChart labelAks={t('educator.analytics.dailyChartAria')} data={dataHarian} tinggi={180} />
               )}
             </div>
             <details className="mt-3 border-t border-kz-line pt-3">
               <summary className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink">
                 <BarChart3 className="w-4 h-4 text-ink-faint" />
-                More usage metrics
-                <span className="text-ink-faint">· {t!.page_views.toLocaleString()} page views</span>
+                {t('educator.analytics.moreUsage')}
+                <span className="text-ink-faint">· {t('educator.analytics.pageViewsCount', { n: jumlah!.page_views.toLocaleString(LOKAL[bahasa]) })}</span>
               </summary>
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4 mt-4">
-                <Stat icon={<Eye className="w-5 h-5" />} label="Page views" value={t!.page_views} />
-                <Stat icon={<LogIn className="w-5 h-5" />} label="Sign ins" value={t!.logins} />
-                <Stat icon={<Target className="w-5 h-5" />} label="Activity opens" value={t!.quest_opens} />
-                <Stat icon={<CheckCircle2 className="w-5 h-5" />} label="Submissions" value={t!.quest_submits} />
-                <Stat icon={<TrendingUp className="w-5 h-5" />} label="Total events" value={t!.total_events} />
-                <Stat icon={<Activity className="w-5 h-5" />} label="Active in 24 hours" value={inact!.active_1d} />
+                <Stat icon={<Eye className="w-5 h-5" />} label={t('educator.analytics.statPageViews')} value={jumlah!.page_views} />
+                <Stat icon={<LogIn className="w-5 h-5" />} label={t('educator.analytics.statSignIns')} value={jumlah!.logins} />
+                <Stat icon={<Target className="w-5 h-5" />} label={t('educator.analytics.statActivityOpens')} value={jumlah!.quest_opens} />
+                <Stat icon={<CheckCircle2 className="w-5 h-5" />} label={t('educator.analytics.statSubmissions')} value={jumlah!.quest_submits} />
+                <Stat icon={<TrendingUp className="w-5 h-5" />} label={t('educator.analytics.statTotalEvents')} value={jumlah!.total_events} />
+                <Stat icon={<Activity className="w-5 h-5" />} label={t('educator.analytics.statActive24')} value={inact!.active_1d} />
               </div>
               <div className="mt-5">
                 <p className="text-sm text-ink-muted mb-2 flex items-center gap-1.5">
-                  <BookOpen className="w-4 h-4 text-ink-faint" /> When students actually work
+                  <BookOpen className="w-4 h-4 text-ink-faint" /> {t('educator.analytics.whenStudentsWork')}
                 </p>
-                <BarChart labelAks="Events by hour of day" data={dataJam} />
+                <BarChart labelAks={t('educator.analytics.hourlyChartAria')} data={dataJam} />
               </div>
             </details>
           </Card>
@@ -192,7 +195,7 @@ export default function EducatorAnalyticsPage() {
           <details className="surface p-5 mb-4">
             <summary className="flex items-center gap-2 cursor-pointer select-none text-sm text-ink">
               <BarChart3 className="w-4 h-4 text-ink-faint" />
-              More class analytics
+              {t('educator.analytics.moreClassAnalytics')}
             </summary>
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-4 mt-4">
               <div className="lg:col-span-7 space-y-4">

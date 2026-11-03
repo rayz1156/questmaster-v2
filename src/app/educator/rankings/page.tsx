@@ -27,12 +27,14 @@ import {
   Select,
   type DataColumn,
 } from "@/components/ui";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 type AggScore = { team_id: string; team_name: string; total_score: number; quest_count: number };
 type BarisRank = { team_id: string; team_name: string; total_score: number; rank: number; quest_count?: number };
 type AhliKumpulan = { user_id: string; profile?: { display_name?: string | null; email?: string | null } | null };
 
 function RankingsInner() {
+  const { t } = useBahasa();
   const [classes, setClasses] = useState<Klass[]>([]);
   const sp = useSearchParams();
   const [classId, setClassId] = useState(sp.get('classId') || "");
@@ -83,8 +85,8 @@ function RankingsInner() {
   useEffect(() => {
     if (!classId) return;
     loadScores();
-    const t = setInterval(loadScores, 8000);
-    return () => clearInterval(t);
+    const pemasa = setInterval(loadScores, 8000);
+    return () => clearInterval(pemasa);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeId, hunts, classId]);
 
@@ -138,7 +140,7 @@ function RankingsInner() {
         setScores([]);
         setAdj(allAdj.sort((a, b) => b.created_at.localeCompare(a.created_at)));
       }
-    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "Failed to load rankings"); }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : t('educator.rankings.loadFailed')); }
   }
 
   // Markah sama berkongsi pangkat yang sama, dan pangkat seterusnya melompat.
@@ -160,7 +162,7 @@ function RankingsInner() {
   const lajur: DataColumn<BarisRank>[] = [
     {
       key: "rank",
-      header: "Rank",
+      header: t('educator.rankings.colRank'),
       render: (r) => (
         <span className="flex items-center gap-1.5 text-[14px] font-semibold text-ink tabular-nums">
           {semuaSifar ? "–" : r.rank}
@@ -170,7 +172,7 @@ function RankingsInner() {
     },
     {
       key: "team",
-      header: "Team",
+      header: t('educator.rankings.colTeam'),
       render: (r, i) => (
         <span className="flex items-center gap-3 py-3">
           <InitialTile name={r.team_name} index={i} />
@@ -180,7 +182,7 @@ function RankingsInner() {
     },
     {
       key: "activities",
-      header: "Activities",
+      header: t('educator.rankings.colActivities'),
       hideOnMobile: true,
       className: "text-right",
       render: (r) => (
@@ -191,15 +193,15 @@ function RankingsInner() {
     },
     {
       key: "progress",
-      header: "Progress",
+      header: t('educator.rankings.colProgress'),
       hideOnMobile: true,
       render: (r) => (
-        <ProgressBar value={r.total_score} max={top} label={`Progress for ${r.team_name}`} />
+        <ProgressBar value={r.total_score} max={top} label={t('educator.rankings.progressFor', { nama: r.team_name })} />
       ),
     },
     {
       key: "points",
-      header: "Points",
+      header: t('educator.rankings.colPoints'),
       className: "text-right",
       render: (r) => <span className="text-[13px] font-medium text-ink tabular-nums">{r.total_score}</span>,
     },
@@ -210,24 +212,24 @@ function RankingsInner() {
       <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
         <div>
           <h2 className="section-title">
-            {semuaSifar ? "Class rankings" : "A little competition. A lot of progress."}
+            {semuaSifar ? t('educator.rankings.titleZero') : t('educator.rankings.title')}
           </h2>
           <p className="text-sm text-ink-muted mt-0.5">
-            Teams earn points through class activities. Rankings update in real time.
+            {t('educator.rankings.desc')}
           </p>
         </div>
         <div className="flex items-center gap-3">
           {classId && hunts.length > 0 && (
-            <Select className="w-auto" value={activeId} onChange={e => setActiveId(e.target.value)} aria-label="Filter by activity">
-              <option value="">All activities</option>
+            <Select className="w-auto" value={activeId} onChange={e => setActiveId(e.target.value)} aria-label={t('educator.rankings.filterAria')}>
+              <option value="">{t('educator.rankings.allActivities')}</option>
               {hunts.map(h => <option key={h.id} value={h.id}>{h.title}</option>)}
             </Select>
           )}
           <Button variant="outline" onClick={loadScores}>
-            <RefreshCw className="w-4 h-4" /> Refresh
+            <RefreshCw className="w-4 h-4" /> {t('common.refresh')}
           </Button>
           <span className="inline-flex items-center gap-1.5 text-[12px] font-medium text-kz-up">
-            <span className="w-1.5 h-1.5 rounded-full bg-kz-up" aria-hidden="true" /> Live
+            <span className="w-1.5 h-1.5 rounded-full bg-kz-up" aria-hidden="true" /> {t('educator.rankings.live')}
           </span>
         </div>
       </div>
@@ -236,8 +238,8 @@ function RankingsInner() {
 
       {semuaSifar && (
         <Alert tone="info" icon={<BarChart3 className="w-4 h-4" />} className="mb-5">
-          <span className="font-semibold text-ink">A fresh start.</span>{" "}
-          Rankings begin when teams earn points.
+          <span className="font-semibold text-ink">{t('educator.rankings.freshStart')}</span>{" "}
+          {t('educator.rankings.freshStartDesc')}
         </Alert>
       )}
 
@@ -252,13 +254,13 @@ function RankingsInner() {
         <div className="bg-white rounded-[4px] shadow-card">
           <EmptyState
             icon={<Users className="w-6 h-6" />}
-            title="No teams yet."
-            text="Create teams in this class and rankings will appear here."
+            title={t('educator.rankings.noTeamsTitle')}
+            text={t('educator.rankings.noTeamsText')}
           />
         </div>
       ) : (
         <DataTable
-          label="Team rankings"
+          label={t('educator.rankings.tableLabel')}
           columns={lajur}
           rows={ranked}
           rowKey={(r) => r.team_id}
@@ -267,8 +269,8 @@ function RankingsInner() {
             expandedTeam === r.team_id ? (
               <div className="py-2">
                 <div className="pl-4 sm:pl-[68px] border-l-2 border-[#ebe2ff] space-y-1">
-                  {!teamMembers[r.team_id] ? <p className="text-xs text-ink-faint py-1">Loading members…</p> :
-                   teamMembers[r.team_id].length === 0 ? <p className="text-xs text-ink-faint py-1">No members</p> :
+                  {!teamMembers[r.team_id] ? <p className="text-xs text-ink-faint py-1">{t('educator.rankings.loadingMembers')}</p> :
+                   teamMembers[r.team_id].length === 0 ? <p className="text-xs text-ink-faint py-1">{t('educator.rankings.noMembers')}</p> :
                    teamMembers[r.team_id].map((m: AhliKumpulan) => (
                     <div key={m.user_id} className="text-xs text-ink-muted flex items-center gap-2 py-0.5">
                       <UserIcon className="w-3 h-3 text-ink-faint"/>
@@ -287,7 +289,7 @@ function RankingsInner() {
 
       {ranked.length > 0 && (
         <p className="text-xs text-ink-faint mt-3">
-          Updates automatically · Equal scores share a rank · Click a team to see its members
+          {t('educator.rankings.footerNote')}
         </p>
       )}
     </>
@@ -304,13 +306,13 @@ function RankingsInner() {
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        title="Rankings"
-        description="Choose a class to see how its teams are doing."
+        title={t('educator.rankings.pageTitle')}
+        description={t('educator.rankings.pageDesc')}
       />
       {classes.length > 0 && (
         <div className="flex items-center gap-3 flex-wrap mb-5">
-          <Select className="w-auto" value={classId} onChange={e => setClassId(e.target.value)} aria-label="Select a class">
-            <option value="">Select a class</option>
+          <Select className="w-auto" value={classId} onChange={e => setClassId(e.target.value)} aria-label={t('educator.rankings.selectClassAria')}>
+            <option value="">{t('educator.rankings.selectClass')}</option>
             {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </Select>
         </div>
@@ -318,12 +320,15 @@ function RankingsInner() {
       <div className="bg-white rounded-[4px] shadow-card">
         <EmptyState
           icon={<BarChart3 className="w-6 h-6" />}
-          title="Pick a class."
-          text="Rankings belong to a class, so choose one above."
+          title={t('educator.rankings.pickTitle')}
+          text={t('educator.rankings.pickText')}
         />
       </div>
     </Shell>
   );
 }
 
-export default function Rankings() { return <Suspense fallback={<p>Loading...</p>}><RankingsInner /></Suspense>; }
+export default function Rankings() {
+  const { t } = useBahasa();
+  return <Suspense fallback={<p>{t('common.loadingDots')}</p>}><RankingsInner /></Suspense>;
+}
