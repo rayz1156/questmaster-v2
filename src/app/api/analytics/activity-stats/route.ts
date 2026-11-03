@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -9,12 +10,12 @@ export const dynamic = 'force-dynamic';
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const classId = url.searchParams.get('classId');
-  if (!classId) return NextResponse.json({ error: 'classId required' }, { status: 400 });
+  if (!classId) return ralatJson('classId required', 400);
 
   const supa = getRouteSupabase(req);
   const { data: userData } = await supa.auth.getUser();
   const uid = userData?.user?.id;
-  if (!uid) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!uid) return ralatJson('Unauthorized', 401);
 
   // RLS will enforce the educator can only read their own classes; if zero rows return, surface as forbidden
   const { data: hunts, error: huntsErr } = await supa
@@ -22,7 +23,7 @@ export async function GET(req: NextRequest) {
     .select('id,title,points,status,start_at,end_at,created_at')
     .eq('class_id', classId)
     .order('created_at', { ascending: true });
-  if (huntsErr) return NextResponse.json({ error: huntsErr.message }, { status: 500 });
+  if (huntsErr) return ralatJson(huntsErr.message, 500);
 
   const { count: memberCount } = await supa
     .from('qm_class_members')

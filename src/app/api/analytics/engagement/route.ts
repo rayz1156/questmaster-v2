@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export async function GET(req: NextRequest) {
   try {
@@ -9,7 +10,7 @@ export async function GET(req: NextRequest) {
     const supa = getRouteSupabase(req);
     const { data: userData } = await supa.auth.getUser();
     if (!userData?.user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      return ralatJson('Not authenticated', 401);
     }
 
     // Call the SQL helper function (defined in the migration) which enforces
@@ -19,11 +20,11 @@ export async function GET(req: NextRequest) {
     });
     if (error) {
       console.error('engagement rpc failed', error);
-      return NextResponse.json({ error: error.message }, { status: 500 });
+      return ralatJson(error.message, 500);
     }
     return NextResponse.json({ data });
   } catch (e: unknown) {
     const msg = e instanceof Error ? e.message : 'Unknown error';
-    return NextResponse.json({ error: msg }, { status: 500 });
+    return ralatJson(msg, 500);
   }
 }

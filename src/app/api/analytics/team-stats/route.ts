@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 
@@ -14,17 +15,17 @@ type CompletionRow = { team_id: string; hunt_id: string; awarded_points: number 
 export async function GET(req: NextRequest) {
   const url = new URL(req.url);
   const classId = url.searchParams.get('classId');
-  if (!classId) return NextResponse.json({ error: 'classId required' }, { status: 400 });
+  if (!classId) return ralatJson('classId required', 400);
 
   const supa = getRouteSupabase(req);
   const { data: userData } = await supa.auth.getUser();
-  if (!userData?.user?.id) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  if (!userData?.user?.id) return ralatJson('Unauthorized', 401);
 
   const { data: huntsData, error: huntsErr } = await supa
     .from('qm_hunts')
     .select('id,title,class_id')
     .eq('class_id', classId);
-  if (huntsErr) return NextResponse.json({ error: huntsErr.message }, { status: 500 });
+  if (huntsErr) return ralatJson(huntsErr.message, 500);
   const hunts: HuntRow[] = (huntsData ?? []) as HuntRow[];
   if (hunts.length === 0) return NextResponse.json({ hunts: [] });
 
