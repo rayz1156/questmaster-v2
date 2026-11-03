@@ -11,6 +11,8 @@ import { mampatImej } from '@/lib/mampatImej';
 
 import { supabase } from '@/lib/supabase';
 import { ConfirmDialog } from '@/components/ui/PromptDialog';
+import { LOKAL, terjemahBilangan } from '@/lib/i18n';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 /** Wrap fetch() to attach the Supabase access token so /api/* routes can auth. */
 async function authedFetch(input: RequestInfo | URL, init: RequestInit = {}): Promise<Response> {
@@ -41,13 +43,15 @@ function formatBytes(n?: number | null) {
   return `${(n / 1024 / 1024).toFixed(1)} MB`;
 }
 
-function visibilityLabel(v: SubmissionVisibility) {
-  if (v === 'public') return 'Public (all in class)';
-  if (v === 'private') return 'Private (only submitter + educator)';
-  return 'Class-scoped';
-}
-
 export default function SubmissionBoardView({ huntId, classId, initialBoard, initialItems, myRole, myId, initialColumns = []}: Props) {
+  const { t, bahasa } = useBahasa();
+  // Dilindung di dalam komponen kerana fungsi terjemahan t tiada pada
+  // peringkat modul.
+  function visibilityLabel(v: SubmissionVisibility) {
+    if (v === 'public') return t('boards.submission.visPublic');
+    if (v === 'private') return t('boards.submission.visPrivate');
+    return t('boards.submission.visClassScoped');
+  }
   const [board, setBoard] = useState<SubmissionBoard | null>(initialBoard);
   const [items, setItems] = useState<SubmissionBoardItem[]>(initialItems);
   const [columns, setColumns] = useState<SubmissionBoardColumn[]>(initialColumns);
@@ -79,8 +83,8 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   async function createBoard() {
     setSavingBoard(true);
     setErr(null);
-    const r = await authedFetch(apiBase, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: 'Submission Board' }) });
-    if (!r.ok) { setErr((await r.json()).error || 'Failed to create board'); }
+    const r = await authedFetch(apiBase, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ title: t('boards.submission.createBoardTitle') }) });
+    if (!r.ok) { setErr((await r.json()).error || t('boards.submission.createBoardFailed')); }
     else { await refresh(); }
     setSavingBoard(false);
   }
@@ -104,18 +108,19 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   }
 
   async function createColumn() {
-    const t = newColTitle.trim();
-    if (!t) return;
+    // Namakan semula supaya tidak bertembung dengan fungsi terjemahan t.
+    const tajuk = newColTitle.trim();
+    if (!tajuk) return;
     setAddingCol(true);
     setErr(null);
     try {
       const r = await authedFetch(apiBase + '/columns', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: t })
+        body: JSON.stringify({ title: tajuk })
       });
       const j = await r.json();
-      if (!r.ok) throw new Error(j.error || 'Failed to create column');
+      if (!r.ok) throw new Error(j.error || t('boards.submission.failedCreateColumn'));
       setColumns([...columns, j.column]);
       setNewColTitle('');
     } catch (e: any) {
@@ -126,20 +131,21 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   }
 
   async function renameColumn(columnId: string, title: string) {
-    const t = title.trim();
-    if (!t) return;
+    // Namakan semula supaya tidak bertembung dengan fungsi terjemahan t.
+    const tajuk = title.trim();
+    if (!tajuk) return;
     const prev = columns;
-    setColumns(columns.map((c) => c.id === columnId ? { ...c, title: t } : c));
+    setColumns(columns.map((c) => c.id === columnId ? { ...c, title: tajuk } : c));
     setEditingColId(null);
     try {
       const r = await authedFetch(apiBase + '/columns/' + columnId, {
         method: 'PATCH',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ title: t })
+        body: JSON.stringify({ title: tajuk })
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
-        throw new Error(j.error || 'Failed to rename');
+        throw new Error(j.error || t('boards.submission.failedRename'));
       }
     } catch (e: any) {
       setErr(e.message || String(e));
@@ -152,14 +158,16 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
     if (!col) return;
     const itemsHere = items.filter((i) => i.column_id === columnId);
     if (itemsHere.length > 0 && !isEducator) {
-      setErr('Column has ' + itemsHere.length + ' item' + (itemsHere.length === 1 ? '' : 's') + '. Move them first, or ask your educator to delete.');
+      setErr(terjemahBilangan(bahasa, 'boards.submission.colItemsOne', 'boards.submission.colItemsOther', itemsHere.length, { n: itemsHere.length }));
       return;
     }
-    const desc = itemsHere.length > 0 ? `${itemsHere.length} item(s) inside will be detached.` : 'This action cannot be undone.';
+    const desc = itemsHere.length > 0
+      ? terjemahBilangan(bahasa, 'boards.submission.detachedOne', 'boards.submission.detachedOther', itemsHere.length, { n: itemsHere.length })
+      : t('boards.submission.actionCannotUndo');
     setConfirmState({
-      title: `Delete column "${col.title}"?`,
+      title: t('boards.submission.deleteColumnTitle', { tajuk: col.title }),
       description: desc,
-      confirmLabel: 'Delete',
+      confirmLabel: t('boards.submission.deleteLabel'),
       tone: 'danger',
       onConfirm: async () => {
         setConfirmState(null);
@@ -169,7 +177,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
           const r = await authedFetch(apiBase + '/columns/' + columnId, { method: 'DELETE' });
           if (!r.ok) {
             const j = await r.json().catch(() => ({}));
-            throw new Error(j.error || 'Failed to delete column');
+            throw new Error(j.error || t('boards.submission.failedDeleteColumn'));
           }
           // Items in this column had column_id set to NULL via ON DELETE SET NULL
           setItems(items.map((i) => i.column_id === columnId ? { ...i, column_id: null } : i));
@@ -195,7 +203,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
       });
       if (!r.ok) {
         const j = await r.json().catch(() => ({}));
-        throw new Error(j.error || 'Failed to move card');
+        throw new Error(j.error || t('boards.submission.failedMoveCard'));
       }
     } catch (e: any) {
       setErr(e.message || String(e));
@@ -205,15 +213,15 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
 
   async function deleteItem(id: string) {
     setConfirmState({
-      title: 'Delete this submission?',
-      description: 'This action cannot be undone.',
-      confirmLabel: 'Delete',
+      title: t('boards.submission.deleteItemTitle'),
+      description: t('boards.submission.actionCannotUndo'),
+      confirmLabel: t('boards.submission.deleteLabel'),
       tone: 'danger',
       onConfirm: async () => {
         setConfirmState(null);
         const r = await authedFetch(`${apiBase}/items/${id}`, { method: 'DELETE' });
         if (r.ok) setItems(items.filter((i) => i.id !== id));
-        else setErr((await r.json()).error || 'Delete failed');
+        else setErr((await r.json()).error || t('boards.submission.deleteFailed'));
       },
     });
   }
@@ -221,13 +229,13 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
   if (!board) {
     return (
       <div className="card p-6 text-center">
-        <p className="text-sm text-gray-600 mb-3">No submission board for this activity in this class yet.</p>
+        <p className="text-sm text-gray-600 mb-3">{t('boards.submission.noBoard')}</p>
         {isEducator ? (
           <button onClick={createBoard} disabled={savingBoard} className="btn-primary inline-flex items-center gap-2 px-4 py-2">
-            <Plus className="w-4 h-4" /> Create Submission Board
+            <Plus className="w-4 h-4" /> {t('boards.submission.createBoardBtn')}
           </button>
         ) : (
-          <p className="text-xs text-gray-500">Ask your educator to create one.</p>
+          <p className="text-xs text-gray-500">{t('boards.submission.askEducator')}</p>
         )}
         {err && <p className="text-xs text-red-600 mt-2">{err}</p>}
       </div>
@@ -248,9 +256,9 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
             </span>
             <span className={`px-2 py-0.5 rounded inline-flex items-center gap-1 ${board.is_open ? 'bg-emerald-100 text-emerald-800' : 'bg-gray-200 text-gray-700'}`}>
               {board.is_open ? <Unlock className="w-3 h-3" /> : <Lock className="w-3 h-3" />}
-              {board.is_open ? 'Open' : 'Closed'}
+              {board.is_open ? t('boards.submission.openLabel') : t('boards.submission.closedLabel')}
             </span>
-            <span className="text-gray-500 inline-flex items-center gap-1"><Users className="w-3 h-3" /> {items.length} submission{items.length === 1 ? '' : 's'}</span>
+            <span className="text-gray-500 inline-flex items-center gap-1"><Users className="w-3 h-3" /> {terjemahBilangan(bahasa, 'boards.submission.submissionOne', 'boards.submission.submissionOther', items.length, { n: items.length })}</span>
           </div>
         </div>
         <div className="flex flex-wrap items-center gap-2">
@@ -262,19 +270,19 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
                 onChange={(e) => updateBoard({ visibility: e.target.value as SubmissionVisibility })}
                 disabled={savingBoard}
               >
-                <option value="class_scoped">Class-scoped</option>
-                <option value="public">Public</option>
-                <option value="private">Private</option>
+                <option value="class_scoped">{t('boards.submission.visClassScoped')}</option>
+                <option value="public">{t('boards.submission.visPublic')}</option>
+                <option value="private">{t('boards.submission.visPrivate')}</option>
               </select>
               <button onClick={() => updateBoard({ is_open: !board.is_open })} disabled={savingBoard} className="btn-secondary inline-flex items-center gap-1 px-3 py-1.5 text-xs">
                 {board.is_open ? <Lock className="w-3 h-3" /> : <Unlock className="w-3 h-3" />}
-                {board.is_open ? 'Close' : 'Open'}
+                {board.is_open ? t('boards.submission.closeLabel') : t('boards.submission.openLabel')}
               </button>
             </>
           )}
           {board.is_open && (
             <button onClick={() => setShowSubmit(true)} className="btn-primary inline-flex items-center gap-1 px-3 py-1.5 text-sm">
-              <Plus className="w-4 h-4" /> New Submission
+              <Plus className="w-4 h-4" /> {t('boards.submission.newSubmission')}
             </button>
           )}
         </div>
@@ -282,25 +290,25 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
 
       {/* Layout toolbar */}
       <div className="flex flex-wrap items-center gap-2 text-xs">
-        <span className="text-gray-600">View:</span>
+        <span className="text-gray-600">{t('boards.submission.viewLabel')}</span>
         <div className="inline-flex rounded-md overflow-hidden border border-gray-200">
           <button
             type="button"
             onClick={() => changeLayout('columns')}
             disabled={savingBoard}
             className={`px-3 py-1.5 transition ${layoutMode === 'columns' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-            title="Display submissions side by side in columns"
-          >Columns</button>
+            title={t('boards.submission.layoutColumnsTitle')}
+          >{t('boards.submission.layoutColumns')}</button>
           <button
             type="button"
             onClick={() => changeLayout('mood')}
             disabled={savingBoard}
             className={`px-3 py-1.5 transition ${layoutMode === 'mood' ? 'bg-indigo-600 text-white' : 'text-gray-600 hover:bg-gray-50'}`}
-            title="Display submissions as a free mood-board grid"
-          >Mood board</button>
+            title={t('boards.submission.layoutMoodTitle')}
+          >{t('boards.submission.layoutMood')}</button>
         </div>
         <span className="text-gray-400">·</span>
-        <span className="text-gray-500">{items.length} item{items.length === 1 ? '' : 's'} in {Math.max(1, columns.length)} column{columns.length === 1 ? '' : 's'}</span>
+        <span className="text-gray-500">{terjemahBilangan(bahasa, 'boards.submission.itemOne', 'boards.submission.itemOther', items.length, { n: items.length })} {t('boards.submission.wordIn')} {terjemahBilangan(bahasa, 'boards.submission.columnOne', 'boards.submission.columnOther', Math.max(1, columns.length), { n: Math.max(1, columns.length) })}</span>
       </div>
 
       {/* Items renderer */}
@@ -315,7 +323,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
           editingColTitle={editingColTitle}
           newColTitle={newColTitle}
           addingCol={addingCol}
-          onSetEditingCol={(id, t) => { setEditingColId(id); setEditingColTitle(t); }}
+          onSetEditingCol={(id, tajuk) => { setEditingColId(id); setEditingColTitle(tajuk); }}
           onSetEditingColTitle={setEditingColTitle}
           onCommitColTitle={renameColumn}
           onDeleteColumn={deleteColumn}
@@ -329,7 +337,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
         />
       ) : (
         items.length === 0 ? (
-          <div className="card p-6 text-center text-sm text-gray-500">No submissions yet.</div>
+          <div className="card p-6 text-center text-sm text-gray-500">{t('boards.submission.noSubmissions')}</div>
         ) : (
         <div
           className="mx-0 mt-2 mb-8 rounded-3xl px-4 sm:px-6 pt-6 pb-10 min-h-[60vh] shadow-inner relative"
@@ -385,7 +393,7 @@ export default function SubmissionBoardView({ huntId, classId, initialBoard, ini
         open={!!confirmState}
         title={confirmState?.title ?? ''}
         description={confirmState?.description}
-        confirmLabel={confirmState?.confirmLabel ?? 'Confirm'}
+        confirmLabel={confirmState?.confirmLabel ?? t('common.confirm')}
         tone={confirmState?.tone ?? 'default'}
         onConfirm={() => confirmState?.onConfirm()}
         onCancel={() => setConfirmState(null)}
@@ -424,6 +432,7 @@ interface ColumnsViewProps {
 }
 
 function ColumnsView(props: ColumnsViewProps) {
+  const { t } = useBahasa();
   const { items, columns, myId, isEducator, draggingItemId, editingColId, editingColTitle, newColTitle, addingCol,
           onSetEditingCol, onSetEditingColTitle, onCommitColTitle, onDeleteColumn, onSetNewColTitle, onCreateColumn, onRequestAddToColumn,
           onSetDraggingItem, onMoveItem, onEditItem, onDeleteItem } = props;
@@ -465,7 +474,7 @@ function ColumnsView(props: ColumnsViewProps) {
                   type="button"
                   onClick={() => onSetEditingCol(col.id, col.title)}
                   className="flex-1 min-w-0 truncate text-left text-sm font-semibold text-gray-800 hover:text-indigo-700"
-                  title="Click to rename"
+                  title={t('boards.submission.clickRename')}
                 >{col.title}</button>
               )}
               <span className="text-xs text-gray-500">{colItems.length}</span>
@@ -473,12 +482,12 @@ function ColumnsView(props: ColumnsViewProps) {
                 type="button"
                 onClick={() => onDeleteColumn(col.id)}
                 className="text-xs text-gray-400 hover:text-red-600 px-1"
-                title={colItems.length > 0 && !isEducator ? 'Column not empty (educator can still delete)' : 'Delete column'}
+                title={colItems.length > 0 && !isEducator ? t('boards.submission.colNotEmptyTitle') : t('boards.submission.deleteColumnLabel')}
               >✕</button>
             </div>
             <div className="flex flex-col gap-2 min-h-[40px] max-h-[60vh] overflow-y-auto pr-1 -mr-1">
               {colItems.length === 0 ? (
-                <div className="text-xs text-gray-400 text-center py-3 border border-dashed border-gray-200 rounded">Drop here</div>
+                <div className="text-xs text-gray-400 text-center py-3 border border-dashed border-gray-200 rounded">{t('boards.submission.dropHere')}</div>
               ) : colItems.map((it) => (
                 <div
                   key={it.id}
@@ -498,7 +507,7 @@ function ColumnsView(props: ColumnsViewProps) {
                   />
                 </div>
               ))}
-          <button type="button" onClick={() => onRequestAddToColumn(col.id)} className="text-xs text-gray-500 hover:text-indigo-700 border border-dashed border-gray-300 hover:border-indigo-400 rounded py-1.5 mt-1" title="Add submission to this column">+ Upload here</button>
+          <button type="button" onClick={() => onRequestAddToColumn(col.id)} className="text-xs text-gray-500 hover:text-indigo-700 border border-dashed border-gray-300 hover:border-indigo-400 rounded py-1.5 mt-1" title={t('boards.submission.uploadHereTitle')}>{t('boards.submission.uploadHere')}</button>
             </div>
           </div>
         );
@@ -517,7 +526,7 @@ function ColumnsView(props: ColumnsViewProps) {
             }
           }}
         >
-          <div className="text-sm font-semibold text-yellow-800 px-1">Uncategorised ({orphanItems.length})</div>
+          <div className="text-sm font-semibold text-yellow-800 px-1">{t('boards.submission.uncategorisedCount', { n: orphanItems.length })}</div>
           <div className="flex flex-col gap-2 max-h-[60vh] overflow-y-auto pr-1 -mr-1">
             {orphanItems.map((it) => (
               <div
@@ -538,7 +547,7 @@ function ColumnsView(props: ColumnsViewProps) {
                 />
               </div>
             ))}
-        <button type="button" onClick={() => onRequestAddToColumn(null)} className="text-xs text-yellow-700 hover:text-yellow-900 border border-dashed border-yellow-300 hover:border-yellow-500 rounded py-1.5 mt-1" title="Add new submission (uncategorised)">+ Upload</button>
+        <button type="button" onClick={() => onRequestAddToColumn(null)} className="text-xs text-yellow-700 hover:text-yellow-900 border border-dashed border-yellow-300 hover:border-yellow-500 rounded py-1.5 mt-1" title={t('boards.submission.uploadUncatTitle')}>{t('boards.submission.uploadBtn')}</button>
           </div>
         </div>
       )}
@@ -549,7 +558,7 @@ function ColumnsView(props: ColumnsViewProps) {
           <div className="flex items-center gap-1">
             <input
               type="text"
-              placeholder="+ New column title…"
+              placeholder={t('boards.submission.newColPlaceholder')}
               value={newColTitle}
               onChange={(e) => onSetNewColTitle(e.target.value)}
               onKeyDown={(e) => { if (e.key === 'Enter') onCreateColumn(); }}
@@ -561,7 +570,7 @@ function ColumnsView(props: ColumnsViewProps) {
               onClick={onCreateColumn}
               disabled={addingCol || !newColTitle.trim()}
               className="px-2 py-1.5 text-sm bg-indigo-600 text-white rounded hover:bg-indigo-700 disabled:opacity-50"
-            >Add</button>
+            >{t('boards.submission.addLabel')}</button>
           </div>
         </div>
       </div>
@@ -570,6 +579,7 @@ function ColumnsView(props: ColumnsViewProps) {
 }
 
 function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol }: { item: SubmissionBoardItem; myId: string; isEducator: boolean; onEdit: () => void; onDelete: () => void; columns: SubmissionBoardColumn[]; onMoveCol: (colId: string | null) => void }) {
+  const { t, bahasa } = useBahasa();
   const isOwner = item.submitted_by === myId;
   const canEdit = isOwner || isEducator;
 
@@ -579,13 +589,13 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol
         <ItemTypeBadge type={item.item_type} />
         <div className="min-w-0 flex-1">
           {item.title && <p className="text-sm font-semibold truncate">{item.title}</p>}
-          {item.submitter && <p className="text-xs text-gray-500 truncate">{item.submitter.display_name || 'Student'}</p>}
+          {item.submitter && <p className="text-xs text-gray-500 truncate">{item.submitter.display_name || t('common.student')}</p>}
         </div>
       </div>
 
       {item.item_type === 'image' && item.image_url && (
         <a href={item.image_url} target="_blank" rel="noopener noreferrer" className="block">
-          <img src={item.image_url} alt={item.title || 'Submission image'} referrerPolicy="no-referrer" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} className="w-full h-40 object-cover rounded" />
+          <img src={item.image_url} alt={item.title || t('boards.submission.submissionImageAlt')} referrerPolicy="no-referrer" loading="lazy" onError={(e) => { (e.currentTarget as HTMLImageElement).style.display = 'none'; }} className="w-full h-40 object-cover rounded" />
         </a>
       )}
       {item.item_type === 'video' && (() => {
@@ -596,7 +606,7 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol
         return (
           <div className="relative w-full bg-black rounded overflow-hidden group" style={{aspectRatio: '16/9'}}>
             <iframe src={vSrc} className="absolute inset-0 w-full h-full" allow="autoplay; encrypted-media; fullscreen; picture-in-picture" allowFullScreen />
-            <a href={vSrc} target="_blank" rel="noopener noreferrer" title="Open video in new tab (better for portrait videos)" className="absolute top-1 right-1 z-10 bg-black/70 hover:bg-black/90 text-white text-[10px] font-semibold px-2 py-1 rounded shadow-md transition">⤢ Enlarge</a>
+            <a href={vSrc} target="_blank" rel="noopener noreferrer" title={t('boards.submission.openVideoTitle')} className="absolute top-1 right-1 z-10 bg-black/70 hover:bg-black/90 text-white text-[10px] font-semibold px-2 py-1 rounded shadow-md transition">{t('boards.submission.enlarge')}</a>
           </div>
         );
       })()}
@@ -614,7 +624,7 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol
         <a href={item.file_url} download={item.file_name || true} className="flex items-center gap-2 p-2 rounded bg-gray-50 hover:bg-gray-100 text-xs">
           <Paperclip className="w-4 h-4" />
           <div className="min-w-0 flex-1">
-            <p className="font-semibold truncate">{item.file_name || 'Download'}</p>
+            <p className="font-semibold truncate">{item.file_name || t('common.download')}</p>
             <p className="text-gray-500">{item.file_mime_type} · {formatBytes(item.file_size_bytes)}</p>
           </div>
           <Download className="w-4 h-4" />
@@ -624,22 +634,22 @@ function ItemCard({ item, myId, isEducator, onEdit, onDelete, columns, onMoveCol
         <a href={item.chatbot_url} target="_blank" rel="noopener noreferrer" className="flex items-center gap-2 p-2 rounded bg-indigo-50 hover:bg-indigo-100 text-xs">
           <span className="w-8 h-8 rounded flex items-center justify-center bg-indigo-100 text-indigo-600 font-bold">AI</span>
           <span className="min-w-0 flex-1">
-            <span className="block font-semibold truncate text-indigo-700">{item.title || 'Learning Assistant'}</span>
-            <span className="block text-indigo-500">Open assistant</span>
+            <span className="block font-semibold truncate text-indigo-700">{item.title || t('boards.submission.assistantFallback')}</span>
+            <span className="block text-indigo-500">{t('boards.submission.openAssistant')}</span>
           </span>
         </a>
       )}
       {item.description && <p className="text-xs text-gray-700 whitespace-pre-wrap break-words line-clamp-4 max-h-24 overflow-hidden">{item.description}</p>}
 
       <div className="flex items-center justify-between mt-auto pt-2 border-t border-gray-100 text-xs text-gray-500">
-        <span title={new Date(item.created_at).toLocaleString()}>{new Date(item.created_at).toLocaleDateString()} {new Date(item.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+        <span title={new Date(item.created_at).toLocaleString(LOKAL[bahasa])}>{new Date(item.created_at).toLocaleDateString(LOKAL[bahasa])} {new Date(item.created_at).toLocaleTimeString(LOKAL[bahasa], { hour: '2-digit', minute: '2-digit' })}</span>
         <div className="flex items-center gap-2">
           {(item.item_type === 'file' || item.item_type === 'image') && (item.file_url || item.image_url) && (
-            <a href={item.file_url || item.image_url!} download className="hover:text-gray-900" title="Download"><Download className="w-4 h-4" /></a>
+            <a href={item.file_url || item.image_url!} download className="hover:text-gray-900" title={t('common.download')}><Download className="w-4 h-4" /></a>
           )}
-          {(canEdit || isEducator) && columns.length > 0 && (() => { const idx = columns.findIndex(c => c.id === item.column_id); const prev = idx > 0 ? columns[idx-1] : null; const next = idx >= 0 && idx < columns.length-1 ? columns[idx+1] : null; return (<><button type="button" onClick={() => onMoveCol(prev ? prev.id : null)} disabled={idx === 0 && !item.column_id} className="hover:text-indigo-700 disabled:opacity-30 px-1" title={prev ? `Move to ${prev.title}` : "Move to Uncategorised"}>←</button><button type="button" onClick={() => onMoveCol(next ? next.id : (columns[0]?.id || null))} className="hover:text-indigo-700 px-1" title={next ? `Move to ${next.title}` : (columns[0] ? `Move to ${columns[0].title}` : "Move")}>→</button></>); })()}
-        {canEdit && <button onClick={onEdit} className="hover:text-gray-900" title="Edit"><Edit2 className="w-4 h-4" /></button>}
-          {canEdit && <button onClick={onDelete} className="hover:text-red-600" title="Delete"><Trash2 className="w-4 h-4" /></button>}
+          {(canEdit || isEducator) && columns.length > 0 && (() => { const idx = columns.findIndex(c => c.id === item.column_id); const prev = idx > 0 ? columns[idx-1] : null; const next = idx >= 0 && idx < columns.length-1 ? columns[idx+1] : null; return (<><button type="button" onClick={() => onMoveCol(prev ? prev.id : null)} disabled={idx === 0 && !item.column_id} className="hover:text-indigo-700 disabled:opacity-30 px-1" title={prev ? t('boards.submission.moveWithTitle', { tajuk: prev.title }) : t('boards.submission.moveToUncategorised')}>←</button><button type="button" onClick={() => onMoveCol(next ? next.id : (columns[0]?.id || null))} className="hover:text-indigo-700 px-1" title={next ? t('boards.submission.moveWithTitle', { tajuk: next.title }) : (columns[0] ? t('boards.submission.moveWithTitle', { tajuk: columns[0].title }) : t('boards.submission.moveLabel'))}>→</button></>); })()}
+        {canEdit && <button onClick={onEdit} className="hover:text-gray-900" title={t('boards.submission.editLabel')}><Edit2 className="w-4 h-4" /></button>}
+          {canEdit && <button onClick={onDelete} className="hover:text-red-600" title={t('boards.submission.deleteLabel')}><Trash2 className="w-4 h-4" /></button>}
         </div>
       </div>
     </div>
@@ -663,6 +673,7 @@ function ItemTypeBadge({ type }: { type: SubmissionItemType }) {
 // Submit modal
 // ============================================================
 function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreated }: { apiBase: string; classId: string; isEducator: boolean; columnId: string | null; onClose: () => void; onCreated: (item: SubmissionBoardItem) => void }) {
+  const { t } = useBahasa();
   const [tab, setTab] = useState<TabType>('text');
   // KZ-017: keupayaan dalam konteks kelas supaya pelajar mengikut kebenaran
   // pemilik kelas, bukan hanya bendera akaun sendiri.
@@ -683,9 +694,9 @@ function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreate
       const baseBody: any = { itemType: tab === 'youtube' ? 'video' : tab, title: title || null, description: description || null, columnId: columnId || null };
 
       if (tab === 'text') {
-        if (!title && !description) throw new Error('Title or description required');
+        if (!title && !description) throw new Error(t('boards.submission.titleOrDescRequired'));
       } else if (tab === 'link') {
-        if (!linkUrl) throw new Error('Link URL required');
+        if (!linkUrl) throw new Error(t('boards.submission.linkUrlRequired'));
         baseBody.linkUrl = linkUrl;
       // Try to unfurl OpenGraph metadata (best-effort; failures are non-fatal)
       try {
@@ -698,11 +709,11 @@ function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreate
         }
       } catch { /* non-fatal */ }
       } else if (tab === 'image' || tab === 'file') {
-        if (!file) throw new Error('Please choose a file');
+        if (!file) throw new Error(t('boards.submission.chooseFileRequired'));
         const fd = new FormData();
         fd.append('file', tab === 'image' ? await mampatImej(file) : file);
         const ur = await authedFetch(`${apiBase}/upload-file`, { method: 'POST', body: fd });
-        if (!ur.ok) throw new Error((await ur.json()).error || 'Upload failed');
+        if (!ur.ok) throw new Error((await ur.json()).error || t('boards.submission.uploadFailed'));
         const uj = await ur.json();
         if (tab === 'image') {
           baseBody.imageUrl = uj.fileluFileUrl;
@@ -719,8 +730,8 @@ function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreate
         }
       } else if (tab === 'youtube') {
         const raw = ytUrl.trim();
-        if (!raw) throw new Error('Please paste a YouTube link');
-        if (!parseYouTubeId(raw)) throw new Error("That doesn't look like a valid YouTube link");
+        if (!raw) throw new Error(t('boards.submission.ytUrlRequired'));
+        if (!parseYouTubeId(raw)) throw new Error(t('boards.submission.invalidYoutube'));
         baseBody.videoProvider = 'youtube';
         baseBody.youtubeUrl = raw;
       }
@@ -728,7 +739,7 @@ function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreate
       // video hanya melalui tab YouTube di atas.
 
       const r = await authedFetch(`${apiBase}/items`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(baseBody) });
-      if (!r.ok) throw new Error((await r.json()).error || 'Create failed');
+      if (!r.ok) throw new Error((await r.json()).error || t('boards.submission.createFailed'));
       const j = await r.json();
       onCreated(j.item);
     } catch (e: any) {
@@ -742,23 +753,23 @@ function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreate
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className="bg-white rounded-lg max-w-lg w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
         <div className="p-4 border-b flex items-center justify-between">
-          <h3 className="font-bold">New Submission</h3>
+          <h3 className="font-bold">{t('boards.submission.newSubmission')}</h3>
           <button onClick={onClose} className="text-gray-500 hover:text-gray-900"><X className="w-5 h-5" /></button>
         </div>
         <div className="p-4 space-y-3">
           <div className="flex gap-1 flex-wrap">
             {/* KZ-039: tab 'video' (muat naik terus) dan 'chatbot' dibuang. */}
-            {(['text', 'image', 'youtube', 'link', 'file'] as TabType[]).map((t) => (
-              <button key={t} onClick={() => setTab(t)} className={`px-3 py-1.5 rounded text-xs ${tab === t ? 'bg-purple-600 text-white' : 'bg-gray-100'}`}>{t}</button>
+            {(['text', 'image', 'youtube', 'link', 'file'] as TabType[]).map((jenis) => (
+              <button key={jenis} onClick={() => setTab(jenis)} className={`px-3 py-1.5 rounded text-xs ${tab === jenis ? 'bg-purple-600 text-white' : 'bg-gray-100'}`}>{t(jenis === 'text' ? 'boards.submission.tabText' : jenis === 'image' ? 'boards.submission.tabImage' : jenis === 'youtube' ? 'boards.submission.tabYoutube' : jenis === 'link' ? 'boards.submission.tabLink' : 'boards.submission.tabFile')}</button>
             ))}
           </div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title (optional)" className="input w-full" />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description (optional)" className="input w-full" rows={3} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('boards.submission.titleOptional')} className="input w-full" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('boards.submission.descOptional')} className="input w-full" rows={3} />
           {tab === 'link' && <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." className="input w-full" />}
           {tab === 'youtube' && (
             <div className="space-y-1">
               <input value={ytUrl} onChange={(e) => setYtUrl(e.target.value)} placeholder="https://www.youtube.com/watch?v=..." className="input w-full" />
-              <p className="text-xs text-gray-500">Paste a YouTube link or its embed code (unlisted is fine). It will play right on the board.</p>
+              <p className="text-xs text-gray-500">{t('boards.submission.ytNote')}</p>
             </div>
           )}
           {tab === 'image' && (
@@ -767,13 +778,13 @@ function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreate
           {tab === 'file' && (
             caps.canUploadFiles
               ? <input type="file" accept="*/*" onChange={(e) => setFile(e.target.files?.[0] || null)} className="input w-full" />
-              : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">File upload isn&apos;t enabled for your account yet. Ask your admin to turn it on, or share a Link instead.</div>
+              : <div className="text-sm rounded-lg bg-violet-50 border border-violet-200 text-violet-800 px-3 py-2">{t('boards.submission.uploadDisabled')}</div>
           )}
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="btn-secondary px-3 py-1.5 text-sm">Cancel</button>
-          <button onClick={submit} disabled={busy} className="btn-primary px-3 py-1.5 text-sm">{busy ? 'Submitting...' : 'Submit'}</button>
+          <button onClick={onClose} className="btn-secondary px-3 py-1.5 text-sm">{t('common.cancel')}</button>
+          <button onClick={submit} disabled={busy} className="btn-primary px-3 py-1.5 text-sm">{busy ? t('boards.submission.submitting') : t('boards.submission.submitLabel')}</button>
         </div>
       </div>
     </div>
@@ -785,6 +796,7 @@ function SubmitModal({ apiBase, classId, isEducator, columnId, onClose, onCreate
 // allows replacing the content of file/image/video/link items.
 // =============================================================
 function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item: SubmissionBoardItem; onClose: () => void; onSaved: (it: SubmissionBoardItem) => void }) {
+  const { t } = useBahasa();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [title, setTitle] = useState(item.title || '');
@@ -805,7 +817,7 @@ function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item:
     try {
       const patch: any = { title: title || null, description: description || null };
       if (isLink) {
-        if (!linkUrl) throw new Error('Link URL required');
+        if (!linkUrl) throw new Error(t('boards.submission.linkUrlRequired'));
         patch.linkUrl = linkUrl;
         // If link changed, re-unfurl OpenGraph metadata
         if (linkUrl !== item.link_url) {
@@ -826,7 +838,7 @@ function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item:
         const fd = new FormData();
         fd.append('file', newFile);
         const ur = await authedFetch(`${apiBase}/upload-file`, { method: 'POST', body: fd });
-        if (!ur.ok) throw new Error((await ur.json()).error || 'Upload failed');
+        if (!ur.ok) throw new Error((await ur.json()).error || t('boards.submission.uploadFailed'));
         const uj = await ur.json();
         if (isImage) {
           patch.imageUrl = uj.fileluFileUrl;
@@ -835,7 +847,7 @@ function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item:
           // Strategy: send fileluFileCode + size via the dedicated POST + DELETE flow.
           // Simpler approach: delete current, post a new item, return early.
           const delRes = await authedFetch(`${apiBase}/items/${item.id}`, { method: 'DELETE' });
-          if (!delRes.ok) throw new Error('Delete during replace failed');
+          if (!delRes.ok) throw new Error(t('boards.submission.deleteReplaceFailed'));
           const newRes = await authedFetch(`${apiBase}/items`, {
             method: 'POST',
             headers: { 'content-type': 'application/json' },
@@ -844,7 +856,7 @@ function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item:
               fileluFileCode: uj.fileCode, fileName: uj.fileName, fileSizeBytes: uj.sizeBytes, mimeType: uj.mimeType,
             }),
           });
-          if (!newRes.ok) throw new Error((await newRes.json()).error || 'Replace failed');
+          if (!newRes.ok) throw new Error((await newRes.json()).error || t('boards.submission.replaceFailed'));
           const nj = await newRes.json();
           onSaved(nj.item);
           return;
@@ -853,11 +865,11 @@ function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item:
       if (isVideo && newFile) {
         // Video replace: delete then re-add via SubmitModal-like flow is complex.
         // For now require the user to delete + resubmit videos manually.
-        throw new Error('To replace a video, please delete this submission and submit a new one.');
+        throw new Error(t('boards.submission.videoReplaceHint'));
       }
 
       const r = await authedFetch(`${apiBase}/items/${item.id}`, { method: 'PATCH', headers: { 'content-type': 'application/json' }, body: JSON.stringify(patch) });
-      if (!r.ok) { setErr((await r.json()).error || 'Save failed'); return; }
+      if (!r.ok) { setErr((await r.json()).error || t('boards.submission.saveFailed')); return; }
       const j = await r.json();
       onSaved(j.item);
     } catch (e: any) {
@@ -870,28 +882,28 @@ function EditModal({ apiBase, item, onClose, onSaved }: { apiBase: string; item:
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50" onClick={onClose}>
       <div className="bg-white rounded-lg max-w-md w-full max-h-[90vh] overflow-auto" onClick={(e) => e.stopPropagation()}>
-        <div className="p-4 border-b flex items-center justify-between"><h3 className="font-bold">Edit Submission</h3><button onClick={onClose}><X className="w-5 h-5" /></button></div>
+        <div className="p-4 border-b flex items-center justify-between"><h3 className="font-bold">{t('boards.submission.editSubmission')}</h3><button onClick={onClose}><X className="w-5 h-5" /></button></div>
         <div className="p-4 space-y-3">
           <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide">{item.item_type}</div>
-          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Title" className="input w-full" />
-          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Description" className="input w-full" rows={3} />
+          <input value={title} onChange={(e) => setTitle(e.target.value)} placeholder={t('boards.submission.titlePlaceholder')} className="input w-full" />
+          <textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder={t('boards.submission.descPlaceholder')} className="input w-full" rows={3} />
           {isLink && (
             <input value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} placeholder="https://..." className="input w-full" />
           )}
           {(isFile || isImage) && (
             <div>
-              <label className="text-xs text-slate-600 block mb-1">Replace {item.item_type} (optional)</label>
+              <label className="text-xs text-slate-600 block mb-1">{t('boards.submission.replaceTypeOptional', { jenis: item.item_type })}</label>
               <input type="file" accept={isImage ? 'image/*' : '*/*'} onChange={(e) => setNewFile(e.target.files?.[0] || null)} className="input w-full" />
             </div>
           )}
           {isVideo && (
-            <p className="text-xs text-slate-500">To replace the video, please delete this submission and submit a new one.</p>
+            <p className="text-xs text-slate-500">{t('boards.submission.videoReplaceHint')}</p>
           )}
           {err && <p className="text-xs text-red-600">{err}</p>}
         </div>
         <div className="p-4 border-t flex justify-end gap-2">
-          <button onClick={onClose} className="btn-secondary px-3 py-1.5 text-sm">Cancel</button>
-          <button onClick={save} disabled={busy} className="btn-primary px-3 py-1.5 text-sm">{busy ? 'Saving...' : 'Save'}</button>
+          <button onClick={onClose} className="btn-secondary px-3 py-1.5 text-sm">{t('common.cancel')}</button>
+          <button onClick={save} disabled={busy} className="btn-primary px-3 py-1.5 text-sm">{busy ? t('boards.submission.saving') : t('boards.submission.saveLabel')}</button>
         </div>
       </div>
     </div>
