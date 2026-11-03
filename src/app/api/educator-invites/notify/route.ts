@@ -3,13 +3,14 @@ import { createClient } from '@supabase/supabase-js';
 import nodemailer from 'nodemailer';
 import { emelJemputanPendidik } from '@/lib/i18n/emel';
 import { bahasaPelayan } from '@/lib/i18n/pelayan';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
     const { classId, email, code } = body || {};
     if (!classId || !email || !code) {
-      return NextResponse.json({ error: 'Missing classId, email, or code' }, { status: 400 });
+      return ralatJson('Missing classId, email, or code', 400);
     }
 
     // The browser uses localStorage-based auth (no cookies). The client must
@@ -19,7 +20,7 @@ export async function POST(req: NextRequest) {
       ? authHeader.slice(7).trim()
       : '';
     if (!accessToken) {
-      return NextResponse.json({ error: 'Missing access token' }, { status: 401 });
+      return ralatJson('Missing access token', 401);
     }
 
     const url = process.env.NEXT_PUBLIC_SUPABASE_URL!;
@@ -31,7 +32,7 @@ export async function POST(req: NextRequest) {
 
     const { data: userData, error: userErr } = await supa.auth.getUser(accessToken);
     if (userErr || !userData?.user) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
+      return ralatJson('Not authenticated', 401);
     }
     const user = userData.user;
 
@@ -42,10 +43,10 @@ export async function POST(req: NextRequest) {
       .eq('id', classId)
       .single();
     if (kErr || !klass) {
-      return NextResponse.json({ error: 'Class not found' }, { status: 404 });
+      return ralatJson('Class not found', 404);
     }
     if (klass.owner_id !== user.id) {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return ralatJson('Forbidden', 403);
     }
 
     // Inviter display name
@@ -66,7 +67,7 @@ export async function POST(req: NextRequest) {
     const fromName = process.env.SMTP_FROM_NAME || process.env.BREVO_FROM_NAME || 'Kuizen';
 
     if (!host || !smtpUser || !smtpPass) {
-      return NextResponse.json({ error: 'SMTP not configured' }, { status: 500 });
+      return ralatJson('SMTP not configured', 500);
     }
 
     const siteUrl = process.env.NEXT_PUBLIC_SITE_URL || `${req.nextUrl.origin}`;
@@ -98,6 +99,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ ok: true, sent: true, link: acceptUrl });
   } catch (e: any) {
     console.error('educator-invites/notify error', e);
-    return NextResponse.json({ error: e?.message || 'failed' }, { status: 500 });
+    return ralatJson(e?.message || 'failed', 500);
   }
 }
