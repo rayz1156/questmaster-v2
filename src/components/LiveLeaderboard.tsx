@@ -1,6 +1,8 @@
 "use client";
 
 import { Crown, Flame, User as UserIcon } from "lucide-react";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL } from "@/lib/i18n";
 
 /**
  * Leaderboard, satu bahasa untuk seluruh platform.
@@ -78,6 +80,7 @@ export interface PodiumEntry {
  * supaya juara berada di tengah dan paling tinggi tanpa perlu dilabel.
  */
 export function LeaderboardPodium({ rows, className = "" }: { rows: PodiumEntry[]; className?: string }) {
+  const { t, bahasa } = useBahasa();
   const top = rows.slice(0, 3);
   if (top.length < 2) return null;
 
@@ -105,7 +108,7 @@ export function LeaderboardPodium({ rows, className = "" }: { rows: PodiumEntry[
               <div className={`mt-2 text-sm font-medium truncate max-w-full px-1 ${entry.me ? "text-brand-purple" : "text-ink"}`}>
                 {entry.name}
               </div>
-              <div className="text-xs text-ink-muted tabular-nums mt-0.5">{entry.score.toLocaleString()} pts</div>
+              <div className="text-xs text-ink-muted tabular-nums mt-0.5">{entry.score.toLocaleString(LOKAL[bahasa])} {t('ui.lbPts')}</div>
               {(entry.streak ?? 0) >= 2 && (
                 <div className="text-xs text-[#8A6100] flex items-center gap-1 mt-0.5">
                   <Flame className="w-3 h-3" /> {entry.streak}
@@ -129,11 +132,11 @@ export function LeaderboardPodium({ rows, className = "" }: { rows: PodiumEntry[
 
 export default function LiveLeaderboard({
   rows,
-  title = "Leaderboard",
+  title,
   subtitle,
   highlight,
   limit,
-  emptyText = "No players yet.",
+  emptyText,
   podium = true,
 }: {
   rows: LiveLeaderboardRow[];
@@ -146,6 +149,7 @@ export default function LiveLeaderboard({
   /** Matikan tangga bila ruang terlalu sempit, contohnya jalur sisi. */
   podium?: boolean;
 }) {
+  const { t } = useBahasa();
   const senarai = typeof limit === "number" ? rows.slice(0, limit) : rows;
   const naikTangga = podium && senarai.length >= 2;
   const atas = naikTangga ? senarai.slice(0, 3) : [];
@@ -156,12 +160,12 @@ export default function LiveLeaderboard({
       <Crown className="absolute -top-2 -right-2 w-16 h-16 text-[#EFEBFB] pointer-events-none" />
 
       <div className="mb-4">
-        <div className="section-title">{title}</div>
+        <div className="section-title">{title ?? t('ui.lbTitle')}</div>
         {subtitle && <div className="text-sm text-ink-muted mt-0.5">{subtitle}</div>}
       </div>
 
       {senarai.length === 0 ? (
-        <p className="text-sm text-ink-muted">{emptyText}</p>
+        <p className="text-sm text-ink-muted">{emptyText ?? t('ui.lbEmpty')}</p>
       ) : (
         <>
           {naikTangga && (
@@ -198,17 +202,17 @@ export default function LiveLeaderboard({
                     <div className="text-[15px] font-medium text-ink truncate flex items-center gap-1.5">
                       <UserIcon className="w-4 h-4 text-ink-faint shrink-0" />
                       <span className="truncate">{r.nickname}</span>
-                      {saya && <span className="text-xs text-brand-purple shrink-0">you</span>}
+                      {saya && <span className="text-xs text-brand-purple shrink-0">{t('ui.lbYou')}</span>}
                     </div>
                     {(r.streak ?? 0) >= 2 && (
                       <div className="text-xs text-[#8A6100] flex items-center gap-1 mt-0.5">
-                        <Flame className="w-3 h-3" /> {r.streak} in a row
+                        <Flame className="w-3 h-3" /> {t('ui.lbInARow', { n: r.streak ?? 0 })}
                       </div>
                     )}
                   </div>
                   <div className={`shrink-0 min-w-[64px] px-3 py-1.5 rounded-xl text-center ${pts}`}>
                     <div className="text-lg font-semibold leading-none tabular-nums">{r.score}</div>
-                    <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">pts</div>
+                    <div className="text-[10px] uppercase tracking-wide opacity-80 leading-none mt-0.5">{t('ui.lbPts')}</div>
                   </div>
                 </div>
               );

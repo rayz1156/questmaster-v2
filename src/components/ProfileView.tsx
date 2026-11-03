@@ -13,6 +13,7 @@ import {
 } from "@/lib/data";
 import type { Profile } from "@/lib/types";
 import { mampatImej } from "@/lib/mampatImej";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /**
  * Profil, semakan reka bentuk September 2026.
@@ -58,6 +59,7 @@ function Field({ label, hint, children }: { label: string; hint?: string; childr
 
 /** Kad intro seperti yang orang lain lihat. Hidup sambil menaip. */
 function IntroCardPreview({ name, bio, imageUrl }: { name: string; bio: string; imageUrl: string | null }) {
+  const { t } = useBahasa();
   return (
     <div className="rounded-2xl bg-white border border-hairline overflow-hidden">
       <div className="h-20 bg-[#EAE6FC]" />
@@ -74,7 +76,7 @@ function IntroCardPreview({ name, bio, imageUrl }: { name: string; bio: string; 
         {bio ? (
           <p className="mt-1.5 text-sm text-ink-muted whitespace-pre-wrap leading-relaxed">{bio}</p>
         ) : (
-          <p className="mt-1.5 text-sm text-ink-faint">Your About me text appears here.</p>
+          <p className="mt-1.5 text-sm text-ink-faint">{t('ui.profil.aboutMePreview')}</p>
         )}
       </div>
     </div>
@@ -83,6 +85,7 @@ function IntroCardPreview({ name, bio, imageUrl }: { name: string; bio: string; 
 
 export default function ProfileView({ role }: { role: "educator" | "participant" }) {
   const router = useRouter();
+  const { t } = useBahasa();
   const [tab, setTab] = useState<TabKey>("profile");
   const [p, setP] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
@@ -147,9 +150,9 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
       await updateMyIntroDisplayName(introName);
       await updateMyBio(bio);
       await reloadProfile();
-      flash("ok", "Changes saved");
+      flash("ok", t('ui.profil.changesSaved'));
     } catch (e: any) {
-      flash("err", e?.message || "Failed to save changes");
+      flash("err", e?.message || t('ui.profil.saveFailed'));
     } finally {
       setIntroSaving(false);
     }
@@ -158,7 +161,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
   async function onPickImage(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0];
     if (!f) return;
-    if (f.size > 15 * 1024 * 1024) { flash("err", "Photo must be 15 MB or smaller"); return; }
+    if (f.size > 15 * 1024 * 1024) { flash("err", t('ui.profil.photoSize')); return; }
     setMediaBusy(true);
     try {
       const fd = new FormData();
@@ -166,9 +169,9 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
       const r = await fetch("/api/profile/intro/upload-image", { method: "POST", body: fd, headers: await authHeaders() });
       if (!r.ok) throw new Error(await r.text());
       await reloadProfile();
-      flash("ok", "Photo updated");
+      flash("ok", t('ui.profil.photoUpdated'));
     } catch (e: any) {
-      flash("err", e?.message || "Upload failed");
+      flash("err", e?.message || t('ui.profil.uploadFailed'));
     } finally {
       setMediaBusy(false);
       if (imgInputRef.current) imgInputRef.current.value = "";
@@ -180,9 +183,9 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     try {
       await updateMyUsername(username);
       await reloadProfile();
-      flash("ok", "Username updated");
+      flash("ok", t('ui.profil.usernameUpdated'));
     } catch (e: any) {
-      flash("err", e?.message || "Failed to update username");
+      flash("err", e?.message || t('ui.profil.usernameFailed'));
     } finally { setUsernameSaving(false); }
   }
 
@@ -190,65 +193,72 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
     setEmailSaving(true);
     try {
       await updateMyEmail(email);
-      flash("ok", "Email update requested. Check your inbox to confirm.");
+      flash("ok", t('ui.profil.emailRequested'));
     } catch (e: any) {
-      flash("err", e?.message || "Failed to update email");
+      flash("err", e?.message || t('ui.profil.emailFailed'));
     } finally { setEmailSaving(false); }
   }
 
   async function savePassword() {
-    if (newPw.length < 8) { flash("err", "Password must be at least 8 characters"); return; }
-    if (newPw !== confirmPw) { flash("err", "Passwords do not match"); return; }
+    if (newPw.length < 8) { flash("err", t('ui.profil.pwShort')); return; }
+    if (newPw !== confirmPw) { flash("err", t('ui.profil.pwMismatch')); return; }
     setPwSaving(true);
     try {
       await updateMyPassword(newPw);
       setNewPw(""); setConfirmPw("");
-      flash("ok", "Password updated");
+      flash("ok", t('ui.profil.pwUpdated'));
     } catch (e: any) {
-      flash("err", e?.message || "Failed to update password");
+      flash("err", e?.message || t('ui.profil.pwFailed'));
     } finally { setPwSaving(false); }
   }
 
   async function doDelete() {
-    if (delText.trim().toUpperCase() !== "DELETE") { flash("err", "Type DELETE to confirm"); return; }
+    if (delText.trim().toUpperCase() !== "DELETE") { flash("err", t('ui.profil.typeDelete')); return; }
     setDelBusy(true);
     try {
       await softDeleteMyAccount();
       router.replace("/login");
     } catch (e: any) {
-      flash("err", e?.message || "Failed to deactivate account");
+      flash("err", e?.message || t('ui.profil.deactivateFailed'));
       setDelBusy(false);
     }
   }
 
-  const shownName = introName || ((p as any)?.display_name as string) || ((p as any)?.username as string) || "Your name";
+  const shownName = introName || ((p as any)?.display_name as string) || ((p as any)?.username as string) || t('ui.profil.nameFallback');
+
+  // Label tab ikut bahasa; pemalar TABS di atas kekal untuk kunci sahaja.
+  const tabLabel: Record<TabKey, string> = {
+    profile: t('ui.profil.tabProfile'),
+    account: t('ui.profil.tabAccount'),
+    security: t('ui.profil.tabSecurity'),
+  };
 
   if (loading) {
-    return <div className="max-w-shell mx-auto px-6 py-10 text-sm text-ink-muted">Loading profile…</div>;
+    return <div className="max-w-shell mx-auto px-6 py-10 text-sm text-ink-muted">{t('ui.profil.loading')}</div>;
   }
 
   return (
     <div className="max-w-shell mx-auto px-6 py-10">
       <div className="max-w-2xl">
-        <div className="eyebrow mb-1">Your account</div>
-        <h1 className="page-title">Make it yours.</h1>
+        <div className="eyebrow mb-1">{t('ui.profil.eyebrow')}</div>
+        <h1 className="page-title">{t('ui.profil.title')}</h1>
         <p className="page-subtitle">
           {role === "educator"
-            ? "Your intro card is the first thing learners see when they join one of your classes."
-            : "Your intro card is what classmates see on every intro board you join."}
+            ? t('ui.profil.subtitleEducator')
+            : t('ui.profil.subtitleParticipant')}
         </p>
       </div>
 
       <div className="mt-7 flex items-center gap-7 border-b border-hairline">
-        {TABS.map(t => (
+        {TABS.map(tabItem => (
           <button
-            key={t.key}
-            onClick={() => setTab(t.key)}
+            key={tabItem.key}
+            onClick={() => setTab(tabItem.key)}
             className={`pb-3 -mb-px text-sm font-medium border-b-2 transition ${
-              tab === t.key ? "border-brand-purple text-ink" : "border-transparent text-ink-muted hover:text-ink"
+              tab === tabItem.key ? "border-brand-purple text-ink" : "border-transparent text-ink-muted hover:text-ink"
             }`}
           >
-            {t.label}
+            {tabLabel[tabItem.key]}
           </button>
         ))}
       </div>
@@ -274,27 +284,27 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
               <div>
                 <input ref={imgInputRef} type="file" accept="image/*" hidden onChange={onPickImage} />
                 <button onClick={() => imgInputRef.current?.click()} disabled={mediaBusy} className="btn-quiet text-brand-purple disabled:opacity-40">
-                  {mediaBusy ? "Uploading…" : "Change photo"}
+                  {mediaBusy ? t('ui.profil.uploading') : t('ui.profil.changePhoto')}
                 </button>
-                <div className="text-xs text-ink-faint mt-1">JPG or PNG, up to 15 MB.</div>
+                <div className="text-xs text-ink-faint mt-1">{t('ui.profil.photoHint')}</div>
               </div>
             </div>
 
-            <Field label="Display name" hint="Leave blank to show your username instead. This name appears in classes, on leaderboards and in Live Quiz.">
+            <Field label={t('ui.profil.displayNameLabel')} hint={t('ui.profil.displayNameHint')}>
               <input
                 value={introName}
                 onChange={e => setIntroName(e.target.value)}
                 name="intro-display-name"
                 autoComplete="off"
                 maxLength={80}
-                placeholder={((p as any)?.display_name as string) || "Your name"}
+                placeholder={((p as any)?.display_name as string) || t('ui.profil.nameFallback')}
                 className="input"
               />
             </Field>
 
             <div>
               <div className="flex items-baseline justify-between">
-                <span className="text-sm font-medium text-ink">About me</span>
+                <span className="text-sm font-medium text-ink">{t('ui.profil.aboutMe')}</span>
                 <span className="text-xs text-ink-faint tabular-nums">{bio.length}/500</span>
               </div>
               <textarea
@@ -302,22 +312,22 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
                 onChange={e => setBio(e.target.value)}
                 rows={5}
                 maxLength={500}
-                placeholder="A sentence or two about you."
+                placeholder={t('ui.profil.aboutPlaceholder')}
                 className="input mt-1.5 resize-y leading-relaxed"
               />
             </div>
 
             <div>
               <button onClick={saveIntroCard} disabled={introSaving} className="btn-primary">
-                {introSaving ? "Saving…" : "Save changes"}
+                {introSaving ? t('ui.profil.saving') : t('ui.profil.saveChanges')}
               </button>
             </div>
           </div>
 
           <div>
-            <div className="eyebrow mb-2">Your intro card</div>
+            <div className="eyebrow mb-2">{t('ui.profil.introCard')}</div>
             <IntroCardPreview name={shownName} bio={bio} imageUrl={imageUrl} />
-            <p className="text-xs text-ink-faint mt-3 leading-relaxed">This is exactly what other people see.</p>
+            <p className="text-xs text-ink-faint mt-3 leading-relaxed">{t('ui.profil.introNote')}</p>
           </div>
         </div>
       )}
@@ -325,19 +335,19 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
       {tab === "account" && (
         <div className="mt-8 max-w-lg space-y-8">
           <div>
-            <Field label="Username" hint="3 to 30 characters: lowercase letters, digits, dot, hyphen or underscore.">
+            <Field label={t('ui.profil.usernameLabel')} hint={t('ui.profil.usernameHint')}>
               <input
                 value={username}
                 onChange={e => setUsername(e.target.value.toLowerCase())}
                 name="profile-username"
                 autoComplete="username"
-                placeholder="your_username"
+                placeholder={t('ui.profil.usernamePlaceholder')}
                 className="input"
               />
             </Field>
             <div className="mt-3">
               <button onClick={saveUsername} disabled={usernameSaving} className="btn-secondary">
-                {usernameSaving ? "Saving…" : "Save username"}
+                {usernameSaving ? t('ui.profil.saving') : t('ui.profil.saveUsername')}
               </button>
             </div>
           </div>
@@ -345,7 +355,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
           <div className="h-px bg-hairline" />
 
           <div>
-            <Field label="Email" hint="We send a confirmation link before the change takes effect.">
+            <Field label={t('ui.profil.emailLabel')} hint={t('ui.profil.emailHint')}>
               <input
                 value={email}
                 onChange={e => setEmail(e.target.value)}
@@ -357,7 +367,7 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
             </Field>
             <div className="mt-3">
               <button onClick={saveEmail} disabled={emailSaving} className="btn-secondary">
-                {emailSaving ? "Saving…" : "Save email"}
+                {emailSaving ? t('ui.profil.saving') : t('ui.profil.saveEmail')}
               </button>
             </div>
           </div>
@@ -367,15 +377,15 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
       {tab === "security" && (
         <div className="mt-8 max-w-lg space-y-8">
           <div>
-            <div className="section-title">Password</div>
-            <p className="text-sm text-ink-muted mt-1">At least 8 characters. Choose something you do not use elsewhere.</p>
+            <div className="section-title">{t('ui.profil.passwordTitle')}</div>
+            <p className="text-sm text-ink-muted mt-1">{t('ui.profil.passwordHint')}</p>
             <div className="mt-4 space-y-3">
               <input
                 value={newPw}
                 onChange={e => setNewPw(e.target.value)}
                 type="password"
                 autoComplete="new-password"
-                placeholder="New password"
+                placeholder={t('ui.profil.newPasswordPlaceholder')}
                 className="input"
               />
               <input
@@ -383,13 +393,13 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
                 onChange={e => setConfirmPw(e.target.value)}
                 type="password"
                 autoComplete="new-password"
-                placeholder="Confirm password"
+                placeholder={t('ui.profil.confirmPasswordPlaceholder')}
                 className="input"
               />
             </div>
             <div className="mt-4">
               <button onClick={savePassword} disabled={pwSaving} className="btn-primary">
-                {pwSaving ? "Updating…" : "Change password"}
+                {pwSaving ? t('ui.profil.updating') : t('ui.profil.changePassword')}
               </button>
             </div>
           </div>
@@ -397,26 +407,26 @@ export default function ProfileView({ role }: { role: "educator" | "participant"
           <div className="h-px bg-hairline" />
 
           <div>
-            <div className="section-title">Delete account</div>
+            <div className="section-title">{t('ui.profil.deleteAccountTitle')}</div>
             <p className="text-sm text-ink-muted mt-1">
-              This deactivates your account and signs you out. Nothing you created is removed, and an administrator can restore access.
+              {t('ui.profil.deleteAccountDesc')}
             </p>
             {!showDel ? (
               <button onClick={() => setShowDel(true)} className="btn-quiet text-[#C0392B] mt-3">
-                Delete account
+                {t('ui.profil.deleteAccountTitle')}
               </button>
             ) : (
               <div className="mt-4 rounded-xl border border-hairline p-4">
                 <p className="text-sm text-ink">
-                  Type <span className="font-mono font-semibold">DELETE</span> to confirm.
+                  {t('ui.profil.typeDeletePrefix')}<span className="font-mono font-semibold">DELETE</span>{t('ui.profil.typeDeleteSuffix')}
                 </p>
                 <div className="mt-3 flex gap-2">
                   <input value={delText} onChange={e => setDelText(e.target.value)} placeholder="DELETE" className="input flex-1" />
                   <button onClick={doDelete} disabled={delBusy} className="btn-secondary text-[#C0392B] shrink-0">
-                    {delBusy ? "Deactivating…" : "Confirm"}
+                    {delBusy ? t('ui.profil.deactivating') : t('common.confirm')}
                   </button>
                   <button onClick={() => { setShowDel(false); setDelText(""); }} className="btn-quiet shrink-0 px-2">
-                    Cancel
+                    {t('common.cancel')}
                   </button>
                 </div>
               </div>
