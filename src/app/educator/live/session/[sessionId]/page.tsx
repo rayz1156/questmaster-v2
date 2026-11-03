@@ -16,6 +16,7 @@ import { EDU_TABS } from "@/lib/eduTabs";
 import { ArrowLeft, Users, Play, Eye, SkipForward, Square, RotateCcw, Copy, Check, Maximize2, X } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import LiveLeaderboard from "@/components/LiveLeaderboard";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import RaceHostPanel, { type PemainLumba, type ReviewHos } from "@/components/RaceHostPanel";
 import BossHostPanel, { type PemainRaksasa, type SeranganFeed, type StatsRaksasa } from "@/components/BossHostPanel";
 import { Alert, Badge, Button, Card, CardHead, PageHead } from "@/components/ui";
@@ -83,15 +84,12 @@ async function authedFetch(url: string, init?: RequestInit) {
   return json;
 }
 
-const LABEL_STATUS: Record<string, string> = {
-  lobby: "Lobby",
-  asking: "Answering",
-  revealed: "Answer revealed",
-  ended: "Session over",
-};
+// Label status kini melalui kamus i18n dalam komponen (keperluan dwibahasa
+// KZ-042); objek statik modul dibuang kerana tiada akses kepada `t`.
 
 export default function PanelHosSesi() {
   const { sessionId } = useParams<{ sessionId: string }>() as { sessionId: string };
+  const { t } = useBahasa();
 
   const [state, setState] = useState<KeadaanHos | null>(null);
   const [loading, setLoading] = useState(true);
@@ -114,7 +112,7 @@ export default function PanelHosSesi() {
       setState(json.data);
       setErr(null);
     } catch (e) {
-      setErr((e instanceof Error ? e.message : null) || "Could not load the session.");
+      setErr((e instanceof Error ? e.message : null) || t("live.session.loadFailed"));
     } finally {
       setLoading(false);
     }
@@ -149,7 +147,7 @@ export default function PanelHosSesi() {
       });
       await muat();
     } catch (e) {
-      alert((e instanceof Error ? e.message : null) || "Action failed.");
+      alert((e instanceof Error ? e.message : null) || t("live.session.actionFailed"));
     } finally {
       setBusy(false);
     }
@@ -176,14 +174,14 @@ export default function PanelHosSesi() {
   if (loading) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-muted">{t("common.loading")}</p>
       </Shell>
     );
   }
   if (!state) {
     return (
       <Shell tabs={EDU_TABS}>
-        <p className="text-sm text-ink-muted">{err || "Session not found."} <Link href="/educator/live" className="text-brand-purple font-semibold">Back →</Link></p>
+        <p className="text-sm text-ink-muted">{err || t("live.session.notFound")} <Link href="/educator/live" className="text-brand-purple font-semibold">{t("common.back")} →</Link></p>
       </Shell>
     );
   }
@@ -205,22 +203,31 @@ export default function PanelHosSesi() {
     streak: session.status === "ended" ? p.best_streak : p.streak,
   }));
 
-  // Label status yang sama seperti sebelum ini (Racing/Battling/perbincangan).
+  // Label status yang sama seperti sebelum ini (Racing/Battling/perbincangan),
+  // kini melalui kamus supaya dwibahasa.
   const labelStatus =
     (lumba || raksasa) && session.status === "asking"
       ? raksasa
-        ? "Battling"
-        : "Racing"
+        ? t("live.session.statusBattling")
+        : t("live.session.statusRacing")
       : (lumba || raksasa) && session.status === "ended" && (session.review_index ?? -1) >= 0
-        ? "Class discussion"
-        : LABEL_STATUS[session.status] || session.status;
+        ? t("live.session.statusDiscussion")
+        : session.status === "lobby"
+          ? t("live.session.statusLobby")
+          : session.status === "asking"
+            ? t("live.session.statusAsking")
+            : session.status === "revealed"
+              ? t("live.session.statusRevealed")
+              : session.status === "ended"
+                ? t("live.session.statusEnded")
+                : session.status;
 
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        crumb="Live Quiz"
-        name={quiz?.title || "Live session"}
-        secondaryActions={[{ label: "All quizzes", icon: <ArrowLeft className="w-4 h-4" />, href: "/educator/live" }]}
+        crumb={t("live.educatorEditor.crumb")}
+        name={quiz?.title || t("live.session.nameFallback")}
+        secondaryActions={[{ label: t("live.educatorEditor.allQuizzes"), icon: <ArrowLeft className="w-4 h-4" />, href: "/educator/live" }]}
         actions={
           <Badge variant="dot" warna={session.status === "ended" ? "gray" : "green"}>
             {labelStatus}
@@ -238,29 +245,29 @@ export default function PanelHosSesi() {
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={`/api/live/qr?code=${session.code}&size=220`}
-              alt={`QR code for session ${session.code}`}
+              alt={t("live.session.qrAlt", { kod: session.code })}
               width={140}
               height={140}
               className="rounded-lg border border-gray-200"
             />
-            <div className="text-[11px] text-gray-500 mt-1">Scan to join</div>
+            <div className="text-[11px] text-gray-500 mt-1">{t("live.session.scanToJoin")}</div>
           </div>
 
           <div className="min-w-0 flex-1">
-            <div className="text-xs text-gray-500">Session code</div>
+            <div className="text-xs text-gray-500">{t("live.session.codeLabel")}</div>
             <button
               onClick={salinKod}
-              title="Copy the code"
+              title={t("live.session.copyCode")}
               className="flex items-center gap-2 font-mono text-3xl font-bold tracking-widest text-brand-purple"
             >
               {session.code}
               {disalin ? <Check className="w-5 h-5 text-green-600" /> : <Copy className="w-5 h-5 text-gray-400" />}
             </button>
 
-            <div className="text-xs text-gray-500 mt-3">Join link</div>
+            <div className="text-xs text-gray-500 mt-3">{t("live.session.joinLink")}</div>
             <button
               onClick={salinPautan}
-              title="Copy the link"
+              title={t("live.session.copyLink")}
               className="flex items-center gap-2 text-sm text-gray-700 hover:text-brand-purple max-w-full"
             >
               <span className="font-mono truncate">{pautanSertai || "/live/" + session.code}</span>
@@ -271,25 +278,25 @@ export default function PanelHosSesi() {
 
             <div className="flex items-center gap-3 mt-3 flex-wrap">
               <Button variant="outline" size="sm" onClick={() => setPaparPenuh(true)}>
-                <Maximize2 className="w-4 h-4" /> Show on screen
+                <Maximize2 className="w-4 h-4" /> {t("live.session.showOnScreen")}
               </Button>
               <span className="flex items-center gap-2 text-sm text-gray-600">
                 <Users className="w-5 h-5 text-indigo-600" />
-                <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} students
+                <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} {t("live.session.studentsWord")}
               </span>
             </div>
           </div>
         </div>
         <p className="text-xs text-gray-500 mt-3">
-          Three ways in: scan the QR code, open the link, or go to{" "}
-          <span className="font-mono">{pautanAsas}</span> and type the code.
+          {t("live.session.threeWays1")}{" "}
+          <span className="font-mono">{pautanAsas}</span>{t("live.session.threeWays2")}
         </p>
       </Card>
       )}
 
       {sesiPenuh && (
         <Alert tone="warning" className="mb-4">
-          This session has reached its limit of {hadPemain} players. New players are turned away for now.
+          {t("live.session.fullSession", { had: hadPemain ?? 0 })}
         </Alert>
       )}
 
@@ -322,26 +329,26 @@ export default function PanelHosSesi() {
       <div className="flex items-center gap-2 mb-4 flex-wrap">
         {session.status === "lobby" && (
           <Button onClick={() => kawal("start")} disabled={busy}>
-            <Play className="w-4 h-4" /> Start quiz
+            <Play className="w-4 h-4" /> {t("live.session.startQuiz")}
           </Button>
         )}
         {session.status === "asking" && (
           <Button onClick={() => kawal("reveal")} disabled={busy}>
-            <Eye className="w-4 h-4" /> Reveal answer
+            <Eye className="w-4 h-4" /> {t("live.session.revealAnswer")}
           </Button>
         )}
         {(session.status === "asking" || session.status === "revealed") && (
           <Button onClick={() => kawal("next")} disabled={busy}>
-            <SkipForward className="w-4 h-4" /> Next question
+            <SkipForward className="w-4 h-4" /> {t("live.session.nextQuestion")}
           </Button>
         )}
         {session.status !== "ended" && (
           <>
             <Button variant="dim" warna="red" onClick={() => kawal("end")} disabled={busy}>
-              <Square className="w-4 h-4" /> End session
+              <Square className="w-4 h-4" /> {t("live.session.endSession")}
             </Button>
             <Button variant="outline" onClick={() => kawal("reset")} disabled={busy}>
-              <RotateCcw className="w-4 h-4" /> Reset
+              <RotateCcw className="w-4 h-4" /> {t("live.session.reset")}
             </Button>
           </>
         )}
@@ -352,24 +359,24 @@ export default function PanelHosSesi() {
           <LiveLeaderboard
             rows={barisPapan}
             limit={10}
-            title="Final leaderboard"
-            subtitle="Ranked by points, then by speed."
+            title={t("live.play.finalLbTitle")}
+            subtitle={t("live.play.lbSubtitle")}
           />
         </div>
       ) : session.status === "lobby" ? (
         <Card className="mb-4">
-          <CardHead title="Waiting in the lobby…" />
-          <p className="text-sm text-gray-500 mt-2">Students appear here as they join. Press &quot;Start quiz&quot; when you are ready.</p>
+          <CardHead title={t("live.session.waitingLobby")} />
+          <p className="text-sm text-gray-500 mt-2">{t("live.session.lobbyNote")}</p>
         </Card>
       ) : currentQuestion && (
         <Card className="mb-4">
-          <div className="text-xs text-gray-500 mb-1">Question {session.current_index + 1} / {totalSoalan}</div>
+          <div className="text-xs text-gray-500 mb-1">{t("live.play.questionOf", { semasa: session.current_index + 1, jumlah: totalSoalan })}</div>
           <div className="font-semibold mb-1">{currentQuestion.prompt}</div>
           <div className="text-xs text-gray-400 mb-2">
             {currentQuestion.use_countdown === false
-              ? "No countdown. Reveal when you are ready; faster answers still score higher."
-              : `${currentQuestion.time_limit_sec}s countdown`}
-            {currentQuestion.double_points ? " · double points" : ""}
+              ? t("live.session.noCountdownNote")
+              : t("live.educatorEditor.countdownSec", { n: currentQuestion.time_limit_sec })}
+            {currentQuestion.double_points ? " · " + t("live.session.doublePointsInline") : ""}
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
             {currentQuestion.options.map((o) => {
@@ -382,14 +389,14 @@ export default function PanelHosSesi() {
                 >
                   <span className="font-mono mr-1">{o.key}.</span> {o.text}
                   {distribution && (
-                    <span className="float-right text-xs text-gray-500">{jumlah} answers</span>
+                    <span className="float-right text-xs text-gray-500">{t("live.session.nAnswers", { n: jumlah })}</span>
                   )}
                 </div>
               );
             })}
           </div>
           {session.status !== "revealed" && (
-            <p className="text-xs text-gray-400 mt-2">The correct answer stays hidden until you reveal it.</p>
+            <p className="text-xs text-gray-400 mt-2">{t("live.session.hiddenUntilReveal")}</p>
           )}
         </Card>
       )}
@@ -399,18 +406,18 @@ export default function PanelHosSesi() {
           <CardHead
             title={
               <span className="flex items-center gap-2">
-                <Users className="w-4 h-4 text-indigo-600" /> Students ({playerCount})
+                <Users className="w-4 h-4 text-indigo-600" /> {t("live.session.studentsCount", { n: playerCount })}
               </span>
             }
           />
           {players.length === 0 ? (
-            <p className="text-sm text-gray-500 mt-2">No students yet.</p>
+            <p className="text-sm text-gray-500 mt-2">{t("live.session.noStudents")}</p>
           ) : (
             <ol className="text-sm space-y-1 mt-2">
               {players.map((p, i) => (
                 <li key={p.id} className="flex items-center justify-between">
                   <span>{i + 1}. {p.nickname}</span>
-                  <span className="text-xs text-gray-400">joined</span>
+                  <span className="text-xs text-gray-400">{t("live.session.joinedWord")}</span>
                 </li>
               ))}
             </ol>
@@ -419,7 +426,7 @@ export default function PanelHosSesi() {
       ) : session.status === "ended" ? null : (
         <LiveLeaderboard
           rows={barisPapan}
-          subtitle={`${playerCount} taking part, ranked by points then speed.`}
+          subtitle={t("live.session.takingPart", { n: playerCount })}
         />
       )}
       </>
@@ -429,16 +436,16 @@ export default function PanelHosSesi() {
         <div className="fixed inset-0 z-50 bg-white flex flex-col items-center justify-center p-6">
           <button
             onClick={() => setPaparPenuh(false)}
-            title="Close"
+            title={t("common.close")}
             className="absolute top-4 right-4 text-gray-400 hover:text-gray-700"
           >
             <X className="w-7 h-7" />
           </button>
-          <div className="text-lg text-gray-500 mb-3">Join the quiz</div>
+          <div className="text-lg text-gray-500 mb-3">{t("live.session.joinTheQuiz")}</div>
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/live/qr?code=${session.code}&size=900`}
-            alt={`QR code for session ${session.code}`}
+            alt={t("live.session.qrAlt", { kod: session.code })}
             className="w-[min(52vh,52vw)] h-[min(52vh,52vw)]"
           />
           <div className="font-mono text-6xl sm:text-7xl font-bold tracking-widest text-brand-purple mt-4">
@@ -449,7 +456,7 @@ export default function PanelHosSesi() {
           </div>
           <div className="text-sm text-gray-500 mt-4 flex items-center gap-2">
             <Users className="w-5 h-5 text-indigo-600" />
-            <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} joined
+            <strong>{playerCount}</strong>{hadPemain !== null ? <> / {hadPemain}</> : null} {t("live.session.joinedWord")}
           </div>
         </div>
       )}
