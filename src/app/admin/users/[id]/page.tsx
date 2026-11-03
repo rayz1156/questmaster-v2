@@ -75,11 +75,20 @@ import { labelTindakan, bezaAudit, alasanAudit } from "@/lib/adminAudit";
 import {
   pelanProfil,
   PELAN_ADMIN,
-  LABEL_PELAN,
   pendingPendidik,
   emelBelumSah,
   type PelanAdmin,
 } from "@/lib/adminUsers";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, type KunciKamus } from "@/lib/i18n";
+
+// Kunci label pelan penuh; nilai teknikal pelan (free/pro/...) kekal.
+const KUNCI_PELAN_PENUH: Record<string, KunciKamus> = {
+  free: "admin.users.planLabelFree",
+  pro: "admin.users.planLabelPro",
+  institution: "admin.users.planLabelInstitution",
+  unlimited: "admin.users.planLabelUnlimited",
+};
 
 type MukaTab = "profile" | "classes" | "activity";
 
@@ -98,7 +107,11 @@ type KelasMentah = {
   joined_at?: string | null;
 };
 
-/** Baris kelas yang dipaparkan dalam DataTable tab Classes. */
+/**
+ * Baris kelas yang dipaparkan dalam DataTable tab Classes. Medan peranan dan
+ * status menyimpan KUNCI ('student' | 'owner' | 'coed', 'archived' | 'ended'
+ * | 'active') yang diterjemah semasa render (KZ-043).
+ */
 type BarisKelas = {
   id: string;
   nama: string;
@@ -107,20 +120,23 @@ type BarisKelas = {
   tarikh: string;
 };
 
-function fmt(d: string | null | undefined) {
-  if (!d) return "Never";
+// Format tarikh; lokal pilihan supaya paparan ikut bahasa, tiada nilai
+// dipaparkan sebagai label yang diberikan pemanggil.
+function fmt(d: string | null | undefined, lokal?: string, tiada = "Never") {
+  if (!d) return tiada;
   try {
-    return new Date(d).toLocaleString();
+    return new Date(d).toLocaleString(lokal);
   } catch {
     return String(d);
   }
 }
 
-function labelPeranan(role: string) {
-  if (role === "superadmin") return "Owner";
-  if (role === "admin") return "Admin";
-  if (role === "educator") return "Educator";
-  return "Student";
+/** Label pil peranan; superadmin dipapar "Owner". */
+function labelPerananT(role: string, t: (k: "admin.roleOwner" | "admin.roleAdmin" | "admin.roleEducator" | "common.student") => string) {
+  if (role === "superadmin") return t("admin.roleOwner");
+  if (role === "admin") return t("admin.roleAdmin");
+  if (role === "educator") return t("admin.roleEducator");
+  return t("common.student");
 }
 
 /** Butang tindakan menegak dalam kad "Account actions", nilai v3 (KZ-DS-v3). */
@@ -154,6 +170,7 @@ function ButangTindakan({
 export default function Page({ params }: { params: { id: string } }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
   const { id } = params;
 
   const [users, setUsers] = useState<Profile[]>([]);
@@ -199,9 +216,9 @@ export default function Page({ params }: { params: { id: string } }) {
               (baris || []).map((c: KelasMentah) => ({
                 id: c.id,
                 nama: c.name,
-                peranan: "Student",
-                status: c.is_archived ? "Archived" : c.ended_at ? "Ended" : "Active",
-                // Normalisasi rentetan kosong: fmt() memaparkan "Never".
+                peranan: "student",
+                status: c.is_archived ? "archived" : c.ended_at ? "ended" : "active",
+                // Normalisasi rentetan kosong: fmt() memaparkan label "tiada".
                 tarikh: c.joined_at || "",
               })),
             );
@@ -211,15 +228,15 @@ export default function Page({ params }: { params: { id: string } }) {
               ...(owned || []).map((c: KelasMentah) => ({
                 id: c.id,
                 nama: c.name,
-                peranan: "Owner",
-                status: c.is_archived ? "Archived" : c.ended_at ? "Ended" : "Active",
+                peranan: "owner",
+                status: c.is_archived ? "archived" : c.ended_at ? "ended" : "active",
                 tarikh: c.created_at || "",
               })),
               ...(coEducator || []).map((c: KelasMentah) => ({
                 id: c.id,
                 nama: c.name,
-                peranan: "Co-educator",
-                status: c.is_archived ? "Archived" : c.ended_at ? "Ended" : "Active",
+                peranan: "coed",
+                status: c.is_archived ? "archived" : c.ended_at ? "ended" : "active",
                 tarikh: c.created_at || "",
               })),
             ]);
@@ -239,7 +256,7 @@ export default function Page({ params }: { params: { id: string } }) {
 
   const u = users.find((x) => x.id === id) || null;
   const m = meta[id];
-  const namaPaparan = u?.display_name?.trim() || "Unnamed user";
+  const namaPaparan = u?.display_name?.trim() || t("admin.unnamedUser");
   const emel = m?.email || null;
   const belumSah = !!u && emelBelumSah(id, meta);
   const menungguLulus = !!u && pendingPendidik(u);
@@ -247,9 +264,9 @@ export default function Page({ params }: { params: { id: string } }) {
   const superAdminSasaran = u?.role === "superadmin";
   const bolehBahaya = !diriSendiri && !superAdminSasaran;
   const namaProfil = (uid: string | null | undefined) => {
-    if (!uid) return "Unnamed user";
+    if (!uid) return t("admin.unnamedUser");
     const p = users.find((x) => x.id === uid);
-    return p?.display_name || "Unnamed user";
+    return p?.display_name || t("admin.unnamedUser");
   };
 
   /** Ralat 42501 dari RPC 0047: sasaran dilindungi. */
@@ -260,17 +277,20 @@ export default function Page({ params }: { params: { id: string } }) {
   const tukarPeranan = async (perananBaru: "participant" | "educator" | "admin") => {
     if (!u || perananBaru === u.role) return;
     const ok = await confirm({
-      title: `Change role from ${labelPeranan(u.role)} to ${labelPeranan(perananBaru)}?`,
+      title: t("admin.userDetail.roleChangeConfirm", {
+        dari: labelPerananT(u.role, t),
+        ke: labelPerananT(perananBaru, t),
+      }),
       tone: "default",
     });
     if (!ok) return;
     try {
       await adminUpdateProfile(id, { role: perananBaru });
       await logAudit("role_change", "profile", id, { before: { role: u.role }, after: { role: perananBaru } });
-      setMesej({ baik: true, teks: "Role updated." });
+      setMesej({ baik: true, teks: t("admin.userDetail.roleUpdated") });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to change role.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.roleChangeFailed")) });
       reload();
     }
   };
@@ -285,7 +305,10 @@ export default function Page({ params }: { params: { id: string } }) {
     if (pelanBaru === semasa) return;
     if (semasa === "unlimited") {
       const ok = await confirm({
-        title: `Downgrade "${namaPaparan}" from Unlimited to ${LABEL_PELAN[pelanBaru]}? All limits will be re-applied immediately.`,
+        title: t("admin.userDetail.downgradeConfirm", {
+          nama: namaPaparan,
+          pelan: t(KUNCI_PELAN_PENUH[pelanBaru]),
+        }),
         tone: "danger",
       });
       if (!ok) {
@@ -297,10 +320,10 @@ export default function Page({ params }: { params: { id: string } }) {
       const { error } = await supabase.rpc("qm_set_plan", { p_user: id, p_plan: pelanBaru });
       if (error) throw error;
       await logAudit("set_plan", "profile", id, { before: { plan: semasa }, after: { plan: pelanBaru } });
-      setMesej({ baik: true, teks: "Plan updated." });
+      setMesej({ baik: true, teks: t("admin.userDetail.planUpdated") });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to change plan.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.planChangeFailed")) });
       reload();
     }
   };
@@ -317,10 +340,10 @@ export default function Page({ params }: { params: { id: string } }) {
         after: { max_classes_owned: owned, max_classes_as_coeducator: coed },
       });
       setHadDraf(null);
-      setMesej({ baik: true, teks: "Class limits updated." });
+      setMesej({ baik: true, teks: t("admin.userDetail.limitsUpdated") });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to save limits.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.limitsSaveFailed")) });
     }
   };
 
@@ -332,17 +355,17 @@ export default function Page({ params }: { params: { id: string } }) {
       await logAudit(baharu ? "enable_capability" : "disable_capability", "profile", id, { capability: kunci });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to update permissions.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.permFailed")) });
       reload();
     }
   };
 
   const hantarReset = async () => {
     if (!emel) {
-      setMesej({ baik: false, teks: "No email on file for this user." });
+      setMesej({ baik: false, teks: t("admin.userDetail.noEmailOnFile") });
       return;
     }
-    const ok = await confirm({ title: `Send a password reset email to ${emel}?`, tone: "default" });
+    const ok = await confirm({ title: t("admin.userDetail.resetConfirm", { emel }), tone: "default" });
     if (!ok) return;
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(emel, {
@@ -350,9 +373,9 @@ export default function Page({ params }: { params: { id: string } }) {
       });
       if (error) throw error;
       await logAudit("password_reset_sent", "profile", id, {});
-      setMesej({ baik: true, teks: `Password reset email sent to ${emel}.` });
+      setMesej({ baik: true, teks: t("admin.userDetail.resetSent", { emel }) });
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to send reset email.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.resetFailed")) });
     }
   };
 
@@ -367,7 +390,7 @@ export default function Page({ params }: { params: { id: string } }) {
       });
       const out = (await res.json().catch(() => ({}))) as { ok?: number; total?: number; error?: string };
       if (!res.ok) throw new Error(out.error || `HTTP ${res.status}`);
-      setMesej({ baik: true, teks: `Verified ${out.ok ?? 0}/${out.total ?? 1}.` });
+      setMesej({ baik: true, teks: t("admin.userDetail.verifiedMsg", { ok: out.ok ?? 0, total: out.total ?? 1 }) });
       reload();
     } catch (e) {
       setMesej({ baik: false, teks: e instanceof Error ? e.message : String(e) });
@@ -376,7 +399,7 @@ export default function Page({ params }: { params: { id: string } }) {
 
   const hantarSemula = async () => {
     if (!emel) {
-      setMesej({ baik: false, teks: "No email on file for this user." });
+      setMesej({ baik: false, teks: t("admin.userDetail.noEmailOnFile") });
       return;
     }
     try {
@@ -386,22 +409,22 @@ export default function Page({ params }: { params: { id: string } }) {
         options: { emailRedirectTo: `${window.location.origin}/auth/callback` },
       });
       if (error) throw error;
-      setMesej({ baik: true, teks: `Verification email resent to ${emel}.` });
+      setMesej({ baik: true, teks: t("admin.userDetail.resent", { emel }) });
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Resend failed.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.resendFailed")) });
     }
   };
 
   const luluskan = async () => {
-    const ok = await confirm({ title: `Approve "${namaPaparan}" as an educator?`, tone: "default" });
+    const ok = await confirm({ title: t("admin.userDetail.approveConfirm", { nama: namaPaparan }), tone: "default" });
     if (!ok) return;
     try {
       await adminUpdateProfile(id, { approved: true });
       await logAudit("approve", "profile", id);
-      setMesej({ baik: true, teks: "Educator approved." });
+      setMesej({ baik: true, teks: t("admin.userDetail.educatorApproved") });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to approve.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.approveFailed")) });
       reload();
     }
   };
@@ -413,13 +436,13 @@ export default function Page({ params }: { params: { id: string } }) {
     if (!mod) return;
     try {
       await adminSetSuspended(id, mod === "suspend", alasan);
-      setMesej({ baik: true, teks: mod === "suspend" ? "Account suspended." : "Account restored." });
+      setMesej({ baik: true, teks: mod === "suspend" ? t("admin.userDetail.suspendedMsg") : t("admin.userDetail.restoredMsg") });
       reload();
     } catch (e) {
       if (ralatDilindungi(e)) {
-        setMesej({ baik: false, teks: "You can't change this account." });
+        setMesej({ baik: false, teks: t("admin.userDetail.cantChange") });
       } else {
-        setMesej({ baik: false, teks: mesejHad(e, "Failed to update the account.") });
+        setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.accountUpdateFailed")) });
       }
       reload();
     }
@@ -427,7 +450,7 @@ export default function Page({ params }: { params: { id: string } }) {
 
   const hapus = async () => {
     const ok = await confirm({
-      title: `Permanently delete "${namaPaparan}"? This cannot be undone.`,
+      title: t("admin.userDetail.deleteConfirm", { nama: namaPaparan }),
       tone: "danger",
     });
     if (!ok) return;
@@ -436,27 +459,27 @@ export default function Page({ params }: { params: { id: string } }) {
       await adminDeleteUser(id);
       router.push("/admin/users");
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Delete failed.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.userDetail.deleteFailed")) });
     }
   };
 
   if (muat) {
     return (
       <AdminShell>
-        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
       </AdminShell>
     );
   }
 
   if (!u) {
     return (
-      <AdminShell title="User not found">
+      <AdminShell title={t("admin.userDetail.notFoundTitle")}>
         <Card>
           <EmptyState
             icon={<UserIcon className="w-6 h-6" />}
-            title="User not found."
-            text="This account may have been deleted."
-            actionLabel="Back to Users"
+            title={`${t("admin.userDetail.notFoundTitle")}.`}
+            text={t("admin.userDetail.notFoundText")}
+            actionLabel={t("admin.userDetail.backToUsers")}
             href="/admin/users"
           />
         </Card>
@@ -474,23 +497,30 @@ export default function Page({ params }: { params: { id: string } }) {
   // Lencana status akaun (sama seperti lajur Account senarai Users, KZ-024).
   const lencanaStatus = u.suspended ? (
     <Badge variant="dim" warna="red">
-      Suspended
+      {t("admin.suspended")}
     </Badge>
   ) : !u.approved ? (
     <Badge variant="dim" warna="yellow">
-      Pending
+      {t("admin.pending")}
     </Badge>
   ) : (
     <Badge variant="dot" warna="green">
-      Active
+      {t("admin.active")}
     </Badge>
   );
+
+  // Label peranan kelas daripada kunci teknikal.
+  const labelPerananKelas = (kunci: string) => {
+    if (kunci === "owner") return t("admin.userDetail.roleOwner");
+    if (kunci === "coed") return t("admin.userDetail.roleCoeducator");
+    return t("admin.userDetail.roleStudent");
+  };
 
   // Lajur DataTable tab Classes; data dan pautan sama seperti jadual lama.
   const lajurKelas: DataColumn<BarisKelas>[] = [
     {
       key: "kelas",
-      header: "Class",
+      header: t("admin.userDetail.colClass"),
       render: (k) => (
         <Link
           href={`/admin/classes/${k.id}`}
@@ -502,32 +532,32 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "peranan",
-      header: "Role",
-      render: (k) => <span className="text-[13px] text-ink-faint">{k.peranan}</span>,
+      header: t("admin.users.colRole"),
+      render: (k) => <span className="text-[13px] text-ink-faint">{labelPerananKelas(k.peranan)}</span>,
     },
     {
       key: "status",
-      header: "Status",
+      header: t("admin.userDetail.colStatus"),
       render: (k) =>
-        k.status === "Archived" ? (
+        k.status === "archived" ? (
           <Badge variant="dim" warna="gray">
-            Archived
+            {t("admin.archived")}
           </Badge>
-        ) : k.status === "Ended" ? (
+        ) : k.status === "ended" ? (
           <Badge variant="dim" warna="yellow">
-            Ended
+            {t("admin.ended")}
           </Badge>
         ) : (
           <Badge variant="dot" warna="green">
-            Active
+            {t("admin.active")}
           </Badge>
         ),
     },
     {
       key: "tarikh",
-      header: "Date",
+      header: t("admin.userDetail.colDate"),
       hideOnMobile: true,
-      render: (k) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{fmt(k.tarikh)}</span>,
+      render: (k) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{fmt(k.tarikh, LOKAL[bahasa], t("admin.never"))}</span>,
     },
   ];
 
@@ -538,28 +568,28 @@ export default function Page({ params }: { params: { id: string } }) {
         subtitle={
           <span className="inline-flex flex-wrap items-center gap-1.5">
             <Badge variant="dim" warna="purple">
-              {labelPeranan(u.role)}
+              {labelPerananT(u.role, t)}
             </Badge>
             {lencanaStatus}
           </span>
         }
         menu={[
-          { label: "All users", href: "/admin/users", icon: <UsersIcon className="w-[18px] h-[18px]" /> },
-          { label: "Classes", href: "/admin/classes", icon: <GraduationCap className="w-[18px] h-[18px]" /> },
-          { label: "Activities", href: "/admin/hunts", icon: <MapIcon className="w-[18px] h-[18px]" /> },
+          { label: t("admin.userDetail.menuAllUsers"), href: "/admin/users", icon: <UsersIcon className="w-[18px] h-[18px]" /> },
+          { label: t("admin.userDetail.menuClasses"), href: "/admin/classes", icon: <GraduationCap className="w-[18px] h-[18px]" /> },
+          { label: t("admin.userDetail.menuActivities"), href: "/admin/hunts", icon: <MapIcon className="w-[18px] h-[18px]" /> },
         ]}
-        lastLogin={fmt(m?.last_sign_in_at)}
-        menuMoreItems={[{ label: "View audit history", onSelect: () => setTab("activity") }]}
+        lastLogin={fmt(m?.last_sign_in_at, LOKAL[bahasa], t("admin.never"))}
+        menuMoreItems={[{ label: t("admin.userDetail.viewAuditHistory"), onSelect: () => setTab("activity") }]}
       >
-        <h1 className="text-[24px] font-bold text-ink leading-tight">User details</h1>
-        <p className="text-[14px] text-ink-faint mt-1">Profile, classes and activity history of this account.</p>
+        <h1 className="text-[24px] font-bold text-ink leading-tight">{t("admin.userDetail.title")}</h1>
+        <p className="text-[14px] text-ink-faint mt-1">{t("admin.userDetail.description")}</p>
 
         <Tabs
           className="mt-6"
           items={[
-            { label: "Profile", onSelect: () => setTab("profile"), aktif: tab === "profile" },
-            { label: "Classes", onSelect: () => setTab("classes"), aktif: tab === "classes" },
-            { label: "Activity history", onSelect: () => setTab("activity"), aktif: tab === "activity" },
+            { label: t("admin.userDetail.tabProfile"), onSelect: () => setTab("profile"), aktif: tab === "profile" },
+            { label: t("admin.userDetail.tabClasses"), onSelect: () => setTab("classes"), aktif: tab === "classes" },
+            { label: t("admin.userDetail.tabActivity"), onSelect: () => setTab("activity"), aktif: tab === "activity" },
           ]}
         />
 
@@ -574,80 +604,80 @@ export default function Page({ params }: { params: { id: string } }) {
         <div className="mt-6 grid lg:grid-cols-3 gap-6 items-start">
           {/* Maklumat akaun: DataSection/DataRow terus dalam kandungan kanan. */}
           <div className="lg:col-span-2 space-y-8 min-w-0">
-            <DataSection title="Basics">
-              <DataRow label="Name" value={u.display_name || "Unnamed user"} />
-              <DataRow label="Username" value={u.username || "-"} />
-              <DataRow label="Email" value={emel || "No email"} />
+            <DataSection title={t("admin.userDetail.basics")}>
+              <DataRow label={t("admin.userDetail.name")} value={u.display_name || t("admin.unnamedUser")} />
+              <DataRow label={t("admin.userDetail.username")} value={u.username || "-"} />
+              <DataRow label={t("admin.userDetail.email")} value={emel || t("admin.noEmail")} />
               <DataRow
-                label="Email status"
+                label={t("admin.userDetail.emailStatus")}
                 value={
                   !emel ? (
                     <Badge variant="dim" warna="gray">
-                      No email
+                      {t("admin.noEmail")}
                     </Badge>
                   ) : m?.email_confirmed_at ? (
                     <Badge variant="dim" warna="green">
-                      Verified
+                      {t("admin.verified")}
                     </Badge>
                   ) : (
                     <Badge variant="dim" warna="yellow">
-                      Unverified
+                      {t("admin.unverified")}
                     </Badge>
                   )
                 }
               />
               <DataRow
-                label="Role"
+                label={t("admin.userDetail.role")}
                 value={
                   u.role === "superadmin" ? (
                     <Badge variant="dim" warna="purple">
-                      Owner
+                      {t("admin.roleOwner")}
                     </Badge>
                   ) : (
                     <Select
                       value={u.role}
                       onChange={(e) => tukarPeranan(e.target.value as "participant" | "educator" | "admin")}
-                      aria-label="Role"
+                      aria-label={t("admin.userDetail.role")}
                       className="w-40"
                     >
-                      <option value="participant">Student</option>
-                      <option value="educator">Educator</option>
-                      <option value="admin">Admin</option>
+                      <option value="participant">{t("common.student")}</option>
+                      <option value="educator">{t("admin.roleEducator")}</option>
+                      <option value="admin">{t("admin.roleAdmin")}</option>
                     </Select>
                   )
                 }
               />
-              <DataRow label="Registered" value={fmt(m?.created_at || u.created_at)} />
-              <DataRow label="Last sign in" value={fmt(m?.last_sign_in_at)} />
+              <DataRow label={t("admin.userDetail.registered")} value={fmt(m?.created_at || u.created_at, LOKAL[bahasa], t("admin.never"))} />
+              <DataRow label={t("admin.userDetail.lastSignIn")} value={fmt(m?.last_sign_in_at, LOKAL[bahasa], t("admin.never"))} />
             </DataSection>
 
             {adaPelan && (
-              <DataSection title="Plan">
+              <DataSection title={t("admin.userDetail.plan")}>
                 <DataRow
-                  label="Plan"
+                  label={t("admin.userDetail.plan")}
                   value={
                     <Select
                       value={pelanProfil(u)}
                       onChange={(e) => tukarPelan(e.target.value as PelanAdmin)}
-                      aria-label="Plan"
+                      aria-label={t("admin.userDetail.plan")}
                       className="w-40"
                     >
                       {PELAN_ADMIN.map((p) => (
                         <option key={p} value={p}>
-                          {LABEL_PELAN[p]}
+                          {t(KUNCI_PELAN_PENUH[p])}
                         </option>
                       ))}
                     </Select>
                   }
                 />
-                <DataRow label="Plan expires" value={u.plan_expires_at ? fmt(u.plan_expires_at) : "-"} />
+                <DataRow label={t("admin.userDetail.planExpires")} value={u.plan_expires_at ? fmt(u.plan_expires_at, LOKAL[bahasa], t("admin.never")) : "-"} />
               </DataSection>
             )}
 
             {bolehHad && (
-              <DataSection title="Class limits">
+              <DataSection title={t("admin.userDetail.classLimits")}>
                 <DataRow
-                  label="Max classes (own)"
+                  label={t("admin.userDetail.maxOwn")}
                   value={
                     <Input
                       type="number"
@@ -655,12 +685,12 @@ export default function Page({ params }: { params: { id: string } }) {
                       className="w-28"
                       value={drafHad.owned}
                       onChange={(e) => setHadDraf({ owned: e.target.value, coed: drafHad.coed })}
-                      aria-label="Max classes (own)"
+                      aria-label={t("admin.userDetail.maxOwn")}
                     />
                   }
                 />
                 <DataRow
-                  label="Max as co-educator"
+                  label={t("admin.userDetail.maxCoed")}
                   value={
                     <Input
                       type="number"
@@ -668,39 +698,39 @@ export default function Page({ params }: { params: { id: string } }) {
                       className="w-28"
                       value={drafHad.coed}
                       onChange={(e) => setHadDraf({ owned: drafHad.owned, coed: e.target.value })}
-                      aria-label="Max as co-educator"
+                      aria-label={t("admin.userDetail.maxCoed")}
                     />
                   }
                 />
                 <div className="flex flex-wrap items-center gap-3 py-5 px-5">
                   <Button onClick={simpanHad}>
-                    <Save className="w-4 h-4" /> Save
+                    <Save className="w-4 h-4" /> {t("admin.save")}
                   </Button>
-                  <span className="text-[12px] text-ink-faint">Empty means the plan default applies.</span>
+                  <span className="text-[12px] text-ink-faint">{t("admin.userDetail.planDefaultHint")}</span>
                 </div>
               </DataSection>
             )}
 
             {adaPelan && (
-              <DataSection title="Upload permissions">
+              <DataSection title={t("admin.userDetail.uploadPermissions")}>
                 <DataRow
-                  label="Allowed uploads"
+                  label={t("admin.userDetail.allowedUploads")}
                   value={
                     <span className="flex flex-wrap items-center gap-x-5 gap-y-2">
                       <CheckRadio
                         type="checkbox"
-                        label="Files (FileLu)"
+                        label={t("admin.userDetail.filesUpload")}
                         checked={!!u.can_upload_files}
                         onChange={() => toggleKebenaran("can_upload_files")}
                       />
                       <CheckRadio
                         type="checkbox"
-                        label="Videos (Bunny Stream)"
+                        label={t("admin.userDetail.videosUpload")}
                         checked={!!u.can_upload_videos}
                         onChange={() => toggleKebenaran("can_upload_videos")}
                       />
                       {(u.role === "admin" || u.role === "superadmin") && (
-                        <span className="text-[12px] text-ink-faint">Admins always allowed</span>
+                        <span className="text-[12px] text-ink-faint">{t("admin.userDetail.adminsAlwaysAllowed")}</span>
                       )}
                     </span>
                   }
@@ -711,40 +741,40 @@ export default function Page({ params }: { params: { id: string } }) {
 
           {/* Kad tindakan akaun; tindakan dan pengesahan sama seperti sebelum ini. */}
           <Card>
-            <CardHead title="Account actions" subtitle={emel || "No email"} />
+            <CardHead title={t("admin.userDetail.accountActions")} subtitle={emel || t("admin.noEmail")} />
             <div className="mt-4 space-y-2">
-              <ButangTindakan onClick={hantarReset} ikon={<KeyRound className="w-4 h-4" />} label="Send password reset" />
+              <ButangTindakan onClick={hantarReset} ikon={<KeyRound className="w-4 h-4" />} label={t("admin.userDetail.sendPasswordReset")} />
               {belumSah && (
-                <ButangTindakan onClick={sahkanEmel} ikon={<MailCheck className="w-4 h-4" />} label="Verify email" />
+                <ButangTindakan onClick={sahkanEmel} ikon={<MailCheck className="w-4 h-4" />} label={t("admin.userDetail.verifyEmail")} />
               )}
               {belumSah && (
-                <ButangTindakan onClick={hantarSemula} ikon={<Mail className="w-4 h-4" />} label="Resend verification" />
+                <ButangTindakan onClick={hantarSemula} ikon={<Mail className="w-4 h-4" />} label={t("admin.userDetail.resendVerification")} />
               )}
               {menungguLulus && (
-                <ButangTindakan onClick={luluskan} ikon={<UserCheck className="w-4 h-4" />} label="Approve educator" />
+                <ButangTindakan onClick={luluskan} ikon={<UserCheck className="w-4 h-4" />} label={t("admin.userDetail.approveEducator")} />
               )}
               <ButangTindakan
                 onClick={() => setTab("activity")}
                 ikon={<ScrollText className="w-4 h-4" />}
-                label="View audit history"
+                label={t("admin.userDetail.viewAuditHistory")}
               />
               {bolehBahaya &&
                 (u.suspended ? (
                   <ButangTindakan
                     onClick={() => setDialogGantung("restore")}
                     ikon={<RotateCcw className="w-4 h-4" />}
-                    label="Restore account"
+                    label={t("admin.userDetail.restoreAccount")}
                   />
                 ) : (
                   <ButangTindakan
                     bahaya
                     onClick={() => setDialogGantung("suspend")}
                     ikon={<Ban className="w-4 h-4" />}
-                    label="Suspend account"
+                    label={t("admin.userDetail.suspendAccount")}
                   />
                 ))}
             </div>
-            <p className="text-[12px] text-ink-faint mt-4">Account changes are recorded in Audit.</p>
+            <p className="text-[12px] text-ink-faint mt-4">{t("admin.auditNote")}</p>
           </Card>
         </div>
       )}
@@ -752,9 +782,9 @@ export default function Page({ params }: { params: { id: string } }) {
       {/* Zon bahaya: pengesahan menaip nama paparan tetap sama. */}
       {tab === "profile" && bolehBahaya && (
         <Card className="mt-6">
-          <div className="text-[13px] font-bold text-red-600 mb-1">Danger zone</div>
+          <div className="text-[13px] font-bold text-red-600 mb-1">{t("admin.dangerZone")}</div>
           <p className="text-[14px] text-ink-muted mb-4">
-            Deleting this user removes their account permanently. Type the display name exactly to enable the button.
+            {t("admin.userDetail.deleteDesc")}
           </p>
           <div className="flex flex-wrap items-center gap-3">
             <Input
@@ -762,7 +792,7 @@ export default function Page({ params }: { params: { id: string } }) {
               placeholder={namaPaparan}
               value={pengesahanHapus}
               onChange={(e) => setPengesahanHapus(e.target.value)}
-              aria-label="Type the display name to confirm deletion"
+              aria-label={t("admin.userDetail.typeToConfirmAria")}
             />
             <button
               type="button"
@@ -770,7 +800,7 @@ export default function Page({ params }: { params: { id: string } }) {
               onClick={hapus}
               className="inline-flex items-center justify-center gap-2 font-bold tracking-[0.26px] rounded-[4px] transition select-none h-9 px-[18px] py-[7px] text-[13px] bg-red-600 text-white hover:opacity-90 disabled:opacity-40 disabled:cursor-not-allowed"
             >
-              <Trash2 className="w-4 h-4" /> Delete user
+              <Trash2 className="w-4 h-4" /> {t("admin.userDetail.deleteButton")}
             </button>
           </div>
         </Card>
@@ -779,19 +809,19 @@ export default function Page({ params }: { params: { id: string } }) {
       {/* ===== Tab Classes ===== */}
       {tab === "classes" &&
         (kelas === null ? (
-          <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+          <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
         ) : (
           <DataTable
             className="mt-6"
-            label="Classes of this user"
+            label={t("admin.userDetail.classesTable")}
             columns={lajurKelas}
             rows={kelas}
             rowKey={(k) => k.id}
             empty={
               <EmptyState
                 icon={<GraduationCap className="w-6 h-6" />}
-                title="No classes."
-                text="This user has no classes yet."
+                title={t("admin.userDetail.noClasses")}
+                text={t("admin.userDetail.noClassesText")}
               />
             }
           />
@@ -800,22 +830,22 @@ export default function Page({ params }: { params: { id: string } }) {
       {/* ===== Tab Activity history ===== */}
       {tab === "activity" &&
         (audit === null ? (
-          <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+          <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
         ) : audit.length === 0 ? (
-          <EmptyState icon={<ScrollText className="w-6 h-6" />} title="No activity yet." className="mt-6" />
+          <EmptyState icon={<ScrollText className="w-6 h-6" />} title={t("admin.userDetail.noActivity")} className="mt-6" />
         ) : (
           <Card padat className="mt-6">
             {audit.map((r) => {
-              const beza = bezaAudit(r.meta);
+              const beza = bezaAudit(r.meta, bahasa);
               const alasan = alasanAudit(r.meta);
               return (
                 <div key={r.id} className="px-6 py-4 border-t border-kz-line first:border-t-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="text-[13px] font-bold text-ink">{labelTindakan(r.action).label}</span>
-                    <span className="text-[12px] text-ink-faint">by {namaProfil(r.actor_id)}</span>
-                    <span className="ml-auto text-[12px] text-ink-faint whitespace-nowrap">{relTime(r.created_at)}</span>
+                    <span className="text-[13px] font-bold text-ink">{labelTindakan(r.action, bahasa).label}</span>
+                    <span className="text-[12px] text-ink-faint">{t("admin.userDetail.by", { nama: namaProfil(r.actor_id) })}</span>
+                    <span className="ml-auto text-[12px] text-ink-faint whitespace-nowrap">{relTime(r.created_at, undefined, bahasa)}</span>
                   </div>
-                  {alasan && <p className="text-[13px] text-ink-muted mt-1">Reason: {alasan}</p>}
+                  {alasan && <p className="text-[13px] text-ink-muted mt-1">{t("admin.userDetail.reason", { alasan })}</p>}
                   {beza.length > 0 && (
                     <div className="mt-1 space-y-0.5">
                       {beza.map((b) => (
@@ -833,8 +863,8 @@ export default function Page({ params }: { params: { id: string } }) {
 
       <ReasonDialog
         open={dialogGantung !== null}
-        title={dialogGantung === "restore" ? `Restore "${namaPaparan}"?` : `Suspend "${namaPaparan}"?`}
-        confirmLabel={dialogGantung === "restore" ? "Restore account" : "Suspend account"}
+        title={dialogGantung === "restore" ? t("admin.userDetail.restoreConfirm", { nama: namaPaparan }) : t("admin.userDetail.suspendConfirm", { nama: namaPaparan })}
+        confirmLabel={dialogGantung === "restore" ? t("admin.userDetail.restoreAccount") : t("admin.userDetail.suspendAccount")}
         tone={dialogGantung === "restore" ? "default" : "danger"}
         onConfirm={sahkanGantung}
         onClose={() => setDialogGantung(null)}
