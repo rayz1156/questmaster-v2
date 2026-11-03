@@ -21,10 +21,12 @@ import {
   Select,
   Textarea,
 } from '@/components/ui';
+import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 function Inner() {
   const router = useRouter();
   const sp = useSearchParams();
+  const { t } = useBahasa();
   const [classes, setClasses] = useState<Klass[]>([]);
   const [classId, setClassId] = useState<string>(sp.get('classId') || "");
   const [title, setTitle] = useState("");
@@ -42,8 +44,8 @@ function Inner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   const submit = async () => {
-    if (!title.trim()) { setErr("Title required"); return; }
-    if (!classId) { setErr("Please select a class"); return; }
+    if (!title.trim()) { setErr(t("educator.activityNew.titleRequired")); return; }
+    if (!classId) { setErr(t("educator.activityNew.selectClass")); return; }
     setBusy(true); setErr(null);
     try {
       const hunt = await createHuntInClass(classId, title.trim(), desc.trim());
@@ -57,55 +59,52 @@ function Inner() {
         points: Number(points) || 0,
       });
       router.push(`/educator/activities/${hunt.id}`);
-    } catch (e: unknown) { setErr(e instanceof Error ? e.message : "Failed to create activity"); setBusy(false); }
+    } catch (e: unknown) { setErr(e instanceof Error ? e.message : t("educator.activityNew.createFailed")); setBusy(false); }
   };
   return (
     <div className="max-w-2xl">
       <PageHead
-        title="Create New Activity"
-        description="Set the class, the basics, and where students hand in their work."
-        secondaryActions={[{ label: "Back", icon: <ArrowLeft className="w-4 h-4" />, onSelect: () => router.back() }]}
+        title={t("educator.activityNew.pageTitle")}
+        description={t("educator.activityNew.pageDesc")}
+        secondaryActions={[{ label: t("common.back"), icon: <ArrowLeft className="w-4 h-4" />, onSelect: () => router.back() }]}
       />
 
       {classes.length === 0 ? (
         <Card>
-          <p className="text-[14px] text-ink-muted mb-4">You need to create a class first. Each activity belongs to a class.</p>
-          <Button href="/educator/classes">Create a class</Button>
+          <p className="text-[14px] text-ink-muted mb-4">{t("educator.activityNew.needClass")}</p>
+          <Button href="/educator/classes">{t("educator.activityNew.createClassButton")}</Button>
         </Card>
       ) : (
         <Card className="space-y-5">
-          <Field label="Class" htmlFor="new-activity-class">
+          <Field label={t("common.class")} htmlFor="new-activity-class">
             <Select id="new-activity-class" value={classId} onChange={e => setClassId(e.target.value)}>
               {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
             </Select>
           </Field>
-          <Field label="Title" htmlFor="new-activity-title">
-            <Input id="new-activity-title" placeholder="Activity title" value={title} onChange={e => setTitle(e.target.value)} />
+          <Field label={t("educator.activityNew.titleLabel")} htmlFor="new-activity-title">
+            <Input id="new-activity-title" placeholder={t("educator.activityNew.titlePlaceholder")} value={title} onChange={e => setTitle(e.target.value)} />
           </Field>
-          <Field label="Status" htmlFor="new-activity-status">
+          <Field label={t("educator.activityNew.statusLabel")} htmlFor="new-activity-status">
             <Select id="new-activity-status" value={status} onChange={e => setStatus(e.target.value as 'draft'|'active'|'archived')}>
-              <option value="draft">Draft</option><option value="active">Active</option><option value="archived">Archived</option>
+              <option value="draft">{t("participant.statusDraft")}</option><option value="active">{t("participant.statusActive")}</option><option value="archived">{t("participant.statusArchived")}</option>
             </Select>
           </Field>
-          <Field label="Short description" htmlFor="new-activity-desc">
+          <Field label={t("educator.activityNew.descLabel")} htmlFor="new-activity-desc">
             <Input id="new-activity-desc" value={desc} onChange={e => setDesc(e.target.value)} />
           </Field>
-          <Field label="Instructions" htmlFor="new-activity-instructions">
-            <Textarea id="new-activity-instructions" placeholder="What teams need to do to complete this quest..." value={instructions} onChange={e => setInstructions(e.target.value)} />
+          <Field label={t("educator.activityNew.instructionsLabel")} htmlFor="new-activity-instructions">
+            <Textarea id="new-activity-instructions" placeholder={t("educator.activityNew.instructionsPlaceholder")} value={instructions} onChange={e => setInstructions(e.target.value)} />
           </Field>
-          <Field label="Instruction Link 1 (any URL)" htmlFor="new-activity-link1">
+          <Field label={t("educator.activityNew.link1Label")} htmlFor="new-activity-link1">
             <Input id="new-activity-link1" value={link1} onChange={e => setLink1(e.target.value)} placeholder="https://drive.google.com/..." />
           </Field>
-          <Field label="Instruction Link 2 (any URL)" htmlFor="new-activity-link2">
+          <Field label={t("educator.activityNew.link2Label")} htmlFor="new-activity-link2">
             <Input id="new-activity-link2" value={link2} onChange={e => setLink2(e.target.value)} placeholder="https://youtu.be/..." />
           </Field>
           <Alert tone="info" icon={<Info className="w-4 h-4" />}>
-            Submission link (optional). When set, the activity board replaces team-column
-            submissions with this link (Google Drive, Dropbox, Padlet, etc). Prefer students
-            to post their work directly inside Kuizen? Leave this blank and create a Kuizen
-            submission board from the manage page after you save this activity.
+            {t("educator.activityNew.alertSubmission")}
           </Alert>
-          <Field label="Submission URL" htmlFor="new-activity-submission" note="Optional">
+          <Field label={t("educator.activityNew.submissionUrlLabel")} htmlFor="new-activity-submission" note={t("educator.activityNew.optional")}>
             <Input
               id="new-activity-submission"
               type="url"
@@ -114,7 +113,7 @@ function Inner() {
               placeholder="https://drive.google.com/drive/folders/..."
             />
           </Field>
-          <Field label="Completion points" htmlFor="new-activity-points" note="0 to 1000">
+          <Field label={t("educator.activityNew.pointsLabel")} htmlFor="new-activity-points" note={t("educator.activityNew.pointsNote")}>
             <Input
               id="new-activity-points"
               type="number"
@@ -126,7 +125,7 @@ function Inner() {
           </Field>
           {err && <p className="text-[14px] text-kz-down">{err}</p>}
           <Button disabled={busy} onClick={submit} className="w-full">
-            <Check className="w-4 h-4" />{busy ? "Creating..." : "Create Activity"}
+            <Check className="w-4 h-4" />{busy ? t("educator.activityNew.creating") : t("educator.activityNew.createButton")}
           </Button>
         </Card>
       )}
@@ -135,5 +134,6 @@ function Inner() {
 }
 
 export default function NewHunt() {
-  return <Shell tabs={EDU_TABS}><Suspense fallback={<div className="p-4 text-sm text-ink-faint">Loading...</div>}><Inner/></Suspense></Shell>;
+  const { t } = useBahasa();
+  return <Shell tabs={EDU_TABS}><Suspense fallback={<div className="p-4 text-sm text-ink-faint">{t("common.loadingDots")}</div>}><Inner/></Suspense></Shell>;
 }

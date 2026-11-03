@@ -32,13 +32,15 @@ import {
   Select,
   Tabs,
 } from "@/components/ui";
+import { useBahasa, type FungsiT } from '@/lib/i18n/BahasaProvider';
+import { terjemahBilangan } from '@/lib/i18n';
 
 /** Lencana status aktiviti ikut status sebenar (Active/Draft/Archived). */
-function LencanaStatus({ status }: { status?: string | null }) {
+function LencanaStatus({ status, t }: { status?: string | null; t: FungsiT }) {
   const s = String(status || "draft").toLowerCase();
-  if (s === "active") return <Badge variant="dot" warna="green">Active</Badge>;
-  if (s === "archived") return <Badge variant="dim" warna="gray">Archived</Badge>;
-  return <Badge variant="dim" warna="yellow">Draft</Badge>;
+  if (s === "active") return <Badge variant="dot" warna="green">{t("participant.statusActive")}</Badge>;
+  if (s === "archived") return <Badge variant="dim" warna="gray">{t("participant.statusArchived")}</Badge>;
+  return <Badge variant="dim" warna="yellow">{t("participant.statusDraft")}</Badge>;
 }
 
 /** Sisa hari sehingga end_at; null bila tiada tarikh (tiada lencana masa). */
@@ -51,6 +53,7 @@ function sisaHari(endAt?: string | null): number | undefined {
 function PageInner() {
   const { user } = useSession('educator');
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
   const sp = useSearchParams();
   const classFilterFromUrl = sp.get('classId') || "";
 
@@ -78,7 +81,7 @@ function PageInner() {
   useEffect(() => { setClassFilter(classFilterFromUrl); }, [classFilterFromUrl]);
 
   async function onDelete(id: string) {
-    if (!(await confirm({ title: 'Delete this activity? This cannot be undone.', tone: 'danger' }))) return;
+    if (!(await confirm({ title: t('educator.activities.deleteConfirm'), tone: 'danger' }))) return;
     await deleteHunt(id);
     await refresh();
   }
@@ -92,12 +95,12 @@ function PageInner() {
   }, [hunts, classFilter, q, onlyActive]);
 
   const menuFor = (h: Hunt) => [
-    { label: "Manage activity", icon: <FileText className="w-4 h-4" />, onSelect: () => { window.location.href = `/educator/activities/${h.id}`; } },
-    { label: "View submissions", icon: <ClipboardList className="w-4 h-4" />, onSelect: () => { window.location.href = `/educator/activities/${h.id}/submissions`; } },
+    { label: t("educator.activities.manage"), icon: <FileText className="w-4 h-4" />, onSelect: () => { window.location.href = `/educator/activities/${h.id}`; } },
+    { label: t("educator.activities.viewSubmissions"), icon: <ClipboardList className="w-4 h-4" />, onSelect: () => { window.location.href = `/educator/activities/${h.id}/submissions`; } },
     ...(h.submission_link
-      ? [{ label: "Open submission link", icon: <LinkIcon className="w-4 h-4" />, onSelect: () => window.open(h.submission_link as string, "_blank", "noopener") }]
+      ? [{ label: t("educator.activities.openSubmissionLink"), icon: <LinkIcon className="w-4 h-4" />, onSelect: () => window.open(h.submission_link as string, "_blank", "noopener") }]
       : []),
-    { label: "Delete activity", icon: <Trash2 className="w-4 h-4" />, danger: true, onSelect: () => onDelete(h.id) },
+    { label: t("educator.activities.deleteMenu"), icon: <Trash2 className="w-4 h-4" />, danger: true, onSelect: () => onDelete(h.id) },
   ];
 
   /** Kad projek satu aktiviti; lencana mata dan status data sebenar. */
@@ -108,13 +111,13 @@ function PageInner() {
       description={h.description || undefined}
       badges={
         <>
-          <Badge variant="dim" warna="purple">{h.points ?? 0} pts</Badge>
-          <LencanaStatus status={h.status} />
+          <Badge variant="dim" warna="purple">{t("participant.ptsBadge", { n: h.points ?? 0 })}</Badge>
+          <LencanaStatus status={h.status} t={t} />
         </>
       }
       daysLeft={sisaHari(h.end_at)}
       menuItems={menuFor(h)}
-      menuLabel="Activity actions"
+      menuLabel={t("ui.activityActions")}
       href={`/educator/activities/${h.id}`}
     />
   );
@@ -126,34 +129,34 @@ function PageInner() {
         <ClassShell classId={classFilter} current="activities">
           <div className="flex items-end justify-between gap-4 flex-wrap mb-5">
             <div>
-              <h2 className="section-title">Activities</h2>
+              <h2 className="section-title">{t("educator.activities.sectionTitle")}</h2>
               <p className="text-sm text-ink-muted mt-0.5">
-                {shown.length} {shown.length === 1 ? "activity" : "activities"}
+                {terjemahBilangan(bahasa, "educator.activities.countOne", "educator.activities.countOther", shown.length, { n: shown.length })}
               </p>
             </div>
-            <Button href="/educator/activities/new"><Plus className="w-4 h-4" /> Create activity</Button>
+            <Button href="/educator/activities/new"><Plus className="w-4 h-4" /> {t("educator.activities.createButton")}</Button>
           </div>
 
           {shown.length > 4 && (
             <div className="mb-4 max-w-sm">
               <Input
-                placeholder="Search activities..."
+                placeholder={t("educator.activities.searchPlaceholder")}
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
                 ikonKiri={<Search className="w-4 h-4" />}
-                aria-label="Search activities"
+                aria-label={t("educator.activities.searchAria")}
               />
             </div>
           )}
 
-          {busy && <p className="text-sm text-ink-muted">Loading…</p>}
+          {busy && <p className="text-sm text-ink-muted">{t("common.loading")}</p>}
 
           {!busy && shown.length === 0 ? (
             <EmptyState
               icon={<ListChecks className="w-6 h-6" />}
-              title="Set the first task."
-              text="Activities are the work your students hand in and you grade."
-              actionLabel="Create activity"
+              title={t("educator.activities.emptyTitle")}
+              text={t("educator.activities.emptyText")}
+              actionLabel={t("educator.activities.emptyAction")}
               href="/educator/activities/new"
             />
           ) : (
@@ -164,7 +167,7 @@ function PageInner() {
                 </ProjectGrid>
               )}
               {!busy && shown.length > 0 && (
-                <p className="text-xs text-ink-faint mt-4">Open an activity to manage submissions.</p>
+                <p className="text-xs text-ink-faint mt-4">{t("educator.activities.openHint")}</p>
               )}
             </>
           )}
@@ -177,15 +180,15 @@ function PageInner() {
   return (
     <Shell tabs={EDU_TABS}>
       <PageHead
-        title="Your teaching library"
-        description="Create and manage your activities and quizzes all in one place."
-        primaryAction={{ label: "Create activity", icon: <Plus className="w-4 h-4" />, href: "/educator/activities/new" }}
+        title={t("educator.activities.libraryTitle")}
+        description={t("educator.activities.libraryDesc")}
+        primaryAction={{ label: t("educator.activities.createButton"), icon: <Plus className="w-4 h-4" />, href: "/educator/activities/new" }}
       />
 
       <Tabs
         items={[
-          { label: "Activities", href: "/educator/activities" },
-          { label: "Quizzes", href: "/educator/live" },
+          { label: t("educator.activities.tabActivities"), href: "/educator/activities" },
+          { label: t("educator.activities.tabQuizzes"), href: "/educator/live" },
         ]}
         className="mb-5"
       />
@@ -193,31 +196,31 @@ function PageInner() {
       <div className="flex items-center gap-3 flex-wrap mb-5">
         <div className="flex-1 min-w-[220px] max-w-sm">
           <Input
-            placeholder="Search activities"
+            placeholder={t("educator.activities.searchAria")}
             value={q}
             onChange={(e) => setQ(e.target.value)}
             ikonKiri={<Search className="w-4 h-4" />}
-            aria-label="Search activities"
+            aria-label={t("educator.activities.searchAria")}
           />
         </div>
-        <Select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} aria-label="Filter by class" className="w-auto">
-          <option value="">All classes</option>
+        <Select value={classFilter} onChange={(e) => setClassFilter(e.target.value)} aria-label={t("participant.filterByClassAria")} className="w-auto">
+          <option value="">{t("participant.allClasses")}</option>
           {Object.entries(classMap).map(([id, name]) => (<option key={id} value={id}>{name}</option>))}
         </Select>
-        <Select value={onlyActive ? "active" : "all"} onChange={(e) => setOnlyActive(e.target.value === "active")} aria-label="Filter by status" className="w-auto">
-          <option value="all">All statuses</option>
-          <option value="active">Active</option>
+        <Select value={onlyActive ? "active" : "all"} onChange={(e) => setOnlyActive(e.target.value === "active")} aria-label={t("educator.activities.filterStatusAria")} className="w-auto">
+          <option value="all">{t("educator.activities.allStatuses")}</option>
+          <option value="active">{t("participant.statusActive")}</option>
         </Select>
       </div>
 
-      {busy && <p className="text-sm text-ink-muted">Loading…</p>}
+      {busy && <p className="text-sm text-ink-muted">{t("common.loading")}</p>}
 
       {!busy && shown.length === 0 ? (
         <EmptyState
           icon={<ListChecks className="w-6 h-6" />}
-          title="Nothing here yet."
-          text="Activities you create in any class appear here."
-          actionLabel="Create activity"
+          title={t("educator.activities.emptyLibraryTitle")}
+          text={t("educator.activities.emptyLibraryText")}
+          actionLabel={t("educator.activities.emptyAction")}
           href="/educator/activities/new"
         />
       ) : !busy && (
@@ -226,7 +229,10 @@ function PageInner() {
             {shown.map((h) => kad(h))}
           </ProjectGrid>
           <p className="text-xs text-ink-faint mt-4">
-            {shown.length} of {hunts.length} {hunts.length === 1 ? "activity" : "activities"} shown. Open an activity to manage submissions.
+            {terjemahBilangan(bahasa, "educator.activities.shownOne", "educator.activities.shownOther", hunts.length, {
+              papar: shown.length,
+              jumlah: hunts.length,
+            })} {t("educator.activities.openHint")}
           </p>
         </>
       )}
@@ -235,5 +241,6 @@ function PageInner() {
 }
 
 export default function Page() {
-  return <Suspense fallback={<p className="p-6 text-sm text-ink-muted">Loading…</p>}><PageInner /></Suspense>;
+  const { t } = useBahasa();
+  return <Suspense fallback={<p className="p-6 text-sm text-ink-muted">{t("common.loading")}</p>}><PageInner /></Suspense>;
 }

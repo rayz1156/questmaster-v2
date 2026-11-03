@@ -13,17 +13,21 @@ import { pelanSaya, mesejHad, tanpaHad, HAD_PELAN, type RingkasanPelan } from "@
 import HadPelanNotis from "@/components/HadPelanNotis";
 import { HardDrive } from "lucide-react";
 import { inisial, warnaIndeks } from "@/lib/papanPemukaPeserta";
+import { useBahasa, type FungsiT } from "@/lib/i18n/BahasaProvider";
+import { LOKAL } from "@/lib/i18n";
 
-function roleLabel(role: string): string {
-  if (role === "owner") return "Owner";
-  if (role === "co-creator" || role === "co_creator") return "Co-creator";
-  if (role === "co-educator" || role === "co_educator") return "Co-educator";
+// Label peranan pendidik ikut bahasa skrin; nilai teknikal role tidak diubah.
+function roleLabel(role: string, t: FungsiT): string {
+  if (role === "owner") return t("educator.classes.roleOwner");
+  if (role === "co-creator" || role === "co_creator") return t("educator.classes.roleCocreator");
+  if (role === "co-educator" || role === "co_educator") return t("educator.classes.roleCoeducator");
   return role;
 }
 
 export default function EduClasses() {
   const [classes, setClasses] = useState<EducatorClassRow[]>([]);
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
   const [invites, setInvites] = useState<MyClassEducatorInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [showNew, setShowNew] = useState(false);
@@ -54,7 +58,7 @@ export default function EduClasses() {
       setPelan(pl);
       setAktiviti(ak);
     } catch (e: any) {
-      setErr(e.message || "Failed to load");
+      setErr(e.message || t("papanKelas.failedToLoad"));
     } finally {
       setLoading(false);
     }
@@ -63,14 +67,14 @@ export default function EduClasses() {
 
   const onCreate = async () => {
     setErr(null);
-    if (!name.trim()) { setErr("Class name is required"); return; }
+    if (!name.trim()) { setErr(t("educator.classes.nameRequired")); return; }
     setBusy(true);
     try {
       await createClass(name.trim(), desc.trim() || undefined, color);
       setName(""); setDesc(""); setShowNew(false);
       await reload();
     } catch (e: any) {
-      setErr(mesejHad(e, "Kelas tidak dapat dicipta."));
+      setErr(mesejHad(e, t("educator.classes.createFailed")));
     } finally { setBusy(false); }
   };
 
@@ -88,7 +92,7 @@ export default function EduClasses() {
   const [dupErr, setDupErr] = useState<string | null>(null);
   const openDuplicate = (k: EducatorClassRow) => {
     setDupTarget(k);
-    setDupTitle(`Copy of ${k.name}`);
+    setDupTitle(t("educator.classes.dupCopyOf", { nama: k.name }));
     setDupLB(true); setDupAct(true); setDupMem(false); setDupEdu(true);
     setDupTpl(false); setDupDraft(true);
     setDupErr(null);
@@ -108,31 +112,38 @@ export default function EduClasses() {
       });
       setDupTarget(null);
       await reload();
-      alert(`Created "${res.name}". Copied: ${res.copied.columns} columns, ${res.copied.cards} cards, ${res.copied.hunts} activities, ${res.copied.members} members, ${res.copied.educators} educators.`);
+      alert(t("educator.classes.dupCreated", {
+        nama: res.name,
+        lajur: res.copied.columns,
+        kad: res.copied.cards,
+        aktiviti: res.copied.hunts,
+        ahli: res.copied.members,
+        pendidik: res.copied.educators,
+      }));
     } catch (e: any) {
-      setDupErr(e?.message || 'Failed to duplicate');
+      setDupErr(e?.message || t("educator.classes.dupFailed"));
     } finally { setDupBusy(false); }
   };
 
   const onLeave = async (k: EducatorClassRow) => {
     if (k.role === "owner") return;
-    if (!(await confirm({ title: `Leave "${k.name}"?`, description: "You will lose your co-educator access to this class. The owner can re-invite you later.", tone: "danger", confirmLabel: "Leave class" }))) return;
+    if (!(await confirm({ title: t("educator.classes.leaveTitle", { nama: k.name }), description: t("educator.classes.leaveDesc"), tone: "danger", confirmLabel: t("educator.classes.leaveLabel") }))) return;
     try {
       await leaveClassAsEducator(k.id);
       await reload();
     } catch (e: any) {
-      alert(e?.message || "Failed to leave class");
+      alert(e?.message || t("educator.classes.leaveFailed"));
     }
   };
 
   const onDelete = async (k: EducatorClassRow) => {
     if (k.role !== "owner") return;
-    if (!(await confirm({ title: `Delete class "${k.name}"? All its activities will be deleted too.`, tone: 'danger' }))) return;
+    if (!(await confirm({ title: t("educator.classes.deleteTitle", { nama: k.name }), tone: 'danger' }))) return;
     try {
       await deleteClass(k.id);
       await reload();
     } catch (e: any) {
-      alert(e.message || "Failed to delete class");
+      alert(e.message || t("educator.classes.deleteFailed"));
     }
   };
 
@@ -143,7 +154,7 @@ export default function EduClasses() {
 const onPinToggle = async (k: EducatorClassRow) => {
     const sudahPin = aktiviti.some(a => a.class_id === k.id && a.pinned);
     if (!sudahPin && aktiviti.filter(a => a.pinned).length >= 3) {
-      setPinMsg("You can pin up to 3 classes.");
+      setPinMsg(t("educator.classes.pinLimit"));
       return;
     }
     try {
@@ -152,8 +163,8 @@ const onPinToggle = async (k: EducatorClassRow) => {
       setAktiviti(await listMyClassActivity());
     } catch (e: any) {
       setPinMsg(/Pin limit reached/i.test(e?.message || "")
-        ? "You can pin up to 3 classes."
-        : e?.message || "Failed to update pin");
+        ? t("educator.classes.pinLimit")
+        : e?.message || t("educator.classes.pinFailed"));
     }
   };
 
@@ -162,10 +173,10 @@ const onPinToggle = async (k: EducatorClassRow) => {
     setInviteMsg(null);
     try {
       await acceptClassEducatorInviteByCode(code);
-      setInviteMsg({ type: "ok", text: "Invite accepted! The class has been added below." });
+      setInviteMsg({ type: "ok", text: t("educator.classes.inviteAccepted") });
       await reload();
     } catch (e: any) {
-      setInviteMsg({ type: "err", text: e?.message || "Failed to accept invite" });
+      setInviteMsg({ type: "err", text: e?.message || t("educator.classes.inviteAcceptFailed") });
     } finally {
       setInviteBusy(null);
     }
@@ -184,14 +195,14 @@ const onPinToggle = async (k: EducatorClassRow) => {
   // kad V2-005, ditambah "Copy class code" yang dahulunya butang Copy.
   const menuTindakan = (k: EducatorClassRow, dipin: boolean) => [
     ...(dipin
-      ? [{ label: "Unpin", icon: <PinOff className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]
-      : [{ label: "Pin to top", icon: <Pin className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]),
-    { label: "Copy class code", icon: <Copy className="w-4 h-4"/>, onSelect: () => navigator.clipboard.writeText(k.join_code) },
+      ? [{ label: t("educator.classes.menuUnpin"), icon: <PinOff className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]
+      : [{ label: t("educator.classes.menuPin"), icon: <Pin className="w-4 h-4"/>, onSelect: () => onPinToggle(k) }]),
+    { label: t("educator.classes.menuCopyCode"), icon: <Copy className="w-4 h-4"/>, onSelect: () => navigator.clipboard.writeText(k.join_code) },
     ...(k.role === "owner" ? [
-      { label: "Duplicate class", icon: <CopyPlus className="w-4 h-4"/>, onSelect: () => openDuplicate(k) },
-      { label: "Delete class", icon: <Trash2 className="w-4 h-4"/>, danger: true, onSelect: () => onDelete(k) },
+      { label: t("educator.classes.menuDuplicate"), icon: <CopyPlus className="w-4 h-4"/>, onSelect: () => openDuplicate(k) },
+      { label: t("educator.classes.menuDelete"), icon: <Trash2 className="w-4 h-4"/>, danger: true, onSelect: () => onDelete(k) },
     ] : [
-      { label: "Leave class", icon: <UserIcon className="w-4 h-4"/>, danger: true, onSelect: () => onLeave(k) },
+      { label: t("educator.classes.menuLeave"), icon: <UserIcon className="w-4 h-4"/>, danger: true, onSelect: () => onLeave(k) },
     ]),
   ];
 
@@ -199,19 +210,19 @@ const onPinToggle = async (k: EducatorClassRow) => {
     <Shell tabs={EDU_TABS}>
       <div className="flex items-end justify-between gap-4 flex-wrap mb-7">
         <div>
-          <h1 className="page-title">Your classes</h1>
-          <p className="page-subtitle">Everything you teach, in one place.</p>
+          <h1 className="page-title">{t("educator.classes.title")}</h1>
+          <p className="page-subtitle">{t("educator.classes.subtitle")}</p>
         </div>
-        <button onClick={() => setShowNew(s => !s)} className="btn-primary"><Plus className="w-4 h-4"/> New class</button>
+        <button onClick={() => setShowNew(s => !s)} className="btn-primary"><Plus className="w-4 h-4"/> {t("educator.classes.newClass")}</button>
       </div>
 
       {invites.length > 0 && (
         <div className="surface p-5 mb-6">
           <div className="flex items-center gap-2 mb-1">
             <Mail className="w-4 h-4 text-brand-purple"/>
-            <div className="font-semibold text-ink">You have been invited to co-teach</div>
+            <div className="font-semibold text-ink">{t("educator.classes.invitedCoteach")}</div>
           </div>
-          <p className="text-sm text-ink-muted mb-4">Accept to gain access to the class.</p>
+          <p className="text-sm text-ink-muted mb-4">{t("educator.classes.invitedDesc")}</p>
           {inviteMsg && (
             <div className={`text-sm mb-3 ${inviteMsg.type === "ok" ? "text-[#2E7D4F]" : "text-red-600"}`}>{inviteMsg.text}</div>
           )}
@@ -221,10 +232,13 @@ const onPinToggle = async (k: EducatorClassRow) => {
                 <span className="w-8 h-8 rounded-lg shrink-0" style={{ background: i.class_color || "#7057D9" }}/>
                 <div className="flex-1 min-w-0">
                   <div className="font-medium text-ink truncate">{i.class_name}</div>
-                  <div className="text-xs text-ink-faint truncate">Invited by {i.inviter_name || "another educator"} · expires {new Date(i.expires_at).toLocaleDateString()}</div>
+                  <div className="text-xs text-ink-faint truncate">{t("educator.classes.invitedBy", {
+                    nama: i.inviter_name || t("educator.classes.anotherEducator"),
+                    tarikh: new Date(i.expires_at).toLocaleDateString(LOKAL[bahasa]),
+                  })}</div>
                 </div>
                 <code className="code-chip text-xs hidden sm:block">{i.code}</code>
-                <button disabled={inviteBusy === i.code} onClick={() => onAcceptInvite(i.code)} className="btn-secondary py-1.5 px-3 text-sm"><Check className="w-4 h-4"/> Accept</button>
+                <button disabled={inviteBusy === i.code} onClick={() => onAcceptInvite(i.code)} className="btn-secondary py-1.5 px-3 text-sm"><Check className="w-4 h-4"/> {t("educator.classes.accept")}</button>
               </div>
             ))}
           </div>
@@ -234,15 +248,15 @@ const onPinToggle = async (k: EducatorClassRow) => {
       {pelan && (
         <div className="mb-4 flex flex-wrap items-center gap-2 text-sm">
           <span className={`px-2.5 py-1 rounded-lg text-xs font-medium ${pelan.pelan === "free" ? "bg-[#F3F2F7] text-ink-muted border border-hairline" : "bg-violet-50 text-brand-purple border border-violet-200"}`}>
-            {pelan.pelan === "pro" ? "Pro plan" : pelan.pelan === "institution" ? "Institution plan" : pelan.pelan === "unlimited" ? "Unlimited plan" : "Free plan"}
+            {pelan.pelan === "pro" ? t("educator.classes.planPro") : pelan.pelan === "institution" ? t("educator.classes.planInstitution") : pelan.pelan === "unlimited" ? t("educator.classes.planUnlimited") : t("educator.classes.planFree")}
           </span>
           <span className="text-ink-muted">
             {tanpaHad(pelan.hadKelas)
-              ? `${pelan.kelasDigunakan} classes`
-              : `Classes: ${pelan.kelasDigunakan} of ${pelan.hadKelas} used`}
+              ? t("educator.classes.classesUsed", { guna: pelan.kelasDigunakan })
+              : t("educator.classes.classesOfUsed", { guna: pelan.kelasDigunakan, had: pelan.hadKelas ?? 0 })}
           </span>
           {!tanpaHad(pelan.hadKelas) && pelan.kelasDigunakan >= (pelan.hadKelas ?? 0) && (
-            <HadPelanNotis pesan="Delete a class or upgrade to add more." />
+            <HadPelanNotis pesan={t("educator.classes.planNotice")} />
           )}
         </div>
       )}
@@ -253,17 +267,17 @@ const onPinToggle = async (k: EducatorClassRow) => {
 
       {showNew && (
         <div className="surface p-5 mb-6">
-          <div className="font-semibold text-ink mb-4">Create a class</div>
-          <label className="block text-sm font-medium text-ink mb-1.5">Class name</label>
-          <input className="input mb-4" placeholder="e.g. Kursus Pembangunan Laman Web" value={name} onChange={e => setName(e.target.value)}/>
-          <label className="block text-sm font-medium text-ink mb-1.5">Description <span className="text-ink-faint font-normal">(optional)</span></label>
-          <input className="input mb-4" placeholder="What is this class about?" value={desc} onChange={e => setDesc(e.target.value)}/>
+          <div className="font-semibold text-ink mb-4">{t("educator.classes.createTitle")}</div>
+          <label className="block text-sm font-medium text-ink mb-1.5">{t("educator.classes.nameLabel")}</label>
+          <input className="input mb-4" placeholder={t("educator.classes.namePlaceholder")} value={name} onChange={e => setName(e.target.value)}/>
+          <label className="block text-sm font-medium text-ink mb-1.5">{t("educator.classes.descriptionLabel")} <span className="text-ink-faint font-normal">{t("educator.classes.optional")}</span></label>
+          <input className="input mb-4" placeholder={t("educator.classes.descPlaceholder")} value={desc} onChange={e => setDesc(e.target.value)}/>
           <div className="flex items-center gap-3">
-            <label className="text-sm text-ink-muted">Colour</label>
+            <label className="text-sm text-ink-muted">{t("educator.classes.colourLabel")}</label>
             <input type="color" value={color} onChange={e => setColor(e.target.value)} className="w-9 h-9 rounded-lg border border-hairline bg-white p-0.5"/>
             <div className="ml-auto flex items-center gap-2">
-              <button type="button" onClick={() => setShowNew(false)} className="btn-secondary">Cancel</button>
-              <button type="button" disabled={busy} onClick={onCreate} className="btn-primary">{busy ? "Creating…" : "Create class"}</button>
+              <button type="button" onClick={() => setShowNew(false)} className="btn-secondary">{t("common.cancel")}</button>
+              <button type="button" disabled={busy} onClick={onCreate} className="btn-primary">{busy ? t("educator.classes.creating") : t("educator.classes.createButton")}</button>
             </div>
           </div>
           {err && <div className="text-sm text-red-600 mt-3">{err}</div>}
@@ -273,15 +287,15 @@ const onPinToggle = async (k: EducatorClassRow) => {
       {!showNew && err && <div className="text-xs text-red-600 mb-2">{err}</div>}
 
       {loading ? (
-        <p className="text-sm text-ink-muted">Loading…</p>
+        <p className="text-sm text-ink-muted">{t("common.loading")}</p>
       ) : classes.length === 0 ? (
         <div className="surface py-20 text-center">
           <div className="w-14 h-14 rounded-full bg-[#EAE6FC] flex items-center justify-center mx-auto mb-4">
             <GraduationCap className="w-6 h-6 text-brand-purple"/>
           </div>
-          <div className="section-title mb-1">Start with a class.</div>
-          <p className="text-sm text-ink-muted mb-5">A class holds your learning board, activities, quizzes and rankings.</p>
-          <button onClick={() => setShowNew(true)} className="btn-primary">Create your first class</button>
+          <div className="section-title mb-1">{t("educator.classes.startTitle")}</div>
+          <p className="text-sm text-ink-muted mb-5">{t("educator.classes.startText")}</p>
+          <button onClick={() => setShowNew(true)} className="btn-primary">{t("educator.classes.createFirst")}</button>
         </div>
       ) : (
         <>
@@ -295,7 +309,7 @@ const onPinToggle = async (k: EducatorClassRow) => {
                   : "bg-white border-hairline text-ink-muted hover:text-ink"
               }`}
             >
-              Active ({kelasAktif.length})
+              {t("educator.classes.tabActive")} ({kelasAktif.length})
             </button>
             <button
               onClick={() => setTab("tamat")}
@@ -305,7 +319,7 @@ const onPinToggle = async (k: EducatorClassRow) => {
                   : "bg-white border-hairline text-ink-muted hover:text-ink"
               }`}
             >
-              Ended ({kelasTamat.length})
+              {t("educator.classes.tabEnded")} ({kelasTamat.length})
             </button>
             {pinMsg && <span className="text-sm text-ink-muted">{pinMsg}</span>}
           </div>
@@ -313,7 +327,7 @@ const onPinToggle = async (k: EducatorClassRow) => {
           {carianAktif && (
             <input
               className="input mb-4"
-              placeholder="Search classes"
+              placeholder={t("educator.classes.searchPlaceholder")}
               value={cari}
               onChange={e => setCari(e.target.value)}
             />
@@ -321,7 +335,7 @@ const onPinToggle = async (k: EducatorClassRow) => {
 
           {senaraiPapar.length === 0 ? (
             <div className="surface py-12 text-center text-sm text-ink-muted">
-              No classes match &quot;{cari}&quot;.
+              {t("educator.classes.noMatch", { cari })}
             </div>
           ) : (
             <>
@@ -331,10 +345,10 @@ const onPinToggle = async (k: EducatorClassRow) => {
                 <table className="w-full text-left">
                   <thead>
                     <tr className="t-head">
-                      <th className="px-6 py-4 font-normal">Class</th>
-                      <th className="px-6 py-4 font-normal">Status</th>
-                      <th className="px-6 py-4 font-normal">Created</th>
-                      <th className="w-14" aria-label="Actions" />
+                      <th className="px-6 py-4 font-normal">{t("educator.classes.colClass")}</th>
+                      <th className="px-6 py-4 font-normal">{t("educator.classes.colStatus")}</th>
+                      <th className="px-6 py-4 font-normal">{t("educator.classes.colCreated")}</th>
+                      <th className="w-14" aria-label={t("educator.classes.colActions")} />
                     </tr>
                   </thead>
                   <tbody>
@@ -362,10 +376,10 @@ const onPinToggle = async (k: EducatorClassRow) => {
                                   className="flex items-center gap-1.5 text-[14px] font-medium text-ink hover:text-brand-purple transition"
                                 >
                                   <span className="truncate">{k.name}</span>
-                                  {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label="Pinned"/>}
+                                  {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label={t("educator.classes.pinned")}/>}
                                 </Link>
                                 <div className="text-xs text-ink-faint truncate">
-                                  Code: {k.join_code} · {roleLabel(k.role)}
+                                  {t("educator.classes.codeRole", { kod: k.join_code, peranan: roleLabel(k.role, t) })}
                                 </div>
                               </div>
                             </div>
@@ -376,11 +390,11 @@ const onPinToggle = async (k: EducatorClassRow) => {
                                 className={`h-1.5 w-1.5 rounded-full ${tamat ? "bg-kz-down" : "bg-kz-up"}`}
                                 aria-hidden="true"
                               />
-                              {tamat ? "Ended" : "Active"}
+                              {tamat ? t("educator.classes.statusEnded") : t("educator.classes.statusActive")}
                             </span>
                           </td>
                           <td className="px-6 py-4 text-[13px] text-ink-muted">
-                            {new Date(k.created_at).toLocaleDateString()}
+                            {new Date(k.created_at).toLocaleDateString(LOKAL[bahasa])}
                           </td>
                           <td className="px-6 py-4 text-right align-middle">
                             <RowMenu items={menuTindakan(k, dipin)} />
@@ -395,9 +409,9 @@ const onPinToggle = async (k: EducatorClassRow) => {
                     jadi Prev/Next dilumpuhkan jujur. */}
                 <div className="flex flex-wrap items-center justify-between gap-2 border-t border-kz-line px-6 py-3">
                   <span className="text-[13px] text-ink-faint">
-                    Showing {senaraiPapar.length} of {senaraiPapar.length} classes
+                    {t("educator.classes.showing", { papar: senaraiPapar.length, jumlah: senaraiPapar.length })}
                   </span>
-                  <div className="flex items-center gap-1" aria-label="Pagination">
+                  <div className="flex items-center gap-1" aria-label={t("educator.classes.pagination")}>
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border border-hairline text-[13px] text-ink-faint opacity-50">‹</span>
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] bg-brand-purple text-[13px] font-bold text-white">1</span>
                     <span className="inline-flex h-8 w-8 items-center justify-center rounded-[4px] border border-hairline text-[13px] text-ink-faint opacity-50">›</span>
@@ -426,27 +440,27 @@ const onPinToggle = async (k: EducatorClassRow) => {
                         </span>
                         <div className="min-w-0 flex-1">
                           <Link
-                            href={`/educator/classes/${k.id}`}
-                            className="flex items-center gap-1.5 text-[14px] font-medium text-ink hover:text-brand-purple transition"
+                          href={`/educator/classes/${k.id}`}
+                          className="flex items-center gap-1.5 text-[14px] font-medium text-ink hover:text-brand-purple transition"
                           >
-                            <span className="truncate">{k.name}</span>
-                            {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label="Pinned"/>}
+                          <span className="truncate">{k.name}</span>
+                          {dipin && <Pin className="w-3.5 h-3.5 fill-current text-brand-purple shrink-0" aria-label={t("educator.classes.pinned")}/>}
                           </Link>
                           <div className="text-xs text-ink-faint truncate">
-                            Code: {k.join_code} · {roleLabel(k.role)}
+                          {t("educator.classes.codeRole", { kod: k.join_code, peranan: roleLabel(k.role, t) })}
                           </div>
-                        </div>
-                        <RowMenu items={menuTindakan(k, dipin)} />
-                      </div>
-                      <div className="mt-3 flex items-center justify-between text-[13px] text-ink-muted">
-                        <span className="inline-flex items-center gap-1.5">
+                          </div>
+                          <RowMenu items={menuTindakan(k, dipin)} />
+                          </div>
+                          <div className="mt-3 flex items-center justify-between text-[13px] text-ink-muted">
+                          <span className="inline-flex items-center gap-1.5">
                           <span
-                            className={`h-1.5 w-1.5 rounded-full ${tamat ? "bg-kz-down" : "bg-kz-up"}`}
-                            aria-hidden="true"
+                          className={`h-1.5 w-1.5 rounded-full ${tamat ? "bg-kz-down" : "bg-kz-up"}`}
+                          aria-hidden="true"
                           />
-                          {tamat ? "Ended" : "Active"}
-                        </span>
-                        <span>{new Date(k.created_at).toLocaleDateString()}</span>
+                          {tamat ? t("educator.classes.statusEnded") : t("educator.classes.statusActive")}
+                          </span>
+                          <span>{new Date(k.created_at).toLocaleDateString(LOKAL[bahasa])}</span>
                       </div>
                     </div>
                   );
@@ -460,28 +474,28 @@ const onPinToggle = async (k: EducatorClassRow) => {
         <div className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center p-4" onClick={() => !dupBusy && setDupTarget(null)}>
           <div onClick={(e)=>e.stopPropagation()} className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl">
             <div className="flex items-center justify-between mb-3">
-              <h3 className="text-base font-semibold">Duplicate class</h3>
+              <h3 className="text-base font-semibold">{t("educator.classes.dupTitle")}</h3>
               <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="text-gray-500 hover:text-gray-900">✕</button>
             </div>
-            <label className="block text-xs font-medium text-gray-700 mb-1">New class title</label>
-            <input value={dupTitle} onChange={(e)=>setDupTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder={`Copy of ${dupTarget.name}`} />
+            <label className="block text-xs font-medium text-gray-700 mb-1">{t("educator.classes.dupNewTitle")}</label>
+            <input value={dupTitle} onChange={(e)=>setDupTitle(e.target.value)} className="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm mb-4 focus:outline-none focus:ring-2 focus:ring-indigo-500" placeholder={t("educator.classes.dupCopyOf", { nama: dupTarget.name })} />
             <div className="space-y-2 mb-4">
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupLB} onChange={(e)=>setDupLB(e.target.checked)} className="rounded"/> Copy learning board</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupAct} onChange={(e)=>setDupAct(e.target.checked)} className="rounded"/> Copy activities</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupMem} onChange={(e)=>setDupMem(e.target.checked)} className="rounded"/> Copy members</label>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupEdu} onChange={(e)=>setDupEdu(e.target.checked)} className="rounded"/> Copy educators</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupLB} onChange={(e)=>setDupLB(e.target.checked)} className="rounded"/> {t("educator.classes.dupCopyLearningBoard")}</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupAct} onChange={(e)=>setDupAct(e.target.checked)} className="rounded"/> {t("educator.classes.dupCopyActivities")}</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupMem} onChange={(e)=>setDupMem(e.target.checked)} className="rounded"/> {t("educator.classes.dupCopyMembers")}</label>
+              <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupEdu} onChange={(e)=>setDupEdu(e.target.checked)} className="rounded"/> {t("educator.classes.dupCopyEducators")}</label>
             </div>
             <details className="mb-4">
-              <summary className="text-xs font-medium text-gray-700 cursor-pointer select-none">Advanced / Template options</summary>
+              <summary className="text-xs font-medium text-gray-700 cursor-pointer select-none">{t("educator.classes.dupAdvanced")}</summary>
               <div className="mt-2 space-y-2 pl-1">
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupTpl} onChange={(e)=>setDupTpl(e.target.checked)} className="rounded"/> Save as reusable template <span className="text-xs text-gray-500">(strips content, keeps structure)</span></label>
-                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupDraft} onChange={(e)=>setDupDraft(e.target.checked)} className="rounded"/> Save as draft <span className="text-xs text-gray-500">(don't publish until reviewed)</span></label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupTpl} onChange={(e)=>setDupTpl(e.target.checked)} className="rounded"/> {t("educator.classes.dupTemplate")} <span className="text-xs text-gray-500">{t("educator.classes.dupTemplateNote")}</span></label>
+                <label className="flex items-center gap-2 text-sm"><input type="checkbox" checked={dupDraft} onChange={(e)=>setDupDraft(e.target.checked)} className="rounded"/> {t("educator.classes.dupDraft")} <span className="text-xs text-gray-500">{t("educator.classes.dupDraftNote")}</span></label>
               </div>
             </details>
             {dupErr && <div className="text-xs text-red-600 mb-2">{dupErr}</div>}
             <div className="flex items-center justify-end gap-2">
-              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">Cancel</button>
-              <button onClick={onDuplicate} disabled={dupBusy} className="btn-primary py-1.5 px-3 text-sm">{dupBusy ? 'Duplicating…' : 'Duplicate'}</button>
+              <button onClick={()=>setDupTarget(null)} disabled={dupBusy} className="px-3 py-1.5 rounded-lg border border-gray-300 hover:bg-gray-50 text-sm">{t("common.cancel")}</button>
+              <button onClick={onDuplicate} disabled={dupBusy} className="btn-primary py-1.5 px-3 text-sm">{dupBusy ? t("educator.classes.duplicating") : t("educator.classes.duplicate")}</button>
             </div>
           </div>
         </div>
@@ -493,6 +507,7 @@ const onPinToggle = async (k: EducatorClassRow) => {
 
 /** Bar kemajuan kuota storan + senarai had pelan (tiket V2-002b). */
 function KadStoran({ pelan }: { pelan: RingkasanPelan }) {
+  const { t } = useBahasa();
   const had = HAD_PELAN[pelan.pelan];
   const usedMb = (pelan.storageDigunakanBytes ?? 0) / (1024 * 1024);
   // Pelan unlimited (storageMb null): tiada kuota, tiada bar amaran.
@@ -507,11 +522,11 @@ function KadStoran({ pelan }: { pelan: RingkasanPelan }) {
     <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-6">
       <div className="flex items-center gap-2 mb-2">
         <HardDrive className="w-4 h-4 text-brand-purple" />
-        <div className="font-semibold text-ink text-sm">Storage</div>
+        <div className="font-semibold text-ink text-sm">{t("educator.classes.storageTitle")}</div>
         <span className="ml-auto text-xs text-ink-muted">
           {had.storageMb === null
-            ? `${fmt(usedMb)} MB used (unlimited)`
-            : `${fmt(usedMb)} MB of ${had.storageMb} MB used`}
+            ? t("educator.classes.storageUnlimited", { guna: fmt(usedMb) })
+            : t("educator.classes.storageOf", { guna: fmt(usedMb), had: had.storageMb })}
         </span>
       </div>
       {had.storageMb !== null && (
@@ -524,13 +539,13 @@ function KadStoran({ pelan }: { pelan: RingkasanPelan }) {
       )}
       {hampirPenuh && (
         <div className="text-xs text-amber-600 mt-2">
-          You have used {Math.round(pct)}% of your storage. Delete old files or upgrade.
+          {t("educator.classes.storageWarning", { peratus: Math.round(pct) })}
         </div>
       )}
       <div className="flex flex-wrap gap-x-5 gap-y-1 mt-3 text-xs text-ink-muted">
-        <span>Classes: {pelan.kelasDigunakan} of {tanpaHad(pelan.hadKelas) ? "unlimited" : pelan.hadKelas}</span>
-        <span>Activities: {pelan.aktivitiDigunakan ?? 0} of {had.aktiviti === null ? "unlimited" : had.aktiviti}</span>
-        <span>Boards: {pelan.papanDigunakan ?? 0} of {had.papan === null ? "unlimited" : had.papan}</span>
+        <span>{t("educator.classes.storageClasses", { guna: pelan.kelasDigunakan, had: tanpaHad(pelan.hadKelas) ? t("educator.classes.unlimited") : pelan.hadKelas ?? 0 })}</span>
+        <span>{t("educator.classes.storageActivities", { guna: pelan.aktivitiDigunakan ?? 0, had: had.aktiviti === null ? t("educator.classes.unlimited") : had.aktiviti })}</span>
+        <span>{t("educator.classes.storageBoards", { guna: pelan.papanDigunakan ?? 0, had: had.papan === null ? t("educator.classes.unlimited") : had.papan })}</span>
       </div>
     </div>
   );
