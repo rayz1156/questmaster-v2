@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 // Tiket V2-006: halaman /naik-taraf menghantar minat pelan ke sini. Satu baris
 // dimasukkan ke qm_feedback dengan type 'plan_interest' melalui klien Supabase
@@ -23,7 +24,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => null);
     const pelan = String(body?.pelan || '');
     if (pelan !== 'pro' && pelan !== 'institution') {
-      return NextResponse.json({ error: 'Invalid plan.' }, { status: 400 });
+      return ralatJson('Invalid plan.', 400);
     }
 
     const bil: Bil = body?.bil === 'bulanan' ? 'bulanan' : 'tahunan';
@@ -51,10 +52,7 @@ export async function POST(req: NextRequest) {
     if (errSemak) {
       console.error('naik-taraf rate check failed, skipping', errSemak);
     } else if (count && count > 0) {
-      return NextResponse.json(
-        { error: 'You already sent a request recently. Please wait 10 minutes.' },
-        { status: 429 },
-      );
+      return ralatJson('You already sent a request recently. Please wait 10 minutes.', 429);
     }
 
     // Ringkasan medan dibina di pelayan supaya subject dan message konsisten.
@@ -79,13 +77,13 @@ export async function POST(req: NextRequest) {
 
     if (error) {
       console.error('plan interest insert failed', error);
-      return NextResponse.json({ error: 'Could not save your request.' }, { status: 500 });
+      return ralatJson('Could not save your request.', 500);
     }
     return NextResponse.json({ ok: true });
   } catch (e: unknown) {
     // S1: jangan pulangkan mesej ralat dalaman kepada klien; log di pelayan
     // sahaja dan balas dengan mesej umum, sama seperti laluan insert gagal.
     console.error('naik-taraf unexpected', e);
-    return NextResponse.json({ error: 'Could not save your request.' }, { status: 500 });
+    return ralatJson('Could not save your request.', 500);
   }
 }
