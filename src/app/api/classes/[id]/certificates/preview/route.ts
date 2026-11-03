@@ -15,6 +15,7 @@ import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { janaPdfSijil } from '@/lib/sijil/janaPdf';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -26,18 +27,15 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const userId = auth.user!.id;
 
   if (!dalamHad(`cert-preview:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const templateId = typeof body.template_id === 'string' ? body.template_id : '';
-  if (!templateId) return NextResponse.json({ error: 'template_id is required.' }, { status: 400 });
+  if (!templateId) return ralatJson('template_id is required.', 400);
 
   // Templat mesti milik kelas ini (klien Bearer, RLS pendidik).
   const { data: template } = await auth.supa
@@ -47,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq('class_id', classId)
     .maybeSingle();
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
 
   // Nama kelas sebagai program pada PDF contoh.

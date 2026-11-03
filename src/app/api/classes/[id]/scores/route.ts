@@ -3,6 +3,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { kedudukanSeri } from '@/lib/laporanMarkah';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,16 +58,13 @@ export async function GET(
   { params }: { params: { id: string } },
 ) {
   if (!UUID.test(String(params.id))) {
-    return NextResponse.json({ error: 'Not a valid class id.' }, { status: 400 });
+    return ralatJson('Not a valid class id.', 400);
   }
 
   const sp = req.nextUrl.searchParams;
   const sort = sp.get('sort') ?? 'total';
   if (!(SUSUN_SAH as readonly string[]).includes(sort)) {
-    return NextResponse.json(
-      { error: 'Invalid sort. Use total, task, live or name.' },
-      { status: 400 },
-    );
+    return ralatJson('Invalid sort. Use total, task, live or name.', 400);
   }
   const limitRaw = Number(sp.get('limit'));
   const limit =
@@ -81,10 +79,7 @@ export async function GET(
 
   // Had kadar 30 permintaan seminit bagi setiap pengguna.
   if (!dalamHad(`class-scores:${callerId}`, 30)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // Kelas tidak wujud: 404 generik, sama corak dengan laluan export.
@@ -94,7 +89,7 @@ export async function GET(
     .eq('id', params.id)
     .maybeSingle();
   if (!kelas) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return ralatJson('Not found', 404);
   }
 
   // Pemanggil MESTI pemilik kelas, pendidik kelas (jemputan diterima) atau
@@ -102,7 +97,7 @@ export async function GET(
   // kelas disemak berasingan.
   const ok = kelas.owner_id === callerId || (await semakPendidikKelas(supa, params.id, callerId));
   if (!ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   // View markah melalui klien pemanggil (polisi 0050 guna auth.uid()).
@@ -114,7 +109,7 @@ export async function GET(
     .eq('class_id', params.id);
   if (errView) {
     console.error('class scores view failed');
-    return NextResponse.json({ error: 'Failed to load scores.' }, { status: 500 });
+    return ralatJson('Failed to load scores.', 500);
   }
   const semuaPelajar = (barisView || []) as BarisView[];
 
@@ -157,7 +152,7 @@ export async function GET(
     .eq('class_id', params.id);
   if (errPasukan) {
     console.error('class scores teams failed');
-    return NextResponse.json({ error: 'Failed to load scores.' }, { status: 500 });
+    return ralatJson('Failed to load scores.', 500);
   }
   const pasukan = ((barisPasukan || []) as BarisPasukan[]).slice().sort(
     (a, b) => (Number(b.total_score) || 0) - (Number(a.total_score) || 0),
@@ -181,7 +176,7 @@ export async function GET(
       .in('team_id', idsPasukan.length > 0 ? idsPasukan : [TIADA_UUID]);
     if (errAhli) {
       console.error('class scores team members failed');
-      return NextResponse.json({ error: 'Failed to load scores.' }, { status: 500 });
+      return ralatJson('Failed to load scores.', 500);
     }
     const kiraan = new Map<string, number>();
     for (const m of (ahliPasukan || []) as Array<{ team_id: string }>) {

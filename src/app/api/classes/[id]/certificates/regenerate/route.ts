@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 import {
   bacaTemplatKelas,
   janaSemulaPdfSijil,
@@ -38,30 +39,21 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const userId = auth.user!.id;
 
   if (!dalamHad(`cert-regen:${userId}`, HAD_REGEN)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const body = await req.json().catch(() => ({}));
   const ids = tapiskanIdSijil(body.certificate_ids);
   if (ids.length === 0) {
-    return NextResponse.json(
-      { error: 'certificate_ids is required.' },
-      { status: 400 },
-    );
+    return ralatJson('certificate_ids is required.', 400);
   }
   if (ids.length > MAX_IDS) {
-    return NextResponse.json(
-      { error: 'Too many certificates in one request.' },
-      { status: 400 },
-    );
+    return ralatJson('Too many certificates in one request.', 400);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
   if (!ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   // RPC menyemak semula kebenaran, templat aktif, had dan konflik di dalam
@@ -71,7 +63,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     p_ids: ids,
   });
   if (rpcErr) {
-    return NextResponse.json({ error: rpcErr.message }, { status: 400 });
+    return ralatJson(rpcErr.message, 400);
   }
   const hasil = normaliseHasilRebind(rebind);
   const updatedIds = hasil?.updated_ids ?? [];

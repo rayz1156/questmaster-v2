@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { dalamHad } from '@/lib/hadKadar';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,7 @@ export async function GET(
   // Tolak parameter bukan UUID (kzsec: IDOR pada [id]).
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!UUID.test(String(params.id))) {
-    return NextResponse.json({ error: 'Not a valid class id.' }, { status: 400 });
+    return ralatJson('Not a valid class id.', 400);
   }
 
   const auth = await requireUser(req);
@@ -36,10 +37,7 @@ export async function GET(
 
   // Had kadar 30 permintaan seminit bagi setiap pengguna.
   if (!dalamHad(`insights:${user!.id}`, 30)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // Klien pemanggil: penapis kebenaran 0051 guna auth.uid() pemanggil.
@@ -48,13 +46,13 @@ export async function GET(
   });
   if (error) {
     if (error.message === 'Forbidden') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return ralatJson('Forbidden', 403);
     }
     console.error('insights rpc failed', error);
-    return NextResponse.json({ error: 'Failed to load insights.' }, { status: 500 });
+    return ralatJson('Failed to load insights.', 500);
   }
   if (!data) {
-    return NextResponse.json({ error: 'Failed to load insights.' }, { status: 500 });
+    return ralatJson('Failed to load insights.', 500);
   }
 
   return NextResponse.json({ data });

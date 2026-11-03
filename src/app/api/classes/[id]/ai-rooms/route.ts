@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassMember, requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { janaKodBilik, ralatBilik, bacaJsonKecil } from '@/lib/bilikAi';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('class_id', params.id)
     .order('created_at', { ascending: false });
   if (error) {
-    return NextResponse.json({ error: 'Senarai chatroom tidak dapat dibaca.' }, { status: 500 });
+    return ralatJson('Senarai chatroom tidak dapat dibaca.', 500);
   }
   return NextResponse.json({ rooms: data ?? [] });
 }
@@ -67,7 +68,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq('id', params.id)
     .maybeSingle();
   if (!kelas) {
-    return NextResponse.json({ error: 'Kelas tidak ditemui.' }, { status: 404 });
+    return ralatJson('Kelas tidak ditemui.', 404);
   }
   if (!(await guruKelas(supa, params.id, user.id))) {
     return ralatBilik(403, 'NOT_EDUCATOR', 'Hanya pendidik kelas boleh mencipta chatroom.');
@@ -79,14 +80,14 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   if (title.length < 1 || title.length > 80) {
-    return NextResponse.json({ error: 'Tajuk bilik mesti 1 hingga 80 aksara.' }, { status: 400 });
+    return ralatJson('Tajuk bilik mesti 1 hingga 80 aksara.', 400);
   }
   let description: string | null = null;
   if (typeof body.description === 'string') {
     description = body.description.trim() || null;
   }
   if (description && description.length > 300) {
-    return NextResponse.json({ error: 'Penerangan bilik maksimum 300 aksara.' }, { status: 400 });
+    return ralatJson('Penerangan bilik maksimum 300 aksara.', 400);
   }
 
   // Model: lalai (is_default) jika tidak diberi; mesti didayakan.
@@ -99,7 +100,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .eq('enabled', true)
       .maybeSingle();
     if (!model) {
-      return NextResponse.json({ error: 'Model tidak ditemui atau tidak didayakan.' }, { status: 400 });
+      return ralatJson('Model tidak ditemui atau tidak didayakan.', 400);
     }
     modelId = model.id;
   } else {
@@ -139,7 +140,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   if (!room) {
     console.error('[bilik-ai] cipta bilik gagal:', ralatAkhir ?? 'kod bertembung');
-    return NextResponse.json({ error: 'Bilik tidak dapat dicipta.' }, { status: 500 });
+    return ralatJson('Bilik tidak dapat dicipta.', 500);
   }
   return NextResponse.json({ room }, { status: 201 });
 }

@@ -19,6 +19,7 @@ import { bacaJsonKecil } from '@/lib/bilikAi';
 import { dalamHad } from '@/lib/hadKadar';
 import { penyediaSedia, dapatkanPenyedia } from '@/lib/ai/penyedia';
 import { PROMPT_CADANGAN_LNA, bersihkanCadangan } from '@/lib/lnaCadangan';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -39,7 +40,7 @@ const MODEL_CADANGAN = 'qwen3.7-plus';
 
 /** 404 generik untuk bukan ahli: kewujudan kelas tidak terbongkar. */
 function tidakDitemui(): NextResponse {
-  return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+  return ralatJson('Not found.', 404);
 }
 
 /** Semakan bersama kedua-dua kaedah: log masuk, UUID, guru kelas. */
@@ -51,7 +52,7 @@ async function semakGuru(
   if (auth.response) return { user: null, response: auth.response };
   const user = auth.user!;
   if (!sahUuid(classId)) {
-    return { user: null, response: NextResponse.json({ error: 'Not a valid class id.' }, { status: 400 }) };
+    return { user: null, response: ralatJson('Not a valid class id.', 400) };
   }
   const supa = getServiceSupabase();
   const role = await perananKelas(supa, user.id, classId);
@@ -83,34 +84,22 @@ export async function POST(
 
   // Had kadar dahulu: kos model dikuasakan sebelum badan dibaca.
   if (!dalamHad('lna-cadang:' + user.id, 5)) {
-    return NextResponse.json(
-      { error: 'Terlalu banyak permintaan. Cuba lagi sebentar.' },
-      { status: 429 },
-    );
+    return ralatJson('Terlalu banyak permintaan. Cuba lagi sebentar.', 429);
   }
 
   const badan = await bacaJsonKecil(req);
   if (!badan.ok) return badan.response;
   const teks = badan.body.text;
   if (typeof teks !== 'string' || teks.length < TEKS_MIN || teks.length > TEKS_MAKS) {
-    return NextResponse.json(
-      { error: 'Teks mesti 30 hingga 4,000 aksara.' },
-      { status: 400 },
-    );
+    return ralatJson('Teks mesti 30 hingga 4,000 aksara.', 400);
   }
 
   if (!penyediaSedia('qwen')) {
-    return NextResponse.json(
-      { error: 'AI belum disediakan. Taip senarai sendiri.' },
-      { status: 503 },
-    );
+    return ralatJson('AI belum disediakan. Taip senarai sendiri.', 503);
   }
   const penyedia = dapatkanPenyedia('qwen');
   if (!penyedia) {
-    return NextResponse.json(
-      { error: 'AI belum disediakan. Taip senarai sendiri.' },
-      { status: 503 },
-    );
+    return ralatJson('AI belum disediakan. Taip senarai sendiri.', 503);
   }
 
   const pemutus = new AbortController();
@@ -133,19 +122,13 @@ export async function POST(
 
     const { items, amaran } = bersihkanCadangan(jawapan);
     if (items.length < 3) {
-      return NextResponse.json(
-        { error: 'AI tidak memberi cadangan yang sah. Cuba lagi atau taip sendiri.' },
-        { status: 502 },
-      );
+      return ralatJson('AI tidak memberi cadangan yang sah. Cuba lagi atau taip sendiri.', 502);
     }
     return NextResponse.json({ items, amaran });
   } catch (e) {
     clearTimeout(pemasa);
     // Tiada teks pengguna dalam log; hanya jenis ralat dan mesej penyedia.
     console.error('[lna-cadang] panggilan penyedia gagal:', e instanceof Error ? e.message : e);
-    return NextResponse.json(
-      { error: 'AI tidak dapat dihubungi. Cuba lagi atau taip sendiri.' },
-      { status: 502 },
-    );
+    return ralatJson('AI tidak dapat dihubungi. Cuba lagi atau taip sendiri.', 502);
   }
 }

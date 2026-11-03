@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireClassOwner, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -27,7 +28,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select('id, name, description, color, owner_id')
     .eq('id', params.id)
     .single();
-  if (srcErr || !src) return NextResponse.json({ error: 'Source class not found' }, { status: 404 });
+  if (srcErr || !src) return ralatJson('Source class not found', 404);
 
   const title = (body.newTitle && body.newTitle.trim()) || `Copy of ${src.name}`;
   const ownerId = auth.user!.id;
@@ -39,7 +40,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .select('id, name')
     .single();
   if (insErr || !newClass) {
-    return NextResponse.json({ error: insErr?.message || 'Failed to create class' }, { status: 500 });
+    return ralatJson(insErr?.message || 'Failed to create class', 500);
   }
   const newClassId = newClass.id as string;
 

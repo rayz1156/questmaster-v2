@@ -16,6 +16,7 @@ import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas, keluarkanSijil } from '@/lib/sijil/keluarkan';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -39,41 +40,32 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ? body.participant_ids.filter((x: unknown) => typeof x === 'string')
     : null;
   if (!templateId) {
-    return NextResponse.json({ error: 'template_id is required.' }, { status: 400 });
+    return ralatJson('template_id is required.', 400);
   }
 
   // KZ-011: kunci berasingan mengikut jenis permintaan; pratonton dan
   // pengeluaran tidak lagi berkongsi had yang sama.
   if (!confirm && !dalamHad(`cert-eligibility:${userId}`, HAD_KELAYAKAN)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
   if (confirm) {
     if (participantIds && participantIds.length > MAX_ID_PERMINTAAN) {
-      return NextResponse.json(
-        { error: 'Too many students in one request.' },
-        { status: 400 },
-      );
+      return ralatJson('Too many students in one request.', 400);
     }
     if (!dalamHad(`cert-issue:${userId}`, HAD_ISSUE)) {
-      return NextResponse.json(
-        { error: 'Too many requests. Please wait a minute and try again.' },
-        { status: 429 },
-      );
+      return ralatJson('Too many requests. Please wait a minute and try again.', 429);
     }
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
   if (!ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   // Templat mesti milik kelas ini.
   const template = await bacaTemplatKelas(auth.supa, templateId, classId);
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
 
   // ------------------------------------------------------------------
@@ -84,7 +76,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       p_template: templateId,
     });
     if (error) {
-      return NextResponse.json({ error: error.message }, { status: 400 });
+      return ralatJson(error.message, 400);
     }
     return NextResponse.json({ preview: data ?? [] });
   }
@@ -100,9 +92,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ...(hasil.skipped ? { skipped: true } : {}),
     });
   } catch (e) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Could not issue certificates.' },
-      { status: 400 },
-    );
+    return ralatJson(e instanceof Error ? e.message : 'Could not issue certificates.', 400);
   }
 }

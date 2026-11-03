@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { parseTeamCsv, TEAMS_CSV_MAX_BYTES } from '@/lib/team-import';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 // Mesej had pelan, disalin kecil di sini. JANGAN import '@/lib/pelan':
 // ia membina klien Supabase pelayar pada skop modul dan laluan API tidak
@@ -45,13 +46,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const dryRun = new URL(req.url).searchParams.get('dryRun') === '1';
   const body = await req.json().catch(() => ({}));
   if (typeof body.content !== 'string' || !body.content.trim()) {
-    return NextResponse.json({ error: 'A CSV file is required.' }, { status: 400 });
+    return ralatJson('A CSV file is required.', 400);
   }
   if (body.content.length > TEAMS_CSV_MAX_BYTES) {
-    return NextResponse.json(
-      { error: 'That file is too large. The limit is about 500 KB.' },
-      { status: 400 },
-    );
+    return ralatJson('That file is too large. The limit is about 500 KB.', 400);
   }
 
   const { rows, errors } = parseTeamCsv(body.content);
@@ -72,13 +70,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const teks = error.message || '';
     if (Object.keys(MESEJ_HAD).some((kod) => teks.includes(kod))) {
       // Mesej pelan yang betul, bukan ralat Postgres mentah.
-      return NextResponse.json({ error: mesejHadError(error) }, { status: 403 });
+      return ralatJson(mesejHadError(error), 403);
     }
     if (teks.includes('QM_FORBIDDEN')) {
-      return NextResponse.json({ error: 'Only an educator of this class can import teams.' }, { status: 403 });
+      return ralatJson('Only an educator of this class can import teams.', 403);
     }
     if (teks.includes('QM_NOT_FOUND')) {
-      return NextResponse.json({ error: 'Class not found.' }, { status: 404 });
+      return ralatJson('Class not found.', 404);
     }
     if (teks.includes('QM_LEADER_CONFLICT')) {
       return NextResponse.json(
@@ -86,7 +84,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
         { status: 400 },
       );
     }
-    return NextResponse.json({ error: teks || 'Something went wrong.' }, { status: 400 });
+    return ralatJson(teks || 'Something went wrong.', 400);
   }
 
   return NextResponse.json(data);

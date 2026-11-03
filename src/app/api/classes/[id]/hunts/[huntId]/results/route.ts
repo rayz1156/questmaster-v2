@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -50,7 +51,7 @@ export async function GET(
   { params }: { params: { id: string; huntId: string } },
 ) {
   if (!UUID.test(String(params.id)) || !UUID.test(String(params.huntId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
 
   const auth = await requireUser(req);
@@ -60,10 +61,7 @@ export async function GET(
 
   // Had kadar 30 permintaan seminit bagi setiap pengguna.
   if (!dalamHad(`hunt-results:${callerId}`, 30)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // Kelas tidak wujud: 404 generik.
@@ -73,12 +71,12 @@ export async function GET(
     .eq('id', params.id)
     .maybeSingle();
   if (!kelas) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return ralatJson('Not found', 404);
   }
 
   const ok = kelas.owner_id === callerId || (await semakPendidikKelas(supa, params.id, callerId));
   if (!ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   const svc = getServiceSupabase();
@@ -91,7 +89,7 @@ export async function GET(
     .eq('class_id', params.id)
     .maybeSingle();
   if (!hunt) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return ralatJson('Not found', 404);
   }
 
   // Cabaran hunt; lajur answer tidak diambil.
@@ -102,7 +100,7 @@ export async function GET(
     .order('order_idx');
   if (errCabaran) {
     console.error('hunt results challenges failed');
-    return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
+    return ralatJson('Failed to load results.', 500);
   }
   const cabaran = (cabaranData || []) as BarisCabaran[];
   const idsCabaran = cabaran.map((c) => c.id);
@@ -114,7 +112,7 @@ export async function GET(
     .in('challenge_id', idsCabaran.length > 0 ? idsCabaran : [TIADA_UUID]);
   if (errHantaran) {
     console.error('hunt results submissions failed');
-    return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
+    return ralatJson('Failed to load results.', 500);
   }
   const hantaran = (hantaranData || []) as BarisHantaran[];
 
@@ -142,7 +140,7 @@ export async function GET(
     .eq('class_id', params.id);
   if (errAhli) {
     console.error('hunt results members failed');
-    return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
+    return ralatJson('Failed to load results.', 500);
   }
   const idsAhli = (ahliData || []).map((a: { user_id: string }) => String(a.user_id));
 
@@ -152,7 +150,7 @@ export async function GET(
     .in('id', idsAhli.length > 0 ? idsAhli : [TIADA_UUID]);
   if (errProfil) {
     console.error('hunt results profiles failed');
-    return NextResponse.json({ error: 'Failed to load results.' }, { status: 500 });
+    return ralatJson('Failed to load results.', 500);
   }
   const petaNama = new Map<string, string>();
   for (const p of (profilData || []) as BarisProfil[]) {

@@ -3,6 +3,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { kiraKedudukan } from '@/lib/markahPeserta';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -40,7 +41,7 @@ export async function GET(
   // Tolak parameter bukan UUID awal (kzsec V2-013 R4).
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!UUID.test(String(params.id)) || !UUID.test(String(params.userId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
@@ -54,7 +55,7 @@ export async function GET(
     .eq('id', params.id)
     .maybeSingle();
   if (!klass) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return ralatJson('Not found', 404);
   }
 
   // Pemanggil MESTI pemilik kelas, educator kelas (jemputan diterima) atau
@@ -62,15 +63,12 @@ export async function GET(
   const isOwner = klass.owner_id === callerId;
   const ok = isOwner || (await semakPendidikKelas(supa, params.id, callerId));
   if (!ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   // Had kadar 60 permintaan seminit bagi setiap pemanggil.
   if (!dalamHad(`member-scores:${callerId}`, 60)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // Sasaran mesti ahli kelas itu; 404 generik supaya ID bukan ahli tidak
@@ -82,7 +80,7 @@ export async function GET(
     .eq('user_id', params.userId)
     .maybeSingle();
   if (!ahli) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return ralatJson('Not found', 404);
   }
 
   // ----- Data melalui service role (selepas semakan kebenaran) -----
@@ -96,7 +94,7 @@ export async function GET(
     .eq('id', params.userId)
     .maybeSingle();
   if (profilErr) {
-    return NextResponse.json({ error: profilErr.message }, { status: 500 });
+    return ralatJson(profilErr.message, 500);
   }
 
   // Baris view kelas: jumlah, pecahan, dan kedudukan. Kedudukan dikira di
@@ -111,7 +109,7 @@ export async function GET(
     )
     .eq('class_id', params.id);
   if (viewErr) {
-    return NextResponse.json({ error: viewErr.message }, { status: 500 });
+    return ralatJson(viewErr.message, 500);
   }
   const senarai = (barisView || []) as BarisView[];
   const kedudukan = kiraKedudukan(senarai.map((b) => Number(b.total_score) || 0));
@@ -126,7 +124,7 @@ export async function GET(
     .select('challenge_id, status')
     .eq('user_id', params.userId);
   if (hantarErr) {
-    return NextResponse.json({ error: hantarErr.message }, { status: 500 });
+    return ralatJson(hantarErr.message, 500);
   }
   const idCabaran = Array.from(new Set((hantar || []).map((s: { challenge_id: string }) => s.challenge_id)));
 
@@ -135,7 +133,7 @@ export async function GET(
     .select('id, hunt_id, points')
     .in('id', idCabaran.length > 0 ? idCabaran : ['00000000-0000-0000-0000-000000000000']);
   if (cabaranErr) {
-    return NextResponse.json({ error: cabaranErr.message }, { status: 500 });
+    return ralatJson(cabaranErr.message, 500);
   }
   const petaCabaran = new Map<string, { hunt_id: string; points: number }>();
   for (const c of cabaran || []) {
@@ -149,7 +147,7 @@ export async function GET(
     .in('id', idHunt.length > 0 ? idHunt : ['00000000-0000-0000-0000-000000000000'])
     .eq('class_id', params.id);
   if (huntErr) {
-    return NextResponse.json({ error: huntErr.message }, { status: 500 });
+    return ralatJson(huntErr.message, 500);
   }
 
   // Agregat per hunt: mata diluluskan dan bilangan jawapan diluluskan serta
@@ -191,7 +189,7 @@ export async function GET(
     .select('id, session_id, score, joined_at')
     .eq('user_id', params.userId);
   if (pemainErr) {
-    return NextResponse.json({ error: pemainErr.message }, { status: 500 });
+    return ralatJson(pemainErr.message, 500);
   }
   const idSesi = Array.from(new Set((pemain || []).map((p: { session_id: string }) => p.session_id)));
 
@@ -200,7 +198,7 @@ export async function GET(
     .select('id, quiz_id, status')
     .in('id', idSesi.length > 0 ? idSesi : ['00000000-0000-0000-0000-000000000000']);
   if (sesiErr) {
-    return NextResponse.json({ error: sesiErr.message }, { status: 500 });
+    return ralatJson(sesiErr.message, 500);
   }
   const idKuiz = Array.from(new Set((sesi || []).map((s: { quiz_id: string }) => s.quiz_id)));
 
@@ -210,7 +208,7 @@ export async function GET(
     .in('id', idKuiz.length > 0 ? idKuiz : ['00000000-0000-0000-0000-000000000000'])
     .eq('class_id', params.id);
   if (kuizErr) {
-    return NextResponse.json({ error: kuizErr.message }, { status: 500 });
+    return ralatJson(kuizErr.message, 500);
   }
   const kelasKuiz = new Set((kuiz || []).map((k: { id: string }) => String(k.id)));
   const tajukKuiz = new Map<string, string>();
@@ -222,7 +220,7 @@ export async function GET(
     .select('session_id, player_id, is_correct')
     .in('player_id', idPemain.length > 0 ? idPemain : ['00000000-0000-0000-0000-000000000000']);
   if (jawapanErr) {
-    return NextResponse.json({ error: jawapanErr.message }, { status: 500 });
+    return ralatJson(jawapanErr.message, 500);
   }
 
   type SesiKuiz = { sessionId: string; quizTitle: string; playedAt: string; score: number; correct: number; answered: number };
@@ -254,7 +252,7 @@ export async function GET(
     .eq('user_id', params.userId)
     .order('created_at', { ascending: false });
   if (pelarasanErr) {
-    return NextResponse.json({ error: pelarasanErr.message }, { status: 500 });
+    return ralatJson(pelarasanErr.message, 500);
   }
   const adjustments = (pelarasan || []).map((a: { delta: number; reason: string | null; created_at: string }) => ({
     delta: Number(a.delta) || 0,

@@ -24,6 +24,7 @@ import { dalamHad } from '@/lib/hadKadar';
 import { janaPdfSijil } from '@/lib/sijil/janaPdf';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,22 +50,19 @@ export async function POST(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(classId)) || !UUID.test(String(params.templateId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
 
   if (!dalamHad(`cert-sample:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const template = await bacaTemplatKelas(auth.supa, params.templateId, classId);
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -131,16 +129,13 @@ export async function POST(
       .from('certificates')
       .upload(namaFail, bait, { contentType: 'application/pdf' });
     if (upErr) {
-      return NextResponse.json({ error: upErr.message }, { status: 500 });
+      return ralatJson(upErr.message, 500);
     }
     const { data: signed, error: signErr } = await svc.storage
       .from('certificates')
       .createSignedUrl(namaFail, SAAT_URL);
     if (signErr || !signed) {
-      return NextResponse.json(
-        { error: signErr?.message ?? 'Could not sign the sample URL.' },
-        { status: 500 },
-      );
+      return ralatJson(signErr?.message ?? 'Could not sign the sample URL.', 500);
     }
     return NextResponse.json({ url: signed.signedUrl, expires_in: SAAT_URL });
   }

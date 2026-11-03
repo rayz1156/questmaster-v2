@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas, balasRalatPeer } from '@/lib/peer-server';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +17,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
   const ok = await semakPendidikKelas(auth.supa, params.id, auth.user!.id);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const { data, error } = await auth.supa
     .from('qm_peer_rounds')
@@ -38,7 +39,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const auth = await requireUser(req);
   if (auth.response) return auth.response;
   const ok = await semakPendidikKelas(auth.supa, params.id, auth.user!.id);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const body = await req.json().catch(() => ({}));
   const name = typeof body.name === 'string' ? body.name.trim() : '';
@@ -47,19 +48,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const week =
     Number.isInteger(body.week) && body.week >= 1 && body.week <= 52 ? body.week : null;
 
-  if (!name) return NextResponse.json({ error: 'A round name is required.' }, { status: 400 });
+  if (!name) return ralatJson('A round name is required.', 400);
   if (!opensAt || !closesAt || Number.isNaN(Date.parse(opensAt)) || Number.isNaN(Date.parse(closesAt))) {
-    return NextResponse.json({ error: 'Valid open and close dates are required.' }, { status: 400 });
+    return ralatJson('Valid open and close dates are required.', 400);
   }
   if (Date.parse(closesAt) <= Date.parse(opensAt)) {
-    return NextResponse.json({ error: 'The close date must be after the open date.' }, { status: 400 });
+    return ralatJson('The close date must be after the open date.', 400);
   }
   // Fasa 1: sumatif dijangka datang kemudian.
   if (body.kind && body.kind !== 'formatif') {
-    return NextResponse.json(
-      { error: 'Marked (summative) rounds are not available yet. They will come in a later phase.' },
-      { status: 400 },
-    );
+    return ralatJson('Marked (summative) rounds are not available yet. They will come in a later phase.', 400);
   }
 
   const { data, error } = await auth.supa

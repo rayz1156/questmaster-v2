@@ -25,6 +25,7 @@ import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
 import { muat16Bait, tandatanganImej } from '@/lib/sijil/aset';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -49,22 +50,19 @@ export async function POST(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(classId)) || !UUID.test(String(params.templateId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
 
   if (!dalamHad(`cert-asset-finalize:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const template = await bacaTemplatKelas(auth.supa, params.templateId, classId);
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
 
   // Pelan berkesan pemilik kelas: semak sama seperti asset-ticket supaya
@@ -81,10 +79,7 @@ export async function POST(
     if (!rpcErr && typeof rpcPlan === 'string') pelan = rpcPlan;
   }
   if (!pelanSijilBerbayar(pelan)) {
-    return NextResponse.json(
-      { error: 'Certificate backgrounds, logos and signatures are available on Pro, Institution and Unlimited plans.' },
-      { status: 402 },
-    );
+    return ralatJson('Certificate backgrounds, logos and signatures are available on Pro, Institution and Unlimited plans.', 402);
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -95,7 +90,7 @@ export async function POST(
   const path = typeof body.path === 'string' ? body.path : '';
 
   if (!kind) {
-    return NextResponse.json({ error: 'kind must be background, logo or signature.' }, { status: 400 });
+    return ralatJson('kind must be background, logo or signature.', 400);
   }
 
   // Laluan mesti berprefiks kelas+templat+kind dan bebas path traversal.
@@ -107,28 +102,19 @@ export async function POST(
     || path.includes('//')
     || path.endsWith('/')
   ) {
-    return NextResponse.json(
-      { error: 'Invalid path. Use the path returned by the asset ticket.' },
-      { status: 400 },
-    );
+    return ralatJson('Invalid path. Use the path returned by the asset ticket.', 400);
   }
 
   // Sahkan tandatangan bait pertama objek.
   const bait = await muat16Bait(path);
   if (!bait) {
-    return NextResponse.json(
-      { error: 'Uploaded file not found. Upload it to the signed URL first.' },
-      { status: 404 },
-    );
+    return ralatJson('Uploaded file not found. Upload it to the signed URL first.', 404);
   }
   if (!tandatanganImej(bait)) {
     // Bukan PNG/JPEG: padam objek supaya bucket tidak menimpan sampah.
     const svc = getServiceSupabase();
     await svc.storage.from('certificate-assets').remove([path]).catch(() => undefined);
-    return NextResponse.json(
-      { error: 'The uploaded file is not a valid PNG or JPEG image.' },
-      { status: 400 },
-    );
+    return ralatJson('The uploaded file is not a valid PNG or JPEG image.', 400);
   }
 
   const lajur = LAJUR[kind];
@@ -148,10 +134,7 @@ export async function POST(
     .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
     .single();
   if (updErr || !updated) {
-    return NextResponse.json(
-      { error: updErr?.message ?? 'Could not attach the image.' },
-      { status: 400 },
-    );
+    return ralatJson(updErr?.message ?? 'Could not attach the image.', 400);
   }
 
   // Padam objek lama hanya jika TIADA baris lain (templat kelas atau item

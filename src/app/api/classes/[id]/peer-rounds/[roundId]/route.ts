@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getRouteSupabase } from '@/lib/supabase-route';
 import { balasRalatPeer, pusinganPendidik } from '@/lib/peer-server';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,21 +27,21 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     patch.closes_at = new Date(body.closes_at).toISOString();
   }
   if (Object.keys(patch).length === 0) {
-    return NextResponse.json({ error: 'Nothing to update.' }, { status: 400 });
+    return ralatJson('Nothing to update.', 400);
   }
   if (
     patch.opens_at &&
     patch.closes_at &&
     Date.parse(String(patch.closes_at)) <= Date.parse(String(patch.opens_at))
   ) {
-    return NextResponse.json({ error: 'The close date must be after the open date.' }, { status: 400 });
+    return ralatJson('The close date must be after the open date.', 400);
   }
   // Suntingan tarikh sebelah sahaja: banding dengan nilai sedia ada.
   if (patch.opens_at && !patch.closes_at && Date.parse(String(patch.opens_at)) >= Date.parse(String(cek.round!.closes_at))) {
-    return NextResponse.json({ error: 'The close date must be after the open date.' }, { status: 400 });
+    return ralatJson('The close date must be after the open date.', 400);
   }
   if (patch.closes_at && !patch.opens_at && Date.parse(String(patch.closes_at)) <= Date.parse(String(cek.round!.opens_at))) {
-    return NextResponse.json({ error: 'The close date must be after the open date.' }, { status: 400 });
+    return ralatJson('The close date must be after the open date.', 400);
   }
 
   const supa = getRouteSupabase(req);
@@ -68,10 +69,7 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
     .select('id', { count: 'exact', head: true })
     .eq('round_id', params.roundId);
   if ((count ?? 0) > 0) {
-    return NextResponse.json(
-      { error: 'This round already has submitted evaluations and cannot be deleted.' },
-      { status: 409 },
-    );
+    return ralatJson('This round already has submitted evaluations and cannot be deleted.', 409);
   }
 
   const { error } = await supa.from('qm_peer_rounds').delete().eq('id', params.roundId);

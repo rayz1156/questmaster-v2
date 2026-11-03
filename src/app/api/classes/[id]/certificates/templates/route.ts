@@ -15,6 +15,7 @@ import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { normaliseMedan } from '@/lib/sijil/medan';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -50,14 +51,14 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const classId = params.id;
 
   const ok = await semakPendidikKelas(auth.supa, classId, auth.user!.id);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const { data, error } = await auth.supa
     .from('qm_certificate_templates')
     .select('id, title, background_path, logo_path, layout, fields, signature_path, criteria, created_at, updated_at')
     .eq('class_id', classId)
     .order('created_at', { ascending: true });
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return ralatJson(error.message, 400);
   // V2-016b: pulangkan medan isian dan boolean ada tandatangan; laluan
   // objek tandatangan tidak didedahkan (UI guna laluan signature-url).
   const senarai = (data ?? []).map((t: Record<string, unknown>) => {
@@ -74,24 +75,18 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const userId = auth.user!.id;
 
   if (!dalamHad(`cert-tpl:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const title = typeof body.title === 'string' ? body.title.trim() : '';
-  if (!title) return NextResponse.json({ error: 'title is required.' }, { status: 400 });
+  if (!title) return ralatJson('title is required.', 400);
   const criteria = bacaKriteria(body);
   if (!criteria) {
-    return NextResponse.json(
-      { error: 'criteria.type must be all_members, hunt_completed, min_score or live_attended.' },
-      { status: 400 },
-    );
+    return ralatJson('criteria.type must be all_members, hunt_completed, min_score or live_attended.', 400);
   }
 
   // Latar/logo: laluan objek yang sudah dimuat naik pelayar ke
@@ -120,7 +115,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
     .select('id, title, criteria, background_path, logo_path, layout, fields')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return ralatJson(error.message, 400);
   return NextResponse.json({ template: data }, { status: 201 });
 }
 
@@ -130,14 +125,14 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
   const classId = params.id;
 
   const ok = await semakPendidikKelas(auth.supa, classId, auth.user!.id);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const templateId = typeof body.template_id === 'string' ? body.template_id : '';
-  if (!templateId) return NextResponse.json({ error: 'template_id is required.' }, { status: 400 });
+  if (!templateId) return ralatJson('template_id is required.', 400);
   // kzsec V2-015 S2: tolak ID yang bukan UUID sebelum sebarang pertanyaan.
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(templateId)) {
-    return NextResponse.json({ error: 'Invalid template_id.' }, { status: 400 });
+    return ralatJson('Invalid template_id.', 400);
   }
 
   const kemas: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -172,7 +167,7 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
     .eq('class_id', classId)
     .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
     .single();
-  if (error) return NextResponse.json({ error: error.message }, { status: 400 });
+  if (error) return ralatJson(error.message, 400);
   // has_signature supaya klien tahu imej ada tanpa laluan objek.
   const { signature_path, ...templatKini } = data ?? {};
   return NextResponse.json({ template: { ...templatKini, has_signature: !!signature_path } });

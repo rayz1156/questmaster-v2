@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase, requireUser } from '@/lib/supabase-route';
 import { bacaJsonKecil } from '@/lib/bilikAi';
 import { perananKelas, sahUuid } from '@/lib/lnaAkses';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -46,7 +47,7 @@ export async function GET(
 ) {
   const classId = String(params.id ?? '');
   if (!sahUuid(classId)) {
-    return NextResponse.json({ error: 'Not a valid class id.' }, { status: 400 });
+    return ralatJson('Not a valid class id.', 400);
   }
 
   const auth = await requireUser(_req);
@@ -56,7 +57,7 @@ export async function GET(
 
   const role = await perananKelas(svc, user.id, classId);
   if (!role) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   const { data, error } = await svc
@@ -68,7 +69,7 @@ export async function GET(
     .order('created_at', { ascending: true });
   if (error) {
     console.error('[lna] senarai gagal:', error.message);
-    return NextResponse.json({ error: 'Senarai LNA tidak dapat dibaca.' }, { status: 500 });
+    return ralatJson('Senarai LNA tidak dapat dibaca.', 500);
   }
 
   const semua = (data ?? []) as unknown as LnaRingkas[];
@@ -105,7 +106,7 @@ export async function POST(
 ) {
   const classId = String(params.id ?? '');
   if (!sahUuid(classId)) {
-    return NextResponse.json({ error: 'Not a valid class id.' }, { status: 400 });
+    return ralatJson('Not a valid class id.', 400);
   }
 
   const auth = await requireUser(req);
@@ -115,10 +116,7 @@ export async function POST(
 
   const role = await perananKelas(svc, user.id, classId);
   if (role !== 'teacher') {
-    return NextResponse.json(
-      { error: 'Hanya guru boleh mencipta LNA.' },
-      { status: 403 },
-    );
+    return ralatJson('Hanya guru boleh mencipta LNA.', 403);
   }
 
   const hasil = await bacaJsonKecil(req);
@@ -128,10 +126,7 @@ export async function POST(
   // Tajuk: 1 hingga 120 aksara (sama seperti CHECK jadual).
   const title = typeof body.title === 'string' ? body.title.trim() : '';
   if (title.length < 1 || title.length > 120) {
-    return NextResponse.json(
-      { error: 'Tajuk LNA mesti 1 hingga 120 aksara.' },
-      { status: 400 },
-    );
+    return ralatJson('Tajuk LNA mesti 1 hingga 120 aksara.', 400);
   }
 
   // Kumpul id outcome daripada sumber Outcome, dan label item bebas
@@ -143,11 +138,11 @@ export async function POST(
 
   if (body.outcomeIds !== undefined) {
     if (!Array.isArray(body.outcomeIds)) {
-      return NextResponse.json({ error: 'outcomeIds mesti senarai.' }, { status: 400 });
+      return ralatJson('outcomeIds mesti senarai.', 400);
     }
     for (const x of body.outcomeIds) {
       if (typeof x !== 'string' || !sahUuid(x)) {
-        return NextResponse.json({ error: 'outcomeIds mengandungi id tidak sah.' }, { status: 400 });
+        return ralatJson('outcomeIds mengandungi id tidak sah.', 400);
       }
       idTerkumpul.push(x);
     }
@@ -155,18 +150,15 @@ export async function POST(
 
   if (body.newOutcomes !== undefined) {
     if (!Array.isArray(body.newOutcomes)) {
-      return NextResponse.json({ error: 'newOutcomes mesti senarai.' }, { status: 400 });
+      return ralatJson('newOutcomes mesti senarai.', 400);
     }
     for (const x of body.newOutcomes) {
       if (typeof x !== 'string') {
-        return NextResponse.json({ error: 'newOutcomes mesti senarai teks.' }, { status: 400 });
+        return ralatJson('newOutcomes mesti senarai teks.', 400);
       }
       const label = x.trim();
       if (label.length < 1 || label.length > 200) {
-        return NextResponse.json(
-          { error: 'Setiap Outcome baharu mesti 1 hingga 200 aksara.' },
-          { status: 400 },
-        );
+        return ralatJson('Setiap Outcome baharu mesti 1 hingga 200 aksara.', 400);
       }
       labelBaharu.push(label);
     }
@@ -175,15 +167,12 @@ export async function POST(
   if (body.copyFromClassId !== undefined) {
     const sumber = String(body.copyFromClassId);
     if (!sahUuid(sumber)) {
-      return NextResponse.json({ error: 'copyFromClassId tidak sah.' }, { status: 400 });
+      return ralatJson('copyFromClassId tidak sah.', 400);
     }
     // Kelas sumber mesti kelas yang guru ini juga gurunya.
     const perananSumber = await perananKelas(svc, user.id, sumber);
     if (perananSumber !== 'teacher') {
-      return NextResponse.json(
-        { error: 'Anda bukan guru kelas sumber.' },
-        { status: 403 },
-      );
+      return ralatJson('Anda bukan guru kelas sumber.', 403);
     }
     const { data: outcomesSumber } = await svc
       .from('qm_learning_outcomes')
@@ -198,21 +187,18 @@ export async function POST(
 
   if (body.freeItems !== undefined) {
     if (!Array.isArray(body.freeItems)) {
-      return NextResponse.json({ error: 'freeItems mesti senarai.' }, { status: 400 });
+      return ralatJson('freeItems mesti senarai.', 400);
     }
     // Nyah-dup tidak sensitif huruf: "Kemahiran A" dan "kemahiran a"
     // dianggap item yang sama.
     const dilihatBebas = new Set<string>();
     for (const x of body.freeItems) {
       if (typeof x !== 'string') {
-        return NextResponse.json({ error: 'freeItems mesti senarai teks.' }, { status: 400 });
+        return ralatJson('freeItems mesti senarai teks.', 400);
       }
       const label = x.trim();
       if (label.length < 1 || label.length > 200) {
-        return NextResponse.json(
-          { error: 'Setiap item bebas mesti 1 hingga 200 aksara.' },
-          { status: 400 },
-        );
+        return ralatJson('Setiap item bebas mesti 1 hingga 200 aksara.', 400);
       }
       const kunci = label.toLowerCase();
       if (dilihatBebas.has(kunci)) continue;
@@ -231,10 +217,7 @@ export async function POST(
     const idsSah = new Set(((sah ?? []) as { id: string }[]).map((r) => r.id));
     for (const x of idTerkumpul) {
       if (!idsSah.has(x)) {
-        return NextResponse.json(
-          { error: 'Outcome tidak ditemui dalam kelas ini.' },
-          { status: 400 },
-        );
+        return ralatJson('Outcome tidak ditemui dalam kelas ini.', 400);
       }
     }
   }
@@ -245,10 +228,7 @@ export async function POST(
     new Set(idTerkumpul).size + labelBaharu.length + salinanKelasLain.length
     + labelBebas.length;
   if (jumlahItem < 3 || jumlahItem > 15) {
-    return NextResponse.json(
-      { error: 'Jumlah item LNA mesti 3 hingga 15.' },
-      { status: 400 },
-    );
+    return ralatJson('Jumlah item LNA mesti 3 hingga 15.', 400);
   }
 
   // Cipta Outcomes baharu (taip pantas + salinan kelas lain) dalam
@@ -260,7 +240,7 @@ export async function POST(
     .single();
   if (errLna || !lnaBaru) {
     console.error('[lna] cipta gagal:', errLna?.message);
-    return NextResponse.json({ error: 'LNA tidak dapat dicipta.' }, { status: 500 });
+    return ralatJson('LNA tidak dapat dicipta.', 500);
   }
 
   // Kedudukan item mengikut susunan: sedia ada, taip baharu, salinan,
@@ -293,7 +273,7 @@ export async function POST(
       // Berbalik: padam LNA kosong supaya tiada LNA separuh jalan.
       await svc.from('qm_lna').delete().eq('id', String(lnaBaru.id));
       console.error('[lna] cipta outcomes gagal:', errOutcomes?.message);
-      return NextResponse.json({ error: 'LNA tidak dapat dicipta.' }, { status: 500 });
+      return ralatJson('LNA tidak dapat dicipta.', 500);
     }
     for (const o of (outcomesBaru ?? []) as { id: string }[]) tambah(o.id);
   }
@@ -308,7 +288,7 @@ export async function POST(
   if (errItem) {
     await svc.from('qm_lna').delete().eq('id', String(lnaBaru.id));
     console.error('[lna] cipta item gagal:', errItem.message);
-    return NextResponse.json({ error: 'LNA tidak dapat dicipta.' }, { status: 500 });
+    return ralatJson('LNA tidak dapat dicipta.', 500);
   }
 
   return NextResponse.json({ lna: lnaBaru }, { status: 201 });

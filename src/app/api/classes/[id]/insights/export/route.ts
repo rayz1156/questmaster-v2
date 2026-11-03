@@ -10,6 +10,7 @@ import {
 } from '@/lib/insightsCsv';
 import { benderaKeyakinan, LABEL_BENDERA_LNA, senaraiMasteryDaripadaSummary } from '@/lib/lna';
 import type { InsightsKelas } from '@/lib/insightsKelas';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,17 +39,14 @@ export async function GET(
   // Tolak parameter bukan UUID (kzsec: IDOR pada [id]).
   const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
   if (!UUID.test(String(params.id))) {
-    return NextResponse.json({ error: 'Not a valid class id.' }, { status: 400 });
+    return ralatJson('Not a valid class id.', 400);
   }
 
   // Bahagian ditapis kepada senarai putih; sekurang-kurangnya satu sah.
   const url = new URL(req.url);
   const bahagian = separaBahagian(url.searchParams.get('sections'));
   if (bahagian.length === 0) {
-    return NextResponse.json(
-      { error: 'No valid sections. Use students, attention, questions, challenges, teams, trend, lna or all.' },
-      { status: 400 },
-    );
+    return ralatJson('No valid sections. Use students, attention, questions, challenges, teams, trend, lna or all.', 400);
   }
 
   const auth = await requireUser(req);
@@ -57,10 +55,7 @@ export async function GET(
 
   // Had kadar 10 eksport seminit bagi setiap pengguna, sama seperti eksport ahli.
   if (!dalamHad(`insights-export:${user!.id}`, 10)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // Nama kelas untuk nama fail (slug). Kelas tidak wujud: 404 generik.
@@ -70,7 +65,7 @@ export async function GET(
     .eq('id', params.id)
     .maybeSingle();
   if (!klass) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return ralatJson('Not found', 404);
   }
 
   // Data dan kebenaran dalam satu panggilan RPC dengan klien pemanggil.
@@ -79,13 +74,13 @@ export async function GET(
   });
   if (error) {
     if (error.message === 'Forbidden') {
-      return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+      return ralatJson('Forbidden', 403);
     }
     console.error('insights export rpc failed', error);
-    return NextResponse.json({ error: 'Failed to export insights.' }, { status: 500 });
+    return ralatJson('Failed to export insights.', 500);
   }
   if (!data) {
-    return NextResponse.json({ error: 'Failed to export insights.' }, { status: 500 });
+    return ralatJson('Failed to export insights.', 500);
   }
   const insights = data as InsightsKelas;
 

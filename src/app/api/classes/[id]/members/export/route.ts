@@ -4,6 +4,7 @@ import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { binaCsvPeserta, slugFail, type BarisPeserta } from '@/lib/csvPeserta';
 import { kiraKedudukan } from '@/lib/markahPeserta';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +31,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .eq('id', params.id)
     .maybeSingle();
   if (!klass) {
-    return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return ralatJson('Not found', 404);
   }
 
   // Pemanggil MESTI pemilik kelas, educator kelas (jemputan diterima) atau
@@ -38,15 +39,12 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   const isOwner = klass.owner_id === user!.id;
   const ok = isOwner || (await semakPendidikKelas(supa, params.id, user!.id));
   if (!ok) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   // Had kadar 10 permintaan seminit bagi setiap pengguna.
   if (!dalamHad(`members-export:${user!.id}`, 10)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please try again in a minute.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please try again in a minute.', 429);
   }
 
   // Ahli kelas: klien Bearer, jadi RLS menyekat seperti semakan sedia ada.
@@ -55,7 +53,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .select('user_id, joined_at')
     .eq('class_id', params.id);
   if (membersErr) {
-    return NextResponse.json({ error: membersErr.message }, { status: 500 });
+    return ralatJson(membersErr.message, 500);
   }
 
   // V2-013: markah terkumpul daripada view qm_class_individual_scores,
@@ -68,7 +66,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     .select('user_id, task_score, live_score, adjustment_score, total_score')
     .eq('class_id', params.id);
   if (markahErr) {
-    return NextResponse.json({ error: markahErr.message }, { status: 500 });
+    return ralatJson(markahErr.message, 500);
   }
   const senaraiMarkah = (markah || []) as {
     user_id: string;
@@ -101,7 +99,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   if (ids.length > 0) {
     const { data: dir, error: dirErr } = await supa.rpc('qm_user_directory', { p_ids: ids });
     if (dirErr) {
-      return NextResponse.json({ error: dirErr.message }, { status: 500 });
+      return ralatJson(dirErr.message, 500);
     }
     for (const d of dir || []) {
       dirMap.set(String(d.user_id), { nama: d.display_name ?? null, emel: d.email ?? null });
@@ -136,7 +134,7 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
     // PostgREST tidak menilai fungsi SQL dalam penapis; guna cap masa ISO.
     .or(`expires_at.is.null,expires_at.gt.${new Date().toISOString()}`);
   if (invitesErr) {
-    return NextResponse.json({ error: invitesErr.message }, { status: 500 });
+    return ralatJson(invitesErr.message, 500);
   }
   for (const iv of invites || []) {
     baris.push({

@@ -25,6 +25,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -66,23 +67,20 @@ export async function POST(
 
   // Tolak parameter bukan UUID awal (kzsec V2-013 R4).
   if (!UUID.test(String(classId)) || !UUID.test(String(params.templateId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
 
   if (!dalamHad(`cert-asset-ticket:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   // Templat mesti milik kelas ini (klien Bearer; RLS pendidik).
   const template = await bacaTemplatKelas(auth.supa, params.templateId, classId);
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
 
   // Pelan berkesan PEMILIK kelas mengawal aset, bukan pelan pendidik yang
@@ -99,10 +97,7 @@ export async function POST(
     if (!rpcErr && typeof rpcPlan === 'string') pelan = rpcPlan;
   }
   if (!pelanSijilBerbayar(pelan)) {
-    return NextResponse.json(
-      { error: 'Certificate backgrounds, logos and signatures are available on Pro, Institution and Unlimited plans.' },
-      { status: 402 },
-    );
+    return ralatJson('Certificate backgrounds, logos and signatures are available on Pro, Institution and Unlimited plans.', 402);
   }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
@@ -114,23 +109,17 @@ export async function POST(
   const size = typeof body.size === 'number' && Number.isFinite(body.size) ? Math.floor(body.size) : 0;
 
   if (!kind) {
-    return NextResponse.json({ error: 'kind must be background, logo or signature.' }, { status: 400 });
+    return ralatJson('kind must be background, logo or signature.', 400);
   }
   if (mimeType !== 'image/png' && mimeType !== 'image/jpeg') {
-    return NextResponse.json(
-      { error: 'mimeType must be image/png or image/jpeg.' },
-      { status: 400 },
-    );
+    return ralatJson('mimeType must be image/png or image/jpeg.', 400);
   }
   if (size <= 0) {
-    return NextResponse.json({ error: 'size is required.' }, { status: 400 });
+    return ralatJson('size is required.', 400);
   }
   const hadBytes = kind === 'signature' ? MAX_SIG_BYTES : MAX_ASET_BYTES;
   if (size > hadBytes) {
-    return NextResponse.json(
-      { error: `Image must be ${hadBytes / (1024 * 1024)} MB or smaller.` },
-      { status: 400 },
-    );
+    return ralatJson(`Image must be ${hadBytes / (1024 * 1024)} MB or smaller.`, 400);
   }
 
   // Laluan objek SENTIASA dijana pelayan dalam ruang nama kelas+templat,
@@ -145,20 +134,14 @@ export async function POST(
     .from('certificate-assets')
     .createSignedUploadUrl(path);
   if (signErr || !signed) {
-    return NextResponse.json(
-      { error: signErr?.message ?? 'Could not create the upload URL.' },
-      { status: 500 },
-    );
+    return ralatJson(signErr?.message ?? 'Could not create the upload URL.', 500);
   }
 
   if (!urlAwam(signed.signedUrl)) {
     console.error(
       `[cert-asset-ticket] NEXT_PUBLIC_SUPABASE_URL bukan awam: ${signed.signedUrl}`,
     );
-    return NextResponse.json(
-      { error: 'The storage URL is not publicly reachable. Contact the administrator.' },
-      { status: 500 },
-    );
+    return ralatJson('The storage URL is not publicly reachable. Contact the administrator.', 500);
   }
 
   return NextResponse.json({

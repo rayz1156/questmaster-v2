@@ -3,6 +3,7 @@ import { requireUser, getServiceSupabase } from "@/lib/supabase-route";
 import { decrypt } from "@/lib/mcp/crypto";
 import { PROVIDERS, classTags, splitName, EmailProviderContact } from "@/lib/email-providers";
 import { pelanBerbayar } from "@/lib/pelan";
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = "force-dynamic";
 export const fetchCache = "force-no-store";
@@ -60,7 +61,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq("id", params.id)
     .maybeSingle()) as { data: Kelas | null };
   if (!klass) {
-    return NextResponse.json({ error: "Not found" }, { status: 404 });
+    return ralatJson("Not found", 404);
   }
   const dibenarkan = klass.owner_id === user.id;
   if (!dibenarkan) {
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .not("accepted_at", "is", null)
       .maybeSingle();
     if (!ce) {
-      return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+      return ralatJson("Forbidden", 403);
     }
   }
 
@@ -95,13 +96,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
   const pro = pentadbir || pelanBerbayar(berkesan);
   if (!pro) {
-    return NextResponse.json(
-      {
-        error: "Email integration is available on the Pro plan.",
-        code: "QM_PRO_ONLY",
-      },
-      { status: 403 },
-    );
+    return ralatJson("Email integration is available on the Pro plan.", 403, { code: "QM_PRO_ONLY" });
   }
 
   // --- Integrasi pemanggil (service role; jadual tanpa polisi authenticated) ---
@@ -112,13 +107,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .eq("owner_id", user.id)
     .maybeSingle();
   if (!integ) {
-    return NextResponse.json(
-      {
-        error: "Connect Encharge in your profile first.",
-        code: "QM_NO_INTEGRATION",
-      },
-      { status: 400 },
-    );
+    return ralatJson("Connect Encharge in your profile first.", 400, { code: "QM_NO_INTEGRATION" });
   }
 
   // --- Peserta: ahli kelas yang BUKAN pendidik kelas ---
@@ -159,13 +148,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   // --- Penghantaran sebenar ---
   if (!consent) {
-    return NextResponse.json({ error: "Consent is required" }, { status: 400 });
+    return ralatJson("Consent is required", 400);
   }
   if (total > HAD_PESERTA) {
-    return NextResponse.json(
-      { error: `Too many students. The limit is ${HAD_PESERTA}.` },
-      { status: 400 },
-    );
+    return ralatJson(`Too many students. The limit is ${HAD_PESERTA}.`, 400);
   }
 
   // Had kadar: satu eksport setiap kelas setiap 60 saat.
@@ -179,10 +165,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   if (logTerkini) {
     const terakhir = new Date(logTerkini.created_at).getTime();
     if (Date.now() - terakhir < HAD_KADAR_MS) {
-      return NextResponse.json(
-        { error: "This class was sent less than a minute ago. Please wait a moment." },
-        { status: 429 },
-      );
+      return ralatJson("This class was sent less than a minute ago. Please wait a moment.", 429);
     }
   }
 
@@ -200,12 +183,12 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   try {
     kunci = decrypt(integ.secret_enc);
   } catch {
-    return NextResponse.json({ error: "Stored key is invalid. Reconnect Encharge." }, { status: 500 });
+    return ralatJson("Stored key is invalid. Reconnect Encharge.", 500);
   }
 
   const penyedia = PROVIDERS[integ.provider];
   if (!penyedia) {
-    return NextResponse.json({ error: "Unknown provider" }, { status: 500 });
+    return ralatJson("Unknown provider", 500);
   }
   const hasil = await penyedia.upsertContacts(kunci, contacts);
 

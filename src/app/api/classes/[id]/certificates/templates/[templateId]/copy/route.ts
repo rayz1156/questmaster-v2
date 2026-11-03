@@ -18,6 +18,7 @@ import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,17 +39,14 @@ export async function POST(
   const targetClassId = typeof body.target_class_id === 'string' ? body.target_class_id : '';
 
   if (!UUID.test(String(classId)) || !UUID.test(String(params.templateId)) || !UUID.test(targetClassId)) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-lib-copy:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   if (targetClassId === classId) {
-    return NextResponse.json({ error: 'Choose a different class.' }, { status: 400 });
+    return ralatJson('Choose a different class.', 400);
   }
 
   // Pemanggil mesti pendidik kedua-dua kelas: sumber untuk baca templat,
@@ -58,12 +56,12 @@ export async function POST(
     semakPendidikKelas(auth.supa, targetClassId, userId),
   ]);
   if (!okSumber || !okSasaran) {
-    return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+    return ralatJson('Forbidden', 403);
   }
 
   const template = await bacaTemplatKelas(auth.supa, params.templateId, classId);
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
 
   // Sisipan melalui klien pengguna: RLS templat kelas sasaran (pendidik)
@@ -89,10 +87,7 @@ export async function POST(
     .select('id, class_id, title, criteria, background_path, logo_path, layout, fields, library_id')
     .single();
   if (insErr || !salinan) {
-    return NextResponse.json(
-      { error: insErr?.message ?? 'Could not copy the template.' },
-      { status: 400 },
-    );
+    return ralatJson(insErr?.message ?? 'Could not copy the template.', 400);
   }
 
   // Pencetus pelan mungkin memaksa latar NULL pada kelas sasaran (pelan

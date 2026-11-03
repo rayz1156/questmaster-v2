@@ -37,6 +37,7 @@ import { MAKS_SEKALI, MAKS_LAMPIRAN, pathSelamat, untukSetiap } from '@/lib/siji
 import { emelSijil } from '@/lib/i18n/emel';
 import { bahasaPelayan } from '@/lib/i18n/pelayan';
 import type { Bahasa } from '@/lib/i18n';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -50,14 +51,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // KZ-008: had kadar 20 seminit supaya gelung kelompok UI (sehingga 10
   // pusingan) dan butang per baris tidak tersekat 429.
   if (!dalamHad(`cert-email:${userId}`, 20)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   // KZ-007: badan JSON pilihan; badan kosong/tidak sah bermakna semua yang
   // belum diemel (tingkah laku lama kekal).
@@ -91,10 +89,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (!rpcErr && typeof rpcPlan === 'string') pelan = rpcPlan;
   }
   if (pelan !== 'pro' && pelan !== 'institution' && pelan !== 'unlimited') {
-    return NextResponse.json(
-      { error: 'Bulk certificate email is available on Pro and Institution plans.' },
-      { status: 403 },
-    );
+    return ralatJson('Bulk certificate email is available on Pro and Institution plans.', 403);
   }
 
   // Konfigurasi SMTP: SMTP_* (Emailit) diutamakan, BREVO_* sandaran.
@@ -106,7 +101,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     process.env.SMTP_FROM_EMAIL || process.env.BREVO_FROM_EMAIL || 'noreply@veltrix.technology';
   const fromName = process.env.SMTP_FROM_NAME || process.env.BREVO_FROM_NAME || 'Kuizen';
   if (!host || !smtpUser || !smtpPass) {
-    return NextResponse.json({ error: 'SMTP not configured' }, { status: 500 });
+    return ralatJson('SMTP not configured', 500);
   }
 
   // Sasaran: RPC SECURITY DEFINER menyemak semula pendidik kelas dan
@@ -120,7 +115,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     p_ids: certificateIds.length > 0 ? certificateIds : null,
     p_resend: resend,
   });
-  if (rpcErr) return NextResponse.json({ error: rpcErr.message }, { status: 400 });
+  if (rpcErr) return ralatJson(rpcErr.message, 400);
   const baris = (sasaran ?? []) as {
     certificate_id: string;
     code: string;

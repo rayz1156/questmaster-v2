@@ -20,6 +20,7 @@ import { dalamHad } from '@/lib/hadKadar';
 import { pelanSijilBerbayar, pelanPemilikKelas } from '@/lib/sijil/pelanSijil';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { bacaKriteriaPustaka, type ItemPustaka } from '@/lib/sijil/pustaka';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,17 +44,14 @@ export async function POST(
   const libraryId = typeof body.library_id === 'string' ? body.library_id : '';
 
   if (!UUID.test(String(classId)) || !UUID.test(libraryId)) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-lib-use:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   // Item mesti kelihatan kepada pemanggil (RLS: galeri diterbitkan atau
   // "Templat saya" milik sendiri; pentadbir nampak semua galeri).
@@ -63,7 +61,7 @@ export async function POST(
     .eq('id', libraryId)
     .maybeSingle();
   if (!item) {
-    return NextResponse.json({ error: 'Template not found or not published.' }, { status: 404 });
+    return ralatJson('Template not found or not published.', 404);
   }
   const itemPenuh = item as ItemPustaka;
 
@@ -78,10 +76,7 @@ export async function POST(
     && !itemPenuh.background_path?.startsWith('library/')
     && !itemPenuh.logo_path?.startsWith('library/');
   if (!asetPercuma && !pelanSijilBerbayar(pelanPemilik)) {
-    return NextResponse.json(
-      { error: 'This template needs a Pro, Institution or Unlimited class plan.' },
-      { status: 402 },
-    );
+    return ralatJson('This template needs a Pro, Institution or Unlimited class plan.', 402);
   }
 
   const title =
@@ -110,10 +105,7 @@ export async function POST(
     .select('id, title, criteria, background_path, logo_path, layout, fields, library_id')
     .single();
   if (insErr || !template) {
-    return NextResponse.json(
-      { error: insErr?.message ?? 'Could not create the template.' },
-      { status: 400 },
-    );
+    return ralatJson(insErr?.message ?? 'Could not create the template.', 400);
   }
 
   return NextResponse.json({ template }, { status: 201 });

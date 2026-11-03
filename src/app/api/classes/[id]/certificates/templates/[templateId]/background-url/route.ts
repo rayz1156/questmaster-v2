@@ -15,6 +15,7 @@ import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,24 +35,21 @@ export async function GET(
   const userId = auth.user!.id;
 
   if (!UUID.test(String(classId)) || !UUID.test(String(params.templateId))) {
-    return NextResponse.json({ error: 'Not found.' }, { status: 404 });
+    return ralatJson('Not found.', 404);
   }
   if (!dalamHad(`cert-bg-url:${userId}`)) {
-    return NextResponse.json(
-      { error: 'Too many requests. Please wait a minute and try again.' },
-      { status: 429 },
-    );
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
-  if (!ok) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!ok) return ralatJson('Forbidden', 403);
 
   const template = await bacaTemplatKelas(auth.supa, params.templateId, classId);
   if (!template) {
-    return NextResponse.json({ error: 'Certificate template not found.' }, { status: 404 });
+    return ralatJson('Certificate template not found.', 404);
   }
   if (!template.background_path) {
-    return NextResponse.json({ error: 'This template has no background image.' }, { status: 404 });
+    return ralatJson('This template has no background image.', 404);
   }
 
   const svc = getServiceSupabase();
@@ -59,10 +57,7 @@ export async function GET(
     .from('certificate-assets')
     .createSignedUrl(template.background_path, SAAT_URL);
   if (signErr || !signed) {
-    return NextResponse.json(
-      { error: signErr?.message ?? 'Could not sign the background URL.' },
-      { status: 500 },
-    );
+    return ralatJson(signErr?.message ?? 'Could not sign the background URL.', 500);
   }
   return NextResponse.json({ url: signed.signedUrl, expires_in: SAAT_URL });
 }
