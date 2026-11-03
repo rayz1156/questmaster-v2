@@ -1396,6 +1396,7 @@ export const ms: Kamus = {
   analytics: {
     loadFailed: 'Gagal dimuatkan',
     failed: 'Gagal',
+    levelBadge: 'Tahap {n}',
     // Panel prestasi setiap aktiviti (src/components/analytics/ActivityStatsPanel.tsx).
     activity: {
       title: 'Prestasi setiap aktiviti',

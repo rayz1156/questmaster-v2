@@ -81,7 +81,7 @@ export default function TeamStatsPanel({ classId }: { classId: string | null }) 
     <div className="bg-white rounded-xl border border-gray-200 shadow-sm p-5">
       <div className="flex items-center justify-between flex-wrap gap-2">
         <h2 className="font-bold text-gray-900 flex items-center gap-2">
-          <Users className="w-5 h-5 text-purple-600"/> {t('analytics.team.title')} <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label="Level 3">3</span>
+          <Users className="w-5 h-5 text-purple-600"/> {t('analytics.team.title')} <span className="ml-2 inline-flex items-center justify-center w-6 h-6 rounded-md bg-purple-100 text-purple-700 text-xs font-semibold align-middle" aria-label={t('analytics.levelBadge', { n: 3 })}>3</span>
         </h2>
         <div className="text-xs text-gray-500">
           {t('analytics.team.summary', { n: allTeams.length, purata: avgBalance, senget: skewedCount })}

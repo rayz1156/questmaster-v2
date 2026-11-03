@@ -1432,6 +1432,7 @@ export const en = {
   analytics: {
     loadFailed: 'Failed to load',
     failed: 'Failed',
+    levelBadge: 'Level {n}',
     // Panel prestasi setiap aktiviti (src/components/analytics/ActivityStatsPanel.tsx).
     activity: {
       title: 'Per-quest performance',
