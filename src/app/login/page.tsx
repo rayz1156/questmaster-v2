@@ -21,12 +21,12 @@ import { pautanDalamanSelamat } from '@/lib/pautan';
 import GoogleButton from '@/components/GoogleButton';
 import AuthSplit from '@/components/ui/AuthSplit';
 import PemilihBahasa from '@/components/PemilihBahasa';
-import { useBahasa } from '@/lib/i18n/BahasaProvider';
+import { useBahasa, tulisKukiBahasa } from '@/lib/i18n/BahasaProvider';
 
 function LoginInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { t } = useBahasa();
+  const { t, bahasa } = useBahasa();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [show, setShow] = useState(false);
@@ -63,7 +63,7 @@ function LoginInner() {
       setNeedsVerify(/confirm|verif/i.test(m));
       return;
     }
-    const { data: prof } = await supabase.from('qm_profiles').select('role, approved').eq('id', data.user.id).maybeSingle();
+    const { data: prof } = await supabase.from('qm_profiles').select('role, approved, bahasa').eq('id', data.user.id).maybeSingle();
     const role = (prof?.role as string) || (data.user.user_metadata?.role as string) || 'participant';
     if (role === 'educator' && prof && prof.approved === false) {
       setBusy(false);
@@ -71,6 +71,12 @@ function LoginInner() {
       return;
     }
     try { await supabase.auth.getUser(); } catch {}
+    // KZ-043 A4: bahasa dalam profil mengatasi kuki peranti ini, supaya
+    // pilihan pengguna mengikuti mereka semasa log masuk di peranti baharu.
+    const bahasaProfil = prof?.bahasa;
+    if ((bahasaProfil === 'en' || bahasaProfil === 'ms') && bahasaProfil !== bahasa) {
+      tulisKukiBahasa(bahasaProfil);
+    }
     setBusy(false);
     const nextParam = searchParams?.get('next');
     // Hanya laluan relatif dibenarkan (tolak // dan \ sebagai awalan skema),

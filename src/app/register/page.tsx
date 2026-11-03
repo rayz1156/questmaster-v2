@@ -19,7 +19,7 @@ import PemilihBahasa from '@/components/PemilihBahasa';
 import { useBahasa } from '@/lib/i18n/BahasaProvider';
 
 export default function Register() {
-  const { t } = useBahasa();
+  const { t, bahasa } = useBahasa();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [name, setName] = useState('');
@@ -48,6 +48,20 @@ export default function Register() {
       (!error && Array.isArray(data?.user?.identities) && data.user.identities.length === 0);
     if (emelWujud) { setErr(t(role === 'educator' ? 'auth.emailTakenEducator' : 'auth.emailTakenParticipant')); return; }
     if (error) { setErr(error.message); return; }
+    // KZ-043 A4: profil baharu mewarisi pilihan bahasa semasa. Hanya bila
+    // ada sesi (pengesahan emel tidak aktif); fire-and-forget.
+    const { data: sesi } = await supabase.auth.getSession();
+    const tokenSesi = sesi?.session?.access_token;
+    if (tokenSesi) {
+      fetch('/api/profile/language', {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${tokenSesi}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ bahasa }),
+      }).catch(() => {});
+    }
     if (role === 'educator') {
       fetch('/api/notify-educator-pending', {
         method: 'POST',

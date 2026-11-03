@@ -15,6 +15,31 @@ import { createContext, useCallback, useContext, useMemo, type ReactNode } from 
 import { useRouter } from 'next/navigation';
 import { terjemah, BAHASA_LALAI, NAMA_KUKI, NAMA_STORAN, sahBahasa, type Bahasa, type KunciKamus } from './index';
 
+/**
+ * KZ-043 A3: hantar pilihan bahasa ke profil pengguna jika ada sesi.
+ * Fire-and-forget: kegagalan rangkaian atau auth tidak boleh menghalang
+ * pertukaran bahasa di pelayar, jadi ralat ditelan sepenuhnya.
+ */
+async function segerakBahasaProfil(bersih: Bahasa): Promise<void> {
+  try {
+    // Import dinamik supaya pembekal bahasa tidak menambah beban supabase-js
+    // ke setiap bundel klien; ia hanya diperlukan semasa pertukaran bahasa.
+    const { supabase } = await import('@/lib/supabase');
+    const { data: { session } } = await supabase.auth.getSession();
+    if (!session?.access_token) return;
+    await fetch('/api/profile/language', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${session.access_token}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ bahasa: bersih }),
+    });
+  } catch {
+    /* segerak profil gagal: kuki tempatan tetap cukup (KZ-043 A3) */
+  }
+}
+
 export type FungsiT = (kunci: KunciKamus, pembolehubah?: Record<string, string | number>) => string;
 
 type KonteksBahasa = {
@@ -44,16 +69,9 @@ export function BahasaProvider({
   const tukarBahasa = useCallback(
     (b: Bahasa) => {
       const bersih = sahBahasa(b);
-      if (typeof document !== 'undefined') {
-        document.cookie = `${NAMA_KUKI}=${bersih}; path=/; max-age=${TAHUN_SAAT}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
-      }
-      if (typeof window !== 'undefined') {
-        try {
-          window.localStorage.setItem(NAMA_STORAN, bersih);
-        } catch {
-          /* storan disekat: kuki tetap cukup */
-        }
-      }
+      tulisKukiBahasa(bersih);
+      // Segerak ke profil (KZ-043 A3): fire-and-forget, gagal pun tak apa.
+      void segerakBahasaProfil(bersih).catch(() => {});
       // Refresh supaya komponen pelayan (html lang, metadata) ikut bahasa baharu.
       router.refresh();
     },
@@ -68,6 +86,26 @@ export function BahasaProvider({
   const nilai = useMemo<KonteksBahasa>(() => ({ bahasa, tukarBahasa, t }), [bahasa, tukarBahasa, t]);
 
   return <Ctx.Provider value={nilai}>{children}</Ctx.Provider>;
+}
+
+/**
+ * KZ-043 A4: tulis kuki `kz_lang` dan salinan localStorage.
+ * Dieksport supaya halaman log masuk boleh menulis kuki daripada nilai
+ * profil tanpa menyalin logik kuki (dan atributnya) ke tempat lain.
+ * Selamat dipanggil di pelayar sahaja; tiada kesan di pelayan.
+ */
+export function tulisKukiBahasa(bersih: Bahasa): void {
+  const sah = sahBahasa(bersih);
+  if (typeof document !== 'undefined') {
+    document.cookie = `${NAMA_KUKI}=${sah}; path=/; max-age=${TAHUN_SAAT}; SameSite=Lax${location.protocol === 'https:' ? '; Secure' : ''}`;
+  }
+  if (typeof window !== 'undefined') {
+    try {
+      window.localStorage.setItem(NAMA_STORAN, sah);
+    } catch {
+      /* storan disekat: kuki tetap cukup */
+    }
+  }
 }
 
 /** Pastikan bahasa awal sentiasa 'en' atau 'ms'. */
