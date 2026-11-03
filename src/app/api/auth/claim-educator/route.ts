@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,18 +38,18 @@ export async function POST(req: NextRequest) {
 
   const { data: got, error: getErr } = await admin.auth.admin.getUserById(userId);
   if (getErr || !got?.user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    return ralatJson('User not found', 404);
   }
   const u = got.user;
   const meta = (u.user_metadata || {}) as Record<string, unknown>;
 
   if (meta.role) {
-    return NextResponse.json({ error: 'Role already set' }, { status: 409 });
+    return ralatJson('Role already set', 409);
   }
 
   const age = Date.now() - new Date(u.created_at as string).getTime();
   if (!(age >= 0) || age > WINDOW_MS) {
-    return NextResponse.json({ error: 'Not a new account' }, { status: 403 });
+    return ralatJson('Not a new account', 403);
   }
 
   const { data: prof } = await admin
@@ -58,17 +59,17 @@ export async function POST(req: NextRequest) {
     .maybeSingle();
 
   if (!prof) {
-    return NextResponse.json({ error: 'Profile not found' }, { status: 404 });
+    return ralatJson('Profile not found', 404);
   }
   if ((prof as any).role !== 'participant') {
-    return NextResponse.json({ error: 'Role already set' }, { status: 409 });
+    return ralatJson('Role already set', 409);
   }
 
   const { error: mErr } = await admin.auth.admin.updateUserById(userId, {
     user_metadata: { ...meta, role: 'educator' },
   });
   if (mErr) {
-    return NextResponse.json({ error: mErr.message }, { status: 500 });
+    return ralatJson(mErr.message, 500);
   }
 
   const { error: pErr } = await admin
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest) {
     .update({ role: 'educator', approved: false })
     .eq('id', userId);
   if (pErr) {
-    return NextResponse.json({ error: pErr.message }, { status: 500 });
+    return ralatJson(pErr.message, 500);
   }
 
   await admin.from('qm_audit_log').insert({
