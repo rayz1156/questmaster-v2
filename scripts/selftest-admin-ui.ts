@@ -197,7 +197,8 @@ semak(
 semak('4e senarai tab lengkap', TAB_PENGGUNA.map((t) => t.label), [
   'All',
   'Educators',
-  'Participants',
+  // KZ-043: tab pelajar kini "Students" (glosari Student/Pelajar), bukan "Participants".
+  'Students',
   'Admins',
   'Pending approval',
   'Suspended',
