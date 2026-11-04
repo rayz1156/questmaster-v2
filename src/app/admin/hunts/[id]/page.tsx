@@ -48,15 +48,17 @@ import {
 } from "@/lib/data";
 import { tokenJawapan } from "@/lib/adminRanking";
 import type { KelasAdmin } from "@/lib/adminClasses";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL, terjemahBilangan } from "@/lib/i18n";
 
 type MukaTab = "questions" | "submissions";
 
 const MATA_MAX = 100000;
 
-function fmt(d: string | null | undefined) {
+function fmt(d: string | null | undefined, bahasa: "en" | "ms") {
   if (!d) return "-";
   try {
-    return new Date(d).toLocaleString();
+    return new Date(d).toLocaleString(LOKAL[bahasa]);
   } catch {
     return String(d);
   }
@@ -105,6 +107,7 @@ function JawapanRingkas({ answer, max = 60 }: { answer: string | null | undefine
 export default function Page({ params }: { params: { id: string } }) {
   const router = useRouter();
   const confirm = useConfirm();
+  const { t, bahasa } = useBahasa();
   const { id } = params;
 
   const [muat, setMuat] = useState(true);
@@ -153,20 +156,20 @@ export default function Page({ params }: { params: { id: string } }) {
       for (const c of ch) draf[c.id] = String(Number(c.points) || 0);
       setDrafMata(draf);
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to load this activity.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.huntDetail.loadFailed")) });
     } finally {
       setMuat(false);
     }
-  }, [id]);
+  }, [id, t]);
 
   useEffect(() => {
     reload();
   }, [reload]);
 
   const namaProfil = (uid: string | null | undefined) => {
-    if (!uid) return "Unnamed user";
+    if (!uid) return t("admin.unnamedUser");
     const p = profiles.find((u) => u.id === uid);
-    return p?.display_name || "Unnamed user";
+    return p?.display_name || t("admin.unnamedUser");
   };
 
   // ===== Questions & points =====
@@ -225,18 +228,32 @@ export default function Page({ params }: { params: { id: string } }) {
         await adminSetChallengePoints(p.id, p.selepas, alasanBersih);
         laporan.push({ title: p.title, ok: true });
       } catch (e) {
-        laporan.push({ title: p.title, ok: false, teks: mesejHad(e, "Failed") });
+        laporan.push({ title: p.title, ok: false, teks: mesejHad(e, t("admin.huntDetail.reportFailed")) });
       }
     }
     setLaporanMata(laporan);
     setSimpanMata(false);
     if (laporan.every((l) => l.ok)) {
-      setMesej({ baik: true, teks: `Points saved for ${laporan.length} challenge${laporan.length === 1 ? "" : "s"}.` });
+      setMesej({
+        baik: true,
+        teks: terjemahBilangan(bahasa, "admin.huntDetail.savedOne", "admin.huntDetail.savedOther", laporan.length, {
+          n: laporan.length,
+        }),
+      });
       setAlasanMata("");
       reload();
     } else {
       const gagal = laporan.filter((l) => !l.ok).length;
-      setMesej({ baik: false, teks: `${gagal} change${gagal === 1 ? "" : "s"} failed. See the list below.` });
+      setMesej({
+        baik: false,
+        teks: terjemahBilangan(
+          bahasa,
+          "admin.huntDetail.changesFailedOne",
+          "admin.huntDetail.changesFailedOther",
+          gagal,
+          { n: gagal },
+        ),
+      });
       reload();
     }
   };
@@ -247,18 +264,21 @@ export default function Page({ params }: { params: { id: string } }) {
     const ok = await confirm({
       title:
         status === "active"
-          ? `Publish "${hunt.title}"?`
-          : `Archive "${hunt.title}"?`,
+          ? t("admin.huntDetail.publishConfirm", { tajuk: hunt.title })
+          : t("admin.huntDetail.archiveConfirm", { tajuk: hunt.title }),
       tone: status === "archived" ? "danger" : "default",
     });
     if (!ok) return;
     try {
       await adminUpdateHunt(id, { status });
       await logAudit("hunt_status", "hunt", id, { status });
-      setMesej({ baik: true, teks: status === "active" ? "Activity published." : "Activity archived." });
+      setMesej({
+        baik: true,
+        teks: status === "active" ? t("admin.huntDetail.publishedMsg") : t("admin.huntDetail.archivedMsg"),
+      });
       reload();
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to update the activity.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.huntDetail.updateFailed")) });
       reload();
     }
   };
@@ -271,7 +291,7 @@ export default function Page({ params }: { params: { id: string } }) {
       await logAudit("hunt_delete", "hunt", id, { title: hunt.title });
       router.push("/admin/hunts");
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Delete failed.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.huntDetail.deleteFailed")) });
       reload();
     }
   };
@@ -303,7 +323,7 @@ export default function Page({ params }: { params: { id: string } }) {
       const done = await listQuestCompletions(id);
       setSenaraiCompletions(done.map((d) => d.team_id));
     } catch (e) {
-      setMesej({ baik: false, teks: mesejHad(e, "Failed to update the completion.") });
+      setMesej({ baik: false, teks: mesejHad(e, t("admin.huntDetail.completionFailed")) });
     } finally {
       setToggling("");
     }
@@ -314,7 +334,7 @@ export default function Page({ params }: { params: { id: string } }) {
   if (muat) {
     return (
       <AdminShell>
-        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
       </AdminShell>
     );
   }
@@ -322,13 +342,13 @@ export default function Page({ params }: { params: { id: string } }) {
   if (!hunt) {
     return (
       <AdminShell>
-        <PageHead crumb="Activities" name="Not found" />
+        <PageHead crumb={t("admin.hunts.title")} name={t("admin.huntDetail.notFound")} />
         <Card>
           <EmptyState
             icon={<MapIcon className="w-6 h-6" />}
-            title="Activity not found."
-            text="It may have been deleted."
-            actionLabel="Back to Activities"
+            title={t("admin.huntDetail.notFoundTitle")}
+            text={t("admin.huntDetail.notFoundText")}
+            actionLabel={t("common.backToActivities")}
             href="/admin/hunts"
           />
         </Card>
@@ -340,18 +360,27 @@ export default function Page({ params }: { params: { id: string } }) {
 
   // Lencana status aktiviti (sama seperti lajur Status senarai Activities, KZ-024).
   const kapitalStatus = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+  // Label status aktiviti mengikut kamus (nilai DB kekal dalam data).
+  const labelStatusHunt =
+    hunt.status === "active"
+      ? t("admin.huntDetail.statusActive")
+      : hunt.status === "draft"
+        ? t("admin.huntDetail.statusDraft")
+        : hunt.status === "archived"
+          ? t("admin.huntDetail.statusArchived")
+          : kapitalStatus(hunt.status);
   const lencanaStatus =
     hunt.status === "active" ? (
       <Badge variant="dot" warna="green">
-        {kapitalStatus(hunt.status)}
+        {labelStatusHunt}
       </Badge>
     ) : hunt.status === "draft" ? (
       <Badge variant="dim" warna="yellow">
-        {kapitalStatus(hunt.status)}
+        {labelStatusHunt}
       </Badge>
     ) : (
       <Badge variant="dim" warna="gray">
-        {kapitalStatus(hunt.status)}
+        {labelStatusHunt}
       </Badge>
     );
 
@@ -365,12 +394,12 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "tajuk",
-      header: "Title",
+      header: t("admin.huntDetail.colTitle"),
       render: (c) => <span className="text-[13px] font-bold text-ink">{c.title}</span>,
     },
     {
       key: "mata",
-      header: "Points",
+      header: t("admin.huntDetail.colPoints"),
       render: (c) => (
         <Input
           type="number"
@@ -378,18 +407,26 @@ export default function Page({ params }: { params: { id: string } }) {
           max={MATA_MAX}
           value={drafMata[c.id] ?? String(Number(c.points) || 0)}
           onChange={(e) => setDrafMata({ ...drafMata, [c.id]: e.target.value })}
-          aria-label={`Points for ${c.title}`}
+          aria-label={t("admin.huntDetail.pointsAria", { tajuk: c.title })}
           className="w-24"
         />
       ),
     },
   ];
 
+  // Label status penghantaran mengikut kamus (nilai DB kekal dalam data).
+  const labelStatusSub = (s: string) =>
+    s === "approved"
+      ? t("admin.huntDetail.statusApproved")
+      : s === "rejected"
+        ? t("admin.huntDetail.statusRejected")
+        : t("admin.huntDetail.statusPending");
+
   // Lajur DataTable penghantaran; jawapan dipotong, URL sebagai pautan selamat.
   const lajurSub: DataColumn<Submission>[] = [
     {
       key: "peserta",
-      header: "Student",
+      header: t("admin.huntDetail.colStudent"),
       render: (s) => (
         <span className="block truncate max-w-[160px] text-[13px] font-bold text-ink">
           {namaProfil(s.user_id)}
@@ -398,7 +435,7 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "cabaran",
-      header: "Challenge",
+      header: t("admin.huntDetail.colChallenge"),
       hideOnMobile: true,
       render: (s) => (
         <span className="block truncate max-w-[160px] text-[13px] text-ink-faint">
@@ -408,7 +445,7 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "jawapan",
-      header: "Answer",
+      header: t("admin.huntDetail.colAnswer"),
       render: (s) => (
         <span className="block max-w-[260px] text-[13px] text-ink-faint">
           <JawapanRingkas answer={s.answer} />
@@ -417,27 +454,29 @@ export default function Page({ params }: { params: { id: string } }) {
     },
     {
       key: "status",
-      header: "Status",
+      header: t("admin.huntDetail.colStatus"),
       render: (s) =>
         s.status === "approved" ? (
           <Badge variant="dot" warna="green">
-            {kapitalStatus(s.status)}
+            {labelStatusSub(s.status)}
           </Badge>
         ) : s.status === "rejected" ? (
           <Badge variant="dim" warna="red">
-            {kapitalStatus(s.status)}
+            {labelStatusSub(s.status)}
           </Badge>
         ) : (
           <Badge variant="dim" warna="yellow">
-            {kapitalStatus(s.status)}
+            {labelStatusSub(s.status)}
           </Badge>
         ),
     },
     {
       key: "hantar",
-      header: "Submitted",
+      header: t("admin.huntDetail.colSubmitted"),
       hideOnMobile: true,
-      render: (s) => <span className="text-[13px] text-ink-faint whitespace-nowrap">{relTime(s.created_at)}</span>,
+      render: (s) => (
+        <span className="text-[13px] text-ink-faint whitespace-nowrap">{relTime(s.created_at, undefined, bahasa)}</span>
+      ),
     },
     {
       key: "ulas",
@@ -447,7 +486,7 @@ export default function Page({ params }: { params: { id: string } }) {
           href={`/admin/moderation?id=${s.id}`}
           className="text-[13px] font-bold text-brand-purple hover:opacity-80"
         >
-          Review
+          {t("admin.huntDetail.review")}
         </Link>
       ),
     },
@@ -456,7 +495,7 @@ export default function Page({ params }: { params: { id: string } }) {
   return (
     <AdminShell>
       <PageHead
-        crumb="Activities"
+        crumb={t("admin.hunts.title")}
         name={namaTajuk}
         description={
           <span className="inline-flex flex-wrap items-center gap-x-2 gap-y-1">
@@ -465,20 +504,20 @@ export default function Page({ params }: { params: { id: string } }) {
                 href={`/admin/classes/${hunt.class_id}`}
                 className="font-bold text-brand-purple hover:opacity-80"
               >
-                {kelas?.name || "Unnamed class"}
+                {kelas?.name || t("admin.hunts.unnamedClass")}
               </Link>
             )}
-            <span>by {namaProfil(hunt.owner_id)}</span>
+            <span>{t("admin.huntDetail.by")} {namaProfil(hunt.owner_id)}</span>
             {lencanaStatus}
             <span>
-              Start {fmt(hunt.start_at)} · End {fmt(hunt.end_at)}
+              {t("admin.huntDetail.startLabel")} {fmt(hunt.start_at, bahasa)} · {t("admin.huntDetail.endLabel")} {fmt(hunt.end_at, bahasa)}
             </span>
           </span>
         }
         primaryAction={
           hunt.status !== "active"
             ? {
-                label: "Publish",
+                label: t("admin.huntDetail.publish"),
                 icon: <Rocket className="w-4 h-4" />,
                 onSelect: () => tukarStatus("active"),
               }
@@ -488,14 +527,14 @@ export default function Page({ params }: { params: { id: string } }) {
           ...(hunt.status !== "archived"
             ? [
                 {
-                  label: "Archive",
+                  label: t("admin.huntDetail.archive"),
                   icon: <Archive className="w-4 h-4" />,
                   onSelect: () => tukarStatus("archived"),
                 },
               ]
             : []),
           {
-            label: "Delete",
+            label: t("admin.delete"),
             icon: <Trash2 className="w-4 h-4" />,
             onSelect: () => setZonBahaya(true),
           },
@@ -505,9 +544,9 @@ export default function Page({ params }: { params: { id: string } }) {
       {/* Zon bahaya buang aktiviti: pengesahan menaip tajuk, sama seperti lama. */}
       {zonBahaya && (
         <Card className="mb-6 border border-red-200">
-          <CardHead title="Danger zone" />
+          <CardHead title={t("admin.dangerZone")} />
           <p className="text-[14px] text-ink-muted mt-4 mb-4">
-            Deleting this activity removes its challenges and submissions permanently. Type the activity title exactly to enable the button.
+            {t("admin.huntDetail.dangerDesc")}
           </p>
           <div className="flex items-center gap-3 flex-wrap">
             <span className="w-64">
@@ -515,7 +554,7 @@ export default function Page({ params }: { params: { id: string } }) {
                 placeholder={namaTajuk}
                 value={pengesahanHapus}
                 onChange={(e) => setPengesahanHapus(e.target.value)}
-                aria-label="Type the activity title to confirm deletion"
+                aria-label={t("admin.huntDetail.typeTitleAria")}
                 ralat={pengesahanHapus !== "" && pengesahanHapus !== namaTajuk}
               />
             </span>
@@ -524,7 +563,7 @@ export default function Page({ params }: { params: { id: string } }) {
               disabled={pengesahanHapus !== namaTajuk}
               onClick={hapus}
             >
-              <Trash2 className="w-4 h-4" /> Delete activity
+              <Trash2 className="w-4 h-4" /> {t("admin.huntDetail.deleteActivity")}
             </Button>
             <Button
               variant="outline"
@@ -533,7 +572,7 @@ export default function Page({ params }: { params: { id: string } }) {
                 setPengesahanHapus("");
               }}
             >
-              Cancel
+              {t("common.cancel")}
             </Button>
           </div>
         </Card>
@@ -542,12 +581,12 @@ export default function Page({ params }: { params: { id: string } }) {
       <Tabs
         items={[
           {
-            label: "Questions & points",
+            label: t("admin.huntDetail.tabQuestions"),
             onSelect: () => setTab("questions"),
             aktif: tab === "questions",
           },
           {
-            label: "Submissions",
+            label: t("admin.huntDetail.tabSubmissions"),
             onSelect: () => setTab("submissions"),
             aktif: tab === "submissions",
           },
@@ -566,7 +605,7 @@ export default function Page({ params }: { params: { id: string } }) {
           {/* Jadual cabaran; baris yang ada draf berubah disorot (rowClassName). */}
           <DataTable
             className="lg:col-span-2"
-            label="Activity questions"
+            label={t("admin.huntDetail.questionsTable")}
             columns={lajurCabaran}
             rows={challenges}
             rowKey={(c) => c.id}
@@ -576,36 +615,36 @@ export default function Page({ params }: { params: { id: string } }) {
             empty={
               <EmptyState
                 icon={<ClipboardList className="w-6 h-6" />}
-                title="No questions."
-                text="This activity has no challenges yet."
+                title={t("admin.huntDetail.noQuestions")}
+                text={t("admin.huntDetail.noQuestionsText")}
               />
             }
           />
 
           {/* Panel kanan melekat: semak perubahan (logik dan had sama seperti lama) */}
           <Card className="lg:sticky lg:top-20">
-            <CardHead title="Review changes" />
+            <CardHead title={t("admin.huntDetail.reviewChanges")} />
             {perubahanMata.length === 0 ? (
               <p className="text-[14px] text-ink-faint mt-4">
-                No changes yet. Edit points in the table to queue a change.
+                {t("admin.huntDetail.noChanges")}
               </p>
             ) : (
               <div className="mt-4 space-y-1 mb-4">
                 {perubahanMata.map((p) => (
                   <div key={p.id} className="text-[14px] text-ink">
                     <span className="font-bold truncate">{p.title}:</span>{" "}
-                    <span className="text-ink-muted">{p.sebelum} to {p.selepas}</span>
+                    <span className="text-ink-muted">{p.sebelum} {t("admin.huntDetail.toWord")} {p.selepas}</span>
                   </div>
                 ))}
               </div>
             )}
             <div className="flex items-center justify-between text-[12px] text-ink-muted border-t border-hairline pt-3 mb-3">
-              <span>Total before: <span className="font-semibold text-ink">{jumlahSebelum}</span></span>
-              <span>Total after: <span className="font-semibold text-brand-purple">{jumlahSelepas}</span></span>
+              <span>{t("admin.huntDetail.totalBefore")} <span className="font-semibold text-ink">{jumlahSebelum}</span></span>
+              <span>{t("admin.huntDetail.totalAfter")} <span className="font-semibold text-brand-purple">{jumlahSelepas}</span></span>
             </div>
             {mataTakSah.length > 0 && (
               <p className="text-[12px] text-kz-down mb-3">
-                Points must be whole numbers from 0 to {MATA_MAX}. Check: {mataTakSah.join(", ")}
+                {t("admin.huntDetail.pointsRange", { had: MATA_MAX, senarai: mataTakSah.join(", ") })}
               </p>
             )}
             <Textarea
@@ -613,16 +652,16 @@ export default function Page({ params }: { params: { id: string } }) {
               maxLength={500}
               value={alasanMata}
               onChange={(e) => setAlasanMata(e.target.value)}
-              placeholder="Explain why these points change"
-              aria-label="Reason for the points change"
+              placeholder={t("admin.huntDetail.reasonPlaceholder")}
+              aria-label={t("admin.huntDetail.reasonAria")}
             />
             <div className="flex items-center justify-between mt-1.5 mb-3">
               <span className="text-[12px] text-ink-faint">{alasanBersih.length}/500</span>
-              <span className="text-[12px] text-ink-faint">Changes are recorded in Audit.</span>
+              <span className="text-[12px] text-ink-faint">{t("admin.huntDetail.auditNote")}</span>
             </div>
             <div className="flex items-center gap-2">
               <Button onClick={simpanMataBtn} disabled={!bolehSimpan} className="flex-1">
-                {simpanMata ? "Saving..." : "Save changes"}
+                {simpanMata ? t("admin.huntDetail.saving") : t("admin.huntDetail.saveChanges")}
               </Button>
               <Button
                 variant="outline"
@@ -635,14 +674,14 @@ export default function Page({ params }: { params: { id: string } }) {
                   setLaporanMata(null);
                 }}
               >
-                Discard
+                {t("admin.huntDetail.discard")}
               </Button>
             </div>
             {laporanMata && (
               <div className="mt-3 space-y-1 border-t border-hairline pt-3">
                 {laporanMata.map((l) => (
                   <div key={l.title} className={`text-[12px] ${l.ok ? "text-green-700" : "text-kz-down"}`}>
-                    {l.ok ? "Saved" : "Failed"}: {l.title}
+                    {l.ok ? t("admin.huntDetail.reportSaved") : t("admin.huntDetail.reportFailed")}: {l.title}
                     {!l.ok && l.teks ? ` (${l.teks})` : ""}
                   </div>
                 ))}
@@ -656,15 +695,15 @@ export default function Page({ params }: { params: { id: string } }) {
       {tab === "submissions" && (
         <div className="mt-4 space-y-4">
           <DataTable
-            label="Activity submissions"
+            label={t("admin.huntDetail.subsTable")}
             columns={lajurSub}
             rows={subs}
             rowKey={(s) => s.id}
             empty={
               <EmptyState
                 icon={<Inbox className="w-6 h-6" />}
-                title="No submissions."
-                text="Nobody has answered yet."
+                title={t("admin.huntDetail.noSubs")}
+                text={t("admin.huntDetail.noSubsText")}
               />
             }
           />
@@ -681,26 +720,26 @@ export default function Page({ params }: { params: { id: string } }) {
               ) : (
                 <ChevronDown className="w-4 h-4 text-ink-faint" />
               )}
-              Team completions
+              {t("admin.huntDetail.teamCompletions")}
             </button>
             {completions !== null && (
               <div className="px-6 pb-4 pt-1 space-y-1 border-t border-kz-line">
                 {completions.length === 0 ? (
-                  <p className="text-[12px] text-ink-faint">No teams yet.</p>
+                  <p className="text-[12px] text-ink-faint">{t("admin.huntDetail.noTeams")}</p>
                 ) : (
-                  completions.map((t) => {
-                    const sudah = senaraiCompletions.includes(t.id);
+                  completions.map((pas) => {
+                    const sudah = senaraiCompletions.includes(pas.id);
                     return (
                       <button
-                        key={t.id}
+                        key={pas.id}
                         type="button"
-                        onClick={() => togolCompletion(t.id, sudah)}
-                        disabled={toggling === t.id}
+                        onClick={() => togolCompletion(pas.id, sudah)}
+                        disabled={toggling === pas.id}
                         className={`w-full flex items-center gap-2 p-2 rounded-[4px] text-left transition ${
                           sudah ? "bg-green-50" : "bg-[#f8f9fc] hover:bg-[#eff1f5]"
                         }`}
                       >
-                        {toggling === t.id ? (
+                        {toggling === pas.id ? (
                           <span className="w-4 h-4 rounded-full border-2 border-gray-300 border-t-brand-purple animate-spin" />
                         ) : sudah ? (
                           <CheckCircle className="w-4 h-4 text-green-600" />
@@ -708,9 +747,9 @@ export default function Page({ params }: { params: { id: string } }) {
                           <Circle className="w-4 h-4 text-ink-faint" />
                         )}
                         <span className={`text-[13px] truncate ${sudah ? "text-green-700 font-bold" : "text-ink-muted"}`}>
-                          {t.name}
+                          {pas.name}
                         </span>
-                        {sudah && <span className="text-[12px] text-green-600 ml-auto">Complete</span>}
+                        {sudah && <span className="text-[12px] text-green-600 ml-auto">{t("admin.huntDetail.complete")}</span>}
                       </button>
                     );
                   })
