@@ -14,6 +14,7 @@ import { createServerClient } from '@supabase/ssr';
 import { createClient } from '@supabase/supabase-js';
 import { cookies } from 'next/headers';
 import { NextRequest, NextResponse } from 'next/server';
+import { ralatJson } from '@/lib/i18n/ralatApi';
 
 /** Baca token daripada header Authorization: Bearer <token>. */
 export function bearerFromReq(req?: NextRequest | Request | null): string | null {
@@ -59,7 +60,7 @@ export async function requireUser(req?: NextRequest | Request | null) {
   const { data } = await supa.auth.getUser();
   const user = data.user;
   if (!user) {
-    return { user: null, supa, response: NextResponse.json({ error: 'Not authed' }, { status: 401 }) as NextResponse };
+    return { user: null, supa, response: ralatJson('Not authed', 401) as NextResponse };
   }
   return { user, supa, response: null as NextResponse | null };
 }
@@ -77,7 +78,7 @@ export async function requireClassOwner(req: NextRequest | Request | null, class
     return {
       ...auth,
       klass: null,
-      response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as NextResponse,
+      response: ralatJson('Forbidden', 403) as NextResponse,
     };
   }
   return { ...auth, klass };
@@ -93,7 +94,7 @@ export async function requireClassMember(req: NextRequest | Request | null, clas
     .eq('id', classId)
     .single();
   if (!klass) {
-    return { ...auth, klass: null, response: NextResponse.json({ error: 'Not found' }, { status: 404 }) as NextResponse };
+    return { ...auth, klass: null, response: ralatJson('Not found', 404) as NextResponse };
   }
   if (klass.owner_id === auth.user!.id) {
     return { ...auth, klass };
@@ -119,7 +120,7 @@ export async function requireClassMember(req: NextRequest | Request | null, clas
       return {
         ...auth,
         klass: null,
-        response: NextResponse.json({ error: 'Forbidden' }, { status: 403 }) as NextResponse,
+        response: ralatJson('Forbidden', 403) as NextResponse,
       };
     }
   }
