@@ -53,6 +53,8 @@ import {
   type AuditTone,
 } from "@/lib/adminAudit";
 import type { KelasAdmin } from "@/lib/adminClasses";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import { LOKAL } from "@/lib/i18n";
 
 const SEBARIS = 50;
 
@@ -65,10 +67,10 @@ const TONE_PIL: Record<AuditTone, WarnaKit> = {
 };
 
 /** Tarikh penuh untuk tooltip dan panel butiran. */
-function fmt(d: string | null | undefined) {
+function fmt(d: string | null | undefined, bahasa: "en" | "ms") {
   if (!d) return "-";
   try {
-    return new Date(d).toLocaleString();
+    return new Date(d).toLocaleString(LOKAL[bahasa]);
   } catch {
     return String(d);
   }
@@ -84,6 +86,7 @@ function jsonRawat(meta: unknown): string {
 }
 
 export default function Page() {
+  const { t, bahasa } = useBahasa();
   const [muat, setMuat] = useState(true);
   const [rows, setRows] = useState<AuditLogRow[]>([]);
   const [muatLagi, setMuatLagi] = useState(false);
@@ -178,15 +181,15 @@ export default function Page() {
 
   // Baris yang dipaparkan: carian sasaran di klien sahaja.
   const ditapis = useMemo(
-    () => rows.filter((r) => padanCarianSasaran(r, q, petaSasaran, namaPelaku)),
-    [rows, q, petaSasaran, namaPelaku],
+    () => rows.filter((r) => padanCarianSasaran(r, q, petaSasaran, namaPelaku, bahasa)),
+    [rows, q, petaSasaran, namaPelaku, bahasa],
   );
 
   const tindakanWujud = useMemo(() => senaraiTindakan(rows), [rows]);
   const pelakuWujud = useMemo(() => senaraiPelaku(rows), [rows]);
 
   const item = rows.find((r) => r.id === dipilih) || null;
-  const sasaranItem = item ? sasaranAudit(item, petaSasaran) : null;
+  const sasaranItem = item ? sasaranAudit(item, petaSasaran, bahasa) : null;
 
   /** Muat 50 baris berikutnya dengan offset; dilumpuhkan bila halaman pendek. */
   const muatLagiBtn = useCallback(async () => {
@@ -215,30 +218,30 @@ export default function Page() {
   const lajur: DataColumn<AuditLogRow>[] = [
     {
       key: "masa",
-      header: "Time",
+      header: t("admin.audit.colTime"),
       render: (r) => (
         <span
-          title={fmt(r.created_at)}
+          title={fmt(r.created_at, bahasa)}
           className={`text-[13px] whitespace-nowrap ${dipilih === r.id ? "font-bold text-brand-purple" : "text-ink-faint"}`}
         >
-          {relTime(r.created_at)}
+          {relTime(r.created_at, undefined, bahasa)}
         </span>
       ),
     },
     {
       key: "pelaku",
-      header: "Actor",
+      header: t("admin.audit.colActor"),
       render: (r) => (
         <span className="text-[13px] text-ink truncate block max-w-[140px]">
-          {r.actor_id ? profById.get(r.actor_id)?.display_name || "Unnamed user" : "Unknown"}
+          {r.actor_id ? profById.get(r.actor_id)?.display_name || t("admin.unnamedUser") : t("admin.audit.unknown")}
         </span>
       ),
     },
     {
       key: "tindakan",
-      header: "Action",
+      header: t("admin.audit.colAction"),
       render: (r) => {
-        const label = labelTindakan(r.action);
+        const label = labelTindakan(r.action, bahasa);
         return (
           <Badge variant="dim" warna={TONE_PIL[label.tone]}>
             {label.label}
@@ -248,9 +251,9 @@ export default function Page() {
     },
     {
       key: "sasaran",
-      header: "Target",
+      header: t("admin.audit.colTarget"),
       render: (r) => {
-        const sasaran = sasaranAudit(r, petaSasaran);
+        const sasaran = sasaranAudit(r, petaSasaran, bahasa);
         if (sasaran.nama) {
           return <span className="text-[13px] text-ink truncate block max-w-[180px]">{sasaran.nama}</span>;
         }
@@ -266,7 +269,7 @@ export default function Page() {
     },
     {
       key: "alasan",
-      header: "Reason",
+      header: t("admin.audit.colReason"),
       hideOnMobile: true,
       render: (r) => (
         <span className="block truncate text-[13px] text-ink-muted max-w-[200px]">{ringkasAlasan(r.meta)}</span>
@@ -277,8 +280,8 @@ export default function Page() {
   return (
     <AdminShell>
       <PageHead
-        title="Audit log"
-        description="Every admin action, who did it and why. Entries can't be edited or deleted."
+        title={t("admin.audit.title")}
+        description={t("admin.audit.description")}
       />
 
       <div className="grid lg:grid-cols-5 gap-5 items-start">
@@ -286,12 +289,12 @@ export default function Page() {
         <div className="lg:col-span-3">
           {muat ? (
             <Card>
-              <p className="text-[14px] text-ink-faint py-8 text-center">Loading...</p>
+              <p className="text-[14px] text-ink-faint py-8 text-center">{t("common.loadingDots")}</p>
             </Card>
           ) : (
             <>
               <DataTable
-                label="Audit log"
+                label={t("admin.audit.tableLabel")}
                 columns={lajur}
                 rows={ditapis}
                 rowKey={(r) => String(r.id)}
@@ -301,45 +304,45 @@ export default function Page() {
                     <Select
                       value={tindakan}
                       onChange={(e) => setTindakan(e.target.value)}
-                      aria-label="Filter by action"
+                      aria-label={t("admin.audit.filterByAction")}
                       className="w-auto"
                     >
-                      <option value="">All actions</option>
+                      <option value="">{t("admin.audit.allActions")}</option>
                       {tindakanWujud.map((a) => (
                         <option key={a} value={a}>
-                          {labelTindakan(a).label}
+                          {labelTindakan(a, bahasa).label}
                         </option>
                       ))}
                     </Select>
                     <Select
                       value={pelaku}
                       onChange={(e) => setPelaku(e.target.value)}
-                      aria-label="Filter by actor"
+                      aria-label={t("admin.audit.filterByActor")}
                       className="w-auto"
                     >
-                      <option value="">All actors</option>
+                      <option value="">{t("admin.audit.allActors")}</option>
                       {pelakuWujud.map((id) => (
                         <option key={id} value={id}>
-                          {profById.get(id)?.display_name || "Unnamed user"}
+                          {profById.get(id)?.display_name || t("admin.unnamedUser")}
                         </option>
                       ))}
                     </Select>
                     <Select
                       value={period}
                       onChange={(e) => setPeriod(e.target.value as PeriodAudit)}
-                      aria-label="Filter by period"
+                      aria-label={t("admin.audit.filterByPeriod")}
                       className="w-auto"
                     >
-                      <option value="24h">24 hours</option>
-                      <option value="7d">7 days</option>
-                      <option value="30d">30 days</option>
-                      <option value="all">All</option>
+                      <option value="24h">{t("admin.audit.period24h")}</option>
+                      <option value="7d">{t("admin.audit.period7d")}</option>
+                      <option value="30d">{t("admin.audit.period30d")}</option>
+                      <option value="all">{t("admin.audit.periodAll")}</option>
                     </Select>
                     <span className="w-full sm:w-56">
                       <Input
                         ikonKiri={<Search className="w-4 h-4" />}
-                        placeholder="Search target, id or actor"
-                        aria-label="Search audit entries"
+                        placeholder={t("admin.audit.searchPlaceholder")}
+                        aria-label={t("admin.audit.searchAria")}
                         value={q}
                         onChange={(e) => setQ(e.target.value)}
                       />
@@ -349,8 +352,8 @@ export default function Page() {
                 empty={
                   <EmptyState
                     icon={<ScrollText className="w-6 h-6" />}
-                    title="No entries match"
-                    text="Try different filters."
+                    title={t("admin.audit.noMatchTitle")}
+                    text={t("admin.audit.noMatchText")}
                   />
                 }
               />
@@ -358,7 +361,7 @@ export default function Page() {
               {!muat && adaLagi && ditapis.length > 0 && (
                 <div className="mt-4 text-center">
                   <Button variant="outline" disabled={muatLagi} onClick={muatLagiBtn}>
-                    {muatLagi ? "Loading..." : "Load more"}
+                    {muatLagi ? t("common.loadingDots") : t("admin.audit.loadMore")}
                   </Button>
                 </div>
               )}
@@ -372,47 +375,47 @@ export default function Page() {
             <Card>
               <EmptyState
                 icon={<History className="w-6 h-6" />}
-                title="Select an entry"
-                text="Click a row to see the full event."
+                title={t("admin.audit.selectTitle")}
+                text={t("admin.audit.selectText")}
               />
             </Card>
           ) : (
             <Card className="lg:sticky lg:top-20">
-              <CardHead title="Event details" />
+              <CardHead title={t("admin.audit.detailsTitle")} />
 
               <div className="mt-4 space-y-4 text-[14px]">
                 <div>
-                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Actor</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">{t("admin.audit.colActor")}</div>
                   {item.actor_id ? (
                     <Link
                       href={`/admin/users/${item.actor_id}`}
                       onClick={(e) => e.stopPropagation()}
                       className="text-ink font-medium hover:text-brand-purple"
                     >
-                      {profById.get(item.actor_id)?.display_name || "Unnamed user"}
+                      {profById.get(item.actor_id)?.display_name || t("admin.unnamedUser")}
                     </Link>
                   ) : (
-                    <div className="text-ink-muted">Unknown</div>
+                    <div className="text-ink-muted">{t("admin.audit.unknown")}</div>
                   )}
                 </div>
 
                 <div>
-                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Time</div>
-                  <div className="text-ink">{fmt(item.created_at)}</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">{t("admin.audit.colTime")}</div>
+                  <div className="text-ink">{fmt(item.created_at, bahasa)}</div>
                 </div>
 
                 <div>
-                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Action</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">{t("admin.audit.colAction")}</div>
                   <div className="mt-1">
-                    <Badge variant="dim" warna={TONE_PIL[labelTindakan(item.action).tone]}>
-                      {labelTindakan(item.action).label}
+                    <Badge variant="dim" warna={TONE_PIL[labelTindakan(item.action, bahasa).tone]}>
+                      {labelTindakan(item.action, bahasa).label}
                     </Badge>
                   </div>
                 </div>
 
                 {sasaranItem && (
                   <div>
-                    <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Target</div>
+                    <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">{t("admin.audit.colTarget")}</div>
                     {sasaranItem.nama ? (
                       sasaranItem.href ? (
                         <Link
@@ -437,26 +440,26 @@ export default function Page() {
                 )}
 
                 <div>
-                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">Reason</div>
+                  <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint">{t("admin.audit.colReason")}</div>
                   <div className="text-ink whitespace-pre-wrap break-words">
-                    {alasanAudit(item.meta) || "(none)"}
+                    {alasanAudit(item.meta) || t("admin.audit.noneLabel")}
                   </div>
                 </div>
 
-                {bezaAudit(item.meta).length > 0 && (
+                {bezaAudit(item.meta, bahasa).length > 0 && (
                   <div>
-                    <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint mb-1.5">Changes</div>
+                    <div className="text-[11px] font-medium uppercase tracking-[2.2px] text-ink-faint mb-1.5">{t("admin.audit.changes")}</div>
                     <div className="overflow-x-auto">
                       <table className="w-full text-[12px]">
                         <thead>
                           <tr className="text-left text-ink-faint border-b border-kz-line">
-                            <th className="py-1.5 pr-3 font-medium">Field</th>
-                            <th className="py-1.5 pr-3 font-medium">Before</th>
-                            <th className="py-1.5 font-medium">After</th>
+                            <th className="py-1.5 pr-3 font-medium">{t("admin.audit.field")}</th>
+                            <th className="py-1.5 pr-3 font-medium">{t("admin.audit.before")}</th>
+                            <th className="py-1.5 font-medium">{t("admin.audit.after")}</th>
                           </tr>
                         </thead>
                         <tbody>
-                          {bezaAudit(item.meta).map((b) => (
+                          {bezaAudit(item.meta, bahasa).map((b) => (
                             <tr key={b.key} className="border-b border-kz-line last:border-b-0">
                               <td className="py-1.5 pr-3 text-ink-muted">{b.key}</td>
                               <td className="py-1.5 pr-3 text-ink-muted break-words">{b.before}</td>
@@ -470,7 +473,7 @@ export default function Page() {
                 )}
 
                 <details className="border-t border-kz-line pt-3">
-                  <summary className="text-[12px] font-medium text-ink-muted cursor-pointer">Raw data</summary>
+                  <summary className="text-[12px] font-medium text-ink-muted cursor-pointer">{t("admin.audit.rawData")}</summary>
                   <pre className="mt-2 text-[11px] font-mono text-ink-muted whitespace-pre-wrap break-words bg-canvas rounded-[4px] p-3 overflow-x-auto">
                     {jsonRawat(item.meta)}
                   </pre>

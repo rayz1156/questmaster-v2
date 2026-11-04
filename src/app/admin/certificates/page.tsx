@@ -26,6 +26,7 @@ import {
 import { authHeader } from "@/lib/peer-client";
 import type { ItemPustakaApi } from "@/lib/sijil/pustaka";
 import LayoutEditor from "@/app/educator/classes/[id]/certificates/layout-editor";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 /**
  * Gaya label-butang fail (input sembunyi di dalam label; kit Button tidak
@@ -41,6 +42,7 @@ const A4_NISBAH = "841.89 / 595.28";
 const MAX_ASET = 8 * 1024 * 1024;
 
 export default function Page() {
+  const { t } = useBahasa();
   const [items, setItems] = useState<ItemPustakaApi[]>([]);
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState<string | null>(null);
@@ -64,11 +66,11 @@ export default function Page() {
     const res = await fetch("/api/admin/certificate-gallery", { headers: await authHeader() });
     const j = await res.json().catch(() => ({}));
     if (!res.ok) {
-      setMsg(j.error ?? "Could not load the gallery.");
+      setMsg(j.error ?? t("admin.certificates.loadFailed"));
       return;
     }
     setItems(j.items ?? []);
-  }, []);
+  }, [t]);
 
   useEffect(() => {
     let alive = true;
@@ -100,7 +102,7 @@ export default function Page() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not create the item.");
+        setMsg(j.error ?? t("admin.certificates.createFailed"));
         return;
       }
       setMsg(null);
@@ -126,7 +128,7 @@ export default function Page() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not update the item.");
+        setMsg(j.error ?? t("admin.certificates.updateFailed"));
         return;
       }
       setMsg(null);
@@ -148,7 +150,7 @@ export default function Page() {
       });
       const j = await res.json().catch(() => ({}));
       if (!res.ok) {
-        setMsg(j.error ?? "Could not delete the item.");
+        setMsg(j.error ?? t("admin.certificates.deleteFailed"));
         return;
       }
       setMsg(null);
@@ -168,11 +170,11 @@ export default function Page() {
   const muatNaik = async (id: string, jenis: "background" | "logo", fail: File | null) => {
     if (!fail || busy) return;
     if (fail.type !== "image/png" && fail.type !== "image/jpeg") {
-      setMsg("Only PNG and JPEG images are allowed.");
+      setMsg(t("admin.certificates.onlyPngJpeg"));
       return;
     }
     if (fail.size > MAX_ASET) {
-      setMsg("Image must be 8 MB or smaller.");
+      setMsg(t("admin.certificates.maxSize"));
       return;
     }
     setBusy(true);
@@ -184,7 +186,7 @@ export default function Page() {
       });
       const j = await tiket.json().catch(() => ({}));
       if (!tiket.ok || !j.upload_url || !j.path) {
-        setMsg(j.error ?? "Could not create the upload ticket.");
+        setMsg(j.error ?? t("admin.certificates.ticketFailed"));
         return;
       }
       const put = await fetch(j.upload_url as string, {
@@ -193,7 +195,7 @@ export default function Page() {
         body: fail,
       });
       if (!put.ok) {
-        setMsg("Could not upload the image to storage.");
+        setMsg(t("admin.certificates.uploadFailed"));
         return;
       }
       const sah = await fetch(`/api/admin/certificate-gallery/${id}/asset-finalize`, {
@@ -203,7 +205,7 @@ export default function Page() {
       });
       const j2 = await sah.json().catch(() => ({}));
       if (!sah.ok) {
-        setMsg(j2.error ?? "Could not attach the image.");
+        setMsg(j2.error ?? t("admin.certificates.attachFailed"));
         return;
       }
       setMsg(null);
@@ -216,7 +218,7 @@ export default function Page() {
   /** Buka editor susun atur item: dapatkan latar bertandatangan dahulu. */
   const bukaEditor = async (item: ItemPustakaApi) => {
     if (!item.background_path) {
-      setMsg("Upload a background image first.");
+      setMsg(t("admin.certificates.needBackground"));
       return;
     }
     const res = await fetch(`/api/admin/certificate-gallery/${item.id}/background-url`, {
@@ -224,7 +226,7 @@ export default function Page() {
     });
     const j = await res.json().catch(() => ({}));
     if (!res.ok || typeof j.url !== "string") {
-      setMsg(j.error ?? "Could not load the background image.");
+      setMsg(j.error ?? t("admin.certificates.backgroundFailed"));
       return;
     }
     setEditorLatar(j.url);
@@ -234,10 +236,10 @@ export default function Page() {
   return (
     <AdminShell>
       <PageHead
-        title="Certificates"
-        description="Published templates are visible to every educator. Free tier items can be used by Free plan classes."
+        title={t("admin.certificates.title")}
+        description={t("admin.certificates.description")}
         primaryAction={{
-          label: "New gallery template",
+          label: t("admin.certificates.newTemplate"),
           icon: <Plus className="w-4 h-4" />,
           onSelect: () => setBorang((v) => !v),
         }}
@@ -252,47 +254,47 @@ export default function Page() {
       {borang && (
         <Card className="mb-5">
           <CardHead
-            title="New gallery template"
-            subtitle="New items start unpublished with the Kuizen grid v1 layout. Upload a background PNG, adjust the layout, then publish."
+            title={t("admin.certificates.newTemplate")}
+            subtitle={t("admin.certificates.newSub")}
           />
           <div className="mt-4 space-y-4">
-            <Field label="Title" htmlFor="tajuk-templat">
+            <Field label={t("admin.certificates.fieldTitle")} htmlFor="tajuk-templat">
               <Input
                 id="tajuk-templat"
                 value={title}
                 maxLength={120}
                 onChange={(e) => setTitle(e.target.value)}
-                placeholder="Certificate of Participation"
+                placeholder={t("admin.certificates.titlePlaceholder")}
               />
             </Field>
             <div className="flex items-end gap-3 flex-wrap">
-              <Field label="Kind" htmlFor="jenis-templat" className="w-44">
+              <Field label={t("admin.certificates.fieldKind")} htmlFor="jenis-templat" className="w-44">
                 <Select
                   id="jenis-templat"
                   value={kind}
                   onChange={(e) => setKind(e.target.value as "" | "participation" | "achievement")}
                 >
-                  <option value="">None</option>
-                  <option value="participation">Participation</option>
-                  <option value="achievement">Achievement</option>
+                  <option value="">{t("admin.certificates.kindNone")}</option>
+                  <option value="participation">{t("admin.certificates.kindParticipation")}</option>
+                  <option value="achievement">{t("admin.certificates.kindAchievement")}</option>
                 </Select>
               </Field>
-              <Field label="Text tone" htmlFor="nada-teks" className="w-44">
+              <Field label={t("admin.certificates.fieldTone")} htmlFor="nada-teks" className="w-44">
                 <Select
                   id="nada-teks"
                   value={tone}
                   onChange={(e) => setTone(e.target.value as "dark" | "light")}
                 >
-                  <option value="dark">Dark text</option>
-                  <option value="light">Light text</option>
+                  <option value="dark">{t("admin.certificates.toneDark")}</option>
+                  <option value="light">{t("admin.certificates.toneLight")}</option>
                 </Select>
               </Field>
               <div className="flex gap-2 ml-auto">
                 <Button variant="outline" onClick={() => setBorang(false)}>
-                  Cancel
+                  {t("common.cancel")}
                 </Button>
                 <Button disabled={!title.trim() || busy} onClick={cipta}>
-                  Create
+                  {t("admin.certificates.create")}
                 </Button>
               </div>
             </div>
@@ -301,13 +303,13 @@ export default function Page() {
       )}
 
       {loading ? (
-        <p className="text-[14px] text-ink-faint py-8">Loading...</p>
+        <p className="text-[14px] text-ink-faint py-8">{t("common.loadingDots")}</p>
       ) : items.length === 0 ? (
         <Card>
           <EmptyState
             icon={<Award className="w-6 h-6" />}
-            title="No gallery templates"
-            text="Create one to share a design with every educator."
+            title={t("admin.certificates.emptyTitle")}
+            text={t("admin.certificates.emptyText")}
           />
         </Card>
       ) : (
@@ -324,24 +326,24 @@ export default function Page() {
                   />
                 ) : (
                   <div className="absolute inset-0 flex items-center justify-center text-[12px] text-ink-faint">
-                    No background yet
+                    {t("admin.certificates.noBackground")}
                   </div>
                 )}
                 <span className="absolute top-2 left-2">
                   {item.published ? (
                     <Badge variant="dim" warna="green">
-                      Published
+                      {t("admin.certificates.published")}
                     </Badge>
                   ) : (
                     <Badge variant="dim" warna="purple">
-                      Draft
+                      {t("admin.certificates.draft")}
                     </Badge>
                   )}
                 </span>
                 {item.free_tier && (
                   <span className="absolute top-2 right-2">
                     <Badge variant="dim" warna="green">
-                      Free tier
+                      {t("admin.certificates.freeTier")}
                     </Badge>
                   </span>
                 )}
@@ -354,16 +356,16 @@ export default function Page() {
                 </div>
                 <div className="text-[12px] text-ink-faint">
                   {item.kind === "participation"
-                    ? "Participation"
+                    ? t("admin.certificates.kindParticipation")
                     : item.kind === "achievement"
-                      ? "Achievement"
-                      : "No kind"}
+                      ? t("admin.certificates.kindAchievement")
+                      : t("admin.certificates.noKind")}
                   {" · "}
-                  {item.text_tone === "light" ? "Light text" : "Dark text"}
-                  {` · Order ${item.sort_order}`}
+                  {item.text_tone === "light" ? t("admin.certificates.toneLight") : t("admin.certificates.toneDark")}
+                  {` · ${t("admin.certificates.orderLabel", { n: item.sort_order })}`}
                 </div>
                 <div className="flex items-center gap-2 flex-wrap">
-                  <label className={LABEL_BUTANG_FAIL} title="Upload a background PNG or JPEG">
+                  <label className={LABEL_BUTANG_FAIL} title={t("admin.certificates.uploadBackground")}>
                     <input
                       type="file"
                       accept="image/png,image/jpeg"
@@ -371,9 +373,9 @@ export default function Page() {
                       disabled={busy}
                       onChange={(e) => muatNaik(item.id, "background", e.target.files?.[0] ?? null)}
                     />
-                    Background
+                    {t("admin.certificates.background")}
                   </label>
-                  <label className={LABEL_BUTANG_FAIL} title="Upload a logo PNG or JPEG">
+                  <label className={LABEL_BUTANG_FAIL} title={t("admin.certificates.uploadLogo")}>
                     <input
                       type="file"
                       accept="image/png,image/jpeg"
@@ -381,19 +383,19 @@ export default function Page() {
                       disabled={busy}
                       onChange={(e) => muatNaik(item.id, "logo", e.target.files?.[0] ?? null)}
                     />
-                    Logo
+                    {t("admin.certificates.logo")}
                   </label>
                   <Button
                     variant="outline"
                     disabled={busy || !item.background_path}
-                    title={item.background_path ? "Adjust name, QR and code positions" : "Upload a background first"}
+                    title={item.background_path ? t("admin.certificates.layoutTitle") : t("admin.certificates.uploadFirst")}
                     onClick={() => bukaEditor(item)}
                   >
-                    Edit layout
+                    {t("admin.certificates.editLayout")}
                   </Button>
                 </div>
                 <div className="flex items-center gap-3 flex-wrap text-[13px]">
-                  <label className="flex items-center gap-1.5 cursor-pointer" title="Visible to all educators">
+                  <label className="flex items-center gap-1.5 cursor-pointer" title={t("admin.certificates.visibleAll")}>
                     <input
                       type="checkbox"
                       className="h-4 w-4 accent-brand-purple"
@@ -401,9 +403,9 @@ export default function Page() {
                       disabled={busy}
                       onChange={(e) => kemas(item.id, { published: e.target.checked })}
                     />
-                    Published
+                    {t("admin.certificates.published")}
                   </label>
-                  <label className="flex items-center gap-1.5 cursor-pointer" title="Usable by Free plan classes">
+                  <label className="flex items-center gap-1.5 cursor-pointer" title={t("admin.certificates.usableFree")}>
                     <input
                       type="checkbox"
                       className="h-4 w-4 accent-brand-purple"
@@ -411,10 +413,10 @@ export default function Page() {
                       disabled={busy}
                       onChange={(e) => kemas(item.id, { free_tier: e.target.checked })}
                     />
-                    Free tier
+                    {t("admin.certificates.freeTier")}
                   </label>
-                  <label className="flex items-center gap-1.5" title="Order in the educator gallery">
-                    Order
+                  <label className="flex items-center gap-1.5" title={t("admin.certificates.orderInGallery")}>
+                    {t("admin.certificates.orderField")}
                     <Input
                       className="w-16"
                       type="number"
@@ -432,13 +434,13 @@ export default function Page() {
                     variant="outline"
                     className="text-kz-down ml-auto"
                     disabled={busy}
-                    title="Delete this gallery template (reason required)"
+                    title={t("admin.certificates.deleteTemplate")}
                     onClick={() => {
                       setPadamId(padamId === item.id ? null : item.id);
                       setAlasan("");
                     }}
                   >
-                    <Trash2 className="w-4 h-4" /> Delete
+                    <Trash2 className="w-4 h-4" /> {t("admin.delete")}
                   </Button>
                 </div>
                 {padamId === item.id && (
@@ -447,8 +449,8 @@ export default function Page() {
                       className="flex-1 min-w-[200px]"
                       value={alasan}
                       onChange={(e) => setAlasan(e.target.value)}
-                      placeholder="Reason (at least 5 characters)"
-                      aria-label="Reason for deleting this template"
+                      placeholder={t("admin.certificates.reasonPlaceholder")}
+                      aria-label={t("admin.certificates.reasonAria")}
                     />
                     <Button
                       variant="primary"
@@ -456,7 +458,7 @@ export default function Page() {
                       disabled={alasan.trim().length < 5 || busy}
                       onClick={padam}
                     >
-                      Confirm delete
+                      {t("admin.certificates.confirmDelete")}
                     </Button>
                   </div>
                 )}

@@ -230,9 +230,27 @@ export interface SasaranAudit {
   href: string | null;
 }
 
-/** Label jenis sasaran daripada target_type log. */
-export function jenisSasaran(targetType: string | null | undefined): string {
+// Label jenis sasaran versi BM (KZ-043). Kunci = target_type kecil.
+const JENIS_MS: Record<string, string> = {
+  profile: 'Pengguna',
+  user: 'Pengguna',
+  class: 'Kelas',
+  hunt: 'Aktiviti',
+  activity: 'Aktiviti',
+  challenge: 'Cabaran',
+  team: 'Pasukan',
+  submission: 'Hantaran',
+  certificate_library: 'Templat galeri',
+};
+
+/** Label jenis sasaran daripada target_type log; BM mengikut glosari KZ-043. */
+export function jenisSasaran(targetType: string | null | undefined, bahasa: 'en' | 'ms' = 'en'): string {
   const t = String(targetType || '').toLowerCase();
+  if (bahasa === 'ms') {
+    const dikenali = JENIS_MS[t];
+    if (dikenali) return dikenali;
+    return t ? t.charAt(0).toUpperCase() + t.slice(1) : 'Sasaran';
+  }
   if (t === 'profile' || t === 'user') return 'User';
   if (t === 'class') return 'Class';
   if (t === 'hunt' || t === 'activity') return 'Activity';
@@ -250,9 +268,13 @@ export function jenisSasaran(targetType: string | null | undefined): string {
  * hanya untuk sasaran yang ada halaman butiran admin. UUID penuh tidak
  * pernah dipaparkan sebagai nama.
  */
-export function sasaranAudit(r: BarisAudit, peta: PetaSasaranAudit): SasaranAudit {
+export function sasaranAudit(
+  r: BarisAudit,
+  peta: PetaSasaranAudit,
+  bahasa: 'en' | 'ms' = 'en',
+): SasaranAudit {
   const id = r.target_id || '';
-  const jenis = jenisSasaran(r.target_type);
+  const jenis = jenisSasaran(r.target_type, bahasa);
   const idPendek = id ? id.slice(0, 8) : '';
   const t = String(r.target_type || '').toLowerCase();
   let nama: string | null = null;
@@ -286,14 +308,15 @@ export function padanCarianSasaran(
   q: string,
   peta: PetaSasaranAudit,
   namaPelaku: Record<string, string | null>,
+  bahasa: 'en' | 'ms' = 'en',
 ): boolean {
   const jarum = q.trim().toLowerCase();
   if (!jarum) return true;
   if (r.target_id && r.target_id.toLowerCase().includes(jarum)) return true;
   if (r.target_id && r.target_id.slice(0, 8).toLowerCase().includes(jarum)) return true;
-  const sasaran = sasaranAudit(r, peta);
+  const sasaran = sasaranAudit(r, peta, bahasa);
   if (sasaran.nama && sasaran.nama.toLowerCase().includes(jarum)) return true;
-  if (jenisSasaran(r.target_type).toLowerCase().includes(jarum)) return true;
+  if (jenisSasaran(r.target_type, bahasa).toLowerCase().includes(jarum)) return true;
   const pelaku = r.actor_id ? (namaPelaku[r.actor_id] || '').trim() : '';
   if (pelaku && pelaku.toLowerCase().includes(jarum)) return true;
   return false;
