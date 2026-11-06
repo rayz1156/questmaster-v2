@@ -8,6 +8,8 @@ import { getServiceSupabase } from '@/lib/supabase-route';
 import { normalizeSettings } from '@/lib/arena/validate';
 import { toPublicQuestion, presenceOf } from '@/lib/arena/public';
 import { questionAccess, teamScores, coopProgress } from '@/lib/arena/modes';
+import { liveRowToArena, type LiveBankRow } from '@/lib/kuiz-bank';
+import { DEFAULT_SET_SETTINGS } from '@/lib/arena/types';
 import type {
   ArenaSession,
   ArenaSet,
@@ -66,18 +68,50 @@ export async function loadSessionByCode(svc: Svc, code: string): Promise<ArenaSe
   return data ? (data as unknown as ArenaSession) : null;
 }
 
-/** Sesi + set (tetapan dinormalkan). */
+/**
+ * Sesi + set (tetapan dinormalkan).
+ *
+ * KZ-045: sesi boleh memakan soalan daripada bank Kuiz (quiz_id, set_id
+ * null). Untuk sesi itu satu set maya dibina daripada qm_live_quizzes:
+ * tajuk kuiz menjadi tajuk set dan tetapan ialah DEFAULT_SET_SETTINGS
+ * kerana kuiz Live tiada tetapan Arena. Sesi lama (set_id) kekal seperti
+ * sebelum ini.
+ */
 export async function loadPlaySession(
   svc: Svc,
   code: string,
-): Promise<{ session: ArenaSession; set: ArenaSet } | null> {
+): Promise<{ session: ArenaSession; set: ArenaSet; quizId: string | null } | null> {
   const session = await loadSessionByCode(svc, code);
   if (!session) return null;
+
+  // Sesi bank Kuiz: set maya.
+  if (session.quiz_id) {
+    const { data: kuiz } = await svc
+      .from('qm_live_quizzes')
+      .select('id, owner_id, title, description, created_at')
+      .eq('id', session.quiz_id)
+      .maybeSingle();
+    if (!kuiz) return null;
+    const k = kuiz as unknown as {
+      id: string; owner_id: string; title: string; description: string | null; created_at: string;
+    };
+    const set: ArenaSet = {
+      id: k.id,
+      owner_id: k.owner_id,
+      title: k.title,
+      description: k.description,
+      settings: DEFAULT_SET_SETTINGS,
+      created_at: k.created_at,
+      updated_at: k.created_at,
+    };
+    return { session, set, quizId: session.quiz_id };
+  }
+
   const { data } = await svc.from('qm_arena_sets').select('*').eq('id', session.set_id).maybeSingle();
   if (!data) return null;
   const raw = data as unknown as ArenaSet & { settings: unknown };
   const set: ArenaSet = { ...raw, settings: normalizeSettings(raw.settings) };
-  return { session, set };
+  return { session, set, quizId: null };
 }
 
 /** Pemain mengikut token dalam sesi ini; null jika tiada/tidak sah. */
@@ -97,7 +131,9 @@ export async function loadPlayerByToken(
   return data ? (data as unknown as PlayerRow) : null;
 }
 
-/** Soalan set ikut order_idx kemudian created_at (termasuk data: pelayan sahaja). */
+/**
+ * Soalan set ikut order_idx kemudian created_at (termasuk data: pelayan sahaja).
+ */
 export async function orderedQuestions(svc: Svc, setId: string): Promise<ArenaQuestion[]> {
   const { data } = await svc
     .from('qm_arena_questions')
@@ -108,10 +144,48 @@ export async function orderedQuestions(svc: Svc, setId: string): Promise<ArenaQu
   return (data ?? []) as unknown as ArenaQuestion[];
 }
 
-/** Id soalan yang sudah dijawab oleh pemain. */
+/**
+ * KZ-045: soalan SESI ikut sumbernya. Sesi kuiz (quizId tidak null) membaca
+ * qm_live_questions (SEMUA jenis, dipetakan liveRowToArena, ikut order_idx;
+ * jadual itu tiada created_at). Sesi lama membaca qm_arena_questions.
+ * Kedua-dua senarai TIDAK pernah sampai kepada peserta tanpa toPublicQuestion.
+ */
+export async function soalanSesi(
+  svc: Svc,
+  quizId: string | null,
+  setId: string | null,
+): Promise<ArenaQuestion[]> {
+  if (quizId) {
+    const { data } = await svc
+      .from('qm_live_questions')
+      .select(
+        'id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points, qtype, data, hint',
+      )
+      .eq('quiz_id', quizId)
+      .order('order_idx', { ascending: true });
+    const baris = (data ?? []) as unknown as LiveBankRow[];
+    return baris.map((r) =>
+      liveRowToArena({ ...r, qtype: r.qtype || 'multiple', data: r.data ?? null, hint: r.hint ?? null }),
+    );
+  }
+  return orderedQuestions(svc, setId as string);
+}
+
+/**
+ * Id soalan yang sudah dijawab oleh pemain (KZ-045: jawapan sesi kuiz
+ * menyimpan live_question_id; jawapan sesi lama menyimpan question_id).
+ */
 export async function answeredIdsOf(svc: Svc, playerId: string): Promise<Set<string>> {
-  const { data } = await svc.from('qm_arena_answers').select('question_id').eq('player_id', playerId);
-  return new Set(((data ?? []) as unknown as { question_id: string }[]).map((r) => r.question_id));
+  const { data } = await svc
+    .from('qm_arena_answers')
+    .select('question_id, live_question_id')
+    .eq('player_id', playerId);
+  const ids = new Set<string>();
+  for (const r of (data ?? []) as unknown as { question_id: string | null; live_question_id: string | null }[]) {
+    if (r.question_id) ids.add(r.question_id);
+    if (r.live_question_id) ids.add(r.live_question_id);
+  }
+  return ids;
 }
 
 function hashStr(s: string): number {
@@ -173,7 +247,7 @@ export async function buildPlayState(
 ): Promise<PlayStateResponse> {
   const now = Date.now();
   const [qs, playersRes, answersRes, myRes] = await Promise.all([
-    orderedQuestions(svc, set.id),
+    soalanSesi(svc, session.quiz_id, session.set_id),
     svc
       .from('qm_arena_players')
       .select('id,nickname,avatar,team,pos_x,pos_y,score,last_seen_at')
@@ -181,7 +255,10 @@ export async function buildPlayState(
       .order('joined_at', { ascending: true }),
     svc.from('qm_arena_answers').select('player_id').eq('session_id', session.id).range(0, 9999),
     me
-      ? svc.from('qm_arena_answers').select('question_id,is_correct,score').eq('player_id', me.id)
+      ? svc
+          .from('qm_arena_answers')
+          .select('question_id, live_question_id, is_correct, score')
+          .eq('player_id', me.id)
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
 
@@ -191,8 +268,16 @@ export async function buildPlayState(
     counts.set(a.player_id, (counts.get(a.player_id) ?? 0) + 1);
   }
   const myAnswers: PlayStateResponse['myAnswers'] = {};
-  for (const a of (myRes.data ?? []) as unknown as { question_id: string; is_correct: boolean | null; score: number }[]) {
-    myAnswers[a.question_id] = { isCorrect: a.is_correct, score: Number(a.score) || 0 };
+  for (const a of (myRes.data ?? []) as unknown as {
+    question_id: string | null;
+    live_question_id: string | null;
+    is_correct: boolean | null;
+    score: number;
+  }[]) {
+    // KZ-045: kunci ikut lajur yang diisi; id soalan kuiz dan set sama ada
+    // unik dalam skop pemain ini (kekangan unik di pangkalan data).
+    const kunci = a.live_question_id ?? a.question_id;
+    if (kunci) myAnswers[kunci] = { isCorrect: a.is_correct, score: Number(a.score) || 0 };
   }
   const players = rows.map((r) => toPublicPlayer(r, counts.get(r.id) ?? 0, now));
   const meId = me ? me.id : null;

@@ -54,6 +54,24 @@ export async function requireSessionHost(
   const { data, error } = await svc.from('qm_arena_sessions').select('*').eq('id', sessionId).maybeSingle();
   if (error || !data) return { user, svc, session: null, set: null, response: ralatJson('Not found', 404) };
   const session = data as ArenaSession;
+
+  // KZ-045: sesi bank Kuiz (quiz_id) tiada set; hos sah ialah pencipta sesi,
+  // pemilik kuiz atau admin. Sesi lama (set_id) kekal seperti sebelum ini.
+  if (session.quiz_id) {
+    const { data: kuiz } = await svc
+      .from('qm_live_quizzes')
+      .select('owner_id')
+      .eq('id', session.quiz_id)
+      .maybeSingle();
+    const pemilikKuiz = (kuiz as { owner_id?: string } | null)?.owner_id ?? null;
+    const ok =
+      session.host_id === user.id ||
+      (pemilikKuiz !== null && pemilikKuiz === user.id) ||
+      (await isAdmin(svc, user.id));
+    if (!ok) return { user, svc, session: null, set: null, response: ralatJson('Forbidden', 403) };
+    return { user, svc, session, set: null, response: null };
+  }
+
   const { data: setRow } = await svc.from('qm_arena_sets').select('*').eq('id', session.set_id).maybeSingle();
   const set = setRow ? toArenaSet(setRow as Record<string, unknown>) : null;
   const ok = session.host_id === user.id || (set !== null && set.owner_id === user.id) || (await isAdmin(svc, user.id));

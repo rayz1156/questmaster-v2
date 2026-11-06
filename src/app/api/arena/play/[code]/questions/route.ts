@@ -8,9 +8,9 @@ import {
   answeredIdsOf,
   loadPlaySession,
   loadPlayerByToken,
-  orderedQuestions,
   playerOrder,
   playerTokenOf,
+  soalanSesi,
 } from '@/lib/arena/play-server';
 
 export const runtime = 'nodejs';
@@ -27,7 +27,11 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   const me = await loadPlayerByToken(svc, session.id, playerTokenOf(req));
   if (!me) return ralatJson('Invalid player token', 401);
 
-  const [qs, answered] = await Promise.all([orderedQuestions(svc, set.id), answeredIdsOf(svc, me.id)]);
+  // KZ-045: soalan ikut sumber sesi (kuiz atau set lama).
+  const [qs, answered] = await Promise.all([
+    soalanSesi(svc, session.quiz_id, session.set_id),
+    answeredIdsOf(svc, me.id),
+  ]);
   const ordered = playerOrder(qs, session, set, me.id);
   const access = accessFor(ordered, answered, session, set);
 

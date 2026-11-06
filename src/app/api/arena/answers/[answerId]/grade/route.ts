@@ -11,18 +11,25 @@ export const fetchCache = 'force-no-store';
 export async function PATCH(req: NextRequest, { params }: { params: { answerId: string } }) {
   const { data: ans } = await getServiceSupabase()
     .from('qm_arena_answers')
-    .select('id, session_id, player_id, question_id')
+    .select('id, session_id, player_id, question_id, live_question_id')
     .eq('id', params.answerId)
     .maybeSingle();
   if (!ans) return ralatJson('Not found', 404);
-  const row = ans as { id: string; session_id: string; player_id: string; question_id: string };
+  const row = ans as {
+    id: string; session_id: string; player_id: string;
+    question_id: string | null; live_question_id: string | null;
+  };
   const host = await requireSessionHost(req, row.session_id);
   if (host.response || !host.session || !host.user) return host.response ?? ralatJson('Not found', 404);
   const svc = host.svc;
 
   const body = (await req.json().catch(() => null)) as { isCorrect?: unknown; score?: unknown } | null;
   if (!body || typeof body.isCorrect !== 'boolean') return ralatJson('isCorrect must be a boolean', 400);
-  const { data: q } = await svc.from('qm_arena_questions').select('points').eq('id', row.question_id).maybeSingle();
+  // KZ-045: jawapan sesi kuiz merujuk qm_live_questions (live_question_id);
+  // jawapan sesi lama merujuk qm_arena_questions (question_id).
+  const { data: q } = row.live_question_id
+    ? await svc.from('qm_live_questions').select('points').eq('id', row.live_question_id).maybeSingle()
+    : await svc.from('qm_arena_questions').select('points').eq('id', row.question_id).maybeSingle();
   const points = Number((q as { points?: number } | null)?.points) || 0;
   let score = body.isCorrect ? points : 0;
   if (body.score !== undefined && body.score !== null) {

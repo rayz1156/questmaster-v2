@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import { gradeAnswer, revealFor, shouldReveal } from '@/lib/arena/grade';
+import { isGoldenChest } from '@/lib/arena/games';
 import type { AnswerResponse, ArenaAnswer, ArenaQType, GradeResult } from '@/lib/arena/types';
 import {
   accessFor,
   answeredIdsOf,
   loadPlaySession,
   loadPlayerByToken,
-  orderedQuestions,
   playerOrder,
   playerTokenOf,
   readJsonBody,
+  soalanSesi,
 } from '@/lib/arena/play-server';
 
 export const runtime = 'nodejs';
@@ -68,7 +69,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const svc = getServiceSupabase();
   const loaded = await loadPlaySession(svc, params.code);
   if (!loaded) return ralatJson('Session not found', 404);
-  const { session, set } = loaded;
+  const { session, set, quizId } = loaded;
 
   const me = await loadPlayerByToken(svc, session.id, playerTokenOf(req));
   if (!me) return ralatJson('Invalid player token', 401);
@@ -79,7 +80,13 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   if (session.ends_at && now > Date.parse(session.ends_at)) return ralatJson('Time is up', 409);
 
   const questionId = typeof body.questionId === 'string' ? body.questionId : '';
-  const [qs, answered] = await Promise.all([orderedQuestions(svc, set.id), answeredIdsOf(svc, me.id)]);
+  // KZ-045: soalan ikut sumber sesi (kuiz melalui quiz_id, set lama
+  // melalui set_id); id soalan kuiz dan id soalan set tidak berlanggar
+  // kerana kedua-duanya UUID unik.
+  const [qs, answered] = await Promise.all([
+    soalanSesi(svc, session.quiz_id, session.set_id),
+    answeredIdsOf(svc, me.id),
+  ]);
   const q = qs.find((x) => x.id === questionId);
   if (!q) return ralatJson('Question not found', 404);
   if (answered.has(q.id)) return ralatJson('Already answered', 409);
@@ -116,12 +123,20 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     if (elapsedMs !== null) opts.elapsedMs = elapsedMs;
     result = gradeAnswer(q, parsed, opts);
     stored = parsed;
+    // KZ-045 Pulau Harta Karun (KZ-047): soalan emas (isGoldenChest)
+    // menggandakan markah jawapan ini. Fungsi sama tepat dengan klien.
+    if (session.view === 'pulau' && isGoldenChest(session.id, q.id)) {
+      result = { ...result, score: Math.round(Number(result.score) || 0) * 2 };
+    }
   }
 
+  // KZ-045: jawapan sesi kuiz ditulis dengan live_question_id; sesi lama
+  // kekal dengan question_id. Semakan (salah satu mesti ada) di pangkalan data.
   const { error: insErr } = await svc.from('qm_arena_answers').insert({
     session_id: session.id,
     player_id: me.id,
-    question_id: q.id,
+    question_id: quizId ? null : q.id,
+    live_question_id: quizId ? q.id : null,
     answer: stored,
     is_correct: result.isCorrect,
     score: Math.round(Number(result.score) || 0),

@@ -19,8 +19,12 @@ export type ArenaQType = (typeof ARENA_QTYPES)[number];
 export const ARENA_MODES = ['sequencing', 'freestyle', 'round', 'team', 'coop'] as const;
 export type ArenaMode = (typeof ARENA_MODES)[number];
 
-/** list = kad soalan biasa; map = peta 2D (avatar berjalan ke objek soalan). */
-export type ArenaView = 'list' | 'map';
+/**
+ * list = kad soalan biasa; map = peta 2D (avatar berjalan ke objek soalan).
+ * KZ-045: pulau (Pulau Harta Karun, KZ-047: soalan emas markah berganda)
+ * dan hantu (Kejar Hantu, KZ-048).
+ */
+export type ArenaView = 'list' | 'map' | 'pulau' | 'hantu';
 
 export type ArenaSessionStatus = 'lobby' | 'playing' | 'ended';
 export type AnswerRevealMode = 'never' | 'incorrect_only' | 'always';
@@ -151,7 +155,13 @@ export interface ArenaSet {
 
 export interface ArenaSession {
   id: string;
-  set_id: string;
+  /**
+   * KZ-045: sesi baharu memakan soalan daripada bank Kuiz melalui quiz_id
+   * dan set_id kekal null. Sesi lama mempunyai set_id dan quiz_id null.
+   * Semak (set_id is not null) or (quiz_id is not null) di pangkalan data.
+   */
+  set_id: string | null;
+  quiz_id: string | null;
   host_id: string;
   code: string; // 6 aksara, abjad tanpa 0/O/1/I
   mode: ArenaMode;

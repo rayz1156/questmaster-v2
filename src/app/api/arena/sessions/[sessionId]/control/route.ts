@@ -26,8 +26,13 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
   const now = new Date(nowMs).toISOString();
   const patch: Partial<ArenaSession> = {};
 
+  // KZ-045: kira soalan ikut sumber sesi (kuiz melalui quiz_id, set lama
+  // melalui set_id). Arena memainkan keenam-enam jenis.
   const questionCount = async (): Promise<number> => {
-    const { count } = await svc.from('qm_arena_questions').select('id', { count: 'exact', head: true }).eq('set_id', s.set_id);
+    const src = s.quiz_id
+      ? svc.from('qm_live_questions').select('id', { count: 'exact', head: true }).eq('quiz_id', s.quiz_id)
+      : svc.from('qm_arena_questions').select('id', { count: 'exact', head: true }).eq('set_id', s.set_id);
+    const { count } = await src;
     return count ?? 0;
   };
 
