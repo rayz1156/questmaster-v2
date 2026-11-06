@@ -32,6 +32,7 @@ import {
   petakanPeti,
   pilihArahKeSasaran,
   pilihArahRawak,
+  pusatDestinasi,
   sasaranHantu,
   senaraiJubinBolehJalan,
   wrapX,
@@ -98,6 +99,17 @@ check('dalamTerowong tepi kiri', dalamTerowong(2, BARIS_TEROWONG));
 check('dalamTerowong tepi kanan', dalamTerowong(25, BARIS_TEROWONG));
 check('tengah baris terowong bukan zon perlahan', !dalamTerowong(13, BARIS_TEROWONG));
 check('baris lain bukan terowong', !dalamTerowong(2, 16));
+
+/* ===== Bahagian 3b: pusat destinasi enjin pergerakan ===== */
+
+check('pusat destinasi dari pusat jubin ke kanan', pusatDestinasi(13, 16, KANAN).x === 14 && pusatDestinasi(13, 16, KANAN).y === 16);
+check('pusat destinasi dari pusat jubin ke kiri', pusatDestinasi(13, 16, KIRI).x === 12 && pusatDestinasi(13, 16, KIRI).y === 16);
+check('pusat destinasi dari pecahan ke kanan', pusatDestinasi(13.5, 16, KANAN).x === 14);
+check('pusat destinasi dari pecahan ke kiri', pusatDestinasi(13.5, 16, KIRI).x === 13);
+check('pusat destinasi dari pecahan ke atas', pusatDestinasi(13, 15.4, ATAS).y === 15);
+check('pusat destinasi dari pecahan ke bawah', pusatDestinasi(13, 15.4, BAWAH).y === 16);
+check('pusat destinasi hampir pusat tetap ke jubin sebelah', pusatDestinasi(13.0000001, 16, KANAN).x === 14);
+check('pusat destinasi kolum 0 ke kiri (terowong)', pusatDestinasi(0, BARIS_TEROWONG, KIRI).x === -1);
 
 /* ===== Bahagian 4: jadual mod Scatter/Chase ===== */
 

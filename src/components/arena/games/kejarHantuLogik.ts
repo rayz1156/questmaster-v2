@@ -100,6 +100,24 @@ export function arahBolehDari(x: number, y: number, untukHantu = false): Arah[] 
   return URUT_KEUTAMAAN.filter((a) => bolehLalui(x + a.dx, y + a.dy, untukHantu));
 }
 
+/**
+ * Pusat jubin destinasi seterusnya sepanjang arah dari kedudukan semasa
+ * (kedudukan boleh berada antara dua pusat). Digunakan oleh enjin
+ * pergerakan pusat-ke-pusat di komponen; diuji supaya formula tidak
+ * terpesong pada jubin pecahan.
+ */
+export function pusatDestinasi(x: number, y: number, arah: Arah): Jubin {
+  const cx = Math.round(x);
+  const cy = Math.round(y);
+  let nx = cx;
+  let ny = cy;
+  if (arah.dx > 0) nx = Math.floor(x + 1e-7) + 1;
+  else if (arah.dx < 0) nx = Math.ceil(x - 1e-7) - 1;
+  if (arah.dy > 0) ny = Math.floor(y + 1e-7) + 1;
+  else if (arah.dy < 0) ny = Math.ceil(y - 1e-7) - 1;
+  return { x: nx, y: ny };
+}
+
 // --------------------------------------------------------------- terowong
 
 /**
