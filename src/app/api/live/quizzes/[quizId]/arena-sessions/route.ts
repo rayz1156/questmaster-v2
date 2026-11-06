@@ -13,6 +13,7 @@
  * Kejar Hantu KZ-048).
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { getServiceSupabase } from '@/lib/supabase-route';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import { requireQuizHost } from '@/lib/live-quiz';
 import { makeSessionCode } from '@/lib/arena/public';
@@ -46,7 +47,11 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   const teamCount = Number.isFinite(tcRaw) ? Math.min(4, Math.max(2, Math.round(tcRaw))) : 2;
 
   // Arena memainkan keenam-enam jenis; semak kewujudan soalan secara umum.
-  const { count } = await host.supa
+  // qm_arena_sessions tiada polisi RLS (semak-deny), jadi selepas semakan
+  // kebenaran requireQuizHost, bacaan dan sisipan dibuat melalui service
+  // role seperti laluan set Arena (requireSetOwner memulangkan svc).
+  const svc = getServiceSupabase();
+  const { count } = await svc
     .from('qm_live_questions')
     .select('id', { count: 'exact', head: true })
     .eq('quiz_id', params.quizId);
@@ -54,7 +59,7 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
 
   // cuba kod unik sehingga 5 kali (corak laluan sesi set Arena)
   for (let attempt = 0; attempt < 5; attempt++) {
-    const { data, error } = await host.supa
+    const { data, error } = await svc
       .from('qm_arena_sessions')
       .insert({
         quiz_id: params.quizId,
