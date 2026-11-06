@@ -31,8 +31,8 @@ import {
   senaraiPeti,
   petiTerdekatBelumDibuka,
   semuaDijawab,
-  kodKabus,
-  nyahkodKabus,
+  kodKabusPulau,
+  nyahkodKabusPulau,
   kunciKabusSesi,
 } from './pulauLogik';
 import type { GameProps } from './types';
@@ -316,7 +316,7 @@ export default function PulauHartaKarun(props: PulauProps) {
     try {
       const simpan = window.localStorage.getItem(kunciKabusSesi(code, idSaya));
       if (simpan === null) return;
-      const kabus = nyahkodKabus(peta, simpan);
+      const kabus = nyahkodKabusPulau(peta, simpan);
       if (kabus !== null) {
         // gabung: kabus simpanan dipermudahkan selepas reset pulau
         kabus.forEach((k) => kabusRef.current.add(k));
@@ -331,7 +331,7 @@ export default function PulauHartaKarun(props: PulauProps) {
     if (typeof window === 'undefined') return;
     const simpan = () => {
       try {
-        const kod = kodKabus(peta, kabusRef.current);
+        const kod = kodKabusPulau(peta, kabusRef.current);
         if (kod.length > 0 && kod.length <= HAD_SAIZ_KABUS) {
           window.localStorage.setItem(kunciKabusSesi(code, idSaya), kod);
         }
@@ -488,11 +488,13 @@ export default function PulauHartaKarun(props: PulauProps) {
       }
 
       // ---- sentuh peti: belum dijawab dan tidak berkunci
+      // (tidak berulang semasa modal soalan terbuka atau permainan dibekukan)
       const sentuhDahulu = sentuhRef.current;
       if (
-        sentuhDahulu === null ||
-        masa > sentuhDahulu.hingga ||
-        sentuhDahulu.qid !== kunciJubin(jubin.x, jubin.y)
+        bolehGerak &&
+        (sentuhDahulu === null ||
+          masa > sentuhDahulu.hingga ||
+          sentuhDahulu.qid !== kunciJubin(jubin.x, jubin.y))
       ) {
         const diSini = peti.filter(
           (p) => p.x === jubin.x && p.y === jubin.y && !p.dijawab && !p.berkunci,

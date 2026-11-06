@@ -218,3 +218,23 @@ export function nyahkodKabus(peta: PulauMapDef, s: string): Set<string> | null {
 export function kunciKabusSesi(kod: string, idPemain: string): string {
   return 'kz-pulau:' + kod + ':' + idPemain;
 }
+
+/**
+ * Nilai kabus disimpan dengan versi dan id pulau di hadapan
+ * ("v1|<id pulau>|<kod kabus>") supaya tukar pulau tidak mewarisi kabus
+ * pulau lain walaupun kedua-duanya berkongsi ruang koordinat 48x36 dan
+ * kunci localStorage yang sama.
+ */
+export function kodKabusPulau(peta: PulauMapDef, diterokai: Set<string>): string {
+  return 'v1|' + peta.id + '|' + kodKabus(peta, diterokai);
+}
+
+/** Nyahkodkan nilai kabus dengan semakan versi dan pulau; null jika tidak sepadan. */
+export function nyahkodKabusPulau(peta: PulauMapDef, s: string): Set<string> | null {
+  if (typeof s !== 'string' || !s.startsWith('v1|')) return null;
+  const selepas = s.slice(3);
+  const pemisah = selepas.indexOf('|');
+  if (pemisah < 0) return null;
+  if (selepas.slice(0, pemisah) !== peta.id) return null; // pulau lain: mula segar
+  return nyahkodKabus(peta, selepas.slice(pemisah + 1));
+}

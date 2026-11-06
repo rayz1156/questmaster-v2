@@ -40,6 +40,8 @@ import {
   semuaDijawab,
   kodKabus,
   nyahkodKabus,
+  kodKabusPulau,
+  nyahkodKabusPulau,
   kunciKabusSesi,
 } from '../src/components/arena/games/pulauLogik';
 import { isGoldenChest } from '../src/components/arena/games/emas';
@@ -379,10 +381,38 @@ check('vektor keras: ABC123/soalan-999 biasa (h=2896616689)', isGoldenChest('ABC
   check('nyahkodKabus lebih besar dari had ialah null', nyahkodKabus(petaK, besar) === null, besar.length);
   check('kunci kabus mengikut format kz-pulau:kod:id',
     kunciKabusSesi('ABC123', 'p-1') === 'kz-pulau:ABC123:p-1', kunciKabusSesi('ABC123', 'p-1'));
-  // saiz kod sebenar untuk peta penuh diterokai
+  // saiz kod sebenar untuk peta penuh diterokai (semua jubin)
   const semua = new Set<string>();
   for (let y = 0; y < petaK.height; y++) for (let x = 0; x < petaK.width; x++) semua.add(kunciJubin(x, y));
   check('kod kabus penuh masih di bawah had', kodKabus(petaK, semua).length <= HAD_SAIZ_KABUS, kodKabus(petaK, semua).length);
+}
+
+{
+  // nilai kabus sedar pulau: tukar pulau tidak mewarisi kabus pulau lain
+  // walaupun kunci localStorage sama (ruang koordinat 48x36 sama)
+  const petaB = getPulauMap('berapi');
+  const set1 = new Set<string>(['2,2', '10,10']);
+  const nilai = kodKabusPulau(petaK, set1);
+  check(
+    'kodKabusPulau berprefix v1 dan id pulau',
+    nilai.startsWith('v1|kelapa|'),
+    nilai.slice(0, 16),
+  );
+  const balik1 = nyahkodKabusPulau(petaK, nilai);
+  check(
+    'nyahkodKabusPulau bulat-balik pulau sama',
+    balik1 !== null && balik1.size === 2 && balik1.has('2,2') && balik1.has('10,10'),
+    balik1,
+  );
+  check('nyahkodKabusPulau pulau lain ialah null', nyahkodKabusPulau(petaB, nilai) === null);
+  check(
+    'nyahkodKabusPulau nilai tanpa prefix ialah null',
+    nyahkodKabusPulau(petaK, kodKabus(petaK, set1)) === null,
+  );
+  check('nyahkodKabusPulau prefix tanpa pemisah ialah null', nyahkodKabusPulau(petaK, 'v1|') === null);
+  check('nyahkodKabusPulau kabus rosak ialah null', nyahkodKabusPulau(petaK, 'v1|kelapa|x') === null);
+  const nilaiBesar = 'v1|kelapa|' + '0'.repeat(HAD_SAIZ_KABUS + 10);
+  check('nyahkodKabusPulau melebihi had saiz ialah null', nyahkodKabusPulau(petaK, nilaiBesar) === null);
 }
 
 /* ===== Bahagian 10: getPulauMap ===== */
