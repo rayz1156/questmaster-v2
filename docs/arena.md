@@ -1,6 +1,6 @@
 # Kuizen Arena
 
-Kuizen Arena ialah ciri kuiz permainan gaya ZEP QUIZ untuk Kuizen. Pendidik membina **set soalan**, kemudian membuka **sesi** dengan kod 6 aksara. Peserta menyertai tanpa akaun (nama samaran sahaja) dan menjawab soalan sama ada dalam senarai kad atau dengan berjalan di peta 2D.
+Kuizen Arena ialah ciri kuiz permainan berasaskan peta untuk Kuizen. Pendidik membina **set soalan**, kemudian membuka **sesi** dengan kod 6 aksara. Peserta menyertai tanpa akaun (nama samaran sahaja) dan menjawab soalan sama ada dalam senarai kad atau dengan berjalan di peta 2D.
 
 ## Jenis soalan (6)
 
@@ -30,7 +30,7 @@ Kunci jawapan (`qm_arena_questions.data`) **tidak pernah** dihantar kepada peser
 
 ## Peraturan kehadiran
 
-Pemain **tidak pernah dibuang** apabila terputus (pengajaran daripada ZEP). Status dikira daripada `last_seen_at`:
+Pemain **tidak pernah dibuang** apabila terputus (pengajaran penting). Status dikira daripada `last_seen_at`:
 `online` (< 20 s), `away` (< 120 s), `offline` (lebih lama). Pemain kekal dalam senarai dan markahnya kekal; sambung semula dengan `playerToken` yang sama (disimpan dalam localStorage kunci `arena:KOD`).
 
 ## Laluan API
@@ -48,6 +48,8 @@ Pendidik (header `Authorization: Bearer <token>`, pemilik set atau admin):
 | POST | `/api/arena/sessions/[sessionId]/control` | `start`, `end`, `freeze`, `unfreeze`, `next`, `prev`, `restart` (Start Together), `set_time_limit` |
 | PATCH | `/api/arena/answers/[answerId]/grade` | gred esei `{isCorrect, score?}` |
 | POST | `/api/arena/sets/[setId]/ai-generate` | jana soalan AI (tidak disimpan) |
+| GET | `/api/arena/template` | muat turun templat CSV import (tanpa auth, tiada data pengguna) |
+| POST | `/api/arena/sets/[setId]/import` | import soalan `{format, content}` (pemilik set sahaja) |
 
 Peserta (header `x-player-token`, tanpa akaun):
 
@@ -58,6 +60,49 @@ Peserta (header `x-player-token`, tanpa akaun):
 | GET | `/api/arena/play/[code]/questions` | soalan awam + `available` / `locked` |
 | POST | `/api/arena/play/[code]/answer` | `{questionId, answer, elapsedMs?, pass?}` |
 | POST | `/api/arena/play/[code]/move` | `{x, y}` (peta) |
+
+## Import soalan
+
+Pendidik boleh menambah banyak soalan sekali gus melalui tiga format, dalam bahagian
+"Import soalan" pada editor set (`/educator/arena/[setId]`).
+
+- **Templat CSV / Excel**: muat turun `GET /api/arena/template` (BOM UTF-8 supaya Excel
+  Windows membaca aksara beraksen dengan betul), isikan dalam Excel, muat naik fail
+  `.xlsx` atau `.csv` (CSV dari Excel Malaysia boleh guna pembatas `;`).
+- **Aiken**: format teks piawai Moodle, sama seperti Live Quiz. Tampal terus atau muat
+  naik fail `.txt`.
+
+Pengepala templat (padanan tidak peka huruf besar/kecil dan ruang):
+
+```
+jenis,soalan,pilihan_a,pilihan_b,pilihan_c,pilihan_d,pilihan_e,pilihan_f,jawapan,markah,masa_saat,petunjuk
+```
+
+Cara mengisi `jawapan` ikut `jenis`:
+
+| `jenis` | `jawapan` |
+|---|---|
+| `aneka` (multiple) | huruf pilihan yang betul, satu atau lebih dipisah koma (contoh `A` atau `A,C`); pilihan dalam `pilihan_a..f` |
+| `pendek` (subjective) | jawapan yang diterima, dipisah `|` (contoh `Hijau|hijau muda`) |
+| `betul_salah` (ox) | `Betul` atau `Salah` (juga `B`/`S`, `O`/`X`, `True`/`False`) |
+| `esei` (essay) | rubrik gred (pilihan; dipaparkan kepada pendidik sahaja) |
+| `padanan` (match) | diabaikan; setiap `pilihan_x` berbentuk `kiri = kanan` (2-5 pasangan) |
+| `susunan` (order) | tiada; `pilihan_a..e` dalam turutan BETUL (2-5 item) |
+
+`markah` lalai 100 (1-10000), `masa_saat` lalai 30 (5-600), `petunjuk` pilihan (teks).
+Baris kosong dilangkau; nombor baris ralat ikut baris Excel (pengepala = baris 1).
+
+Had dan tingkah laku (`POST /api/arena/sets/[setId]/import`, pemilik set atau admin):
+
+- CSV/Aiken: 500,000 aksara; xlsx: 2 MB selepas nyahkod base64; jumlah XML selepas
+  inflate dihadkan 20 MB (lindung bom zip); maksimum 200 soalan setiap import.
+- **Semua atau tiada** untuk xlsx/csv: satu baris rosak memulangkan 400
+  `{error:'Some rows are invalid.', errors:[{row,message}]}` dan TIADA soalan disisip.
+- Aiken: blok rosak dilangkau; balas `{created, skipped}`. Soalan diimport sebagai
+  `origin:'manual'`, `order_idx` bersambung selepas soalan terakhir.
+- Fail `.xlsx` dibaca oleh penghurai ZIP sendiri (`src/lib/arena/import.ts`):
+  lembaran pertama sahaja, entri dibaca dalam memori, tiada kebergantungan npm baharu.
+- Balasan hanya kiraan (`created`, `skipped`); tiada kunci jawapan keluar dari laluan ini.
 
 ## Penjanaan soalan AI
 
@@ -92,7 +137,7 @@ Pastikan nama bekas (`supabase-db`) ialah stack Supabase yang betul untuk Kuizen
 
 ## Had yang diketahui
 
-- **Tinjauan berkala (polling), bukan websocket**: keadaan dan posisi pemain dikemas kini setiap beberapa saat, jadi pergerakan di peta tidak selancar ZEP.
+- **Tinjauan berkala (polling), bukan websocket**: keadaan dan posisi pemain dikemas kini setiap beberapa saat, jadi pergerakan di peta tidak selancar permainan masa nyata sepenuhnya.
 - **Canvas 2D, bukan Phaser**: enjin peta ringkas (tiada fizik, animasi asas, dua peta sahaja).
 - Penjanaan AI tidak menyimpan soalan dan tidak menyemak fakta secara automatik; pendidik mesti menyemak setiap soalan sebelum disimpan.
 - Bonus laju hanya untuk mod `round`; esei perlu digred manual sebelum markah muktamad.

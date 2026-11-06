@@ -14,7 +14,9 @@ import type {
 
 class ApiError extends Error {
   status: number;
-  constructor(msg: string, status: number) { super(msg); this.status = status; }
+  /** Badan JSON asal balasan ralat, contoh {errors:[{row,message}]}. */
+  body: unknown;
+  constructor(msg: string, status: number, body?: unknown) { super(msg); this.status = status; this.body = body; }
 }
 
 function errText(j: unknown, status: number): string {
@@ -34,7 +36,7 @@ async function call<T>(url: string, method = 'GET', body?: unknown): Promise<T> 
   if (body !== undefined) headers['Content-Type'] = 'application/json';
   const res = await fetch(url, { method, headers, body: body !== undefined ? JSON.stringify(body) : undefined, cache: 'no-store' });
   const json: unknown = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(errText(json, res.status), res.status);
+  if (!res.ok) throw new ApiError(errText(json, res.status), res.status, json);
   return json as T;
 }
 
@@ -84,6 +86,13 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
   const [aiPreview, setAiPreview] = useState<ArenaQuestionInput[]>([]);
   const [aiPicked, setAiPicked] = useState<boolean[]>([]);
   const [aiInfo, setAiInfo] = useState<string | null>(null);
+
+  // import soalan (CSV templat, xlsx, Aiken)
+  const [impBusy, setImpBusy] = useState(false);
+  const [impMsg, setImpMsg] = useState<string | null>(null);
+  const [impErr, setImpErr] = useState<string | null>(null);
+  const [impRows, setImpRows] = useState<{ row: number; message: string }[] | null>(null);
+  const [aikenText, setAikenText] = useState('');
 
   // mula sesi
   const [mode, setMode] = useState<ArenaMode>('sequencing');
@@ -183,6 +192,42 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
       setAiPreview([]); setAiPicked([]);
       setAiInfo(`${r.questions.length} soalan disimpan.`);
     } catch (e) { setAiError(msg(e)); } finally { setAiBusy(false); }
+  }
+
+  // import soalan (KZ-044): xlsx sebagai base64, csv/aiken sebagai teks
+  async function doImport(format: 'xlsx' | 'csv' | 'aiken', content: string) {
+    setImpBusy(true); setImpErr(null); setImpMsg(null); setImpRows(null);
+    try {
+      const r = await call<{ created: number; skipped: number }>(`/api/arena/sets/${setId}/import`, 'POST', { format, content });
+      setImpMsg(r.created + ' soalan ditambah' + (r.skipped ? `, ${r.skipped} blok Aiken dilangkau` : '') + '.');
+      setAikenText('');
+      await load(); // muat semula senarai soalan
+    } catch (e) {
+      const raw = e instanceof ApiError ? e.body : null;
+      const errs = raw && typeof raw === 'object' && Array.isArray((raw as { errors?: unknown }).errors)
+        ? ((raw as { errors: { row: number; message: string }[] }).errors)
+        : null;
+      if (errs && errs.length > 0) setImpRows(errs);
+      else setImpErr(msg(e));
+    } finally { setImpBusy(false); }
+  }
+
+  async function importFile(f: File) {
+    if (f.size > 2 * 1024 * 1024) { setImpErr('Fail melebihi 2 MB.'); return; }
+    if (/\.xlsx$/i.test(f.name)) {
+      // .xlsx dibaca sebagai ArrayBuffer lalu base64 (bukan teks)
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let bin = '';
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      await doImport('xlsx', btoa(bin));
+    } else {
+      await doImport('csv', await f.text());
+    }
+  }
+
+  async function importAikenFile(f: File) {
+    if (f.size > 2 * 1024 * 1024) { setImpErr('Fail melebihi 2 MB.'); return; }
+    setAikenText(await f.text());
   }
 
   async function startSession() {
@@ -325,6 +370,62 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
             </li>
           ))}
         </ol>
+      </section>
+
+      {/* import soalan */}
+      <section className={card + ' space-y-3'}>
+        <h2 className="font-semibold text-slate-800">Import soalan</h2>
+        <p className="text-sm text-slate-600">
+          Muat turun templat di bawah, isikan dalam Excel, kemudian muat naik fail .xlsx atau .csv yang sama.
+          Templat menyertakan satu contoh bagi setiap jenis. Maksimum 200 soalan setiap import.
+        </p>
+        <ul className="grid gap-1 text-xs text-slate-500 sm:grid-cols-2">
+          <li><b>aneka</b>: pilihan dalam pilihan_a dan seterusnya; jawapan = huruf atau huruf dipisah koma (contoh A,C)</li>
+          <li><b>pendek</b>: jawapan yang diterima dipisah dengan | (contoh Hijau|hijau muda)</li>
+          <li><b>betul_salah</b>: jawapan Betul atau Salah (juga B/S, O/X, True/False)</li>
+          <li><b>esei</b>: jawapan = rubrik gred (pilihan)</li>
+          <li><b>padanan</b>: setiap pilihan berbentuk kiri = kanan (2 hingga 5 pasangan)</li>
+          <li><b>susunan</b>: pilihan_a hingga pilihan_e dalam turutan yang betul (2 hingga 5 item)</li>
+        </ul>
+        <div className="flex flex-wrap items-center gap-3 text-sm">
+          <a href="/api/arena/template" className="text-indigo-600 hover:underline">Muat turun templat Excel</a>
+          <label className={btn + ' cursor-pointer'}>
+            {impBusy ? 'Sedang mengimport...' : 'Muat naik Excel / CSV'}
+            <input type="file" accept=".xlsx,.csv" className="hidden" disabled={impBusy}
+              onChange={(e) => { const f = e.currentTarget.files?.[0] ?? null; e.currentTarget.value = ''; if (f) void importFile(f); }} />
+          </label>
+        </div>
+
+        <div className="space-y-2 rounded-lg bg-slate-50 p-3 text-sm">
+          <p className="font-medium text-slate-700">Teks Aiken</p>
+          <p className="text-xs text-slate-500">Contoh format: satu blok bagi setiap soalan, baris kosong memisahkan blok.</p>
+          <pre className="overflow-x-auto rounded bg-white p-2 text-xs text-slate-600 ring-1 ring-slate-200">{'Berapakah 2 + 2?\nA. 3\nB. 4\nANSWER: B'}</pre>
+          <textarea className={inputCls} rows={4} placeholder="Tampal soalan format Aiken di sini"
+            value={aikenText} onChange={(e) => setAikenText(e.target.value)} />
+          <div className="flex flex-wrap gap-2">
+            <label className={smallBtn + ' cursor-pointer font-semibold'}>
+              Muat naik fail Aiken (.txt)
+              <input type="file" accept=".txt,.text" className="hidden" disabled={impBusy}
+                onChange={(e) => { const f = e.currentTarget.files?.[0] ?? null; e.currentTarget.value = ''; if (f) void importAikenFile(f); }} />
+            </label>
+            <button type="button" className={btn} disabled={impBusy || !aikenText.trim()} onClick={() => void doImport('aiken', aikenText)}>
+              Import Aiken
+            </button>
+          </div>
+        </div>
+
+        {impMsg && <p className="rounded-lg bg-emerald-50 px-3 py-2 text-sm text-emerald-700">{impMsg}</p>}
+        {impErr && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{impErr}</p>}
+        {impRows && (
+          <div className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">
+            <p className="font-medium">Tiada soalan diimport. Baiki baris berikut dan muat naik semula:</p>
+            <ul className="mt-1 list-disc space-y-0.5 pl-5">
+              {impRows.map((r, i) => (
+                <li key={i}>Baris {r.row}: {r.message}</li>
+              ))}
+            </ul>
+          </div>
+        )}
       </section>
 
       {/* AI */}
