@@ -21,6 +21,24 @@ export const fetchCache = 'force-no-store';
 /** Panjang maksimum rentetan base64 yang diterima sebelum nyahkod (2 MB -> ~2.8 juta aksara). */
 const BASE64_MAX_CHARS = Math.ceil((ARENA_XLSX_MAX_BYTES / 3) * 4) + 16;
 
+/** Baca badan permintaan sebagai teks; null jika melebihi `max` bait (juga untuk chunked). */
+async function bacaBerhad(req: NextRequest, max: number): Promise<string | null> {
+  const panjang = Number(req.headers.get('content-length') || 0);
+  if (panjang > max) return null;
+  const reader = req.body?.getReader();
+  if (!reader) return '';
+  const cebisan: Buffer[] = [];
+  let jumlah = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    jumlah += value.byteLength;
+    if (jumlah > max) { await reader.cancel(); return null; }
+    cebisan.push(Buffer.from(value));
+  }
+  return Buffer.concat(cebisan).toString('utf8');
+}
+
 /**
  * POST /api/arena/sets/[setId]/import
  * Badan: {format: 'xlsx'|'csv'|'aiken', content: string}.
@@ -36,7 +54,11 @@ export async function POST(req: NextRequest, { params }: { params: { setId: stri
   const own = await requireSetOwner(req, params.setId);
   if (own.response || !own.set) return own.response ?? ralatJson('Not found', 404);
 
-  const body = (await req.json().catch(() => null)) as { format?: unknown; content?: unknown } | null;
+  // KZ-044 kzsec SED-02: had saiz badan SEBELUM JSON dihurai (nginx membenarkan 50 MB)
+  const teks = await bacaBerhad(req, BASE64_MAX_CHARS + 4096);
+  if (teks === null) return ralatJson('That Excel file is too large. The limit is 2 MB.', 413);
+  let body: { format?: unknown; content?: unknown } | null = null;
+  try { body = JSON.parse(teks) as { format?: unknown; content?: unknown } | null; } catch { body = null; }
   if (!body || typeof body !== 'object') return ralatJson('Invalid body', 400);
   const format = body.format;
   if (typeof body.content !== 'string' || !body.content.trim()) {
