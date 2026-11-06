@@ -262,8 +262,11 @@ function lukisPeti(
 // ---------------------------------------------------------------- komponen
 
 export default function PulauHartaKarun(props: PulauProps) {
-  const { me, questions, frozen, resetSeq, paused, powerUp, onTouchQuestion, onMove } = props;
-  const { sessionId, code, mapId, players, meX, meY } = props;
+  // onTouchQuestion, onMove, sessionId dan players dibaca melalui semasaRef
+  // dalam gelung rAF supaya props baharu sentiasa dipakai tanpa memulakan
+  // semula gelung pada setiap render.
+  const { me, questions, frozen, resetSeq, paused, powerUp } = props;
+  const { code, mapId, meX, meY } = props;
 
   const peta: PulauMapDef = getPulauMap(mapId);
 
@@ -300,7 +303,7 @@ export default function PulauHartaKarun(props: PulauProps) {
     laluanRef.current = [];
     // penerokaan milik pulau: tukar pulau mula dengan kabus kosong
     kabusRef.current = new Set<string>();
-  }, [peta.id, idSaya, meX, meY]);
+  }, [peta, idSaya, meX, meY]);
 
   // ------ Start Together (resetSeq): kembali ke titik mula, kabus DIKEKALKAN
   useEffect(() => {
