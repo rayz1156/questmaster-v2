@@ -550,28 +550,47 @@ export default function KejarHantu(props: GameProps) {
       const k = st.kuizi;
       const px = k.x * T + T / 2;
       const py = k.y * T + T / 2;
-      const r = T * 0.45;
-      const sudut = Math.atan2(k.arah.dy, k.arah.dx);
-      const buka = k.bergerak ? 0.14 + 0.22 * Math.abs(Math.sin(t * 12)) : 0.1;
-      ctx.fillStyle = '#fbbf24';
+      // Maskot Kuizen sendiri: badan bulat ungu yang melantun, topi graduan dan
+      // mata yang memandang arah gerak. Sengaja TIADA bentuk baji mulut.
+      const r = T * 0.44;
+      const lantun = k.bergerak ? Math.abs(Math.sin(t * 10)) * r * 0.12 : 0;
+      const by = py - lantun;
+      ctx.fillStyle = '#7c3aed';
       ctx.beginPath();
-      ctx.moveTo(px, py);
-      ctx.arc(px, py, r, sudut + buka, sudut - buka + Math.PI * 2);
+      ctx.ellipse(px, by, r * (1 + lantun / (r * 2)), r * (1 - lantun / (r * 2)), 0, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.fillStyle = '#a78bfa';
+      ctx.beginPath();
+      ctx.arc(px - r * 0.35, by - r * 0.35, r * 0.22, 0, Math.PI * 2);
+      ctx.fill();
+      // topi graduan
+      const topY = by - r * 0.95;
+      ctx.fillStyle = '#111827';
+      ctx.beginPath();
+      ctx.moveTo(px - r * 0.85, topY);
+      ctx.lineTo(px, topY - r * 0.35);
+      ctx.lineTo(px + r * 0.85, topY);
+      ctx.lineTo(px, topY + r * 0.35);
       ctx.closePath();
       ctx.fill();
-      // mata
-      const mx = -k.arah.dy;
-      const my = k.arah.dx;
-      ctx.fillStyle = '#1f2937';
+      ctx.strokeStyle = '#facc15';
+      ctx.lineWidth = Math.max(1, T * 0.06);
+      ctx.beginPath();
+      ctx.moveTo(px, topY);
+      ctx.lineTo(px + r * 0.6, topY + r * 0.15);
+      ctx.lineTo(px + r * 0.6, topY + r * 0.55);
+      ctx.stroke();
+      // mata putih dengan anak mata ikut arah
       for (const sisi of [-1, 1]) {
+        const ex = px + sisi * r * 0.36;
+        const ey = by - r * 0.05;
+        ctx.fillStyle = '#ffffff';
         ctx.beginPath();
-        ctx.arc(
-          px + mx * sisi * r * 0.35 + k.arah.dx * r * 0.2,
-          py + my * sisi * r * 0.35 + k.arah.dy * r * 0.2,
-          r * 0.13,
-          0,
-          Math.PI * 2,
-        );
+        ctx.arc(ex, ey, r * 0.27, 0, Math.PI * 2);
+        ctx.fill();
+        ctx.fillStyle = '#1f2937';
+        ctx.beginPath();
+        ctx.arc(ex + k.arah.dx * r * 0.12, ey + k.arah.dy * r * 0.12, r * 0.13, 0, Math.PI * 2);
         ctx.fill();
       }
     };
@@ -598,7 +617,7 @@ export default function KejarHantu(props: GameProps) {
       }
       // badan: kubah atas + bawah beralun
       const kelip = st.masaKuasa > 0 && st.masaKuasa < MASA_KELIP && Math.sin(t * 14) > 0;
-      const warna = h.gelisah ? (kelip ? '#e5e7eb' : '#2563eb') : WARNA_HANTU[i] ?? '#ef4444';
+      const warna = h.gelisah ? (kelip ? '#fde68a' : '#14b8a6') : WARNA_HANTU[i] ?? '#ef4444';
       ctx.fillStyle = warna;
       ctx.beginPath();
       const kubahY = py - r * 0.1;
