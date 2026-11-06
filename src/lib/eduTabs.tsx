@@ -31,6 +31,7 @@ import {
   MailPlus,
   User as UserIcon,
   Bot,
+  Gamepad2,
 } from "lucide-react";
 
 export type EduTab = {
@@ -62,6 +63,12 @@ export const EDU_TABS: EduTab[] = [
     label: "Live Quiz",
     group: "Teaching",
     icon: <Radio className="w-5 h-5" />,
+  },
+  {
+    href: "/educator/arena",
+    label: "Arena",
+    group: "Teaching",
+    icon: <Gamepad2 className="w-5 h-5" />,
   },
   {
     href: "/educator/ai-rooms",
