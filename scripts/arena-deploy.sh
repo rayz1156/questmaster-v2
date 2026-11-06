@@ -21,8 +21,12 @@ if [ -n "$(git status --porcelain)" ]; then echo "PRODUKSI ada perubahan belum c
 ASAL=$(git rev-parse HEAD)
 git merge --ff-only feat/arena || { echo "Tidak boleh fast-forward; berhenti"; exit 1; }
 
-echo "== 3. Semak jenis"
-if ! npx tsc --noEmit; then
+echo "== 3. Semak jenis (log: /tmp/arena-prod-tsc.log)"
+# .next/types lama boleh merujuk laluan yang sudah dipadam dan menggagalkan tsc;
+# ia hanya untuk semakan jenis dan dijana semula oleh next build.
+rm -rf .next/types
+if ! npx tsc --noEmit > /tmp/arena-prod-tsc.log 2>&1; then
+  grep "error TS" /tmp/arena-prod-tsc.log | head -20
   echo "TSC GAGAL: undur ke $ASAL"; git reset -q --hard "$ASAL"; exit 1
 fi
 
