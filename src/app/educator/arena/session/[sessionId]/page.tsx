@@ -51,6 +51,8 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   ended: { label: 'Tamat', cls: 'bg-rose-100 text-rose-700' },
 };
 const MODE_LABEL: Record<string, string> = { sequencing: 'Ikut turutan', freestyle: 'Bebas', round: 'Pusingan (serentak)', team: 'Pasukan', coop: 'Kerjasama' };
+// KZ-046: label cara main untuk setiap paparan sesi Arena.
+const VIEW_LABEL: Record<string, string> = { list: 'Senarai', map: 'Peta 2D', pulau: 'Pulau Harta Karun', hantu: 'Kejar Hantu' };
 const card = 'rounded-xl border border-slate-200 bg-white p-4 shadow-sm';
 const ctl = 'rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-40';
 
@@ -179,11 +181,12 @@ export default function ArenaHostPage({ params }: { params: { sessionId: string 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <Link href={'/educator/arena/' + data.set.id} className="text-sm text-indigo-600 hover:underline">← {data.set.title}</Link>
+        {/* KZ-046: tab Arena dibuang; kembali ke senarai Kuiz, bukan set lama. */}
+        <Link href={'/educator/live'} className="text-sm text-indigo-600 hover:underline">← {data.set.title}</Link>
         <div className="flex items-center gap-2 text-sm">
           <span className={`rounded-full px-3 py-1 font-medium ${st.cls}`}>{st.label}</span>
           {s.frozen && <span className="rounded-full bg-sky-100 px-3 py-1 font-medium text-sky-700">Dibekukan</span>}
-          <span className="text-slate-500">{MODE_LABEL[s.mode] ?? s.mode} · {s.view === 'map' ? 'Peta 2D' : 'Senarai'}</span>
+          <span className="text-slate-500">{MODE_LABEL[s.mode] ?? s.mode} · {VIEW_LABEL[s.view] ?? 'Senarai'}</span>
         </div>
       </div>
       {err && <p className="rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{err}</p>}
