@@ -2,7 +2,7 @@
  * Kuizen Arena: kontrak jenis bersama (gaya ZEP QUIZ, dibina semula untuk Kuizen).
  *
  * Fail ini ialah KONTRAK. Pelayan (grade/validate/public/modes), UI pendidik,
- * UI peserta, enjin peta dan penjana AI semuanya mengimport daripada sini.
+ * UI peserta dan enjin peta semuanya mengimport daripada sini.
  * Jangan ubah nama atau bentuk tanpa mengemas kini semua pengguna.
  *
  * Keselamatan: `data` soalan mengandungi kunci jawapan. Ia TIDAK boleh sampai

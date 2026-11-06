@@ -6,9 +6,9 @@ import { useRouter } from 'next/navigation';
 import { supabase } from '@/lib/supabase';
 import QuestionEditor, { QTYPE_LABEL } from '@/components/arena/QuestionEditor';
 import { ARENA_MAPS } from '@/lib/arena/maps';
-import { ARENA_QTYPES, DEFAULT_SET_SETTINGS } from '@/lib/arena/types';
+import { DEFAULT_SET_SETTINGS } from '@/lib/arena/types';
 import type {
-  AnswerRevealMode, ArenaMode, ArenaQType, ArenaQuestion, ArenaQuestionInput,
+  AnswerRevealMode, ArenaMode, ArenaQuestion, ArenaQuestionInput,
   ArenaSession, ArenaSet, ArenaSetSettings, ArenaView,
 } from '@/lib/arena/types';
 
@@ -71,19 +71,6 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
   const [settings, setSettings] = useState<ArenaSetSettings>(DEFAULT_SET_SETTINGS);
   const [savingSet, setSavingSet] = useState(false);
   const [editing, setEditing] = useState<string | null>(null); // id soalan atau 'new'
-
-  // AI
-  const [aiTopic, setAiTopic] = useState('');
-  const [aiSource, setAiSource] = useState('');
-  const [aiCount, setAiCount] = useState(5);
-  const [aiTypes, setAiTypes] = useState<ArenaQType[]>(['multiple', 'ox', 'subjective']);
-  const [aiLang, setAiLang] = useState<'ms' | 'en'>('ms');
-  const [aiDiff, setAiDiff] = useState<'mudah' | 'sederhana' | 'sukar'>('sederhana');
-  const [aiBusy, setAiBusy] = useState(false);
-  const [aiError, setAiError] = useState<string | null>(null);
-  const [aiPreview, setAiPreview] = useState<ArenaQuestionInput[]>([]);
-  const [aiPicked, setAiPicked] = useState<boolean[]>([]);
-  const [aiInfo, setAiInfo] = useState<string | null>(null);
 
   // mula sesi
   const [mode, setMode] = useState<ArenaMode>('sequencing');
@@ -153,36 +140,6 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
     try {
       await call(`/api/arena/sets/${setId}/questions`, 'PUT', { order: next.map((q) => q.id) });
     } catch (e) { setError(msg(e)); void load(); }
-  }
-
-  async function generate() {
-    if (!aiTopic.trim()) { setAiError('Masukkan topik.'); return; }
-    setAiBusy(true); setAiError(null); setAiInfo(null); setAiPreview([]);
-    try {
-      const r = await call<{ questions: ArenaQuestionInput[]; model: string; rejected: number }>(
-        `/api/arena/sets/${setId}/ai-generate`, 'POST',
-        { topic: aiTopic.trim(), sourceText: aiSource.trim() || undefined, count: Math.min(20, Math.max(1, aiCount)), types: aiTypes, language: aiLang, difficulty: aiDiff },
-      );
-      setAiPreview(r.questions);
-      setAiPicked(r.questions.map(() => true));
-      setAiInfo(`${r.questions.length} soalan dijana oleh ${r.model}${r.rejected ? ` (${r.rejected} ditolak kerana tidak sah)` : ''}.`);
-    } catch (e) {
-      if (e instanceof ApiError && e.status === 503) {
-        setAiError('Penjanaan AI belum dikonfigurasi pada pelayan (ANTHROPIC_API_KEY belum ditetapkan). Sila hubungi pentadbir. ' + e.message);
-      } else setAiError(msg(e));
-    } finally { setAiBusy(false); }
-  }
-
-  async function saveAi() {
-    const chosen = aiPreview.filter((_, i) => aiPicked[i]);
-    if (chosen.length === 0) return;
-    setAiBusy(true); setAiError(null);
-    try {
-      const r = await call<{ questions: ArenaQuestion[] }>(`/api/arena/sets/${setId}/questions`, 'POST', { questions: chosen });
-      setQuestions((prev) => [...prev, ...r.questions]);
-      setAiPreview([]); setAiPicked([]);
-      setAiInfo(`${r.questions.length} soalan disimpan.`);
-    } catch (e) { setAiError(msg(e)); } finally { setAiBusy(false); }
   }
 
   async function startSession() {
@@ -298,7 +255,7 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
         </div>
         {editing === 'new' && <QuestionEditor onSave={addQuestion} onCancel={() => setEditing(null)} />}
         {questions.length === 0 && editing !== 'new' && (
-          <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">Belum ada soalan. Tambah secara manual atau jana dengan AI.</p>
+          <p className="rounded-xl border border-dashed border-slate-300 p-6 text-center text-sm text-slate-500">Belum ada soalan. Tekan "Tambah soalan" untuk mula.</p>
         )}
         <ol className="space-y-2">
           {questions.map((q, i) => (
@@ -310,7 +267,6 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
                   <span className="mt-0.5 w-6 text-right text-sm font-semibold text-slate-400">{i + 1}</span>
                   <div className="min-w-0 flex-1">
                     <span className="mr-2 inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-xs font-medium text-indigo-700">{QTYPE_LABEL[q.type]}</span>
-                    {q.origin === 'ai' && <span className="mr-2 inline-block rounded-full bg-fuchsia-100 px-2 py-0.5 text-xs text-fuchsia-700">AI</span>}
                     <span className="text-xs text-slate-500">{q.points} mata · {q.time_limit_sec}s</span>
                     <p className="mt-1 break-words text-sm text-slate-800">{q.prompt}</p>
                   </div>
@@ -325,63 +281,6 @@ export default function ArenaSetEditorPage({ params }: { params: { setId: string
             </li>
           ))}
         </ol>
-      </section>
-
-      {/* AI */}
-      <section className={card + ' space-y-3 border-fuchsia-200 bg-fuchsia-50/30'}>
-        <h2 className="font-semibold text-slate-800">Jana dengan AI (Claude)</h2>
-        <input className={inputCls} placeholder="Topik, cth. Fotosintesis" value={aiTopic} onChange={(e) => setAiTopic(e.target.value)} />
-        <textarea className={inputCls} rows={3} placeholder="Teks sumber (pilihan): tampal nota atau petikan" value={aiSource} onChange={(e) => setAiSource(e.target.value)} />
-        <div className="grid gap-3 text-sm sm:grid-cols-3">
-          <label>Bilangan (1-20)
-            <input type="number" min={1} max={20} className={inputCls} value={aiCount} onChange={(e) => setAiCount(Number(e.target.value) || 1)} />
-          </label>
-          <label>Bahasa
-            <select className={inputCls} value={aiLang} onChange={(e) => setAiLang(e.target.value as 'ms' | 'en')}>
-              <option value="ms">Bahasa Melayu</option>
-              <option value="en">English</option>
-            </select>
-          </label>
-          <label>Kesukaran
-            <select className={inputCls} value={aiDiff} onChange={(e) => setAiDiff(e.target.value as 'mudah' | 'sederhana' | 'sukar')}>
-              <option value="mudah">Mudah</option>
-              <option value="sederhana">Sederhana</option>
-              <option value="sukar">Sukar</option>
-            </select>
-          </label>
-        </div>
-        <div className="flex flex-wrap gap-3 text-sm">
-          {ARENA_QTYPES.map((t) => (
-            <label key={t} className="flex items-center gap-1">
-              <input type="checkbox" checked={aiTypes.includes(t)}
-                onChange={(e) => setAiTypes((prev) => (e.target.checked ? [...prev, t] : prev.filter((x) => x !== t)))} />
-              {QTYPE_LABEL[t]}
-            </label>
-          ))}
-        </div>
-        <button type="button" className="rounded-lg bg-fuchsia-600 px-4 py-2 text-sm font-semibold text-white hover:bg-fuchsia-700 disabled:opacity-50"
-          disabled={aiBusy || aiTypes.length === 0} onClick={() => void generate()}>{aiBusy ? 'Sedang menjana...' : 'Jana soalan'}</button>
-        {aiError && <p className="rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-800">{aiError}</p>}
-        {aiInfo && <p className="text-sm text-slate-600">{aiInfo}</p>}
-        {aiPreview.length > 0 && (
-          <div className="space-y-2">
-            <ul className="space-y-2">
-              {aiPreview.map((q, i) => (
-                <li key={i} className="flex items-start gap-2 rounded-lg bg-white p-3 ring-1 ring-slate-200">
-                  <input type="checkbox" className="mt-1" checked={aiPicked[i] ?? false}
-                    onChange={(e) => setAiPicked((p) => p.map((v, j) => (j === i ? e.target.checked : v)))} />
-                  <div className="text-sm">
-                    <span className="mr-2 rounded-full bg-indigo-100 px-2 py-0.5 text-xs text-indigo-700">{QTYPE_LABEL[q.type]}</span>
-                    {q.prompt}
-                  </div>
-                </li>
-              ))}
-            </ul>
-            <button type="button" className={btn} disabled={aiBusy || !aiPicked.some(Boolean)} onClick={() => void saveAi()}>
-              Simpan yang dipilih ({aiPicked.filter(Boolean).length})
-            </button>
-          </div>
-        )}
       </section>
     </div>
   );

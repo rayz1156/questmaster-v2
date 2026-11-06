@@ -47,7 +47,6 @@ Pendidik (header `Authorization: Bearer <token>`, pemilik set atau admin):
 | GET | `/api/arena/sessions/[sessionId]` | papan pemuka hos (pemain, jawapan, pasukan, coop) |
 | POST | `/api/arena/sessions/[sessionId]/control` | `start`, `end`, `freeze`, `unfreeze`, `next`, `prev`, `restart` (Start Together), `set_time_limit` |
 | PATCH | `/api/arena/answers/[answerId]/grade` | gred esei `{isCorrect, score?}` |
-| POST | `/api/arena/sets/[setId]/ai-generate` | jana soalan AI (tidak disimpan) |
 
 Peserta (header `x-player-token`, tanpa akaun):
 
@@ -58,18 +57,6 @@ Peserta (header `x-player-token`, tanpa akaun):
 | GET | `/api/arena/play/[code]/questions` | soalan awam + `available` / `locked` |
 | POST | `/api/arena/play/[code]/answer` | `{questionId, answer, elapsedMs?, pass?}` |
 | POST | `/api/arena/play/[code]/move` | `{x, y}` (peta) |
-
-## Penjanaan soalan AI
-
-`POST /api/arena/sets/[setId]/ai-generate` dengan badan:
-`{topic, sourceText?, count? (1-20, lalai 10), types?, language? ('ms'|'en', lalai 'ms'), difficulty? ('mudah'|'sederhana'|'sukar')}`.
-
-- Memanggil Claude Messages API (`fetch` biasa, tiada SDK). Model lalai `claude-sonnet-5-5`, effort `low`, had masa 60 s.
-- `sourceText` (dipotong kepada ~12,000 aksara) menjadi satu-satunya sumber fakta.
-- Bahasa Melayu ikut gaya DBP; perkataan Bahasa Indonesia dilarang dalam arahan sistem.
-- Setiap soalan disahkan dengan `validateQuestion`; yang gagal dikira dalam `rejected`. Kunci pilihan/padanan/turutan dijana semula supaya tidak membocorkan jawapan.
-- Respons: `{questions, model, rejected}`. Soalan **tidak disimpan**; UI pendidik menyemak dahulu lalu menghantar ke `/questions`.
-- Tiada kunci API: 503 `AI generation not configured: set ANTHROPIC_API_KEY`. Kegagalan lain: 502 (sebab dicatat dalam log pelayan).
 
 ## Pangkalan data
 
@@ -83,16 +70,8 @@ docker exec -i supabase-db psql -U supabase_admin -d postgres < supabase/migrati
 
 Pastikan nama bekas (`supabase-db`) ialah stack Supabase yang betul untuk Kuizen sebelum menjalankannya.
 
-## Pemboleh ubah persekitaran
-
-| Nama | Wajib | Keterangan |
-|---|---|---|
-| `ANTHROPIC_API_KEY` | Untuk AI sahaja | Kunci Claude API. Tanpanya, penjanaan AI memulangkan 503; ciri lain berfungsi seperti biasa. |
-| `ARENA_AI_MODEL` | Tidak | Tukar model AI (lalai `claude-sonnet-5-5`). |
-
 ## Had yang diketahui
 
 - **Tinjauan berkala (polling), bukan websocket**: keadaan dan posisi pemain dikemas kini setiap beberapa saat, jadi pergerakan di peta tidak selancar ZEP.
 - **Canvas 2D, bukan Phaser**: enjin peta ringkas (tiada fizik, animasi asas, dua peta sahaja).
-- Penjanaan AI tidak menyimpan soalan dan tidak menyemak fakta secara automatik; pendidik mesti menyemak setiap soalan sebelum disimpan.
 - Bonus laju hanya untuk mod `round`; esei perlu digred manual sebelum markah muktamad.
