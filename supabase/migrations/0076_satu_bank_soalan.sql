@@ -340,4 +340,454 @@ grant execute on function public.qm_race_serve(uuid) to service_role;
 grant execute on function public.qm_race_start(uuid) to service_role;
 grant execute on function public.qm_boss_start(uuid) to service_role;
 
+-- ---------------------------------------------------------------------------
+-- Pembetulan PM: qm_insights_kelas (0051) hanya mengira soalan yang dimainkan
+-- enjin Live. Salinan TEPAT definisi production (pg_get_functiondef, 7 Nov
+-- 2026) dengan penapis serasi pada CTE mata_kuiz dan soalan_kelas, supaya
+-- jumlah markah kuiz (penyebut peratus) tidak termasuk soalan jenis Arena
+-- yang tidak dimainkan dalam Live.
+-- ---------------------------------------------------------------------------
+CREATE OR REPLACE FUNCTION public.qm_insights_kelas(p_class_id uuid)
+ RETURNS jsonb
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_result jsonb;
+BEGIN
+  IF p_class_id IS NULL THEN
+    RAISE EXCEPTION 'class_id required';
+  END IF;
+
+  IF NOT public.qm_boleh_urus_insights(p_class_id) THEN
+    RAISE EXCEPTION 'Forbidden';
+  END IF;
+
+  WITH ahli AS (
+    SELECT cm.user_id AS uid_ahli, p.display_name AS nama, cm.joined_at AS sertai
+    FROM public.qm_class_members cm
+    JOIN public.qm_profiles p ON p.id = cm.user_id
+    WHERE cm.class_id = p_class_id
+  ),
+  markah AS (
+    SELECT s.user_id AS uid, s.task_score, s.live_score, s.adjustment_score,
+           s.total_score, s.live_sessions
+    FROM public.qm_class_individual_scores s
+    WHERE s.class_id = p_class_id
+  ),
+  sesi_kelas AS (
+    SELECT ls.id AS sesi, ls.quiz_id AS kuiz, ls.status AS status_sesi
+    FROM public.qm_live_sessions ls
+    JOIN public.qm_live_quizzes lq ON lq.id = ls.quiz_id
+    WHERE lq.class_id = p_class_id
+  ),
+  mata_kuiz AS (
+    SELECT q.quiz_id AS kuiz, SUM(q.points) AS jumlah
+    FROM public.qm_live_questions q
+    WHERE q.qtype IN ('multiple','ox') AND q.correct_key <> ''
+    GROUP BY q.quiz_id
+  ),
+  pemain AS (
+    SELECT lp.user_id AS uid, lp.session_id AS sesi, lp.score,
+           lp.joined_at AS main_pada, sk.kuiz, sk.status_sesi
+    FROM public.qm_live_players lp
+    JOIN sesi_kelas sk ON sk.sesi = lp.session_id
+    WHERE lp.user_id IS NOT NULL
+  ),
+  -- quiz_title dan session_ended_at ialah medan tambahan untuk tajuk lajur
+  -- eksport CSV trend; empat medan wajib (session_id, played_at, score, pct)
+  -- kekal pada kedudukan pertama.
+  trend AS (
+    SELECT pe.uid AS uid, pe.sesi AS sesi, pe.main_pada AS played_at,
+           pe.score AS score,
+           CASE WHEN mk.jumlah IS NULL OR mk.jumlah = 0 THEN NULL
+                ELSE ROUND(100.0 * pe.score / mk.jumlah, 1) END AS pct,
+           lq3.title AS quiz_title,
+           ls3.ended_at AS session_ended_at
+    FROM pemain pe
+    JOIN public.qm_live_sessions ls3 ON ls3.id = pe.sesi
+    JOIN public.qm_live_quizzes lq3 ON lq3.id = pe.kuiz
+    LEFT JOIN mata_kuiz mk ON mk.kuiz = pe.kuiz
+    WHERE pe.status_sesi = 'ended'
+  ),
+  trend_json AS (
+    SELECT t3.uid AS uid,
+           COALESCE(jsonb_agg(
+             jsonb_build_object(
+               'session_id', t3.sesi,
+               'played_at', t3.played_at,
+               'score', t3.score,
+               'pct', t3.pct,
+               'quiz_title', t3.quiz_title,
+               'session_ended_at', t3.session_ended_at
+             ) ORDER BY t3.played_at, t3.sesi
+           ), '[]'::jsonb) AS data
+    FROM trend t3
+    GROUP BY t3.uid
+  ),
+  jawapan AS (
+    SELECT lp.user_id AS uid,
+           COUNT(*) AS answered,
+           COUNT(*) FILTER (WHERE la.is_correct) AS correct,
+           AVG(la.ms_taken) AS avg_ms
+    FROM public.qm_live_answers la
+    JOIN public.qm_live_players lp ON lp.id = la.player_id
+    JOIN sesi_kelas sk ON sk.sesi = la.session_id
+    WHERE lp.user_id IS NOT NULL
+    GROUP BY lp.user_id
+  ),
+  hantar AS (
+    SELECT s.user_id AS uid,
+           COUNT(*) FILTER (WHERE s.status = 'approved') AS approved,
+           COUNT(*) FILTER (WHERE s.status = 'pending')  AS pending,
+           COUNT(*) FILTER (WHERE s.status = 'rejected') AS rejected,
+           MIN(s.created_at) FILTER (WHERE s.status = 'pending') AS pending_lama
+    FROM public.qm_submissions s
+    JOIN public.qm_challenges ch ON ch.id = s.challenge_id
+    JOIN public.qm_hunts h ON h.id = ch.hunt_id
+    WHERE h.class_id = p_class_id
+    GROUP BY s.user_id
+  ),
+  terakhir AS (
+    SELECT ta.user_id AS uid, ta.last_active
+    FROM public.qm_aktiviti_terakhir_ahli(p_class_id) ta
+  ),
+  pasukan_ahli AS (
+    SELECT tm.user_id AS uid, tm.team_id,
+           ROW_NUMBER() OVER (PARTITION BY tm.user_id ORDER BY t.created_at, t.id) AS rn
+    FROM public.qm_team_members tm
+    JOIN public.qm_teams t ON t.id = tm.team_id
+    WHERE t.class_id = p_class_id
+  ),
+  sempit AS (
+    SELECT COUNT(*) AS bil_ahli,
+           percentile_cont(0.2) WITHIN GROUP (ORDER BY COALESCE(mk.total_score, 0)) AS p20,
+           ROUND(percentile_cont(0.5) WITHIN GROUP (ORDER BY COALESCE(mk.total_score, 0))::numeric, 1) AS median_total,
+           ROUND(AVG(COALESCE(mk.total_score, 0))::numeric, 1) AS avg_total
+    FROM ahli a
+    LEFT JOIN markah mk ON mk.uid = a.uid_ahli
+  ),
+  ada_sesi_ended AS (
+    SELECT EXISTS (SELECT 1 FROM sesi_kelas sk WHERE sk.status_sesi = 'ended') AS ada
+  ),
+  trend_penuh AS (
+    SELECT t4.uid AS uid, t4.pct AS pct,
+           ROW_NUMBER() OVER (PARTITION BY t4.uid ORDER BY t4.played_at, t4.sesi) AS rn,
+           COUNT(*) OVER (PARTITION BY t4.uid) AS bil_sesi
+    FROM trend t4
+  ),
+  purata AS (
+    SELECT tp.uid AS uid,
+           MAX(tp.bil_sesi) AS bil_sesi,
+           AVG(tp.pct) FILTER (WHERE tp.rn > tp.bil_sesi - 3) AS akhir3,
+           AVG(tp.pct) FILTER (WHERE tp.rn <= tp.bil_sesi - 3) AS dahulu
+    FROM trend_penuh tp
+    GROUP BY tp.uid
+  ),
+  pelajar AS (
+    SELECT
+      a.uid_ahli AS user_id,
+      a.nama AS name,
+      COALESCE(mk.task_score, 0) AS task_score,
+      COALESCE(mk.live_score, 0) AS live_score,
+      COALESCE(mk.adjustment_score, 0) AS adjustment_score,
+      COALESCE(mk.total_score, 0) AS total_score,
+      -- RANK tanpa pemutus seri supaya markah sama berkongsi kedudukan.
+      RANK() OVER (ORDER BY COALESCE(mk.total_score, 0) DESC) AS rank,
+      COALESCE(mk.live_sessions, 0) AS live_sessions,
+      COALESCE(jw.answered, 0) AS answered,
+      COALESCE(jw.correct, 0) AS correct,
+      CASE WHEN COALESCE(jw.answered, 0) > 0
+           THEN ROUND(100.0 * jw.correct / jw.answered, 1) END AS accuracy_pct,
+      CASE WHEN COALESCE(jw.answered, 0) > 0
+           THEN ROUND(jw.avg_ms::numeric, 1) END AS avg_ms,
+      COALESCE(hn.approved, 0) AS approved,
+      COALESCE(hn.pending, 0)  AS pending,
+      COALESCE(hn.rejected, 0) AS rejected,
+      tk.last_active AS last_active,
+      pa.team_id AS team_id,
+      t2.name AS team_name
+    FROM ahli a
+    LEFT JOIN markah mk ON mk.uid = a.uid_ahli
+    LEFT JOIN jawapan jw ON jw.uid = a.uid_ahli
+    LEFT JOIN hantar hn ON hn.uid = a.uid_ahli
+    LEFT JOIN terakhir tk ON tk.uid = a.uid_ahli
+    LEFT JOIN pasukan_ahli pa ON pa.uid = a.uid_ahli AND pa.rn = 1
+    LEFT JOIN public.qm_teams t2 ON t2.id = pa.team_id
+  ),
+  students_json AS (
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'user_id', pl.user_id,
+        'name', pl.name,
+        'task_score', pl.task_score,
+        'live_score', pl.live_score,
+        'adjustment_score', pl.adjustment_score,
+        'total_score', pl.total_score,
+        'rank', pl.rank,
+        'live_sessions', pl.live_sessions,
+        'answered', pl.answered,
+        'correct', pl.correct,
+        'accuracy_pct', pl.accuracy_pct,
+        'avg_ms', pl.avg_ms,
+        'approved', pl.approved,
+        'pending', pl.pending,
+        'rejected', pl.rejected,
+        'last_active', pl.last_active,
+        'team_id', pl.team_id,
+        'team_name', pl.team_name,
+        'trend', COALESCE(tj.data, '[]'::jsonb),
+        'flags', to_jsonb(ARRAY_REMOVE(ARRAY[
+          CASE WHEN sp.bil_ahli >= 5 AND sp.p20 IS NOT NULL
+                    AND pl.total_score <= sp.p20 THEN 'bottom_20' END,
+          CASE WHEN pu.bil_sesi >= 4 AND pu.akhir3 IS NOT NULL AND pu.dahulu IS NOT NULL
+                    AND pu.akhir3 <= pu.dahulu - 15 THEN 'declining' END,
+          CASE WHEN pl.last_active < now() - interval '7 days' THEN 'inactive_7d' END,
+          CASE WHEN ase.ada AND NOT EXISTS
+                    (SELECT 1 FROM pemain pe WHERE pe.uid = pl.user_id) THEN 'never_live' END,
+          CASE WHEN hn2.pending_lama IS NOT NULL
+                    AND hn2.pending_lama < now() - interval '3 days' THEN 'pending_old' END,
+          CASE WHEN pu.bil_sesi >= 4 AND pu.akhir3 IS NOT NULL AND pu.dahulu IS NOT NULL
+                    AND pu.akhir3 >= pu.dahulu + 15 THEN 'improving' END
+        ], NULL))
+      ) ORDER BY pl.rank, pl.name, pl.user_id
+    ), '[]'::jsonb) AS data
+    FROM pelajar pl
+    LEFT JOIN trend_json tj ON tj.uid = pl.user_id
+    LEFT JOIN purata pu ON pu.uid = pl.user_id
+    LEFT JOIN hantar hn2 ON hn2.uid = pl.user_id
+    CROSS JOIN sempit sp
+    CROSS JOIN ada_sesi_ended ase
+  ),
+  nilai AS (
+    SELECT 'total' AS jenis, COALESCE(mk.total_score, 0)::numeric AS v
+    FROM ahli a LEFT JOIN markah mk ON mk.uid = a.uid_ahli
+    UNION ALL
+    SELECT 'task', COALESCE(mk2.task_score, 0)::numeric
+    FROM ahli a2 LEFT JOIN markah mk2 ON mk2.uid = a2.uid_ahli
+    UNION ALL
+    SELECT 'live', COALESCE(mk3.live_score, 0)::numeric
+    FROM ahli a3 LEFT JOIN markah mk3 ON mk3.uid = a3.uid_ahli
+  ),
+  lebar AS (
+    SELECT jenis,
+           CASE WHEN MAX(v) <= 0 THEN 1 ELSE MAX(v) / 10.0 END AS lebar
+    FROM nilai
+    GROUP BY jenis
+  ),
+  bin_nilai AS (
+    SELECT n.jenis AS jenis, LEAST(FLOOR(n.v / l.lebar)::int, 9) AS idx
+    FROM nilai n
+    JOIN lebar l ON l.jenis = n.jenis
+  ),
+  agihan AS (
+    SELECT l.jenis AS jenis, gs.i AS idx,
+           ROUND(gs.i * l.lebar, 1) AS dari,
+           ROUND((gs.i + 1) * l.lebar, 1) AS sampai,
+           COALESCE(b.bil, 0) AS bil
+    FROM lebar l
+    CROSS JOIN generate_series(0, 9) AS gs(i)
+    LEFT JOIN (
+      SELECT jenis, idx, COUNT(*) AS bil FROM bin_nilai GROUP BY jenis, idx
+    ) b ON b.jenis = l.jenis AND b.idx = gs.i
+  ),
+  agihan_json AS (
+    SELECT
+      COALESCE(jsonb_agg(jsonb_build_object('from', dari, 'to', sampai, 'count', bil)
+        ORDER BY idx) FILTER (WHERE jenis = 'total'), '[]'::jsonb) AS total,
+      COALESCE(jsonb_agg(jsonb_build_object('from', dari, 'to', sampai, 'count', bil)
+        ORDER BY idx) FILTER (WHERE jenis = 'task'), '[]'::jsonb) AS task,
+      COALESCE(jsonb_agg(jsonb_build_object('from', dari, 'to', sampai, 'count', bil)
+        ORDER BY idx) FILTER (WHERE jenis = 'live'), '[]'::jsonb) AS live
+    FROM agihan
+  ),
+  soalan_kelas AS (
+    SELECT q.id AS soalan, q.prompt AS prompt, q.options AS options,
+           q.correct_key AS correct_key, lq.title AS tajuk_kuiz
+    FROM public.qm_live_questions q
+    JOIN public.qm_live_quizzes lq ON lq.id = q.quiz_id
+    WHERE lq.class_id = p_class_id
+      AND q.qtype IN ('multiple','ox') AND q.correct_key <> ''
+  ),
+  jawapan_soalan AS (
+    SELECT la.question_id AS soalan, la.choice_key AS choice_key,
+           la.is_correct AS is_correct, la.ms_taken AS ms_taken
+    FROM public.qm_live_answers la
+    JOIN public.qm_live_sessions ls ON ls.id = la.session_id
+    JOIN public.qm_live_quizzes lq2 ON lq2.id = ls.quiz_id
+    WHERE lq2.class_id = p_class_id
+  ),
+  hq AS (
+    SELECT sk.soalan AS soalan, sk.tajuk_kuiz AS tajuk_kuiz,
+           sk.prompt AS prompt, sk.options AS options,
+           sk.correct_key AS correct_key,
+           COUNT(jsa.soalan) AS answered,
+           ROUND(100.0 * COUNT(jsa.soalan) FILTER (WHERE jsa.is_correct)
+                 / NULLIF(COUNT(jsa.soalan), 0), 1) AS correct_pct,
+           ROUND(AVG(jsa.ms_taken)::numeric, 1) AS avg_ms
+    FROM soalan_kelas sk
+    LEFT JOIN jawapan_soalan jsa ON jsa.soalan = sk.soalan
+    GROUP BY sk.soalan, sk.tajuk_kuiz, sk.prompt, sk.options, sk.correct_key
+    HAVING COUNT(jsa.soalan) >= 3
+  ),
+  hq15 AS (
+    SELECT * FROM hq
+    ORDER BY correct_pct ASC NULLS LAST, answered DESC, soalan
+    LIMIT 15
+  ),
+  salah AS (
+    SELECT jsa.soalan AS soalan, jsa.choice_key AS choice_key, COUNT(*) AS bil
+    FROM jawapan_soalan jsa
+    WHERE NOT jsa.is_correct
+    GROUP BY jsa.soalan, jsa.choice_key
+  ),
+  salah_top AS (
+    SELECT DISTINCT ON (s.soalan) s.soalan AS soalan, s.choice_key AS choice_key, s.bil AS bil
+    FROM salah s
+    ORDER BY s.soalan, s.bil DESC, s.choice_key
+  ),
+  label_pilihan AS (
+    SELECT sk.soalan AS soalan, opt->>'key' AS kunci, opt->>'text' AS label
+    FROM soalan_kelas sk
+    CROSS JOIN LATERAL jsonb_array_elements(sk.options) AS opt
+  ),
+  hq_json AS (
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'question_id', hq2.soalan,
+        'quiz_title', hq2.tajuk_kuiz,
+        'prompt', left(hq2.prompt, 200),
+        'answered', hq2.answered,
+        'correct_pct', hq2.correct_pct,
+        'avg_ms', hq2.avg_ms,
+        'top_wrong_choice', CASE WHEN st.soalan IS NOT NULL THEN
+          jsonb_build_object(
+            'key', st.choice_key,
+            'label', lp.label,
+            'count', st.bil
+          ) END,
+        'correct_label', lc.label
+      ) ORDER BY hq2.correct_pct ASC NULLS LAST, hq2.answered DESC, hq2.soalan
+    ), '[]'::jsonb) AS data
+    FROM hq15 hq2
+    LEFT JOIN salah_top st ON st.soalan = hq2.soalan
+    LEFT JOIN label_pilihan lp ON lp.soalan = hq2.soalan AND lp.kunci = st.choice_key
+    LEFT JOIN label_pilihan lc ON lc.soalan = hq2.soalan AND lc.kunci = hq2.correct_key
+  ),
+  hc AS (
+    SELECT ch.id AS cabaran, ch.title AS title, h.title AS hunt_title,
+           COUNT(s.id) AS submitted,
+           COUNT(s.id) FILTER (WHERE s.status = 'approved') AS approved,
+           COUNT(s.id) FILTER (WHERE s.status = 'rejected') AS rejected,
+           COUNT(s.id) FILTER (WHERE s.status = 'pending')  AS pending
+    FROM public.qm_challenges ch
+    JOIN public.qm_hunts h ON h.id = ch.hunt_id
+    LEFT JOIN public.qm_submissions s ON s.challenge_id = ch.id
+    WHERE h.class_id = p_class_id
+    GROUP BY ch.id, ch.title, h.title
+    HAVING COUNT(s.id) >= 2
+  ),
+  hc15 AS (
+    SELECT hc.*, ROUND(100.0 * hc.rejected / NULLIF(hc.approved + hc.rejected, 0), 1) AS rejected_pct
+    FROM hc
+    ORDER BY rejected_pct DESC NULLS LAST, rejected DESC, cabaran
+    LIMIT 15
+  ),
+  hc_json AS (
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'challenge_id', h3.cabaran,
+        'title', h3.title,
+        'hunt_title', h3.hunt_title,
+        'submitted', h3.submitted,
+        'approved', h3.approved,
+        'rejected', h3.rejected,
+        'rejected_pct', h3.rejected_pct,
+        'pending', h3.pending
+      ) ORDER BY h3.rejected_pct DESC NULLS LAST, h3.rejected DESC, h3.cabaran
+    ), '[]'::jsonb) AS data
+    FROM hc15 h3
+  ),
+  pasukan AS (
+    SELECT ts.team_id AS team_id, ts.team_name AS team_name, ts.total_score AS total_score,
+           COUNT(tm.user_id) AS members,
+           COALESCE(ARRAY_AGG(tm.user_id ORDER BY tm.user_id)
+                    FILTER (WHERE tm.user_id IS NOT NULL), ARRAY[]::uuid[]) AS member_ids
+    FROM public.qm_class_team_scores ts
+    LEFT JOIN public.qm_team_members tm ON tm.team_id = ts.team_id
+    WHERE ts.class_id = p_class_id
+    GROUP BY ts.team_id, ts.team_name, ts.total_score
+  ),
+  pasukan_markah AS (
+    SELECT pk.team_id AS team_id,
+           SUM(COALESCE(mk.total_score, 0)) AS jumlah_individu,
+           MAX(COALESCE(mk.total_score, 0)) AS maks_individu,
+           COUNT(*) FILTER (WHERE COALESCE(mk.total_score, 0) = 0) AS sifar
+    FROM pasukan pk
+    JOIN public.qm_team_members tm2 ON tm2.team_id = pk.team_id
+    LEFT JOIN markah mk ON mk.uid = tm2.user_id
+    GROUP BY pk.team_id
+  ),
+  pasukan_json AS (
+    SELECT COALESCE(jsonb_agg(
+      jsonb_build_object(
+        'team_id', pk.team_id,
+        'name', pk.team_name,
+        'members', pk.members,
+        'total_score', pk.total_score,
+        'avg_per_member', CASE WHEN pk.members > 0
+          THEN ROUND(pk.total_score::numeric / pk.members, 1) END,
+        'top_member_share_pct', CASE WHEN COALESCE(pm.jumlah_individu, 0) > 0
+          THEN ROUND(100.0 * pm.maks_individu / pm.jumlah_individu, 1) END,
+        'zero_members', COALESCE(pm.sifar, 0),
+        'flag_unbalanced', COALESCE(pm.jumlah_individu, 0) > 0
+          AND 100.0 * pm.maks_individu / pm.jumlah_individu > 60
+          AND pk.members >= 2,
+        'member_ids', pk.member_ids
+      ) ORDER BY pk.total_score DESC, pk.team_name, pk.team_id
+    ), '[]'::jsonb) AS data
+    FROM pasukan pk
+    LEFT JOIN pasukan_markah pm ON pm.team_id = pk.team_id
+  ),
+  pulse AS (
+    SELECT
+      sp.bil_ahli AS members,
+      sp.avg_total AS avg_total,
+      sp.median_total AS median_total,
+      CASE WHEN sp.bil_ahli > 0 THEN
+        ROUND(100.0 * (SELECT COUNT(DISTINCT pe2.uid) FROM pemain pe2) / sp.bil_ahli, 1)
+      END AS live_participation_pct,
+      CASE WHEN (SELECT COALESCE(SUM(jw2.answered), 0) FROM jawapan jw2) > 0 THEN
+        ROUND(100.0 * (SELECT COALESCE(SUM(jw2.correct), 0) FROM jawapan jw2)
+              / (SELECT COALESCE(SUM(jw2.answered), 0) FROM jawapan jw2), 1)
+      END AS accuracy_pct,
+      (SELECT COUNT(*) FROM public.qm_submissions s2
+         JOIN public.qm_challenges ch2 ON ch2.id = s2.challenge_id
+         JOIN public.qm_hunts h2 ON h2.id = ch2.hunt_id
+        WHERE h2.class_id = p_class_id AND s2.status = 'pending') AS pending_reviews,
+      (SELECT COUNT(*) FROM sesi_kelas sk3 WHERE sk3.status_sesi = 'ended') AS live_sessions
+    FROM sempit sp
+  )
+  SELECT jsonb_build_object(
+    'class_id', p_class_id,
+    'pulse', (SELECT row_to_json(pulse) FROM pulse),
+    'students', (SELECT data FROM students_json),
+    'distribution', (SELECT row_to_json(agihan_json) FROM agihan_json),
+    'hard_questions', (SELECT data FROM hq_json),
+    'hard_challenges', (SELECT data FROM hc_json),
+    'teams', (SELECT data FROM pasukan_json),
+    'generated_at', now()
+  )
+  INTO v_result;
+
+  RETURN v_result;
+END;
+$function$
+
+;
+
+revoke all on function public.qm_insights_kelas(uuid) from public, anon;
+grant execute on function public.qm_insights_kelas(uuid) to authenticated, service_role;
+
 notify pgrst, 'reload schema';
