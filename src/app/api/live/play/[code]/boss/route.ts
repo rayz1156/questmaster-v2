@@ -17,6 +17,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
+import { soalanSerasiLive } from '@/lib/live-quiz';
 import { dalamHad } from '@/lib/hadKadar';
 import { BONUS_LALAI_SEC, susunPenyerang } from '@/lib/lumba-laju';
 import { ralatJson } from '@/lib/i18n/ralatApi';
@@ -98,11 +99,13 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   let review: Record<string, unknown> | null = null;
   const idx = typeof sah.sesi.review_index === 'number' ? sah.sesi.review_index : -1;
   if (k.status === 'ended' && idx >= 0) {
-    const { data: senarai } = (await supa
-      .from('qm_live_questions')
-      .select('id')
-      .eq('quiz_id', sah.sesi.quiz_id)
-      .order('order_idx')) as { data: { id: string }[] | null };
+    // KZ-045: senarai review mesti senarai TAPIS (serasi Live) supaya
+    // indeks padam dengan totalQuestions yang dikira laluan control.
+    const { data: senarai } = (await soalanSerasiLive(
+      supa,
+      sah.sesi.quiz_id,
+      'id',
+    )) as { data: { id: string }[] | null };
     const semua = senarai || [];
     const q = idx < semua.length ? semua[idx] : null;
     if (q) {

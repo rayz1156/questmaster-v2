@@ -12,7 +12,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
-import { scoreAnswer } from '@/lib/live-quiz';
+import { scoreAnswer, soalanSerasiLive } from '@/lib/live-quiz';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 
 export const runtime = 'nodejs';
@@ -96,11 +96,13 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   if (session.status !== 'asking') {
     return ralatJson('Your answer was rejected because the question is closed.', 409);
   }
-  const { data: currentQuestion } = (await supa
-    .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, points, time_limit_sec, use_countdown, double_points')
-    .eq('quiz_id', session.quiz_id)
-    .order('order_idx')
+  // KZ-045: pilih soalan semasa daripada senarai TAPIS supaya indeksnya
+  // padan dengan laluan state/questions.
+  const { data: currentQuestion } = (await soalanSerasiLive(
+    supa,
+    session.quiz_id,
+    'id, quiz_id, order_idx, prompt, options, points, time_limit_sec, use_countdown, double_points',
+  )
     .range(session.current_index, session.current_index)
     .maybeSingle()) as { data: QuestionRow | null };
   if (!currentQuestion || currentQuestion.id !== questionId) {

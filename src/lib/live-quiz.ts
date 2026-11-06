@@ -32,6 +32,37 @@ export interface LiveQuestionRow {
   options: { key: string; text: string }[]; correct_key: string;
   points: number; time_limit_sec: number; use_countdown?: boolean;
   double_points?: boolean;
+  /** KZ-045: jenis soalan bank tunggal ('multiple' untuk baris lama). */
+  qtype?: string;
+  /** KZ-045: kunci jawapan jenis bukan aneka (RAHSIA; editor sahaja). */
+  data?: unknown;
+  hint?: unknown;
+}
+
+/* ============================================================
+ * KZ-045: satu bank soalan
+ * ============================================================
+ * Bank Kuiz kini memegang 6 jenis soalan Arena. Enjin Live (klasik,
+ * lumba, raksasa) hanya memainkan soalan SERASI Live: aneka pilihan
+ * atau betul-salah dengan TEPAT satu jawapan betul. Semua laluan yang
+ * mengindeks soalan untuk DIMAINKAN mesti membaca melalui helper
+ * soalanSerasiLive di bawah supaya current_index sentiasa merujuk
+ * senarai yang sama; laluan penyuntingan pendidik terus membaca semua.
+ */
+
+/** Lajur soalan untuk laluan penyuntingan pendidik (termasuk kunci). */
+export const LAJUR_SOALAN_PENUH =
+  'id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points, qtype, data, hint';
+
+/** Baca soalan kuik yang serasi enjin Live, ikut order_idx. */
+export function soalanSerasiLive(supa: SupaClient, quizId: string, lajur: string) {
+  return supa
+    .from('qm_live_questions')
+    .select(lajur)
+    .eq('quiz_id', quizId)
+    .in('qtype', ['multiple', 'ox'])
+    .neq('correct_key', '')
+    .order('order_idx');
 }
 
 /* ============================================================
@@ -404,7 +435,7 @@ export async function requireQuestionHost(
 
   const { data: question } = (await auth.supa
     .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points, qtype, data, hint')
     .eq('id', questionId)
     .maybeSingle()) as { data: LiveQuestionRow | null };
   if (!question) {

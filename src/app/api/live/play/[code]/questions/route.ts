@@ -14,6 +14,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
+import { soalanSerasiLive } from '@/lib/live-quiz';
 import { createHash } from 'crypto';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 
@@ -67,11 +68,13 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   }
 
   // Senarai lajur eksplisit TANPA correct_key.
-  const { data: questions } = (await supa
-    .from('qm_live_questions')
-    .select('id, order_idx, prompt, options, points, time_limit_sec')
-    .eq('quiz_id', session.quiz_id)
-    .order('order_idx')) as { data: QuestionRow[] | null };
+  // KZ-045: hanya soalan SERASI Live; current_index pada laluan state
+  // merujuk senarai ini, jadi klien mesti menerima senarai yang sama.
+  const { data: questions } = (await soalanSerasiLive(
+    supa,
+    session.quiz_id,
+    'id, order_idx, prompt, options, points, time_limit_sec',
+  )) as { data: QuestionRow[] | null };
 
   const senarai = (questions || []).map((q) => ({
     id: q.id,

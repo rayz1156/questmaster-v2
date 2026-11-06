@@ -84,8 +84,13 @@ export const COLUMNS = {
  * Lajur yang tidak boleh dipulangkan kepada sesiapa melalui MCP, walaupun
  * kepada staf. Digunakan sebagai jaring keselamatan dalam `fetch`, yang
  * mengambil rekod sewenang-wenangnya.
+ *
+ * KZ-045: `correct_key` (qm_live_questions) dan `data` (kunci jawapan jenis
+ * bukan aneka pada qm_live_questions dan qm_arena_questions) menyertai
+ * `answer` sebagai lajur kunci jawapan. Alat MCP yang sah membaca kunci
+ * melalui laluan API pendidik (callApi), bukan melalui fetch.
  */
-export const REDACTED_COLUMNS = new Set(["answer"]);
+export const REDACTED_COLUMNS = new Set(["answer", "correct_key", "data"]);
 
 /** Had lalai dan maksimum untuk sebarang senarai, supaya konteks tidak dibanjiri. */
 export const LIMITS = { default: 25, max: 100 } as const;

@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
-import type { LiveSessionRow } from '@/lib/live-quiz';
+import { soalanSerasiLive, type LiveSessionRow } from '@/lib/live-quiz';
 import { TINDAKAN_REVIEW, langkahReview, type TindakanReview } from '@/lib/lumba-laju';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 
@@ -261,11 +261,13 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     return ralatJson('Invalid action.', 400);
   }
 
-  const { data: questions } = await auth.supa
-    .from('qm_live_questions')
-    .select('id')
-    .eq('quiz_id', ses.quiz_id)
-    .order('order_idx');
+  // KZ-045: kira soalan SERASI Live sahaja supaya next/review padam dengan
+  // senarai yang dilihat pemain (state/questions).
+  const { data: questions } = (await soalanSerasiLive(
+    auth.supa,
+    ses.quiz_id,
+    'id',
+  )) as { data: { id: string }[] | null };
   const totalQuestions = (questions || []).length;
   if (totalQuestions === 0) {
     return ralatJson('This quiz has no questions.', 400);

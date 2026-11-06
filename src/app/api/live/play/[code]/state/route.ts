@@ -10,6 +10,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getServiceSupabase } from '@/lib/supabase-route';
+import { soalanSerasiLive } from '@/lib/live-quiz';
 import { createHash } from 'crypto';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 
@@ -85,11 +86,9 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     // Sejak Bahagian 2.4: hanya id, order_idx dan time_limit_sec, tiada
     // prompt/options, kerana teks soalan datang daripada cache klien
     // (laluan /questions). Senarai lajur eksplisit TANPA correct_key.
-    supa
-      .from('qm_live_questions')
-      .select('id, order_idx, time_limit_sec, use_countdown')
-      .eq('quiz_id', session.quiz_id)
-      .order('order_idx'),
+    // KZ-045: hanya soalan SERASI Live supaya current_index merujuk senarai
+    // yang sama dengan laluan control dan questions.
+    soalanSerasiLive(supa, session.quiz_id, 'id, order_idx, time_limit_sec, use_countdown'),
   ]);
 
   const fp = fingerprint(
@@ -102,7 +101,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     return NextResponse.json({ noChange: true, fp });
   }
 
-  const allQuestions = (questions || []) as QuestionRow[];
+  const allQuestions = (questions || []) as unknown as QuestionRow[];
   const totalQuestions = allQuestions.length;
 
   // KZ-012: sesi Speed Race. KZ-013: sesi Lawan Raksasa turut pulangkan awal;

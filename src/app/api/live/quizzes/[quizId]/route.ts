@@ -14,9 +14,11 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
   const host = await requireQuizHost(req, params.quizId);
   if (host.response) return host.response;
 
+  // Laluan penyuntingan pendidik: SEMUA soalan termasuk qtype, data dan hint
+  // (KZ-045: bank tunggal memegang 6 jenis; enjin Live menapis sendiri).
   const { data: questions, error } = await host.supa
     .from('qm_live_questions')
-    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
+    .select('id, quiz_id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points, qtype, data, hint')
     .eq('quiz_id', params.quizId)
     .order('order_idx');
 

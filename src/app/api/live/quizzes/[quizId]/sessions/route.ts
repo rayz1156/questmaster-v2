@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireQuizHost, generateSessionCode } from '@/lib/live-quiz';
+import { requireQuizHost, generateSessionCode, soalanSerasiLive } from '@/lib/live-quiz';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import {
   BONUS_LALAI_SEC,
@@ -69,11 +69,14 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     tahapRaksasa = t;
   }
 
-  const { data: questions } = await host.supa
-    .from('qm_live_questions')
-    .select('id')
-    .eq('quiz_id', params.quizId)
-    .limit(1);
+  // KZ-045: enjin Live (klasik, lumba, raksasa) hanya memainkan soalan
+  // SERASI Live, jadi sesi hanya boleh bermula dengan sekurang-kurangnya
+  // satu soalan itu.
+  const { data: questions } = (await soalanSerasiLive(
+    host.supa,
+    params.quizId,
+    'id',
+  ).limit(1)) as { data: { id: string }[] | null };
   if (!questions || questions.length === 0) {
     return ralatJson('The quiz needs at least one question.', 400);
   }

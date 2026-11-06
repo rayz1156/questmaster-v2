@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
-import type { LiveSessionRow } from '@/lib/live-quiz';
+import { soalanSerasiLive, type LiveQuestionRow, type LiveSessionRow } from '@/lib/live-quiz';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import {
   susunPapan,
@@ -147,13 +147,15 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
     .eq('id', ses.quiz_id)
     .maybeSingle();
 
-  const { data: questions, error: qErr } = await auth.supa
-    .from('qm_live_questions')
-    .select('id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points')
-    .eq('quiz_id', ses.quiz_id)
-    .order('order_idx');
-  if (qErr) return ralatJson(qErr.message, 500);
-  const allQuestions = questions || [];
+  // KZ-045: laluan hos klasik hanya bermain soalan SERASI Live; indeks
+  // current_index pada pemain merujuk senarai TAPIS ini juga.
+  const hasilSoalan = (await soalanSerasiLive(
+    auth.supa,
+    ses.quiz_id,
+    'id, order_idx, prompt, options, correct_key, points, time_limit_sec, use_countdown, double_points',
+  )) as unknown as { data: LiveQuestionRow[] | null; error: { message: string } | null };
+  if (hasilSoalan.error) return ralatJson(hasilSoalan.error.message, 500);
+  const allQuestions: LiveQuestionRow[] = hasilSoalan.data || [];
 
   // KZ-012: sesi Speed Race mempunyai bentuk balasan sendiri.
   if (ses.game_mode === 'race') {
@@ -191,7 +193,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
         // hanya keluar melalui review.question.correct_key selepas Reveal,
         // kerana skrin ini selalunya ditayang kepada kelas.
         questions: allQuestions.map((q) => {
-          const { correct_key: _kunci, ...tanpaKunci } = q as Record<string, unknown>;
+          const { correct_key: _kunci, ...tanpaKunci } = q as unknown as Record<string, unknown>;
           void _kunci;
           return tanpaKunci;
         }),
@@ -288,7 +290,7 @@ export async function GET(req: NextRequest, { params }: { params: { sessionId: s
         // hanya keluar melalui review.question.correct_key selepas Reveal,
         // kerana skrin ini selalunya ditayang kepada kelas.
         questions: allQuestions.map((q) => {
-          const { correct_key: _kunci, ...tanpaKunci } = q as Record<string, unknown>;
+          const { correct_key: _kunci, ...tanpaKunci } = q as unknown as Record<string, unknown>;
           void _kunci;
           return tanpaKunci;
         }),

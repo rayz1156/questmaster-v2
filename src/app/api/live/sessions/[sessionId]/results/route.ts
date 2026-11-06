@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
+import { soalanSerasiLive } from '@/lib/live-quiz';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { kedudukanSeri, pangkasTeks, ringkasanSesi } from '@/lib/laporanMarkah';
@@ -215,16 +216,19 @@ export async function GET(
   });
 
   // ----- Soalan -----
-  const { data: soalanData, error: errSoalan } = await svc
-    .from('qm_live_questions')
-    .select('id, order_idx, prompt, options, correct_key')
-    .eq('quiz_id', sesi.quiz_id)
-    .order('order_idx');
+  // KZ-045: hanya soalan SERASI Live; enjin Live tidak pernah memainkan
+  // jenis lain, jadi keputusan tidak memaparkan soalan yang tiada jawapan.
+  const hasilSoalan = (await soalanSerasiLive(
+    svc,
+    sesi.quiz_id,
+    'id, order_idx, prompt, options, correct_key',
+  )) as unknown as { data: BarisSoalan[] | null; error: { message: string } | null };
+  const errSoalan = hasilSoalan.error;
   if (errSoalan) {
     console.error('live results questions failed');
     return ralatJson('Failed to load results.', 500);
   }
-  const soalan = (soalanData || []) as BarisSoalan[];
+  const soalan = (hasilSoalan.data || []) as BarisSoalan[];
 
   interface StatistikSoalan {
     answered: number;
