@@ -1,5 +1,5 @@
 /**
- * Kuizen Arena: kontrak jenis bersama (gaya ZEP QUIZ, dibina semula untuk Kuizen).
+ * Kuizen Arena: kontrak jenis bersama (kuiz permainan berasaskan peta, dibina untuk Kuizen).
  *
  * Fail ini ialah KONTRAK. Pelayan (grade/validate/public/modes), UI pendidik,
  * UI peserta dan enjin peta semuanya mengimport daripada sini.
@@ -169,7 +169,7 @@ export interface ArenaSession {
   ended_at: string | null;
 }
 
-/** Status kehadiran (pengajaran daripada ZEP: jangan buang pemain yang terputus). */
+/** Status kehadiran (pengajaran penting: jangan buang pemain yang terputus). */
 export type PresenceStatus = 'online' | 'away' | 'offline';
 /** online: last_seen < 20 s; away: < 120 s; offline: lebih lama. Pemain KEKAL dalam senarai. */
 export const PRESENCE_ONLINE_MS = 20_000;

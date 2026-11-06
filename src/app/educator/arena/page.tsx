@@ -69,7 +69,7 @@ export default function ArenaSetsPage() {
     <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
       <header className="rounded-2xl bg-gradient-to-r from-indigo-600 to-fuchsia-600 p-6 text-white shadow">
         <h1 className="text-2xl font-bold">Kuizen Arena</h1>
-        <p className="mt-1 text-sm text-indigo-100">Kuiz permainan gaya ZEP: 6 jenis soalan, 5 mod, peta 2D.</p>
+        <p className="mt-1 text-sm text-indigo-100">Kuiz permainan: 6 jenis soalan, 5 mod, peta 2D.</p>
       </header>
 
       <section className="rounded-xl border border-slate-200 bg-white p-4 shadow-sm">
