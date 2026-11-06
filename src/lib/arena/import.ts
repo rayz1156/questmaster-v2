@@ -504,7 +504,7 @@ function parseSheet(xml: string, shared: string[]): string[][] {
       const cInner = cm[2] ?? '';
       // kedudukan lajur: r="C5"; tanpa r, ikut selepas sel terdahulu
       const ref = /(?:^|\s)r="([A-Z]+)\d+"/.exec(cAttrs)?.[1];
-      let colIdx = ref ? colIndex(ref) : lastCol + 1;
+      const colIdx = ref ? colIndex(ref) : lastCol + 1;
       lastCol = colIdx;
       if (colIdx < 0 || colIdx >= ARENA_XLSX_MAX_COLS) continue;
       const t = /\bt="([^"]+)"/.exec(cAttrs)?.[1] ?? '';
