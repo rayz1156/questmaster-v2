@@ -1687,6 +1687,28 @@ export const ms: Kamus = {
       aikenPlaceholder: 'Apakah ibu negara Malaysia?\nA. Johor Bahru\nB. Kuala Lumpur\nC. Ipoh\nANSWER: B',
       importing: 'Mengimport…',
       importLabel: 'Import',
+      // KZ-046: penyatuan editor kuiz dengan Arena (6 jenis soalan).
+      arenaOnly: 'Arena sahaja',
+      compatCount: '{x} soalan untuk mod Langsung, {y} untuk Arena',
+      liveFieldsTitle: 'Mod Langsung',
+      liveFieldsNote:
+        'Kira detik dan mata berganda hanya digunakan oleh mod Langsung, dan hanya untuk soalan aneka pilihan satu jawapan serta Betul / Salah.',
+      importTitle: 'Import soalan (Excel, CSV, Aiken)',
+      importDesc:
+        'Muat turun templat di bawah, isikan dalam Excel, kemudian muat naik fail .xlsx atau .csv yang sama. Templat menyertakan satu contoh bagi setiap jenis soalan. Satu baris rosak bermakna tiada soalan diimport; baris itu disenaraikan untuk dibaiki. Maksimum 200 soalan setiap import.',
+      importTypes:
+        'aneka: pilihan dalam pilihan_a dan seterusnya; jawapan = huruf atau huruf dipisah koma (contoh A,C)\npendek: jawapan yang diterima dipisah dengan | (contoh Hijau|hijau muda)\nbetul_salah: jawapan Betul atau Salah (juga B/S, O/X, True/False)\nesei: jawapan = rubrik gred (pilihan)\npadanan: setiap pilihan berbentuk kiri = kanan (2 hingga 5 pasangan)\nsusunan: pilihan_a hingga pilihan_e dalam turutan yang betul (2 hingga 5 item)',
+      importNoRows: 'Tiada soalan diimport. Baiki baris berikut dan muat naik semula:',
+      importDone: '{cipta} soalan ditambah.',
+      importSkipped: ' {lompat} blok Aiken dilangkau.',
+      importTooLarge: 'Fail melebihi 2 MB.',
+      importReadFailed: 'Fail itu tidak dapat dibaca.',
+      uploadExcelCsv: 'Muat naik Excel / CSV',
+      uploadAikenFile: 'Muat naik fail Aiken (.txt)',
+      importAikenButton: 'Import Aiken',
+      aikenTextLabel: 'Teks Aiken',
+      aikenExample: 'Contoh format: satu blok bagi setiap soalan, baris kosong memisahkan blok.',
+      downloadArenaTemplate: 'Muat turun templat Excel',
     },
     // Panel hos sesi (src/app/educator/live/session/[sessionId]/page.tsx).
     session: {

@@ -1,22 +1,29 @@
 "use client";
 
 /**
- * Penyunting kuiz langsung (pendidik). KZ-025: rupa v3 (PageHead dengan
- * breadcrumb "Live Quiz / <tajuk>", setiap soalan dalam Card kit, borang
- * guna Field/Input/Textarea/CheckRadio dan butang kit). Aliran simpan,
- * sunting, padam soalan, import CSV/Aiken dan mula sesi TIDAK berubah;
- * hanya pengendali `catch` ditaip semula supaya lint bersih.
+ * Penyunting kuiz tunggal (pendidik). KZ-046: satu kuiz, semua cara main.
+ *
+ * KZ-025 memperkenalkan rupa v3 (PageHead dengan breadcrumb, kad kit).
+ * KZ-046 menyatukan bank soalan dengan Arena: borang aneka pilihan lama
+ * diganti oleh QuestionEditor Arena (6 jenis soalan), dan import CSV/Aiken
+ * lama diganti oleh import Excel/CSV/Aiken melalui /import-arena.
+ * Medan khusus mod Langsung (kira detik, mata berganda) tidak wujud dalam
+ * format Arena, jadi keduanya dikekalkan sebagai kawalan di sebelah editor
+ * dan dihantar melalui PATCH format lama selepas simpan Arena.
  */
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
 import Link from "next/link";
 import Shell from "@/components/Shell";
 import { EDU_TABS } from "@/lib/eduTabs";
-import { ArrowLeft, Plus, Trash2, Play, Upload, Pencil, Check, X, Download, FileSpreadsheet } from "lucide-react";
+import { ArrowLeft, Plus, Trash2, Play, Upload, Pencil, Download, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import PanelMulaSesi from "@/components/PanelMulaSesi";
+import QuestionEditor, { QTYPE_LABEL } from "@/components/arena/QuestionEditor";
 import { BONUS_LALAI_SEC, RACE_DEFAULT_MINUTES, sahMinitLumba, type TahapRaksasa } from "@/lib/lumba-laju";
+import { isLiveCompatible, liveRowToArena, type LiveBankRow } from "@/lib/kuiz-bank";
+import type { ArenaQuestionInput } from "@/lib/arena/types";
 import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import {
   Alert,
@@ -25,8 +32,6 @@ import {
   CardHead,
   CheckRadio,
   EmptyState,
-  Field,
-  Input,
   PageHead,
   Textarea,
 } from "@/components/ui";
@@ -39,6 +44,9 @@ interface Soalan {
   prompt: string;
   options: Pilihan[];
   correct_key: string;
+  qtype: string | null;
+  data: unknown;
+  hint: unknown;
   points: number;
   time_limit_sec: number;
   use_countdown?: boolean;
@@ -81,8 +89,6 @@ function mesejRalat(e: unknown, zonkal: string): string {
   return e instanceof Error && e.message ? e.message : zonkal;
 }
 
-const HURUF = ["A", "B", "C", "D", "E", "F"];
-
 export default function EditorKuizLangsung() {
   const { quizId } = useParams<{ quizId: string }>() as { quizId: string };
   const router = useRouter();
@@ -93,42 +99,23 @@ export default function EditorKuizLangsung() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  // Borang soalan baharu
-  const [showNew, setShowNew] = useState(false);
-  const [prompt, setPrompt] = useState("");
-  const [opts, setOpts] = useState<Pilihan[]>([
-    { key: "A", text: "" },
-    { key: "B", text: "" },
-    { key: "C", text: "" },
-    { key: "D", text: "" },
-  ]);
-  const [kunci, setKunci] = useState("A");
-  const [points, setPoints] = useState(1000);
-  const [timeLimit, setTimeLimit] = useState(20);
-  const [kiraDetik, setKiraDetik] = useState(true);
-  const [mataBerganda, setMataBerganda] = useState(false);
+  // Suntingan soalan: "new" atau id soalan (KZ-046, ikut editor set Arena).
+  const [editing, setEditing] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
-  // Suntingan soalan sedia ada
-  const [editId, setEditId] = useState<string | null>(null);
-  const [editPrompt, setEditPrompt] = useState("");
-  const [editOpts, setEditOpts] = useState<Pilihan[]>([]);
-  const [editKunci, setEditKunci] = useState("");
-  const [editPoints, setEditPoints] = useState(1000);
-  const [editTime, setEditTime] = useState(20);
+  // Medan khusus mod Langsung yang format Arena tidak simpan (KZ-046):
+  // dikekalkan sebagai kawalan di sebelah QuestionEditor.
+  const [kiraDetik, setKiraDetik] = useState(true);
+  const [mataBerganda, setMataBerganda] = useState(false);
   const [editKira, setEditKira] = useState(true);
   const [editBerganda, setEditBerganda] = useState(false);
 
-  // Import Aiken
-  const [aiken, setAiken] = useState("");
-  const [aikenBusy, setAikenBusy] = useState(false);
-  const [aikenMsg, setAikenMsg] = useState<{ ok: boolean; text: string } | null>(null);
-
-  // Import CSV: templat dimuat turun, diisi dalam Excel, dimuat naik semula.
-  const [csvBusy, setCsvBusy] = useState(false);
-  const [csvMsg, setCsvMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [csvErrors, setCsvErrors] = useState<{ row: number; message: string }[]>([]);
-  const csvInputRef = useRef<HTMLInputElement | null>(null);
+  // Import soalan melalui /import-arena (KZ-046): Excel, CSV atau Aiken.
+  const [impBusy, setImpBusy] = useState(false);
+  const [impMsg, setImpMsg] = useState<string | null>(null);
+  const [impErr, setImpErr] = useState<string | null>(null);
+  const [impRows, setImpRows] = useState<{ row: number; message: string }[] | null>(null);
+  const [aikenText, setAikenText] = useState("");
 
   // KZ-037: kad Outcome yang dinilai (tag kuiz kepada Outcome kelas).
   const [outcomeSet, setOutcomeSet] = useState<OutcomeSet | null>(null);
@@ -163,73 +150,105 @@ export default function EditorKuizLangsung() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { if (quizId) muatOutcome(); }, [quizId]);
 
-  const onTambah = async () => {
-    setErr(null);
-    const bersih = opts.map((o, i) => ({ key: HURUF[i], text: o.text.trim() })).filter((o) => o.text);
-    if (!prompt.trim()) { setErr(t("live.educatorEditor.questionRequired")); return; }
-    if (bersih.length < 2) { setErr(t("live.educatorEditor.optionsMin")); return; }
-    if (!bersih.some((o) => o.key === kunci)) { setErr(t("live.educatorEditor.answerKeyValid")); return; }
-    setBusy(true);
-    try {
-      await authedFetch(`/api/live/quizzes/${quizId}/questions`, {
-        method: "POST",
-        body: JSON.stringify({
-          prompt: prompt.trim(),
-          options: bersih,
-          correct_key: kunci,
-          points,
-          time_limit_sec: timeLimit,
-          use_countdown: kiraDetik,
-          double_points: mataBerganda,
-        }),
-      });
-      setPrompt(""); setOpts([{ key: "A", text: "" }, { key: "B", text: "" }, { key: "C", text: "" }, { key: "D", text: "" }]);
-      setKunci("A"); setPoints(1000); setTimeLimit(20); setKiraDetik(true);
-      setMataBerganda(false); setShowNew(false);
-      await reload();
-    } catch (e) {
-      setErr(mesejRalat(e, t("live.educatorEditor.questionSaveFailed")));
-    } finally { setBusy(false); }
+  /** Soalan ini dimainkan oleh enjin Live (aneka satu jawapan atau ox). */
+  const serasiSoalan = (s: Soalan): boolean =>
+    isLiveCompatible({ qtype: s.qtype || "multiple", correct_key: s.correct_key || "" });
+
+  /** Hasil QuestionEditor akan dimainkan oleh enjin Live? */
+  const serasiInput = (q: ArenaQuestionInput): boolean => {
+    if (q.type === "ox") return true;
+    if (q.type !== "multiple") return false;
+    const senarai = (q.data as { choiceList?: { isAnswer?: boolean }[] }).choiceList ?? [];
+    return senarai.filter((c) => c.isAnswer).length === 1;
+  };
+
+  /** Baris bank menjadi input awal QuestionEditor (format Arena). */
+  const toInput = (s: Soalan): ArenaQuestionInput => {
+    const baris: LiveBankRow = {
+      id: s.id,
+      quiz_id: s.quiz_id,
+      order_idx: s.order_idx,
+      prompt: s.prompt,
+      options: s.options,
+      correct_key: s.correct_key,
+      qtype: s.qtype || "multiple",
+      data: s.data ?? null,
+      hint: s.hint ?? null,
+      points: s.points,
+      time_limit_sec: s.time_limit_sec,
+      use_countdown: s.use_countdown,
+      double_points: s.double_points,
+    };
+    const arena = liveRowToArena(baris);
+    return {
+      type: arena.type,
+      prompt: arena.prompt,
+      data: arena.data,
+      hint: arena.hint,
+      points: arena.points,
+      time_limit_sec: arena.time_limit_sec,
+      origin: arena.origin,
+    };
   };
 
   const mulaSunting = (s: Soalan) => {
-    setEditId(s.id);
-    setEditPrompt(s.prompt);
-    setEditOpts(s.options.map((o) => ({ ...o })));
-    setEditKunci(s.correct_key);
-    setEditPoints(s.points);
-    setEditTime(s.time_limit_sec);
+    setEditing(s.id);
     setEditKira(s.use_countdown !== false);
     setEditBerganda(s.double_points === true);
   };
 
-  const onSimpanSunting = async () => {
-    if (!editId) return;
+  /** Simpan medan khusus mod Langsung melalui PATCH format lama. */
+  const simpanMedanLive = async (id: string, kira: boolean, berganda: boolean) => {
+    await authedFetch("/api/live/questions/" + id, {
+      method: "PATCH",
+      body: JSON.stringify({ use_countdown: kira, double_points: berganda }),
+    });
+  };
+
+  /** Tambah soalan daripada QuestionEditor (format Arena, 6 jenis). */
+  const onTambah = async (q: ArenaQuestionInput) => {
     setErr(null);
-    const bersih = editOpts.map((o) => ({ key: o.key, text: o.text.trim() })).filter((o) => o.text);
-    if (!editPrompt.trim() || bersih.length < 2 || !bersih.some((o) => o.key === editKunci)) {
-      setErr(t("live.educatorEditor.editRequired"));
-      return;
-    }
     setBusy(true);
     try {
-      await authedFetch("/api/live/questions/" + editId, {
-        method: "PATCH",
-        body: JSON.stringify({
-          prompt: editPrompt.trim(),
-          options: bersih,
-          correct_key: editKunci,
-          points: editPoints,
-          time_limit_sec: editTime,
-          use_countdown: editKira,
-          double_points: editBerganda,
-        }),
+      const json = await authedFetch(`/api/live/quizzes/${quizId}/questions`, {
+        method: "POST",
+        body: JSON.stringify(q),
       });
-      setEditId(null);
+      // Medan Live tidak wujud dalam format Arena; simpan melalui PATCH kedua
+      // hanya untuk soalan yang benar-benar dimainkan oleh enjin Live.
+      if (serasiInput(q)) {
+        const baharu = (json as { data: { id: string } }).data;
+        await simpanMedanLive(baharu.id, kiraDetik, mataBerganda);
+      }
+      setEditing(null);
+      await reload();
+    } catch (e) {
+      setErr(mesejRalat(e, t("live.educatorEditor.questionSaveFailed")));
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  /** Sunting soalan sedia ada melalui QuestionEditor. */
+  const onSimpanSunting = async (q: ArenaQuestionInput) => {
+    if (!editing) return;
+    setErr(null);
+    setBusy(true);
+    try {
+      await authedFetch("/api/live/questions/" + editing, {
+        method: "PATCH",
+        body: JSON.stringify(q),
+      });
+      if (serasiInput(q)) {
+        await simpanMedanLive(editing, editKira, editBerganda);
+      }
+      setEditing(null);
       await reload();
     } catch (e) {
       setErr(mesejRalat(e, t("live.educatorEditor.updateFailed")));
-    } finally { setBusy(false); }
+    } finally {
+      setBusy(false);
+    }
   };
 
   const onPadamSoalan = async (s: Soalan) => {
@@ -242,60 +261,80 @@ export default function EditorKuizLangsung() {
     }
   };
 
-  const onImportAiken = async () => {
-    setAikenMsg(null);
-    if (!aiken.trim()) { setAikenMsg({ ok: false, text: t("live.educatorEditor.aikenEmpty") }); return; }
-    setAikenBusy(true);
+  /**
+   * Import melalui /import-arena (KZ-046). Berbeza daripada authedFetch:
+   * balasan 400 boleh membawa {errors:[{row,message}]} yang perlu dibaca
+   * untuk paparan ralat per baris, jadi fetch dibuat secara manual di sini.
+   */
+  const hantarImport = async (format: "xlsx" | "csv" | "aiken", content: string) => {
+    setImpBusy(true);
+    setImpErr(null);
+    setImpMsg(null);
+    setImpRows(null);
     try {
-      const json = await authedFetch(`/api/live/quizzes/${quizId}/import-aiken`, {
-        method: "POST",
-        body: JSON.stringify({ content: aiken }),
-      });
-      setAikenMsg({ ok: true, text: t("live.educatorEditor.aikenDone", { cipta: json.created, lompat: json.skipped }) });
-      setAiken("");
-      await reload();
-    } catch (e) {
-      setAikenMsg({ ok: false, text: mesejRalat(e, t("live.educatorEditor.aikenImportFailed")) });
-    } finally { setAikenBusy(false); }
-  };
-
-  /** Baca fail CSV di klien, hantar sebagai teks, papar ralat per baris. */
-  const onPilihCsv = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-    setCsvMsg(null);
-    setCsvErrors([]);
-    if (file.size > 500000) {
-      setCsvMsg({ ok: false, text: t("live.educatorEditor.csvTooLarge") });
-      if (csvInputRef.current) csvInputRef.current.value = "";
-      return;
-    }
-    setCsvBusy(true);
-    try {
-      const content = await file.text();
       const { data: { session } } = await supabase.auth.getSession();
-      const r = await fetch(`/api/live/quizzes/${quizId}/import-csv`, {
+      const res = await fetch(`/api/live/quizzes/${quizId}/import-arena`, {
         method: "POST",
         headers: {
           "content-type": "application/json",
           ...(session ? { Authorization: "Bearer " + session.access_token } : {}),
         },
-        body: JSON.stringify({ content }),
+        body: JSON.stringify({ format, content }),
       });
-      const j = await r.json().catch(() => ({}));
-      if (!r.ok) {
-        setCsvErrors(Array.isArray(j.errors) ? j.errors : []);
-        setCsvMsg({ ok: false, text: j.error || t("live.educatorEditor.csvImportFailed") });
+      const j: unknown = await res.json().catch(() => ({}));
+      const o = (j ?? {}) as {
+        created?: unknown;
+        skipped?: unknown;
+        error?: unknown;
+        errors?: unknown;
+      };
+      if (!res.ok) {
+        setImpRows(
+          Array.isArray(o.errors) ? (o.errors as { row: number; message: string }[]) : null,
+        );
+        setImpErr(typeof o.error === "string" ? o.error : t("live.educatorEditor.csvImportFailed"));
         return;
       }
-      setCsvMsg({ ok: true, text: t("live.educatorEditor.csvDone", { n: j.created, fail: file.name }) });
+      const cipta = Number(o.created) || 0;
+      const lompat = Number(o.skipped) || 0;
+      setImpMsg(
+        format === "aiken"
+          ? t("live.educatorEditor.aikenDone", { cipta, lompat })
+          : t("live.educatorEditor.importDone", { cipta }) +
+              (lompat ? t("live.educatorEditor.importSkipped", { lompat }) : ""),
+      );
+      setAikenText("");
       await reload();
     } catch {
-      setCsvMsg({ ok: false, text: t("live.educatorEditor.csvReadFailed") });
+      setImpErr(t("live.educatorEditor.importReadFailed"));
     } finally {
-      setCsvBusy(false);
-      if (csvInputRef.current) csvInputRef.current.value = "";
+      setImpBusy(false);
     }
+  };
+
+  /** Fail .xlsx dibaca sebagai base64; .csv sebagai teks (had 2 MB). */
+  const importFile = async (f: File) => {
+    if (f.size > 2 * 1024 * 1024) {
+      setImpErr(t("live.educatorEditor.importTooLarge"));
+      return;
+    }
+    if (/\.xlsx$/i.test(f.name)) {
+      const bytes = new Uint8Array(await f.arrayBuffer());
+      let bin = "";
+      for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+      await hantarImport("xlsx", btoa(bin));
+    } else {
+      await hantarImport("csv", await f.text());
+    }
+  };
+
+  /** Fail Aiken dibaca sebagai teks ke dalam kotak tampal. */
+  const importAikenFile = async (f: File) => {
+    if (f.size > 2 * 1024 * 1024) {
+      setImpErr(t("live.educatorEditor.importTooLarge"));
+      return;
+    }
+    setAikenText(await f.text());
   };
 
   /** Bonus rentetan ialah tetapan seluruh kuiz, dipetik ke sesi bila dimulakan. */
@@ -382,48 +421,26 @@ export default function EditorKuizLangsung() {
     );
   }
 
-  /** Baris pilihan dengan radio kunci: sama untuk borang baharu dan suntingan.
-   * `bolehBuang`: borang baharu sahaja yang mempunyai butang buang pilihan
-   * (borang suntingan asal tiada butang itu, jadi ia dikekalkan begitu). */
-  const barisPilihan = (
-    senarai: Pilihan[],
-    setSenarai: (x: Pilihan[]) => void,
-    kunciIni: string,
-    setKunciIni: (k: string) => void,
-    namaRadio: string,
-    bolehBuang: boolean,
+  /** Bilangan soalan serasi mod Langsung dan jumlah untuk Arena (KZ-046). */
+  const serasiBil = soalan.filter(serasiSoalan).length;
+
+  /** Kawalan medan khusus mod Langsung, di sebelah QuestionEditor. */
+  const kawalanLive = (
+    kira: boolean,
+    setKira: (v: boolean) => void,
+    berganda: boolean,
+    setBerganda: (v: boolean) => void,
   ) => (
-    <div className="space-y-2">
-      {senarai.map((o, i) => (
-        <div key={o.key + i} className="flex items-center gap-2">
-          <CheckRadio
-            type="radio"
-            name={namaRadio}
-            checked={kunciIni === senarai[i].key}
-            onChange={() => setKunciIni(senarai[i].key)}
-            label={<span className="font-bold">{senarai[i].key}.</span>}
-          />
-          <div className="flex-1 min-w-0">
-            <Input
-              placeholder={t("live.educatorEditor.optionPlaceholder", { huruf: senarai[i].key })}
-              value={o.text}
-              onChange={(e) => setSenarai(senarai.map((x, j) => (j === i ? { ...x, text: e.target.value } : x)))}
-            />
-          </div>
-          {bolehBuang && senarai.length > 2 && (
-            <Button
-              variant="icon"
-              size="sm"
-              title={t("live.educatorEditor.removeOption")}
-              ariaLabel={t("live.educatorEditor.removeOption")}
-              className="text-[#e85347] hover:bg-[#fce4e2]"
-              onClick={() => setSenarai(senarai.filter((_, j) => j !== i).map((x, j) => ({ key: HURUF[j], text: x.text })))}
-            >
-              <X className="w-4 h-4" />
-            </Button>
-          )}
-        </div>
-      ))}
+    <div className="rounded-xl bg-violet-50 border border-violet-200 p-4 space-y-2">
+      <p className="text-[13px] font-bold text-ink">{t("live.educatorEditor.liveFieldsTitle")}</p>
+      <p className="text-[12px] text-ink-faint">{t("live.educatorEditor.liveFieldsNote")}</p>
+      <div className="flex flex-wrap gap-6">
+        <CheckRadio label={t("live.educatorEditor.countdown")} checked={kira} onChange={(e) => setKira(e.target.checked)} />
+        <CheckRadio label={t("live.educatorEditor.doublePoints")} checked={berganda} onChange={(e) => setBerganda(e.target.checked)} />
+      </div>
+      <p className="text-[12px] text-ink-faint">
+        {kira ? t("live.educatorEditor.countdownDesc") : t("live.educatorEditor.paceDesc")}
+      </p>
     </div>
   );
 
@@ -520,71 +537,27 @@ export default function EditorKuizLangsung() {
       </Card>
 
       <div className="flex items-center justify-between mb-2 gap-2">
-        <h3 className="text-[14px] font-bold text-ink">{t("live.educatorEditor.questionsCount", { n: soalan.length })}</h3>
-        <Button onClick={() => setShowNew((s) => !s)}>
+        <div>
+          <h3 className="text-[14px] font-bold text-ink">{t("live.educatorEditor.questionsCount", { n: soalan.length })}</h3>
+          {soalan.length > 0 && (
+            <p className="text-[12px] text-ink-faint">
+              {t("live.educatorEditor.compatCount", { x: serasiBil, y: soalan.length })}
+            </p>
+          )}
+        </div>
+        <Button onClick={() => setEditing((s) => (s === "new" ? null : "new"))}>
           <Plus className="w-4 h-4" /> {t("live.educatorEditor.newQuestion")}
         </Button>
       </div>
 
-      {showNew && (
+      {/* KZ-046: QuestionEditor Arena mengendalikan keenam-enam jenis;
+          medan khusus mod Langsung kekal di sebelahnya. */}
+      {editing === "new" && (
         <Card className="mb-4">
           <CardHead title={t("live.educatorEditor.addQuestion")} />
           <div className="mt-4 space-y-4">
-            <Field label={t("live.educatorEditor.questionLabel")} htmlFor="soalan-baharu">
-              <Textarea
-                id="soalan-baharu"
-                rows={2}
-                placeholder={t("live.educatorEditor.questionPlaceholder")}
-                value={prompt}
-                onChange={(e) => setPrompt(e.target.value)}
-              />
-            </Field>
-            <Field label={t("live.educatorEditor.optionsLabel")} note={t("live.educatorEditor.optionsNote")}>
-              {barisPilihan(opts, setOpts, kunci, setKunci, "kunci-baharu", true)}
-            </Field>
-            {opts.length < 6 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-brand-purple"
-                onClick={() => setOpts([...opts, { key: HURUF[opts.length], text: "" }])}
-              >
-                {t("live.educatorEditor.addOption")}
-              </Button>
-            )}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <Field label={t("live.educatorEditor.pointsLabel")} htmlFor="soalan-baharu-mata">
-                <Input
-                  id="soalan-baharu-mata"
-                  type="number"
-                  min={1}
-                  value={points}
-                  onChange={(e) => setPoints(Number(e.target.value) || 1000)}
-                />
-              </Field>
-              <Field label={kiraDetik ? t("live.educatorEditor.timeSeconds") : t("live.educatorEditor.paceSeconds")} htmlFor="soalan-baharu-masa">
-                <Input
-                  id="soalan-baharu-masa"
-                  type="number"
-                  min={5}
-                  value={timeLimit}
-                  onChange={(e) => setTimeLimit(Number(e.target.value) || 20)}
-                />
-              </Field>
-            </div>
-            <div className="flex flex-wrap gap-6">
-              <CheckRadio label={t("live.educatorEditor.countdown")} checked={kiraDetik} onChange={(e) => setKiraDetik(e.target.checked)} />
-              <CheckRadio label={t("live.educatorEditor.doublePoints")} checked={mataBerganda} onChange={(e) => setMataBerganda(e.target.checked)} />
-            </div>
-            <p className="text-[12px] text-ink-faint">
-              {kiraDetik
-                ? t("live.educatorEditor.countdownDesc")
-                : t("live.educatorEditor.paceDesc")}
-            </p>
-            <div className="flex items-center justify-end gap-2">
-              <Button variant="outline" onClick={() => setShowNew(false)}>{t("common.cancel")}</Button>
-              <Button disabled={busy} onClick={onTambah}>{busy ? t("live.educatorEditor.saving") : t("live.educatorEditor.saveQuestion")}</Button>
-            </div>
+            <QuestionEditor onSave={onTambah} onCancel={() => setEditing(null)} />
+            {kawalanLive(kiraDetik, setKiraDetik, mataBerganda, setMataBerganda)}
           </div>
         </Card>
       )}
@@ -601,65 +574,43 @@ export default function EditorKuizLangsung() {
         <div className="space-y-3 mb-6">
           {soalan.map((s, idx) => (
             <Card key={s.id}>
-              {editId === s.id ? (
+              {editing === s.id ? (
                 <div className="space-y-4">
-                  <Field label={t("live.educatorEditor.questionLabel")} htmlFor={`sunting-${s.id}-prompt`}>
-                    <Textarea
-                      id={`sunting-${s.id}-prompt`}
-                      rows={2}
-                      value={editPrompt}
-                      onChange={(e) => setEditPrompt(e.target.value)}
-                    />
-                  </Field>
-                  <Field label={t("live.educatorEditor.optionsLabel")} note={t("live.educatorEditor.optionsNote")}>
-                    {barisPilihan(editOpts, setEditOpts, editKunci, setEditKunci, `kunci-sunting-${s.id}`, false)}
-                  </Field>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    <Field label={t("live.educatorEditor.pointsLabel")} htmlFor={`sunting-${s.id}-mata`}>
-                      <Input
-                        id={`sunting-${s.id}-mata`}
-                        type="number"
-                        min={1}
-                        value={editPoints}
-                        onChange={(e) => setEditPoints(Number(e.target.value) || 1000)}
-                      />
-                    </Field>
-                    <Field label={editKira ? t("live.educatorEditor.timeSeconds") : t("live.educatorEditor.paceSeconds")} htmlFor={`sunting-${s.id}-masa`}>
-                      <Input
-                        id={`sunting-${s.id}-masa`}
-                        type="number"
-                        min={5}
-                        value={editTime}
-                        onChange={(e) => setEditTime(Number(e.target.value) || 20)}
-                      />
-                    </Field>
-                  </div>
-                  <div className="flex flex-wrap gap-6">
-                    <CheckRadio label={t("live.educatorEditor.countdown")} checked={editKira} onChange={(e) => setEditKira(e.target.checked)} />
-                    <CheckRadio label={t("live.educatorEditor.doublePoints")} checked={editBerganda} onChange={(e) => setEditBerganda(e.target.checked)} />
-                  </div>
-                  <div className="flex items-center justify-end gap-2">
-                    <Button variant="outline" onClick={() => setEditId(null)} disabled={busy}>{t("common.cancel")}</Button>
-                    <Button onClick={onSimpanSunting} disabled={busy}><Check className="w-4 h-4" /> {t("live.educatorEditor.saveButton")}</Button>
-                  </div>
+                  <QuestionEditor initial={toInput(s)} onSave={onSimpanSunting} onCancel={() => setEditing(null)} />
+                  {kawalanLive(editKira, setEditKira, editBerganda, setEditBerganda)}
                 </div>
               ) : (
                 <div className="flex items-start gap-2">
                   <span className="text-[12px] font-bold text-ink-faint mt-1">{idx + 1}.</span>
                   <div className="flex-1 min-w-0">
-                    <div className="text-[14px] font-medium text-ink">{s.prompt}</div>
-                    <div className="text-[12px] text-ink-faint mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
-                      {s.options.map((o) => (
-                        <span key={o.key} className={o.key === s.correct_key ? "font-semibold text-green-700" : ""}>
-                          {o.key}. {o.text}{o.key === s.correct_key ? " ✓" : ""}
+                    <div className="flex flex-wrap items-center gap-2">
+                      <span className="inline-block rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-semibold text-indigo-700">
+                        {QTYPE_LABEL[(s.qtype || "multiple") as keyof typeof QTYPE_LABEL]}
+                      </span>
+                      {/* Soalan yang enjin Live tidak mainkan: Arena sahaja. */}
+                      {!serasiSoalan(s) && (
+                        <span className="inline-block rounded-full bg-amber-100 px-2 py-0.5 text-[11px] font-semibold text-amber-800">
+                          {t("live.educatorEditor.arenaOnly")}
                         </span>
-                      ))}
+                      )}
                     </div>
+                    <div className="text-[14px] font-medium text-ink mt-1">{s.prompt}</div>
+                    {s.options.length > 0 && (
+                      <div className="text-[12px] text-ink-faint mt-1 grid grid-cols-1 sm:grid-cols-2 gap-x-4">
+                        {s.options.map((o) => (
+                          <span key={o.key} className={o.key === s.correct_key ? "font-semibold text-green-700" : ""}>
+                            {o.key}. {o.text}{o.key === s.correct_key ? " ✓" : ""}
+                          </span>
+                        ))}
+                      </div>
+                    )}
                     <div className="text-[12px] text-ink-faint mt-1">
                       {t("live.educatorEditor.pointsN", { n: s.points })}{s.double_points ? " × 2" : ""} ·{" "}
-                      {s.use_countdown === false
-                        ? t("live.educatorEditor.noCountdownPace", { n: s.time_limit_sec })
-                        : t("live.educatorEditor.countdownSec", { n: s.time_limit_sec })}
+                      {serasiSoalan(s)
+                        ? (s.use_countdown === false
+                            ? t("live.educatorEditor.noCountdownPace", { n: s.time_limit_sec })
+                            : t("live.educatorEditor.countdownSec", { n: s.time_limit_sec }))
+                        : s.time_limit_sec + "s"}
                     </div>
                   </div>
                   <div className="flex items-center gap-1 shrink-0">
@@ -690,86 +641,95 @@ export default function EditorKuizLangsung() {
         </div>
       )}
 
+      {/* KZ-046: import Excel / CSV / Aiken melalui /import-arena. */}
       <Card className="mb-4">
         <CardHead
           title={
             <span className="flex items-center gap-2">
-              <FileSpreadsheet className="w-4 h-4 text-violet-600" /> {t("live.educatorEditor.csvTitle")}
+              <FileSpreadsheet className="w-4 h-4 text-violet-600" /> {t("live.educatorEditor.importTitle")}
             </span>
           }
         />
         <p className="text-[12px] text-ink-faint mt-3 mb-3">
-          {t("live.educatorEditor.csvDesc")}
+          {t("live.educatorEditor.importDesc")}
         </p>
         <div className="bg-violet-50 border border-violet-200 rounded-xl p-4 mb-3 text-xs text-gray-700">
           <div className="font-semibold mb-1">{t("live.educatorEditor.csvColumns")}</div>
           <ul className="list-disc ml-4 space-y-0.5">
-            <li><code className="font-mono">question</code>, {t("live.educatorEditor.csvColQuestion")}</li>
-            <li><code className="font-mono">option_a</code> {t("live.educatorEditor.csvColRange")} <code className="font-mono">option_d</code>, {t("live.educatorEditor.csvColOptions")}</li>
-            <li><code className="font-mono">correct</code>, {t("live.educatorEditor.csvColCorrect")}</li>
-            <li><code className="font-mono">points</code>, {t("live.educatorEditor.csvColPoints")}</li>
-            <li><code className="font-mono">seconds</code>, {t("live.educatorEditor.csvColSeconds")}</li>
+            {t("live.educatorEditor.importTypes").split("\n").map((baris, i) => (
+              <li key={i}>{baris}</li>
+            ))}
           </ul>
-          <div className="mt-2">
-            {t("live.educatorEditor.csvSaveAs")} <strong>CSV UTF-8</strong> {t("live.educatorEditor.csvInExcel")}
-          </div>
         </div>
         <div className="flex items-center gap-3 flex-wrap">
           {/* Pautan muat turun kekal <a> biasa: ini fail API, bukan laluan aplikasi. */}
           <a
-            href="/api/live/quiz-template"
+            href="/api/arena/template"
             className="px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 text-sm flex items-center gap-1"
           >
-            <Download className="w-4 h-4" /> {t("live.educatorEditor.downloadTemplate")}
+            <Download className="w-4 h-4" /> {t("live.educatorEditor.downloadArenaTemplate")}
           </a>
-          <input
-            ref={csvInputRef}
-            type="file"
-            accept=".csv,text/csv"
-            onChange={onPilihCsv}
-            disabled={csvBusy}
-            className="text-xs"
+          <label className="px-3 py-1.5 rounded-lg border border-violet-300 text-violet-700 hover:bg-violet-50 text-sm flex items-center gap-1 cursor-pointer">
+            <Upload className="w-4 h-4" />
+            {impBusy ? t("live.educatorEditor.uploading") : t("live.educatorEditor.uploadExcelCsv")}
+            <input
+              type="file"
+              accept=".xlsx,.csv"
+              className="hidden"
+              disabled={impBusy}
+              onChange={(e) => {
+                const f = e.currentTarget.files?.[0] ?? null;
+                e.currentTarget.value = "";
+                if (f) void importFile(f);
+              }}
+            />
+          </label>
+        </div>
+
+        <div className="mt-4 space-y-2 rounded-xl bg-slate-50 p-4">
+          <p className="text-[13px] font-bold text-ink">{t("live.educatorEditor.aikenTextLabel")}</p>
+          <p className="text-[12px] text-ink-faint">{t("live.educatorEditor.aikenExample")}</p>
+          <pre className="overflow-x-auto rounded-lg bg-white p-2 text-xs text-ink-faint ring-1 ring-slate-200">{"Berapakah 2 + 2?\nA. 3\nB. 4\nANSWER: B"}</pre>
+          <Textarea
+            className="w-full font-mono text-xs"
+            rows={4}
+            placeholder={t("live.educatorEditor.aikenPlaceholder")}
+            value={aikenText}
+            onChange={(e) => setAikenText(e.target.value)}
           />
-          {csvBusy && <span className="text-xs text-ink-faint">{t("live.educatorEditor.uploading")}</span>}
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="px-3 py-1.5 rounded-lg border border-slate-300 bg-white text-slate-700 hover:bg-slate-50 text-sm flex items-center gap-1 cursor-pointer">
+              {t("live.educatorEditor.uploadAikenFile")}
+              <input
+                type="file"
+                accept=".txt,.text"
+                className="hidden"
+                disabled={impBusy}
+                onChange={(e) => {
+                  const f = e.currentTarget.files?.[0] ?? null;
+                  e.currentTarget.value = "";
+                  if (f) void importAikenFile(f);
+                }}
+              />
+            </label>
+            <Button disabled={impBusy || !aikenText.trim()} onClick={() => void hantarImport("aiken", aikenText)}>
+              <Upload className="w-4 h-4" /> {impBusy ? t("live.educatorEditor.importing") : t("live.educatorEditor.importAikenButton")}
+            </Button>
+          </div>
         </div>
-        {csvMsg && (
-          <Alert tone={csvMsg.ok ? "success" : "danger"} className="mt-3">{csvMsg.text}</Alert>
+
+        {impMsg && <Alert tone="success" className="mt-3">{impMsg}</Alert>}
+        {impErr && <Alert tone="danger" className="mt-3">{impErr}</Alert>}
+        {impRows && (
+          <div className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs text-amber-800">
+            <p className="font-semibold">{t("live.educatorEditor.importNoRows")}</p>
+            <ul className="mt-1 list-disc ml-4 space-y-0.5">
+              {impRows.map((r, i) => (
+                <li key={i}>{r.row > 0 ? t("live.educatorEditor.csvRow", { n: r.row }) : ""}{r.message}</li>
+              ))}
+            </ul>
+          </div>
         )}
-        {csvErrors.length > 0 && (
-          <ul className="mt-2 text-xs text-red-700 space-y-1 max-h-48 overflow-auto list-disc ml-4">
-            {csvErrors.map((x, i) => (
-              <li key={i}>{x.row > 0 ? t("live.educatorEditor.csvRow", { n: x.row }) : ""}{x.message}</li>
-            ))}
-          </ul>
-        )}
-      </Card>
-      <Card>
-        <CardHead
-          title={
-            <span className="flex items-center gap-2">
-              <Upload className="w-4 h-4 text-indigo-600" /> {t("live.educatorEditor.aikenTitle")}
-            </span>
-          }
-        />
-        <p className="text-[12px] text-ink-faint mt-3 mb-2">
-          {t("live.educatorEditor.aikenDesc1")}
-          {t("live.educatorEditor.aikenDescMid")}<code className="font-mono bg-gray-100 px-1 rounded">ANSWER:</code>{t("live.educatorEditor.aikenDesc3")}
-        </p>
-        <Textarea
-          className="w-full font-mono text-xs mb-2"
-          rows={6}
-          placeholder={t("live.educatorEditor.aikenPlaceholder")}
-          value={aiken}
-          onChange={(e) => setAiken(e.target.value)}
-        />
-        <div className="flex items-center gap-3 flex-wrap">
-          <Button onClick={onImportAiken} disabled={aikenBusy}>
-            <Upload className="w-4 h-4" /> {aikenBusy ? t("live.educatorEditor.importing") : t("live.educatorEditor.importLabel")}
-          </Button>
-          {aikenMsg && (
-            <span className={`text-xs ${aikenMsg.ok ? "text-green-600" : "text-red-600"}`}>{aikenMsg.text}</span>
-          )}
-        </div>
       </Card>
     </Shell>
   );

@@ -1723,6 +1723,28 @@ export const en = {
       aikenPlaceholder: 'What is the capital of Malaysia?\nA. Johor Bahru\nB. Kuala Lumpur\nC. Ipoh\nANSWER: B',
       importing: 'Importing…',
       importLabel: 'Import',
+      // KZ-046: quiz editor unified with Arena (6 question types).
+      arenaOnly: 'Arena only',
+      compatCount: '{x} questions for Live mode, {y} for Arena',
+      liveFieldsTitle: 'Live mode',
+      liveFieldsNote:
+        'Countdown and double points are only used by Live mode, and only for single-answer multiple choice and True / False questions.',
+      importTitle: 'Import questions (Excel, CSV, Aiken)',
+      importDesc:
+        'Download the template below, fill it in Excel, then upload the same .xlsx or .csv file. The template includes one example of every question type. One bad row means nothing is imported; the row is listed for you to fix. Up to 200 questions per import.',
+      importTypes:
+        'multiple: choices in option_a onward; answer = a letter or letters separated by commas (example A,C)\nshort: accepted answers separated by | (example Green|light green)\nox: answer True or False (also B/S, O/X, True/False)\nessay: answer = grading rubric (optional)\nmatch: each choice shaped left = right (2 to 5 pairs)\nsort: option_a through option_e in the correct order (2 to 5 items)',
+      importNoRows: 'No questions imported. Fix the rows below and upload again:',
+      importDone: '{cipta} questions added.',
+      importSkipped: ' {lompat} Aiken blocks skipped.',
+      importTooLarge: 'The file is larger than 2 MB.',
+      importReadFailed: 'The file could not be read.',
+      uploadExcelCsv: 'Upload Excel / CSV',
+      uploadAikenFile: 'Upload Aiken file (.txt)',
+      importAikenButton: 'Import Aiken',
+      aikenTextLabel: 'Aiken text',
+      aikenExample: 'Example format: one block per question, a blank line between blocks.',
+      downloadArenaTemplate: 'Download the Excel template',
     },
     // Panel hos sesi (src/app/educator/live/session/[sessionId]/page.tsx).
     session: {
