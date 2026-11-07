@@ -462,6 +462,8 @@ export default function EditorKuizLangsung() {
       {panelMula && (
         <PanelMulaSesi
           bilSoalan={soalan.length}
+          bilSerasi={serasiBil}
+          quizId={quizId}
           mod={modPilih}
           setMod={setModPilih}
           minitTeks={minitTeks}

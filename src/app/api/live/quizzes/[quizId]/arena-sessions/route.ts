@@ -18,6 +18,7 @@ import { ralatJson } from '@/lib/i18n/ralatApi';
 import { requireQuizHost } from '@/lib/live-quiz';
 import { makeSessionCode } from '@/lib/arena/public';
 import { ARENA_MAPS } from '@/lib/arena/maps';
+import { PULAU_PETA } from '@/components/arena/games/pulauPeta';
 import { ARENA_MODES, type ArenaMode, type ArenaSession, type ArenaView } from '@/lib/arena/types';
 
 export const runtime = 'nodejs';
@@ -27,6 +28,8 @@ export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
 
 const PAPARAN_SAHAH: readonly string[] = ['list', 'map', 'pulau', 'hantu'];
+/** KZ-046: view 'pulau' memilih pulau (pulauPeta.ts), bukan peta Arena biasa. */
+const PULAU_ID: readonly string[] = PULAU_PETA.map((p) => p.id);
 
 export async function POST(req: NextRequest, { params }: { params: { quizId: string } }) {
   const host = await requireQuizHost(req, params.quizId);
@@ -41,8 +44,15 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   const paparan = String(body.view ?? 'list');
   if (!PAPARAN_SAHAH.includes(paparan)) return ralatJson('Invalid view', 400);
   const view = paparan as ArenaView;
+  // KZ-046: pilihan peta disemak terhadap senarai yang sepadan dengan view;
+  // view 'pulau' memilih pulau, yang lain memilih peta Arena biasa.
+  const senaraiPeta = paparan === 'pulau' ? PULAU_ID : ARENA_MAPS.map((m) => m.id);
+  const petaLalai =
+    paparan === 'pulau'
+      ? (PULAU_PETA[0]?.id ?? 'kelapa')
+      : (ARENA_MAPS[0]?.id ?? 'kampus');
   const mapIdRaw = typeof body.mapId === 'string' ? body.mapId : '';
-  const mapId = ARENA_MAPS.some((m) => m.id === mapIdRaw) ? mapIdRaw : (ARENA_MAPS[0]?.id ?? 'kampus');
+  const mapId = senaraiPeta.includes(mapIdRaw) ? mapIdRaw : petaLalai;
   const tcRaw = Number(body.teamCount ?? 2);
   const teamCount = Number.isFinite(tcRaw) ? Math.min(4, Math.max(2, Math.round(tcRaw))) : 2;
 
