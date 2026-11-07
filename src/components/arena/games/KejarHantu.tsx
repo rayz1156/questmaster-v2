@@ -458,6 +458,8 @@ export default function KejarHantu(props: GameProps) {
                 h.y = PINTU_KELUAR.y;
                 h.keadaan = 'aktif';
                 h.arah = Math.random() < 0.5 ? KIRI : KANAN;
+                // keluar ketika mod kuasa masih berjalan: turut takut
+                if (st.masaKuasa > 0) h.gelisah = true;
               }
             }
           } else if (h.keadaan === 'rumah') {
