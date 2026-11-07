@@ -178,38 +178,39 @@ check(
 
 /* ===== Bahagian 6: pilihan arah di simpang dengan keutamaan seri ===== */
 
-// Jubin (6,5): simpang empat arah (atas, kiri, bawah, kanan semuanya laluan).
-check('(6,5) simpang penuh', arahBolehDari(6, 5, false).length === 4, arahBolehDari(6, 5, false));
+// Jubin (6,11): simpang empat arah (atas, kiri, bawah, kanan semuanya laluan).
+check('(6,11) simpang penuh', arahBolehDari(6, 11, false).length === 4, arahBolehDari(6, 11, false));
 
 // Semua arah sama jarak bila sasaran ialah jubin itu sendiri: pilih ATAS.
-check('seri empat arah pilih atas', pilihArahKeSasaran(6, 5, KANAN, { x: 6, y: 5 }) === ATAS,
-  pilihArahKeSasaran(6, 5, KANAN, { x: 6, y: 5 }));
+check('seri empat arah pilih atas', pilihArahKeSasaran(6, 11, KANAN, { x: 6, y: 11 }) === ATAS,
+  pilihArahKeSasaran(6, 11, KANAN, { x: 6, y: 11 }));
 
-check('seri atas-kiri pilih atas', pilihArahKeSasaran(6, 5, KANAN, { x: 5, y: 4 }) === ATAS,
-  pilihArahKeSasaran(6, 5, KANAN, { x: 5, y: 4 }));
-check('seri atas-kanan pilih atas', pilihArahKeSasaran(6, 5, KANAN, { x: 7, y: 4 }) === ATAS,
-  pilihArahKeSasaran(6, 5, KANAN, { x: 7, y: 4 }));
+check('seri atas-kiri pilih atas', pilihArahKeSasaran(6, 11, KANAN, { x: 5, y: 10 }) === ATAS,
+  pilihArahKeSasaran(6, 11, KANAN, { x: 5, y: 10 }));
+check('seri atas-kanan pilih atas', pilihArahKeSasaran(6, 11, KANAN, { x: 7, y: 10 }) === ATAS,
+  pilihArahKeSasaran(6, 11, KANAN, { x: 7, y: 10 }));
 // arah semasa dipilih supaya tiada arah seri terlibat sebagai balikan larang
-check('seri kiri-bawah pilih kiri', pilihArahKeSasaran(6, 5, KIRI, { x: 5, y: 6 }) === KIRI,
-  pilihArahKeSasaran(6, 5, KIRI, { x: 5, y: 6 }));
-check('seri bawah-kanan pilih bawah', pilihArahKeSasaran(6, 5, BAWAH, { x: 7, y: 6 }) === BAWAH,
-  pilihArahKeSasaran(6, 5, BAWAH, { x: 7, y: 6 }));
+check('seri kiri-bawah pilih kiri', pilihArahKeSasaran(6, 11, KIRI, { x: 5, y: 12 }) === KIRI,
+  pilihArahKeSasaran(6, 11, KIRI, { x: 5, y: 12 }));
+check('seri bawah-kanan pilih bawah', pilihArahKeSasaran(6, 11, BAWAH, { x: 7, y: 12 }) === BAWAH,
+  pilihArahKeSasaran(6, 11, BAWAH, { x: 7, y: 12 }));
 
 // Arah terdekat menang walaupun keutamaan lebih rendah.
-check('kanan lebih dekat menang atas kiri', pilihArahKeSasaran(6, 5, KANAN, { x: 7, y: 5 }) === KANAN,
-  pilihArahKeSasaran(6, 5, KANAN, { x: 7, y: 5 }));
+check('kanan lebih dekat menang atas kiri', pilihArahKeSasaran(6, 11, KANAN, { x: 7, y: 11 }) === KANAN,
+  pilihArahKeSasaran(6, 11, KANAN, { x: 7, y: 11 }));
 
-// Larang berpatah balik: dari (6,5) arah KANAN, kiri dibuang.
+// Larang berpatah balik: dari (6,11) arah KANAN, kiri dibuang.
 // Sasaran jauh kiri (0,5): atas dan bawah sama jarak, kanan menjauh: pilih ATAS.
-check('larang balik: kiri dibuang dari arah kanan', pilihArahKeSasaran(6, 5, KANAN, { x: 0, y: 5 }) === ATAS,
-  pilihArahKeSasaran(6, 5, KANAN, { x: 0, y: 5 }));
+check('larang balik: kiri dibuang dari arah kanan', pilihArahKeSasaran(6, 11, KANAN, { x: 0, y: 11 }) === ATAS,
+  pilihArahKeSasaran(6, 11, KANAN, { x: 0, y: 11 }));
 
-// Jalan mati sebenar: jubin (12,19) hanya boleh keluar ke bawah. Hantu yang
-// tiba di sana (arah ATAS) terpaksa berpatah balik walau sasaran di atas.
-check('(12,19) jalan satu hala ke bawah', arahBolehDari(12, 19, true).length === 1 && arahBolehDari(12, 19, true)[0] === BAWAH,
-  arahBolehDari(12, 19, true));
-check('jalan mati memaksa berpatah balik', pilihArahKeSasaran(12, 19, ATAS, { x: 12, y: 0 }, true) === BAWAH,
-  pilihArahKeSasaran(12, 19, ATAS, { x: 12, y: 0 }, true));
+// Labirin rekaan sendiri (KZ-048, dilukis semula PM) tiada jalan mati: setiap
+// jubin yang boleh dilalui hantu ada sekurang-kurangnya dua keluar, jadi hantu
+// tidak pernah dipaksa berpatah balik di luar pertukaran mod.
+const jalanMati = senaraiJubinBolehJalan(true).filter((j) => arahBolehDari(j.x, j.y, true).length < 2);
+check('labirin tiada jalan mati untuk hantu', jalanMati.length === 0, jalanMati);
+const jalanMatiKuizi = senaraiJubinBolehJalan(false).filter((j) => arahBolehDari(j.x, j.y, false).length < 2);
+check('labirin tiada jalan mati untuk Kuizi', jalanMatiKuizi.length === 0, jalanMatiKuizi);
 
 // Kuizi tidak boleh lalui pintu: arah atas/bawah sahaja tidak wujud untuknya.
 check('pintu tidak boleh dilalui Kuizi', arahBolehDari(13, 10, false).length === 2, arahBolehDari(13, 10, false));
@@ -217,16 +218,10 @@ check('pintu tidak boleh dilalui Kuizi', arahBolehDari(13, 10, false).length ===
 // Frightened: pilihan rawak tidak pernah balik bila ada pilihan lain.
 let pernahBalik = false;
 for (let i = 0; i < 200; i++) {
-  const a = pilihArahRawak(6, 5, KANAN, true, () => i / 200);
+  const a = pilihArahRawak(6, 11, KANAN, true, () => i / 200);
   if (a === KIRI) pernahBalik = true;
 }
 check('frightened tidak pernah memilih arah balik di simpang penuh', !pernahBalik);
-let sentiasaBalik = true;
-for (let i = 0; i < 200; i++) {
-  const a = pilihArahRawak(12, 19, ATAS, true, () => i / 200);
-  if (a !== BAWAH) sentiasaBalik = false;
-}
-check('frightened balik hanya bila tiada pilihan lain', sentiasaBalik);
 
 // Keutamaan tatasusunan ikut atas, kiri, bawah, kanan.
 check('urutan keutamaan sah', URUT_KEUTAMAAN[0] === ATAS && URUT_KEUTAMAAN[1] === KIRI && URUT_KEUTAMAAN[2] === BAWAH && URUT_KEUTAMAAN[3] === KANAN);
