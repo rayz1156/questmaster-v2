@@ -3,11 +3,19 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { FormEvent, ReactNode } from 'react';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import clsx from 'clsx';
 import { Lock, Snowflake, Trophy, WifiOff } from 'lucide-react';
 import ArenaMap from '@/components/arena/ArenaMap';
 import QuestionPopup, { LABEL_JENIS, WARNA_AVATAR, bacaRalat, ralatBM } from '@/components/arena/QuestionPopup';
+import type { PemainPulau } from '@/components/arena/games/PulauHartaKarun';
 import type { AnswerResponse, PlayStateResponse, PresenceStatus, PublicQuestion } from '@/lib/arena/types';
+
+// KZ-046: permainan Pulau Harta Karun / Kejar Hantu dimuat dengan
+// next/dynamic ssr:false supaya bundel halaman lain tidak membesar;
+// kanvas digambar di klien sahaja.
+const PulauHartaKarun = dynamic(() => import('@/components/arena/games/PulauHartaKarun'), { ssr: false });
+const KejarHantu = dynamic(() => import('@/components/arena/games/KejarHantu'), { ssr: false });
 
 interface Simpanan {
   playerToken: string;
@@ -237,9 +245,19 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
   const [putus, setPutus] = useState(false);
   const [soalan, setSoalan] = useState<SoalanResp>({ questions: [], available: [], locked: [] });
   const [buka, setBuka] = useState<PublicQuestion | null>(null);
+  // KZ-046: hasil jawapan terakhir, dipetakan ke prop powerUp permainan
+  // (pulau/hantu). Jawapan yang menunggu penilaian guru dianggap salah
+  // bagi tujuan permainan sahaja.
+  const [powerUp, setPowerUp] = useState<{ questionId: string; correct: boolean; seq: number } | null>(null);
+  // salinan ref soalan yang sedang dibuka, untuk questionId powerUp
+  const bukaRef = useRef<PublicQuestion | null>(null);
   const [offset, setOffset] = useState(0);
   const [kini, setKini] = useState<number>(() => Date.now());
   const autoBuka = useRef<Set<string>>(new Set());
+
+  useEffect(() => {
+    bukaRef.current = buka;
+  }, [buka]);
 
   const tetapSimpanan = useCallback(
     (s: Simpanan | null) => {
@@ -377,6 +395,16 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
     [soalan, st?.myAnswers],
   );
 
+  // KZ-046: pemain untuk Pulau Harta Karun (PemainPulau), kedudukan terkini.
+  const pemainPulau: PemainPulau[] = (st?.players ?? []).map((p) => ({
+    id: p.id,
+    nickname: p.nickname,
+    avatar: p.avatar,
+    x: p.x,
+    y: p.y,
+    presence: p.presence,
+  }));
+
   const hantarGerak = useCallback(
     (x: number, y: number) => {
       const tk = simpananRef.current;
@@ -402,6 +430,11 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
   const selepasJawab = useCallback(
     (r: AnswerResponse) => {
       setSt((s) => (s && s.me ? { ...s, me: { ...s.me, score: r.totalScore } } : s));
+      // KZ-046: hasil jawapan untuk permainan pulau/hantu. isCorrect null
+      // bermakna menunggu penilaian guru: dianggap salah untuk permainan.
+      const idSoalan = bukaRef.current?.id ?? '';
+      const betul = r.result.isCorrect === true;
+      setPowerUp((p) => ({ questionId: idSoalan, correct: betul, seq: (p?.seq ?? 0) + 1 }));
       void muatState();
       void muatSoalan();
     },
@@ -586,7 +619,44 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
                 </div>
               )}
 
-              {s.view !== 'map' && s.mode !== 'round' && (
+              {/* KZ-046: permainan Pulau Harta Karun / Kejar Hantu. */}
+              {s.view === 'pulau' && (
+                <div className="overflow-hidden rounded-2xl bg-white shadow">
+                  <PulauHartaKarun
+                    sessionId={s.id}
+                    code={code}
+                    mapId={s.map_id}
+                    me={petaMe}
+                    players={pemainPulau}
+                    meX={me.x}
+                    meY={me.y}
+                    questions={petaSoalan}
+                    frozen={s.frozen}
+                    resetSeq={s.reset_seq}
+                    paused={buka !== null}
+                    powerUp={powerUp}
+                    onTouchQuestion={bukaSoalan}
+                    onMove={hantarGerak}
+                  />
+                </div>
+              )}
+
+              {s.view === 'hantu' && (
+                <div className="overflow-hidden rounded-2xl bg-white shadow">
+                  <KejarHantu
+                    me={petaMe}
+                    questions={petaSoalan}
+                    frozen={s.frozen}
+                    resetSeq={s.reset_seq}
+                    paused={buka !== null}
+                    powerUp={powerUp}
+                    onTouchQuestion={bukaSoalan}
+                  />
+                </div>
+              )}
+
+              {/* Grid senarai lama: hanya untuk view 'list', bukan pulau/hantu. */}
+              {s.view === 'list' && s.mode !== 'round' && (
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4">
                   {soalan.questions.map((q, i) => {
                     const a = st.myAnswers[q.id];

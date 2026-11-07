@@ -313,6 +313,9 @@ export async function buildPlayState(
 
   return {
     session: {
+      // KZ-046: id sesi diperlukan oleh permainan Pulau Harta Karun
+      // (kabus peti emas dikunci ikut sessionId + questionId).
+      id: session.id,
       code: session.code,
       mode: session.mode,
       view: session.view,

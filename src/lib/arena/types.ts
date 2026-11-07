@@ -201,7 +201,7 @@ export interface ArenaPlayerPublic {
 
 /** GET /api/arena/play/[code]/state (header x-player-token) */
 export interface PlayStateResponse {
-  session: Pick<ArenaSession, 'code' | 'mode' | 'view' | 'status' | 'frozen' | 'current_index' | 'round_started_at' | 'ends_at' | 'map_id' | 'team_count' | 'reset_seq'> & { title: string; questionCount: number };
+  session: Pick<ArenaSession, 'id' | 'code' | 'mode' | 'view' | 'status' | 'frozen' | 'current_index' | 'round_started_at' | 'ends_at' | 'map_id' | 'team_count' | 'reset_seq'> & { title: string; questionCount: number };
   me: ArenaPlayerPublic | null;
   /** id soalan yang SAYA sudah jawab -> keputusan ringkas */
   myAnswers: Record<string, { isCorrect: boolean | null; score: number }>;
