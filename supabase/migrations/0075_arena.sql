@@ -1,5 +1,5 @@
 -- 0075_arena.sql
--- Kuizen Arena: kuiz gaya ZEP QUIZ (6 jenis soalan, 5 mod, paparan senarai/peta 2D).
+-- Kuizen Arena: kuiz permainan gaya arcade (6 jenis soalan, 5 mod, paparan senarai/peta 2D).
 --
 -- Lima jadual baharu berawalan qm_arena_. Tiada jadual sedia ada diubah.
 -- RLS dihidupkan TANPA polisi: hanya service role (laluan pelayan) boleh
