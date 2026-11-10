@@ -50,6 +50,22 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     .limit(1)
     .maybeSingle();
 
+  // KZ-049: kod ini mungkin sesi Arena (cara main kuiz yang sama). Skrin
+  // masuk Live akan menghala pelajar ke /arena/<kod>; tiada data lain
+  // dipulangkan.
+  if (!session) {
+    const { data: arena } = await supa
+      .from('qm_arena_sessions')
+      .select('id')
+      .eq('code', code)
+      .neq('status', 'ended')
+      .limit(1)
+      .maybeSingle();
+    if (arena) {
+      return NextResponse.json({ registeredName: null, classQuiz: false, member: false, arena: true });
+    }
+  }
+
   const { data: quiz } = await supa
     .from('qm_live_quizzes')
     .select('class_id')

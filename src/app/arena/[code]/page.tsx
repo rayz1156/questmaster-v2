@@ -7,6 +7,7 @@ import dynamic from 'next/dynamic';
 import clsx from 'clsx';
 import { Lock, Snowflake, Trophy, WifiOff } from 'lucide-react';
 import ArenaMap from '@/components/arena/ArenaMap';
+import { supabase } from '@/lib/supabase';
 import QuestionPopup, { LABEL_JENIS, WARNA_AVATAR, bacaRalat, ralatBM } from '@/components/arena/QuestionPopup';
 import type { PemainPulau } from '@/components/arena/games/PulauHartaKarun';
 import type { AnswerResponse, PlayStateResponse, PresenceStatus, PublicQuestion } from '@/lib/arena/types';
@@ -88,6 +89,9 @@ function BorangMasuk({
   const [pasukan, setPasukan] = useState(0);
   const [sibuk, setSibuk] = useState(false);
   const [ralat, setRalat] = useState<string | null>(null);
+  // KZ-049: kuiz kelas menolak tetamu (LOGIN_REQUIRED) dan bukan ahli
+  // (NOT_CLASS_MEMBER). Papar kad dengan langkah seterusnya.
+  const [kodMasuk, setKodMasuk] = useState<'LOGIN_REQUIRED' | 'NOT_CLASS_MEMBER' | null>(null);
 
   async function hantar(e: FormEvent) {
     e.preventDefault();
@@ -101,13 +105,24 @@ function BorangMasuk({
     try {
       const body: Record<string, unknown> = { nickname: n, avatar };
       if (mode === 'team') body.team = pasukan;
+      // KZ-049: hantar Bearer jika pengguna log masuk (sama seperti Live),
+      // supaya pelayan boleh mengesahkan keahlian kelas.
+      const ses = await supabase.auth.getSession();
+      const auth: Record<string, string> = ses.data.session
+        ? { Authorization: `Bearer ${ses.data.session.access_token}` }
+        : {};
       const res = await fetch(`/api/arena/play/${code}/join`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...auth },
         body: JSON.stringify(body),
       });
       const j: unknown = await res.json().catch(() => null);
       if (!res.ok) {
+        const kod = (j as { code?: unknown } | null)?.code;
+        if (kod === 'LOGIN_REQUIRED' || kod === 'NOT_CLASS_MEMBER') {
+          setKodMasuk(kod);
+          return;
+        }
         setRalat(res.status === 404 ? 'Kod permainan tidak dijumpai.' : ralatBM(bacaRalat(j, res.status)));
         return;
       }
@@ -118,6 +133,33 @@ function BorangMasuk({
     } finally {
       setSibuk(false);
     }
+  }
+
+  if (kodMasuk) {
+    const ke = `/arena/${code}`;
+    return (
+      <Skrin>
+        <h1 className="text-2xl font-black text-slate-900">Masuk ke {code}</h1>
+        {kodMasuk === 'LOGIN_REQUIRED' ? (
+          <>
+            <p className="mt-3 text-slate-600">Kuiz ini untuk ahli kelas. Log masuk dahulu, kemudian anda akan kembali ke permainan ini.</p>
+            <Link href={`/login?next=${encodeURIComponent(ke)}`} className="mt-5 block w-full rounded-xl bg-indigo-600 py-4 text-xl font-bold text-white shadow">
+              Log masuk
+            </Link>
+          </>
+        ) : (
+          <>
+            <p className="mt-3 text-slate-600">Anda belum menyertai kelas untuk kuiz ini. Sertai kelas dengan kod kelas daripada guru, kemudian buka semula pautan permainan.</p>
+            <Link href="/participant/join" className="mt-5 block w-full rounded-xl bg-indigo-600 py-4 text-xl font-bold text-white shadow">
+              Sertai kelas
+            </Link>
+          </>
+        )}
+        <button type="button" onClick={() => setKodMasuk(null)} className="mt-3 text-sm font-semibold text-indigo-700 underline">
+          Cuba lagi
+        </button>
+      </Skrin>
+    );
   }
 
   return (

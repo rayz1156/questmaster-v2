@@ -170,6 +170,11 @@ export default function SkrinMainLangsung() {
           : {};
         const r = await fetch(`/api/live/play/${kod}/whoami`, { headers });
         const j = await r.json();
+        // KZ-049: kod ini sesi Arena, bukan Live: pindah ke halaman Arena.
+        if (j?.arena === true) {
+          window.location.replace(`/arena/${encodeURIComponent(kod)}`);
+          return;
+        }
         const nama = typeof j?.registeredName === "string" && j.registeredName ? j.registeredName : "";
         if (hidup) {
           setAdaSesi(!!ses.data.session);
