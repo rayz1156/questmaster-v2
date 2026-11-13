@@ -15,6 +15,7 @@ import {
 } from "lucide-react";
 import { BONUS_LALAI_SEC, formatJam, ordinal, cadanganSoalan, ulanganSoalan } from "@/lib/lumba-laju";
 import QuestionReview, { type ReviewHos } from "@/components/QuestionReview";
+import { useBahasa } from "@/lib/i18n/BahasaProvider";
 
 // KZ-013: jenis kekal dieksport dari sini supaya halaman hos tidak berubah.
 export type { ReviewHos };
@@ -69,6 +70,7 @@ function inisial(nama: string): string {
 }
 
 export default function RaceHostPanel({ session, players, questionCount, serverNow, review, busy, kawal }: Props) {
+  const { t } = useBahasa();
   const [kini, setKini] = useState(() => Date.now());
   const [penuh, setPenuh] = useState(false);
   const sorokRef = useRef(0);
@@ -254,7 +256,8 @@ export default function RaceHostPanel({ session, players, questionCount, serverN
         </div>
         {players.length > 0 && (
           <div className="card">
-            <div className="font-semibold mb-2">Full standings</div>
+            <div className="font-semibold">{t("live.raceStandings.title")}</div>
+            <p className="text-xs text-gray-500 mb-2">{t("live.raceStandings.note")}</p>
             <ol className="divide-y divide-gray-100 text-sm">
               {players.map((p) => (
                 <li key={p.id} className="flex items-center justify-between py-1.5 gap-2">

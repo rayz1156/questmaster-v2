@@ -1543,6 +1543,11 @@ export const ms: Kamus = {
     },
   },
   live: {
+    // Senarai penuh Lumba Laju (src/components/RaceHostPanel.tsx).
+    raceStandings: {
+      title: 'Kedudukan penuh',
+      note: 'Kedudukan ikut siapa sampai garisan penamat dahulu, bukan ikut markah. Markah dikira daripada jawapan betul, kelajuan dan nilai soalan.',
+    },
     // Halaman sertai tanpa log masuk (src/app/live/page.tsx).
     join: {
       title: 'Kuiz Langsung',

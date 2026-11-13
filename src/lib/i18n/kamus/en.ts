@@ -1579,6 +1579,11 @@ export const en = {
     },
   },
   live: {
+    // Senarai penuh Lumba Laju (src/components/RaceHostPanel.tsx).
+    raceStandings: {
+      title: 'Full standings',
+      note: 'Ranked by who reached the finish line first, not by points. Points come from correct answers, speed and question value.',
+    },
     // Halaman sertai tanpa log masuk (src/app/live/page.tsx).
     join: {
       title: 'Live Quiz',
