@@ -107,15 +107,20 @@ function BorangMasuk({
       if (mode === 'team') body.team = pasukan;
       // KZ-049: hantar Bearer jika pengguna log masuk (sama seperti Live),
       // supaya pelayan boleh mengesahkan keahlian kelas.
+      // KZ-050: jika pelayan menolak token (401) sedangkan pengguna ada sesi
+      // log masuk, token itu luput: segar semula dan cuba sekali lagi.
+      const hantarJoin = async (token: string | null) =>
+        fetch(`/api/arena/play/${code}/join`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify(body),
+        });
       const ses = await supabase.auth.getSession();
-      const auth: Record<string, string> = ses.data.session
-        ? { Authorization: `Bearer ${ses.data.session.access_token}` }
-        : {};
-      const res = await fetch(`/api/arena/play/${code}/join`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...auth },
-        body: JSON.stringify(body),
-      });
+      let res = await hantarJoin(ses.data.session?.access_token ?? null);
+      if (res.status === 401 && ses.data.session) {
+        const segar = await supabase.auth.refreshSession();
+        if (segar.data.session) res = await hantarJoin(segar.data.session.access_token);
+      }
       const j: unknown = await res.json().catch(() => null);
       if (!res.ok) {
         const kod = (j as { code?: unknown } | null)?.code;
@@ -296,6 +301,10 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
   const [offset, setOffset] = useState(0);
   const [kini, setKini] = useState<number>(() => Date.now());
   const autoBuka = useRef<Set<string>>(new Set());
+  // KZ-050: sambung semula automatik bila token tempatan tiada/hilang.
+  const tiadaSayaRef = useRef(0);
+  const cubaSambungRef = useRef(false);
+  const [menyambung, setMenyambung] = useState(false);
 
   useEffect(() => {
     bukaRef.current = buka;
@@ -335,7 +344,10 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
       }
       if ((res.status === 401 || res.status === 403) && tk) {
         // token ditolak: buang, papar borang masuk
-        if (simpananRef.current?.playerToken === tk.playerToken) tetapSimpanan(null);
+        if (simpananRef.current?.playerToken === tk.playerToken) {
+          cubaSambungRef.current = false;
+          tetapSimpanan(null);
+        }
         return;
       }
       if (!res.ok) {
@@ -345,7 +357,18 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
       const j = (await res.json()) as PlayStateResponse;
       const t = Date.parse(j.serverTime);
       if (!Number.isNaN(t)) setOffset(t - Date.now());
-      if (tk && !j.me && simpananRef.current?.playerToken === tk.playerToken) tetapSimpanan(null);
+      // KZ-050: token hanya dibuang selepas pelayan TIGA kali berturut-turut
+      // tidak mengenali pemain, bukan pada satu jawapan sahaja.
+      if (tk && !j.me && simpananRef.current?.playerToken === tk.playerToken) {
+        tiadaSayaRef.current += 1;
+        if (tiadaSayaRef.current >= 3) {
+          tiadaSayaRef.current = 0;
+          cubaSambungRef.current = false; // benarkan sambung semula automatik sekali lagi
+          tetapSimpanan(null);
+        }
+      } else {
+        tiadaSayaRef.current = 0;
+      }
       setTiadaSesi(false);
       setPutus(false);
       setSt(j);
@@ -399,6 +422,47 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
     const t = window.setInterval(() => setKini(Date.now()), 500);
     return () => window.clearInterval(t);
   }, []);
+
+  // KZ-050: pemain yang terputus (tab ditutup, pelayar lain, storan dikosongkan)
+  // dan sudah log masuk disambung terus kepada pemain asalnya, tanpa perlu
+  // mengisi borang masuk semula. resumeOnly: pelayan tidak mencipta pemain.
+  const tiadaSimpanan = sedia && !simpanan;
+  useEffect(() => {
+    if (!tiadaSimpanan || cubaSambungRef.current) return;
+    cubaSambungRef.current = true;
+    let hidup = true;
+    setMenyambung(true);
+    void (async () => {
+      try {
+        const ses = await supabase.auth.getSession();
+        if (!ses.data.session) return;
+        const hantar = async (token: string) =>
+          fetch(`/api/arena/play/${code}/join`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+            body: JSON.stringify({ resumeOnly: true }),
+          });
+        let res = await hantar(ses.data.session.access_token);
+        if (res.status === 401) {
+          const segar = await supabase.auth.refreshSession();
+          if (segar.data.session) res = await hantar(segar.data.session.access_token);
+        }
+        if (!res.ok) return;
+        const d = (await res.json()) as { playerId: string; playerToken: string; nickname: string };
+        if (hidup && d?.playerToken && !simpananRef.current) {
+          tetapSimpanan({ playerToken: d.playerToken, playerId: d.playerId, nickname: d.nickname });
+          void muatState();
+        }
+      } catch {
+        /* tiada rangkaian: borang masuk dipapar seperti biasa */
+      } finally {
+        setMenyambung(false);
+      }
+    })();
+    return () => {
+      hidup = false;
+    };
+  }, [tiadaSimpanan, code, tetapSimpanan, muatState]);
 
   const status = st?.session.status;
   const indeks = st?.session.current_index;
@@ -527,6 +591,14 @@ export default function ArenaPlayPage({ params }: { params: { code: string } }) 
           </Link>
         </div>
       </main>
+    );
+  }
+
+  if (!simpanan && menyambung) {
+    return (
+      <Skrin>
+        <p className="text-slate-700">Menyambung semula…</p>
+      </Skrin>
     );
   }
 

@@ -53,7 +53,7 @@ export default function HalamanDemoKejarHantu() {
   };
 
   return (
-    <main className="mx-auto max-w-xl px-4 py-6">
+    <main className="mx-auto max-w-3xl px-4 py-6">
       <h1 className="mb-1 text-xl font-bold text-slate-900">Demo: Kejar Hantu</h1>
       <p className="mb-4 text-sm text-slate-600">
         Halaman main tanpa sesi. Sentuh peti soalan dalam maze untuk membuka soalan palsu.

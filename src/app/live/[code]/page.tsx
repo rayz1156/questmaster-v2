@@ -274,14 +274,19 @@ export default function SkrinMainLangsung() {
       // Tiket V2-007: hantar Bearer bersama POST join jika pengguna log masuk,
       // supaya pelayan boleh menetapkan nama berdaftar dan user_id pemain.
       const ses = await supabase.auth.getSession();
-      const auth: Record<string, string> = ses.data.session
-        ? { Authorization: `Bearer ${ses.data.session.access_token}` }
-        : {};
-      const r = await fetch(`/api/live/play/${kod}/join`, {
-        method: "POST",
-        headers: { "content-type": "application/json", ...auth },
-        body: JSON.stringify({ nickname: bersih }),
-      });
+      const hantarJoin = (token: string | null) =>
+        fetch(`/api/live/play/${kod}/join`, {
+          method: "POST",
+          headers: { "content-type": "application/json", ...(token ? { Authorization: `Bearer ${token}` } : {}) },
+          body: JSON.stringify({ nickname: bersih }),
+        });
+      let r = await hantarJoin(ses.data.session?.access_token ?? null);
+      // KZ-050: 401 sedangkan pengguna ada sesi log masuk bermakna token
+      // luput: segar semula dan cuba sekali lagi sebelum meminta log masuk.
+      if (r.status === 401 && ses.data.session) {
+        const segar = await supabase.auth.refreshSession();
+        if (segar.data.session) r = await hantarJoin(segar.data.session.access_token);
+      }
       const j = await r.json();
       if (!r.ok) {
         // V2-012: kuiz kelas menolak tetamu dan bukan ahli. Papar kad yang

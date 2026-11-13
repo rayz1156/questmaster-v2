@@ -27,6 +27,7 @@ import {
   MATA_BUTIR,
   MATA_HANTU,
   MULAI_HANTU,
+  bilanganHantu,
   MULAI_KUIZI,
   NYAWA_AWAL,
   PECUTAN_TAHAP,
@@ -51,7 +52,7 @@ import {
   type Jubin,
 } from './kejarHantuLogik';
 
-const T = 16; // saiz jubin piksel (kanvas dalaman)
+const T = 32; // saiz jubin piksel (kanvas dalaman; KZ-050: 32 supaya tajam bila dibesarkan)
 const KANVAS_L = LEBAR * T;
 const KANVAS_T = TINGGI * T;
 
@@ -109,8 +110,9 @@ function butirSegar(): boolean[][] {
   return senarai;
 }
 
-function hantuAwal(masaSekarang: number, lepasMati: boolean): Hantu[] {
-  return MULAI_HANTU.map((m, i) => ({
+function hantuAwal(masaSekarang: number, lepasMati: boolean, tahap: number): Hantu[] {
+  // KZ-050: tahap 1 dua hantu sahaja; hantu pertama keluar selepas 3 s.
+  return MULAI_HANTU.slice(0, bilanganHantu(tahap)).map((m, i) => ({
     x: m.x,
     y: m.y,
     mulaY: m.y,
@@ -118,13 +120,13 @@ function hantuAwal(masaSekarang: number, lepasMati: boolean): Hantu[] {
     keadaan: 'rumah' as KeadaanHantu,
     gelisah: false,
     bilaKeluar: lepasMati
-      ? masaSekarang + i * 2 // selepas mati: 0s, 2s, 4s, 6s
-      : i === 1
-        ? 2
-        : i === 0
-          ? 0
+      ? masaSekarang + 3 + i * 4 // selepas mati: 3s, 7s, 11s
+      : i === 0
+        ? 3
+        : i === 1
+          ? 10
           : Infinity,
-    butirKeluar: lepasMati ? null : i === 2 ? 30 : i === 3 ? 60 : null,
+    butirKeluar: lepasMati ? null : i === 2 ? 60 : null,
   }));
 }
 
@@ -143,7 +145,7 @@ function buatKeadaan(p: GameProps): Keadaan {
     masaKuasa: 0,
     combo: 0,
     kuizi: { x: MULAI_KUIZI.x, y: MULAI_KUIZI.y, arah: KIRI, buffer: null, bergerak: false },
-    hantu: hantuAwal(0, false),
+    hantu: hantuAwal(0, false, 1),
     peti: petakanPeti(idSoalan),
     petiHilang: new Set(),
     menunggu: null,
@@ -160,7 +162,7 @@ function resetKedudukan(st: Keadaan, lepasMati: boolean): void {
   st.masaKuasa = 0;
   st.combo = 0;
   st.menunggu = null;
-  st.hantu = hantuAwal(0, lepasMati);
+  st.hantu = hantuAwal(0, lepasMati, st.tahap);
 }
 
 function isEditable(t: EventTarget | null): boolean {
@@ -171,6 +173,7 @@ function isEditable(t: EventTarget | null): boolean {
 
 export default function KejarHantu(props: GameProps) {
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
+  const kawasanRef = useRef<HTMLDivElement | null>(null);
   const propsRef = useRef<GameProps>(props);
   const stRef = useRef<Keadaan | null>(null);
   const [papar, setPapar] = useState<Paparan>({ fasa: 'sedia', skor: 0, nyawa: NYAWA_AWAL, tahap: 1, kuasa: 0 });
@@ -224,33 +227,33 @@ export default function KejarHantu(props: GameProps) {
         bctx.fillStyle = '#151b52';
         bctx.fillRect(x * T, y * T, T, T);
         bctx.strokeStyle = '#4356e0';
-        bctx.lineWidth = 1.5;
+        bctx.lineWidth = T * 0.09;
         bctx.beginPath();
         if ((LABIRIN[y - 1] ?? '')[x] !== '#') {
-          bctx.moveTo(x * T, y * T + 0.75);
-          bctx.lineTo(x * T + T, y * T + 0.75);
+          bctx.moveTo(x * T, y * T + T * 0.045);
+          bctx.lineTo(x * T + T, y * T + T * 0.045);
         }
         if ((LABIRIN[y + 1] ?? '')[x] !== '#') {
-          bctx.moveTo(x * T, y * T + T - 0.75);
-          bctx.lineTo(x * T + T, y * T + T - 0.75);
+          bctx.moveTo(x * T, y * T + T - T * 0.045);
+          bctx.lineTo(x * T + T, y * T + T - T * 0.045);
         }
         if ((LABIRIN[y] ?? '')[x - 1] !== '#') {
-          bctx.moveTo(x * T + 0.75, y * T);
-          bctx.lineTo(x * T + 0.75, y * T + T);
+          bctx.moveTo(x * T + T * 0.045, y * T);
+          bctx.lineTo(x * T + T * 0.045, y * T + T);
         }
         if ((LABIRIN[y] ?? '')[x + 1] !== '#') {
-          bctx.moveTo(x * T + T - 0.75, y * T);
-          bctx.lineTo(x * T + T - 0.75, y * T + T);
+          bctx.moveTo(x * T + T - T * 0.045, y * T);
+          bctx.lineTo(x * T + T - T * 0.045, y * T + T);
         }
         bctx.stroke();
       }
     }
     // pintu rumah hantu
     bctx.strokeStyle = '#f9a8d4';
-    bctx.lineWidth = 3;
+    bctx.lineWidth = T * 0.18;
     bctx.beginPath();
-    bctx.moveTo(13 * T + 2, 11 * T + T / 2);
-    bctx.lineTo(15 * T - 2, 11 * T + T / 2);
+    bctx.moveTo(PINTU_KELUAR.x * T + 2, (PINTU_KELUAR.y + 1) * T + T / 2);
+    bctx.lineTo((PINTU_KELUAR.x + 1) * T - 2, (PINTU_KELUAR.y + 1) * T + T / 2);
     bctx.stroke();
 
     const setInput = (a: Arah): void => {
@@ -269,27 +272,42 @@ export default function KejarHantu(props: GameProps) {
     };
     window.addEventListener('keydown', onKeyDown);
 
-    // leret pada kanvas untuk telefon
+    // KZ-050: leret di mana-mana dalam kawasan permainan (kanvas dan ruang
+    // di bawahnya). Arah didaftar SEMASA jari bergerak (touchmove), bukan
+    // selepas jari diangkat, dan titik mula dikemas kini supaya satu
+    // leretan berterusan boleh menukar arah beberapa kali.
+    const kawasan: HTMLElement = kawasanRef.current ?? canvas;
     let sentuhX = 0;
     let sentuhY = 0;
+    let sentuhAktif = false;
+    const AMBANG = 14;
     const onSentuhMula = (e: TouchEvent): void => {
       const t0 = e.touches[0];
       if (t0) {
         sentuhX = t0.clientX;
         sentuhY = t0.clientY;
+        sentuhAktif = true;
       }
     };
-    const onSentuhTamat = (e: TouchEvent): void => {
-      const t0 = e.changedTouches[0];
-      if (!t0) return;
+    const onSentuhGerak = (e: TouchEvent): void => {
+      const t0 = e.touches[0];
+      if (!t0 || !sentuhAktif) return;
+      if (st.fasa === 'main' && e.cancelable) e.preventDefault(); // elak halaman bergulung semasa bermain
       const dx = t0.clientX - sentuhX;
       const dy = t0.clientY - sentuhY;
-      if (Math.abs(dx) < 18 && Math.abs(dy) < 18) return;
+      if (Math.abs(dx) < AMBANG && Math.abs(dy) < AMBANG) return;
       if (Math.abs(dx) > Math.abs(dy)) setInput(dx > 0 ? KANAN : KIRI);
       else setInput(dy > 0 ? BAWAH : ATAS);
+      sentuhX = t0.clientX;
+      sentuhY = t0.clientY;
     };
-    canvas.addEventListener('touchstart', onSentuhMula, { passive: true });
-    canvas.addEventListener('touchend', onSentuhTamat, { passive: true });
+    const onSentuhTamat = (): void => {
+      sentuhAktif = false;
+    };
+    kawasan.addEventListener('touchstart', onSentuhMula, { passive: true });
+    kawasan.addEventListener('touchmove', onSentuhGerak, { passive: false });
+    kawasan.addEventListener('touchend', onSentuhTamat, { passive: true });
+    kawasan.addEventListener('touchcancel', onSentuhTamat, { passive: true });
 
     // ------------------------------------------------------ enjin pergerakan
 
@@ -534,7 +552,7 @@ export default function KejarHantu(props: GameProps) {
         const denyut = 0.25 + 0.15 * Math.sin(t * 5);
         ctx.fillStyle = `rgba(245,158,11,${denyut.toFixed(3)})`;
         ctx.beginPath();
-        ctx.arc(px, py, T * 0.55 + Math.sin(t * 5) * 1.5, 0, Math.PI * 2);
+        ctx.arc(px, py, T * 0.55 + Math.sin(t * 5) * T * 0.09, 0, Math.PI * 2);
         ctx.fill();
         ctx.fillStyle = '#f59e0b';
         ctx.beginPath();
@@ -645,7 +663,7 @@ export default function KejarHantu(props: GameProps) {
           ctx.fill();
         }
         ctx.strokeStyle = '#f8fafc';
-        ctx.lineWidth = 1.6;
+        ctx.lineWidth = T * 0.1;
         ctx.beginPath();
         const my = py + r * 0.35;
         ctx.moveTo(px - r * 0.5, my);
@@ -771,7 +789,7 @@ export default function KejarHantu(props: GameProps) {
         ctx.fillStyle = '#e0f2fe';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font = 'bold 28px system-ui, sans-serif';
+        ctx.font = `bold ${Math.round(T * 1.1)}px system-ui, sans-serif`;
         ctx.fillText('Permainan dibekukan', KANVAS_L / 2, KANVAS_T / 2);
       }
     };
@@ -780,8 +798,10 @@ export default function KejarHantu(props: GameProps) {
     return () => {
       cancelAnimationFrame(raf);
       window.removeEventListener('keydown', onKeyDown);
-      canvas.removeEventListener('touchstart', onSentuhMula);
-      canvas.removeEventListener('touchend', onSentuhTamat);
+      kawasan.removeEventListener('touchstart', onSentuhMula);
+      kawasan.removeEventListener('touchmove', onSentuhGerak);
+      kawasan.removeEventListener('touchend', onSentuhTamat);
+      kawasan.removeEventListener('touchcancel', onSentuhTamat);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -795,6 +815,7 @@ export default function KejarHantu(props: GameProps) {
     const st = stRef.current;
     const canvas = canvasRef.current;
     if (!st || !canvas) return;
+    kawasanRef.current?.scrollIntoView({ block: 'start', behavior: 'smooth' });
     if (st.fasa === 'sedia') {
       st.fasa = 'main';
       paparRef.current = { ...paparRef.current, fasa: 'main' };
@@ -815,7 +836,22 @@ export default function KejarHantu(props: GameProps) {
   const fasaSedia = papar.fasa === 'sedia';
 
   return (
-    <div className="mx-auto w-full max-w-[480px] select-none">
+    <div
+      ref={kawasanRef}
+      className="kh-kawasan mx-auto w-full select-none scroll-mt-16"
+      style={{ touchAction: papar.fasa === 'main' ? 'none' : 'manipulation' }}
+    >
+      {/* KZ-050: labirin sebesar yang muat. Lebar dihadkan oleh tinggi skrin
+          (nisbah 19:21) supaya seluruh labirin kelihatan tanpa menggulung:
+          komputer (tiada pad) tolak ~150px, skrin sentuh tolak ~340px. */}
+      <style>{`
+        .kh-kawasan { max-width: max(280px, min(100%, calc((100dvh - 150px) * ${LEBAR} / ${TINGGI}))); }
+        .kh-pad { display: none; }
+        @media (pointer: coarse) {
+          .kh-kawasan { max-width: max(260px, min(100%, calc((100dvh - 340px) * ${LEBAR} / ${TINGGI}))); }
+          .kh-pad { display: flex; }
+        }
+      `}</style>
       {/* HUD */}
       <div className="mb-2 flex items-center justify-between rounded-xl border border-violet-200 bg-violet-50 px-4 py-2 text-sm font-semibold text-violet-900">
         <span>Skor permainan: {papar.skor}</span>
@@ -846,12 +882,12 @@ export default function KejarHantu(props: GameProps) {
             <p className="max-w-[90%] text-sm text-slate-300">
               {fasaTamat
                 ? `Skor akhir: ${papar.skor}. Soalan yang sudah dijawab kekal dijawab.`
-                : 'Makan semua butir. Sentuh peti soalan untuk kuasa.'}
+                : 'Makan semua butir. Sentuh peti soalan untuk kuasa. Guna kekunci anak panah, atau leret skrin.'}
             </p>
             <button
               type="button"
               onClick={mula}
-              className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-6 py-2 text-sm font-semibold text-white shadow active:scale-95"
+              className="rounded-xl bg-gradient-to-r from-violet-600 to-indigo-600 px-8 py-3 text-base font-semibold text-white shadow active:scale-95"
             >
               {fasaTamat ? 'Main semula' : 'Mulakan'}
             </button>
@@ -864,12 +900,12 @@ export default function KejarHantu(props: GameProps) {
         )}
       </div>
       {/* D-pad telefon */}
-      <div className="mt-3 flex justify-center">
-        <div className="grid grid-cols-3 grid-rows-3 gap-1 opacity-90">
+      <div className="kh-pad mt-3 -translate-x-5 justify-center">
+        <div className="grid grid-cols-3 grid-rows-2 gap-2 opacity-95">
           <PadButton label="▲" title="Atas" className="col-start-2 row-start-1" onPress={() => tekanPad(ATAS)} />
           <PadButton label="◀" title="Kiri" className="col-start-1 row-start-2" onPress={() => tekanPad(KIRI)} />
           <PadButton label="▶" title="Kanan" className="col-start-3 row-start-2" onPress={() => tekanPad(KANAN)} />
-          <PadButton label="▼" title="Bawah" className="col-start-2 row-start-3" onPress={() => tekanPad(BAWAH)} />
+          <PadButton label="▼" title="Bawah" className="col-start-2 row-start-2" onPress={() => tekanPad(BAWAH)} />
         </div>
       </div>
     </div>
@@ -882,7 +918,7 @@ function PadButton(props: { label: string; title: string; className: string; onP
     <button
       type="button"
       aria-label={title}
-      className={`${className} flex h-12 w-12 touch-none items-center justify-center rounded-xl bg-white/85 text-lg text-slate-800 shadow active:bg-amber-300`}
+      className={`${className} flex h-16 w-20 touch-none items-center justify-center rounded-2xl border border-slate-300 bg-white text-2xl text-slate-800 shadow active:bg-amber-300`}
       onPointerDown={(e) => {
         e.preventDefault();
         onPress();

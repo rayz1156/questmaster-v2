@@ -176,7 +176,13 @@ export default function ArenaHostPage({ params }: { params: { sessionId: string 
   const pending = data.answers.filter((a) => a.is_correct === null);
   const qById = new Map(data.questions.map((q) => [q.id, q]));
   const nameById = new Map(data.players.map((p) => [p.id, p.nickname]));
-  const remainMs = s.ends_at ? new Date(s.ends_at).getTime() - Date.now() : null;
+  // KZ-050: di lobi, ends_at menyimpan tempoh (created_at + minit); jam
+  // hanya berjalan selepas Mula.
+  const remainMs = s.ends_at && s.status !== 'lobby' ? new Date(s.ends_at).getTime() - Date.now() : null;
+  const hadLobiMin =
+    s.ends_at && s.status === 'lobby'
+      ? Math.round((new Date(s.ends_at).getTime() - new Date(s.created_at).getTime()) / 60000)
+      : null;
 
   return (
     <div className="mx-auto max-w-6xl space-y-5 p-4 sm:p-6">
@@ -200,7 +206,8 @@ export default function ArenaHostPage({ params }: { params: { sessionId: string 
           <p className="mt-1 break-all text-sm text-slate-600">{joinUrl}</p>
           <p className="mt-1 text-xs text-slate-400">{data.players.length} pemain · {qCount} soalan
             {s.mode === 'round' && s.current_index >= 0 ? ` · Soalan ${s.current_index + 1}/${qCount}` : ''}
-            {remainMs !== null ? ` · Baki masa ${remainMs > 0 ? Math.ceil(remainMs / 60000) + ' min' : 'tamat'}` : ''}</p>
+            {remainMs !== null ? ` · Baki masa ${remainMs > 0 ? Math.ceil(remainMs / 60000) + ' min' : 'tamat'}` : ''}
+            {hadLobiMin !== null && hadLobiMin > 0 ? ` · Had masa ${hadLobiMin} min (bermula bila Mula ditekan)` : ''}</p>
         </div>
       </section>
 

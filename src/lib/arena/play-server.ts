@@ -64,8 +64,15 @@ export async function readJsonBody(req: NextRequest): Promise<Record<string, unk
 export async function loadSessionByCode(svc: Svc, code: string): Promise<ArenaSession | null> {
   const c = normalizeCode(code);
   if (!c) return null;
-  const { data } = await svc.from('qm_arena_sessions').select('*').eq('code', c).maybeSingle();
-  return data ? (data as unknown as ArenaSession) : null;
+  // KZ-050: ralat sementara (get laluan/pangkalan data) dicuba sekali lagi
+  // dan DILEMPAR jika masih gagal, supaya laluan membalas 5xx. Dahulu ralat
+  // dianggap "sesi tiada" (404) dan pemain nampak "kod tidak dijumpai".
+  for (let cubaan = 0; cubaan < 2; cubaan++) {
+    const { data, error } = await svc.from('qm_arena_sessions').select('*').eq('code', c).maybeSingle();
+    if (!error) return data ? (data as unknown as ArenaSession) : null;
+    if (cubaan === 1) throw new Error('arena session lookup failed');
+  }
+  return null;
 }
 
 /**
@@ -122,13 +129,20 @@ export async function loadPlayerByToken(
 ): Promise<PlayerRow | null> {
   const t = String(token ?? '').trim();
   if (!t || t.length > 200) return null;
-  const { data } = await svc
-    .from('qm_arena_players')
-    .select('*')
-    .eq('session_id', sessionId)
-    .eq('player_token', t)
-    .maybeSingle();
-  return data ? (data as unknown as PlayerRow) : null;
+  // KZ-050: ralat sementara dicuba sekali lagi dan dilempar jika masih
+  // gagal. Dahulu ralat dianggap "token tidak sah", lalu klien membuang
+  // token pemain dan pelajar tercampak ke borang masuk di tengah permainan.
+  for (let cubaan = 0; cubaan < 2; cubaan++) {
+    const { data, error } = await svc
+      .from('qm_arena_players')
+      .select('*')
+      .eq('session_id', sessionId)
+      .eq('player_token', t)
+      .maybeSingle();
+    if (!error) return data ? (data as unknown as PlayerRow) : null;
+    if (cubaan === 1) throw new Error('arena player lookup failed');
+  }
+  return null;
 }
 
 /**

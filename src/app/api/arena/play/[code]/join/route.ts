@@ -85,24 +85,37 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     }
   }
 
-  if (session.status === 'ended') return ralatJson('Session ended', 409);
-
   // Sambung semula pengguna berdaftar (KZ-045): baris sedia ada milik
   // pengguna yang sama dalam sesi ini; token hanya dipulangkan kepada
   // pemilik yang sama (sudah disahkan melalui Bearer).
+  // KZ-050: semakan ini kini SEBELUM semakan sesi tamat, supaya pemain
+  // yang terputus masih boleh kembali melihat markah akhir; dan ralat
+  // pangkalan data dibalas 503 (bukan dianggap "tiada baris", yang dahulu
+  // boleh mencipta pemain pendua).
   if (daftar) {
-    const { data: sedia } = await svc
+    const { data: sedia, error: ralatSedia } = await svc
       .from('qm_arena_players')
       .select('id, player_token, nickname')
       .eq('session_id', session.id)
       .eq('user_id', daftar.userId)
+      .order('joined_at', { ascending: true })
       .limit(1)
       .maybeSingle();
+    if (ralatSedia) return ralatJson('Could not join session', 503);
     if (sedia) {
       const s = sedia as { id: string; player_token: string; nickname: string };
+      await svc.from('qm_arena_players').update({ last_seen_at: new Date().toISOString() }).eq('id', s.id);
       return NextResponse.json({ playerId: s.id, playerToken: s.player_token, nickname: s.nickname });
     }
   }
+
+  // KZ-050: resumeOnly = klien hanya mahu menyambung pemain sedia ada
+  // (dipanggil automatik bila token tempatan hilang). Jangan cipta pemain.
+  if (body.resumeOnly === true) {
+    return ralatJson('No existing player', 404, { code: 'NO_PLAYER' });
+  }
+
+  if (session.status === 'ended') return ralatJson('Session ended', 409);
 
   const nickname = typeof body.nickname === 'string' ? body.nickname.trim().replace(/\s+/g, ' ') : '';
   // Nama bebas (tetamu) mesti 1-24 aksara; nama berdaftar sudah dipotong 24.

@@ -85,7 +85,12 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   if (!sah.ok) return sah.response;
 
   const supa = getServiceSupabase();
-  const { data: keadaan, error } = await supa.rpc('qm_race_state', { p_player: sah.playerId });
+  // KZ-050: ralat sementara get laluan (tiada kod ralat Postgres) dicuba
+  // sekali lagi sebelum membalas 500 kepada pemain.
+  let { data: keadaan, error } = await supa.rpc('qm_race_state', { p_player: sah.playerId });
+  if (error && !error.code) {
+    ({ data: keadaan, error } = await supa.rpc('qm_race_state', { p_player: sah.playerId }));
+  }
   if (error || !keadaan) {
     console.error('qm_race_state failed', error?.code);
     return ralatJson('Could not read the race.', 500);

@@ -36,17 +36,31 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     return count ?? 0;
   };
 
+  // KZ-050: had masa yang ditetapkan di lobi disimpan sebagai
+  // created_at + minit (tempoh, bukan jam berjalan). Bila permainan
+  // bermula, ends_at dikira semula dari saat mula. Dahulu had masa mula
+  // berjalan sebaik ditetapkan di lobi, jadi permainan boleh bermula dengan
+  // masa sudah tamat dan semua jawapan ditolak "Time is up".
+  const tempohLobiMs = (): number | null => {
+    if (s.status !== 'lobby' || !s.ends_at) return null;
+    const d = Date.parse(s.ends_at) - Date.parse(s.created_at);
+    return Number.isFinite(d) && d > 0 ? Math.min(d, 600 * 60_000) : null;
+  };
+
   switch (action) {
-    case 'start':
+    case 'start': {
       patch.status = 'playing';
       patch.started_at = now;
       patch.ended_at = null;
+      const t = tempohLobiMs();
+      if (minutes === null && s.ends_at) patch.ends_at = t !== null ? new Date(nowMs + t).toISOString() : null;
       if (s.mode === 'round') {
         patch.current_index = 0;
         patch.round_started_at = now;
       }
       if (minutes !== null) patch.ends_at = minutes > 0 ? new Date(nowMs + minutes * 60_000).toISOString() : null;
       break;
+    }
     case 'end':
       patch.status = 'ended';
       patch.ended_at = now;
@@ -82,6 +96,10 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
       patch.status = 'playing';
       patch.ended_at = null;
       if (!s.started_at) patch.started_at = now;
+      if (s.status === 'lobby' && s.ends_at) {
+        const t = tempohLobiMs();
+        patch.ends_at = t !== null ? new Date(nowMs + t).toISOString() : null;
+      }
       if (s.mode === 'round' && s.current_index < 0) {
         patch.current_index = 0;
         patch.round_started_at = now;
@@ -92,7 +110,12 @@ export async function POST(req: NextRequest, { params }: { params: { sessionId: 
     }
     case 'set_time_limit':
       if (minutes === null) return ralatJson('minutes is required', 400);
-      patch.ends_at = minutes > 0 ? new Date(nowMs + minutes * 60_000).toISOString() : null;
+      if (s.status === 'lobby') {
+        // tempoh sahaja; jam bermula bila Mula ditekan
+        patch.ends_at = minutes > 0 ? new Date(Date.parse(s.created_at) + minutes * 60_000).toISOString() : null;
+      } else {
+        patch.ends_at = minutes > 0 ? new Date(nowMs + minutes * 60_000).toISOString() : null;
+      }
       break;
   }
 

@@ -9,43 +9,35 @@
 //   '-' pintu rumah hantu (hantu sahaja)   ' ' dalam rumah (hantu sahaja)
 //   'T' jubin terowong (baris tengah, membalut)
 
+// KZ-050: labirin dikecilkan kepada 19 x 21 jubin (dahulu 28 x 31) supaya
+// setiap jubin lebih besar pada skrin telefon dan komputer riba.
 export const LABIRIN: readonly string[] = [
-  '############################',
-  '#.....#..............#.....#',
-  '#.###.#.#####..#####.#.###.#',
-  '#o###...#####..#####...###o#',
-  '#.###.#..............#.###.#',
-  '#.....#.##.######.##.#.....#',
-  '###.#.....o..##..o.....#.###',
-  '#...#.##............##.#...#',
-  '#...#.....#..##..#.....#...#',
-  '######.#####.##.#####.######',
-  '######.####......####.######',
-  '#...........#--#...........#',
-  '#.#..#.#####    #####.#..#.#',
-  '#.#..#.#####    #####.#..#.#',
-  '#....#.##############.#....#',
-  'T..........................T',
-  '#.##.#.####......####.#.##.#',
-  '#.##.#.####.####.####.#.##.#',
-  '#......#....####....#......#',
-  '#.#..#.#.##.####.##.#.#..#.#',
-  '#....#...##......##...#....#',
-  '######.#####.##.#####.######',
-  '#..........................#',
-  '#.##.###.###.##.###.###.##.#',
-  '#o##.#.....#....#.....#.##o#',
-  '#....#.###.#.##.#.###.#....#',
-  '##.##.o..............o.##.##',
-  '#..##.###.##.##.##.###.##..#',
-  '#.....#..............#.....#',
-  '#........###....###........#',
-  '############################',
+  '###################',
+  '#o.......#.......o#',
+  '#.##.###.#.###.##.#',
+  '#.....o.....o.....#',
+  '#.##.#.#####.#.##.#',
+  '#....#...#...#....#',
+  '####.###.#.###.####',
+  '####.#.......#.####',
+  '####.#.##-##.#.####',
+  'T......#   #......T',
+  '####.#.#####.#.####',
+  '####.#.......#.####',
+  '####.#.#####.#.####',
+  '#........#........#',
+  '#.##.###.#.###.##.#',
+  '#o.#...........#.o#',
+  '##.#.#.#####.#.#.##',
+  '#....#o..#..o#....#',
+  '#.######.#.######.#',
+  '#.................#',
+  '###################',
 ];
 
-export const LEBAR = 28;
-export const TINGGI = 31;
-export const BARIS_TEROWONG = 15;
+export const LEBAR = 19;
+export const TINGGI = 21;
+export const BARIS_TEROWONG = 9;
 
 // ------------------------------------------------------------- arah & jubin
 
@@ -131,16 +123,16 @@ export function wrapX(x: number): number {
 /** Jubin baris terowong berhampiran tepi: hantu perlahan 40% di sini. */
 export function dalamTerowong(x: number, y: number): boolean {
   if (Math.round(y) !== BARIS_TEROWONG) return false;
-  return x < 6 || x > LEBAR - 7;
+  return x < 4 || x > LEBAR - 5;
 }
 
 // ------------------------------------------------------- kitaran mod hantu
 
 export type ModHantu = 'scatter' | 'chase';
 
-// Scatter 7, Chase 20, Scatter 7, Chase 20, Scatter 5, Chase 20, Scatter 5,
-// kemudian Chase kekal.
-export const JADUAL_MOD: readonly number[] = [7, 20, 7, 20, 5, 20, 5, Infinity];
+// Scatter 9, Chase 15, Scatter 9, Chase 15, Scatter 7, Chase 20, Scatter 5,
+// kemudian Chase kekal. KZ-050: Scatter lebih panjang supaya lebih mudah.
+export const JADUAL_MOD: readonly number[] = [9, 15, 9, 15, 7, 20, 5, Infinity];
 
 /** Indeks fasa mod pada masa t (saat sejak mula tahap). */
 export function fasaModPadaMasa(t: number): number {
@@ -264,35 +256,42 @@ export function pilihArahRawak(
 
 // ------------------------------------------------------ kedudukan penting
 
-export const MULAI_KUIZI: Jubin = { x: 13, y: 16 };
-export const PUSAT_RUMAH: Jubin = { x: 13, y: 12 }; // tempat mata hantu pulang
-export const PINTU_KELUAR: Jubin = { x: 13, y: 10 }; // jubin atas pintu
+export const MULAI_KUIZI: Jubin = { x: 9, y: 15 };
+export const PUSAT_RUMAH: Jubin = { x: 9, y: 9 }; // tempat mata hantu pulang
+export const PINTU_KELUAR: Jubin = { x: 9, y: 7 }; // jubin atas pintu
 
-// Kedudukan mula hantu dalam rumah (kolum 12..15, baris 12).
+// Kedudukan mula hantu dalam rumah (kolum 8..10, baris 9). KZ-050: tiga
+// hantu sahaja (Garang, Licik, Bijak) kerana labirin lebih kecil.
 export const MULAI_HANTU: readonly Jubin[] = [
-  { x: 13, y: 12 },
-  { x: 12, y: 12 },
-  { x: 14, y: 12 },
-  { x: 15, y: 12 },
+  { x: 9, y: 9 },
+  { x: 8, y: 9 },
+  { x: 10, y: 9 },
 ];
+
+/** Bilangan hantu mengikut tahap: tahap 1 dua hantu, selepas itu tiga. */
+export function bilanganHantu(tahap: number): number {
+  return Math.min(MULAI_HANTU.length, tahap <= 1 ? 2 : 3);
+}
 
 // --------------------------------------------------------------- kelajuan
 
-export const KELAJUAN_ASAS = 7.2; // jubin sesaat, Kuizi 100%
-export const FAKTOR_HANTU = 0.95; // hantu 95% kelajuan Kuizi
-export const FAKTOR_MAKAN_BUTIR = 0.9; // Kuizi melahu sedikit semasa makan butir
+// KZ-050: dimudahkan. Kuizi lebih perlahan (labirin kecil, kawalan telefon),
+// hantu jelas lebih perlahan daripada Kuizi, kuasa lebih lama, lebih nyawa.
+export const KELAJUAN_ASAS = 4.6; // jubin sesaat, Kuizi 100%
+export const FAKTOR_HANTU = 0.78; // hantu 78% kelajuan Kuizi
+export const FAKTOR_MAKAN_BUTIR = 1; // Kuizi tidak melahu semasa makan butir
 export const FAKTOR_TEROWONG = 0.6; // hantu perlahan 40% dalam terowong
 export const FAKTOR_GELISAH = 0.5; // hantu Frightened perlahan 50%
-export const KELAJUAN_MATA = 16; // mata hantu pulang laju ke rumah
-export const PECUTAN_TAHAP = 0.1; // hantu 10% lebih laju setiap tahap
+export const KELAJUAN_MATA = 12; // mata hantu pulang laju ke rumah
+export const PECUTAN_TAHAP = 0.06; // hantu 6% lebih laju setiap tahap
 export const TAHAP_MAKSIMUM = 3;
-export const MASA_KUASA = 8; // mod kuasa 8 saat
+export const MASA_KUASA = 10; // mod kuasa 10 saat
 export const MASA_KELIP = 2; // 2 saat terakhir Frightened berkelip
 export const MATA_HANTU = [200, 400, 800, 1600];
 export const MATA_BUTIR = 10;
 export const JEDA_MATI = 1.5; // jeda selepas ditangkap
 export const JEDA_TAHAP = 2; // jeda "Tahap selesai"
-export const NYAWA_AWAL = 3;
+export const NYAWA_AWAL = 5;
 
 // --------------------------------------------------------------- peti soalan
 
