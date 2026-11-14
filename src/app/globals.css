@@ -148,7 +148,7 @@ h1, h2, h3, h4 { letter-spacing: -0.021em; }
 .eyes-friendly .input { min-height: 52px; font-size: 1.05rem; }
 .eyes-friendly .card { @apply p-7; }
 
-/* Sembunyikan chatbot Bicarra pada skrin kuiz langsung dan sijil */
+/* Sembunyikan chatbot Bicarra pada skrin kuiz, aktiviti dan sijil (senarai dalam BicarraChat.tsx) */
 html.kz-hide-bicarra #airizbot-launcher,
 html.kz-hide-bicarra #airizbot-widget-frame,
 html.kz-hide-bicarra #airizbot-pt-bubble {
