@@ -161,7 +161,7 @@ function QuizList() {
   // berbanding "Personal" yang membayangkan kuiz itu milik peribadi sahaja.
   const labelKelas = (x: LiveQuizRow) => (x.class?.name ? x.class.name : t("live.educatorList.noClass"));
 
-  const CreateForm = () => (
+  const renderCreateForm = () => (
     <Card className="mb-6">
       <CardHead title={t("live.educatorList.createTitle")} subtitle={t("live.educatorList.createSubtitle")} />
       <div className="mt-4 space-y-4">
@@ -294,7 +294,7 @@ function QuizList() {
           )}
         </div>
 
-        {showNew && <CreateForm />}
+        {showNew && renderCreateForm()}
         {!showNew && err && <div className="text-sm text-kz-down mb-4">{err}</div>}
         {loading && <p className="text-sm text-ink-muted">{t("common.loading")}</p>}
 
@@ -350,7 +350,7 @@ function QuizList() {
         </Select>
       </div>
 
-      {showNew && <CreateForm />}
+      {showNew && renderCreateForm()}
       {!showNew && err && <div className="text-sm text-kz-down mb-4">{err}</div>}
       {loading && <p className="text-sm text-ink-muted">{t("common.loading")}</p>}
 
