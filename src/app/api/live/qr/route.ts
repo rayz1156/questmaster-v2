@@ -29,7 +29,10 @@ export async function GET(req: NextRequest) {
     return ralatJson('The request host could not be read.', 400);
   }
   const proto = (req.headers.get('x-forwarded-proto') || 'https').split(',')[0].trim();
-  const url = `${proto === 'http' ? 'http' : 'https'}://${host}/live/${code}`;
+  // KZ-053: dest=solo menggambar QR ke halaman Lumba Solo; lalai kekal
+  // /live/<code> supaya tingkah laku sedia ada tidak berubah.
+  const dest = req.nextUrl.searchParams.get('dest') === 'solo' ? 'solo' : 'live';
+  const url = `${proto === 'http' ? 'http' : 'https'}://${host}/${dest}/${code}`;
 
   try {
     const png = await QRCode.toBuffer(url, {

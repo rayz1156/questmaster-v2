@@ -386,6 +386,24 @@ export const RALAT_MS: Record<string, string> = {
   'The request host could not be read.': 'Hos permintaan tidak dapat dibaca.',
   'The QR code could not be drawn.': 'Kod QR tidak dapat dilukis.',
 
+  /* ===== Lumba solo (KZ-053) ===== */
+  'Challenge not found.': 'Cabaran tidak ditemui.',
+  'This quiz needs at least 3 multiple-choice questions.':
+    'Kuiz ini memerlukan sekurang-kurangnya 3 soalan aneka pilihan.',
+  'Too many runs. Please wait a minute and try again.':
+    'Terlalu banyak larian. Tunggu seminit dan cuba lagi.',
+  'Run token required.': 'Token larian diperlukan.',
+  'Run not found.': 'Larian tidak ditemui.',
+  'This run has already finished.': 'Larian ini sudah tamat.',
+  'Not the current question.': 'Bukan soalan semasa.',
+  'The question has not been served yet.': 'Soalan belum dihidangkan.',
+  'Could not read the question.': 'Soalan tidak dapat dibaca.',
+  'Could not start the run.': 'Larian tidak dapat dimulakan.',
+  'Could not save the answer.': 'Jawapan tidak dapat disimpan.',
+  'Could not finish the run.': 'Larian tidak dapat ditamatkan.',
+  'enabled must be true or false.': 'enabled mesti true atau false.',
+  'Could not generate a solo code.': 'Kod solo tidak dapat dijana.',
+
   /* ===== Naik taraf ===== */
   'You already sent a request recently. Please wait 10 minutes.': 'Anda sudah menghantar permintaan baru-baru ini. Tunggu 10 minit.',
   'Could not save your request.': 'Permintaan anda tidak dapat disimpan.',
