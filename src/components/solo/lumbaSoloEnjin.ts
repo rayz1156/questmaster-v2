@@ -26,6 +26,8 @@ export const KELAJUAN_KOMPUTER = [150, 175] as const;
 export const TREK_PANJANG_M = 4800;
 /** Soalan baharu dibuka setiap 15 saat masa simulasi. */
 export const SOALAN_SETIAP_MS = 15_000;
+/** Tetingkah jawab setiap soalan; melebihi ini dikira salah (tamat masa). */
+export const JAWAB_TETINGKAH_MS = 30_000;
 /** Separuh lebar jalan: |offset| melebihi ini bermakna keluar jalan. */
 export const SEPARUH_JALAN_M = 3.5;
 /** Offset lateral maksimum (kereta tidak boleh hilang jauh). */
