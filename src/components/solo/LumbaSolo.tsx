@@ -140,14 +140,12 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     return bunyiRef.current;
   }, []);
 
-  /** Header biasa: token larian (bila ada) + Bearer sesi (bila ada). */
-  const pengepala = useCallback(async (denganBearer: boolean): Promise<Record<string, string>> => {
+  /** Pengepala biasa: token larian (bila ada) + Bearer sesi (bila ada). */
+  const pengepala = useCallback(async (): Promise<Record<string, string>> => {
     const h: Record<string, string> = {};
     if (tokenRef.current) h["x-run-token"] = tokenRef.current.runToken;
-    if (denganBearer) {
-      const { data } = await supabase.auth.getSession();
-      if (data.session?.access_token) h["Authorization"] = "Bearer " + data.session.access_token;
-    }
+    const { data } = await supabase.auth.getSession();
+    if (data.session?.access_token) h["Authorization"] = "Bearer " + data.session.access_token;
     return h;
   }, []);
 
@@ -188,7 +186,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     setBalasan(null);
     setKeputusan(null);
     try {
-      const h = await pengepala(false);
+      const h = await pengepala();
       const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/start`, {
         method: "POST",
         headers: { ...h, "content-type": "application/json" },
@@ -225,7 +223,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     try {
       const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/next`, {
         method: "POST",
-        headers: await pengepala(false),
+        headers: await pengepala(),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
@@ -265,7 +263,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       try {
         const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/answer`, {
           method: "POST",
-          headers: { ...(await pengepala(true)), "content-type": "application/json" },
+          headers: { ...(await pengepala()), "content-type": "application/json" },
           body: JSON.stringify({ questionId: s.questionId, choice }),
         });
         const json = await res.json().catch(() => ({}));
@@ -302,7 +300,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     try {
       const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/finish`, {
         method: "POST",
-        headers: await pengepala(true),
+        headers: await pengepala(),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
