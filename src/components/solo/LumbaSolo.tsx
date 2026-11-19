@@ -35,6 +35,7 @@ import {
 } from "./lumbaSoloEnjin";
 import { lukisPemandangan } from "./lumbaSoloLukis";
 import { BunyiLumba } from "./lumbaSoloBunyi";
+import type { Pemandangan3D } from "./lumbaSolo3D";
 
 /** Baris papan seperti dipulangkan API. */
 interface BarisPapanUi {
@@ -132,6 +133,9 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const tikRef = useRef(0);
   const bunyiRef = useRef<BunyiLumba | null>(null);
   const kanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** KZ-054: kanvas WebGL berasingan (konteks 2D dan WebGL tidak boleh berkongsi kanvas). */
+  const kanvas3DRef = useRef<HTMLCanvasElement | null>(null);
+  const paparan3DRef = useRef<Pemandangan3D | null>(null);
   const rafRef = useRef(0);
 
   const pastiBunyi = useCallback((): BunyiLumba => {
@@ -336,6 +340,32 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     }
   }, [kod, muatInfo, pengepala, pastiBunyi, t]);
 
+  /* ===== KZ-054: paparan 3D (dimuat dinamik; sandaran 2D jika WebGL tiada) ===== */
+  useEffect(() => {
+    if (fasa !== "lumba") return;
+    let hidup = true;
+    void import("./lumbaSolo3D")
+      .then((m) => {
+        const kanvas = kanvas3DRef.current;
+        if (!hidup || !kanvas) return;
+        try {
+          paparan3DRef.current = new m.Pemandangan3D(kanvas);
+          kanvas.style.visibility = "visible";
+          if (kanvasRef.current) kanvasRef.current.style.visibility = "hidden";
+        } catch {
+          paparan3DRef.current = null;
+        }
+      })
+      .catch(() => {
+        paparan3DRef.current = null;
+      });
+    return () => {
+      hidup = false;
+      paparan3DRef.current?.buang();
+      paparan3DRef.current = null;
+    };
+  }, [fasa]);
+
   /* ===== Gelung utama ===== */
   useEffect(() => {
     if (fasa !== "lumba") return;
@@ -377,7 +407,28 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         }
 
         // Lukis bingkai (canvas di luar React: tiada render semula per bingkai).
-        const kanvas = kanvasRef.current;
+        const paparan3D = paparan3DRef.current;
+        const kanvas3D = kanvas3DRef.current;
+        const kanvas = paparan3D ? null : kanvasRef.current;
+        if (paparan3D && kanvas3D) {
+          paparan3D.ubahSaiz(
+            kanvas3D.clientWidth || 320,
+            kanvas3D.clientHeight || 240,
+            window.devicePixelRatio || 1,
+          );
+          paparan3D.render({
+            masaMs: k.masaMs,
+            jarakM: k.jarakM,
+            offsetM: k.offsetM,
+            hadLaju: k.hadLaju,
+            penalti: penaltiAktif(k),
+            kelajuanKomputer: KELAJUAN_KOMPUTER,
+            trekPanjangM: TREK_PANJANG_M,
+            kelajuan: k.kelajuan,
+            diLuarJalan: k.diLuarJalan,
+            soalanAktif: k.soalanDibukaMs !== null,
+          });
+        }
         if (kanvas) {
           const dpr = Math.min(2, window.devicePixelRatio || 1);
           const lebarCss = kanvas.clientWidth || 320;
@@ -697,8 +748,14 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       <div className="flex-1 relative mx-auto w-full max-w-2xl px-0">
         <canvas
           ref={kanvasRef}
-          className="w-full h-full min-h-[46vh] block rounded-xl"
+          className="w-full h-full min-h-[56vh] block rounded-xl"
           aria-label={t("solo.race")}
+        />
+        <canvas
+          ref={kanvas3DRef}
+          className="absolute inset-0 w-full h-full block rounded-xl pointer-events-none"
+          style={{ visibility: "hidden" }}
+          aria-hidden="true"
         />
 
         {hud.penalti && (
