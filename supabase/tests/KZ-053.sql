@@ -112,8 +112,9 @@ do $$
 declare
   v_n int; v_idx int; v_st text;
 begin
-  select count(*), next_idx, status into v_n, v_idx, v_st from public.qm_solo_runs
+  select next_idx, status into v_idx, v_st from public.qm_solo_runs
    where id = '00000000-0000-0000-0000-0000000053f1';
+  get diagnostics v_n = row_count;
   if v_n <> 1 or v_idx <> 0 or v_st <> 'playing' then
     raise exception 'UJIAN 2 GAGAL: larian tetamu tidak berkelakuan lalai (idx=%, st=%)', v_idx, v_st;
   end if;
