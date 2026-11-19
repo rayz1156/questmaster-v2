@@ -3166,5 +3166,7 @@ export const en = {
     brake: 'Brake',
     left: 'Left',
     right: 'Right',
+    hintKeys: 'Controls: arrow keys or A/D to steer, W to boost, S to brake. Answer questions with keys 1 to 4.',
+    hintTouch: 'Drag your finger left or right to steer. Hold your finger down to boost. Tap an answer when a question appears.',
   },
 };

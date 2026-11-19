@@ -3130,5 +3130,7 @@ export const ms: Kamus = {
     brake: 'Brek',
     left: 'Kiri',
     right: 'Kanan',
+    hintKeys: 'Kawalan: anak panah atau A/D untuk stereng, W pecut, S brek. Jawab soalan dengan kekunci 1 hingga 4.',
+    hintTouch: 'Seret jari ke kiri atau kanan untuk stereng. Tahan jari untuk pecut. Ketik jawapan bila soalan muncul.',
   },
 };
