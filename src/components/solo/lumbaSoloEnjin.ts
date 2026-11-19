@@ -8,8 +8,9 @@
  *   - had laju bermula 120 km/j, betul +20 (maksimum 240);
  *   - salah atau tamat masa: penalti 8 saat pada separuh had laju;
  *   - keluar jalan memperlahankan kereta;
- *   - soalan muncul setiap 15 saat, kereta bergerak perlahan sendiri
- *     (autopilot) semasa soalan dibuka.
+ *   - soalan pertama pada 5 saat, kemudian setiap 15 saat (rehat 4 saat
+ *     selepas setiap soalan); kereta perlahan semasa soalan dibuka tetapi
+ *     stereng kekal aktif (KZ-055).
  */
 
 /** Had laju awal km/j. */
@@ -28,6 +29,10 @@ export const TREK_PANJANG_M = 4800;
 export const SOALAN_SETIAP_MS = 15_000;
 /** Tetingkah jawab setiap soalan; melebihi ini dikira salah (tamat masa). */
 export const JAWAB_TETINGKAH_MS = 30_000;
+/** KZ-055: masa memandu bebas sebelum soalan pertama dibuka. */
+export const SOALAN_PERTAMA_MS = 5_000;
+/** KZ-055: rehat memandu minimum selepas satu soalan ditutup. */
+export const REHAT_SOALAN_MS = 4_000;
 /** Separuh lebar jalan: |offset| melebihi ini bermakna keluar jalan. */
 export const SEPARUH_JALAN_M = 3.5;
 /** Offset lateral maksimum (kereta tidak boleh hilang jauh). */
@@ -67,6 +72,8 @@ export interface KeadaanLumba {
   soalanDibukaMs: number | null;
   /** Bilangan soalan yang sudah dijawab (atau ditutup). */
   soalanDijawab: number;
+  /** Masa soalan terakhir ditutup, atau null jika belum ada. */
+  soalanDitutupMs: number | null;
   /** Kereta sampai garisan penamat. */
   selesai: boolean;
 }
@@ -84,6 +91,7 @@ export function ciptaKeadaanLumba(): KeadaanLumba {
     soalanKe: 0,
     soalanDibukaMs: null,
     soalanDijawab: 0,
+    soalanDitutupMs: null,
     selesai: false,
   };
 }
@@ -108,7 +116,7 @@ export function jawabSalah(k: KeadaanLumba): void {
   k.penaltiTamatMs = k.masaMs + PENALTI_SAAT * 1000;
 }
 
-/** Buka soalan baharu; kereta masuk mod autopilot perlahan. */
+/** Buka soalan baharu; kereta perlahan tetapi pemain masih boleh mengemudi. */
 export function bukaSoalan(k: KeadaanLumba): void {
   k.soalanDibukaMs = k.masaMs;
   k.soalanKe += 1;
@@ -119,6 +127,7 @@ export function tutupSoalan(k: KeadaanLumba): void {
   if (k.soalanDibukaMs !== null) {
     k.soalanDibukaMs = null;
     k.soalanDijawab += 1;
+    k.soalanDitutupMs = k.masaMs;
   }
 }
 
@@ -127,12 +136,17 @@ export function masaSoalanBerlalu(k: KeadaanLumba): number | null {
   return k.soalanDibukaMs === null ? null : k.masaMs - k.soalanDibukaMs;
 }
 
-/** Masanya untuk membuka soalan baharu (tiada soalan terbuka, setiap 15 saat). */
+/**
+ * Masanya untuk membuka soalan baharu: tiada soalan terbuka, soalan pertama
+ * selepas 5 saat, kemudian setiap 15 saat, dengan rehat memandu sekurang-kurangnya
+ * 4 saat selepas soalan sebelumnya ditutup.
+ */
 export function perluSoalan(k: KeadaanLumba): boolean {
   return (
     !k.selesai &&
     k.soalanDibukaMs === null &&
-    k.masaMs >= k.soalanKe * SOALAN_SETIAP_MS
+    k.masaMs >= SOALAN_PERTAMA_MS + k.soalanKe * SOALAN_SETIAP_MS &&
+    (k.soalanDitutupMs === null || k.masaMs >= k.soalanDitutupMs + REHAT_SOALAN_MS)
   );
 }
 
@@ -167,18 +181,14 @@ export function langkahLumba(k: KeadaanLumba, dtMs: number, input: InputPemandu)
   const had = hadLajuEfektif(k);
 
   let sasaran: number;
-  if (k.soalanDibukaMs !== null) {
-    // Autopilot semasa soalan: perlahan dan kembali ke tengah jalan.
-    sasaran = had * 0.5;
-    k.offsetM += (0 - k.offsetM) * Math.min(1, dt / 0.8);
-  } else {
-    if (input.brek) sasaran = 0;
-    else if (input.pecut) sasaran = had;
-    else sasaran = had * 0.75;
-    const arah = (input.kanan ? 1 : 0) - (input.kiri ? 1 : 0);
-    k.offsetM += arah * KADAR_OFFSET_M_S * dt;
-    k.offsetM = Math.max(-OFFSET_MAX_M, Math.min(OFFSET_MAX_M, k.offsetM));
-  }
+  if (input.brek) sasaran = 0;
+  else if (k.soalanDibukaMs !== null) sasaran = had * 0.5; // semasa soalan: perlahan, pecut tiada kesan
+  else if (input.pecut) sasaran = had;
+  else sasaran = had * 0.75;
+  // KZ-055: stereng sentiasa aktif, termasuk semasa soalan (tiada lagi autopilot).
+  const arah = (input.kanan ? 1 : 0) - (input.kiri ? 1 : 0);
+  k.offsetM += arah * KADAR_OFFSET_M_S * dt;
+  k.offsetM = Math.max(-OFFSET_MAX_M, Math.min(OFFSET_MAX_M, k.offsetM));
 
   k.diLuarJalan = Math.abs(k.offsetM) > SEPARUH_JALAN_M;
   if (k.diLuarJalan) sasaran = Math.min(sasaran, had * 0.35);
