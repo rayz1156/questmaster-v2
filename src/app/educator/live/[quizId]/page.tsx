@@ -492,6 +492,11 @@ export default function EditorKuizLangsung() {
         </p>
       </Card>
 
+      {/* KZ-053: panel Cabaran Solo, diletak di atas supaya mudah dijumpai guru. */}
+      <div className="mb-4">
+        <PanelCabaranSolo quizId={quizId} />
+      </div>
+
       {/* KZ-037: kad Outcome yang dinilai; guru memilih Outcome bagi seluruh kuiz. */}
       <Card className="mb-4">
         <CardHead title={t("live.educatorEditor.outcomeTitle")} />
@@ -735,8 +740,6 @@ export default function EditorKuizLangsung() {
         )}
       </Card>
 
-      {/* KZ-053: panel Cabaran Solo (lumba kendiri dengan papan top scorer). */}
-      <PanelCabaranSolo quizId={quizId} />
     </Shell>
   );
 }
