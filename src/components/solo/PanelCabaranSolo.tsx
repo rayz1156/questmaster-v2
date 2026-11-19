@@ -226,6 +226,9 @@ export default function PanelCabaranSolo({ quizId }: { quizId: string }) {
           </div>
           {/* Kod QR melalui laluan QR sedia ada, dest=solo supaya imbas membawa
               pelajar ke /solo/<kod> dan bukan /live/<kod>. */}
+          {/* PNG QR dijana oleh laluan sendiri mengikut kod; next/image tidak
+              memberi pengoptimuman untuk PNG dinamik ini. */}
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={`/api/live/qr?code=${encodeURIComponent(keadaan.code)}&dest=solo&size=180`}
             alt={t("solo.qrAlt")}

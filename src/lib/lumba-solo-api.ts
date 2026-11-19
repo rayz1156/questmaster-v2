@@ -20,7 +20,6 @@ import { bearerFromReq, getRouteSupabase, getServiceSupabase } from '@/lib/supab
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import { ahliKelas, keputusanMasuk, namaBerdaftar, potongNama, soalanSerasiLive } from '@/lib/live-quiz';
 import {
-  hashIp,
   hashToken,
   kocok,
   sahkanKodSolo,

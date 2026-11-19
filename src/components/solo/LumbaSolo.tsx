@@ -19,7 +19,6 @@ import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import {
   bukaSoalan,
   ciptaKeadaanLumba,
-  hadLajuEfektif,
   JAWAB_TETINGKAH_MS,
   jawabBetul,
   jawabSalah,

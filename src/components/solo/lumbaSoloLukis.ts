@@ -103,7 +103,7 @@ export function lukisPemandangan(
     if (deltaM < 2 || deltaM > PANDANGAN_M) continue;
     const y = pemainY - deltaM * pxm;
     if (y < -40) continue;
-    lukisKereta(ctx, tengahX, y, 26, 44, WARNA_KOMPUTER[i] ?? '#38bdf8', pxm);
+    lukisKereta(ctx, tengahX, y, 26, 44, WARNA_KOMPUTER[i] ?? '#38bdf8');
   }
 
   // Kereta pemain, ungu Kuizen, dengan bayang lembut.
@@ -115,7 +115,7 @@ export function lukisPemandangan(
   ctx.ellipse(pemainX + 3, pemainY + 6, 16, 24, 0, 0, Math.PI * 2);
   ctx.fill();
   ctx.restore();
-  lukisKereta(ctx, pemainX, pemainY, 28, 48, WARNA_PEMAIN, pxm);
+  lukisKereta(ctx, pemainX, pemainY, 28, 48, WARNA_PEMAIN);
 
   // Asap penalti: jalur kelabu di belakang kereta pemain.
   if (p.penalti) {
@@ -135,7 +135,6 @@ export function lukisKereta(
   lebar: number,
   tinggi: number,
   warna: string,
-  _pxm: number,
 ): void {
   const rx = lebar / 2;
   const ry = tinggi / 2;
@@ -151,7 +150,6 @@ export function lukisKereta(
   // Badan bulat (kereta melihat ke atas).
   ctx.fillStyle = warna;
   ctx.beginPath();
-  const r = Math.min(rx, ry) * 0.55;
   ctx.moveTo(x - rx + 3, y - ry + 3);
   ctx.quadraticCurveTo(x, y - ry - 6, x + rx - 3, y - ry + 3);
   ctx.lineTo(x + rx - 3, y + ry - 3);
@@ -168,5 +166,4 @@ export function lukisKereta(
   ctx.beginPath();
   ctx.ellipse(x, y + ry * 0.25, rx * 0.6, ry * 0.3, 0, 0, Math.PI * 2);
   ctx.fill();
-  void r;
 }

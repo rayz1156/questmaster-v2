@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server';
+import { NextRequest } from 'next/server';
 import QRCode from 'qrcode';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 
