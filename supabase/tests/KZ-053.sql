@@ -50,14 +50,17 @@ insert into public.qm_live_questions (id, quiz_id, order_idx, prompt, options, c
    'Warna langit?', '[{"key":"A","text":"Biru"},{"key":"B","text":"Merah"}]'::jsonb, 'A', 1000, 30),
   ('00000000-0000-0000-0000-0000000053e3', '00000000-0000-0000-0000-0000000053d1', 2,
    'Air mendidih pada?', '[{"key":"A","text":"90C"},{"key":"B","text":"100C"}]'::jsonb, 'B', 1000, 30),
-  ('00000000-0000-0000-0000-0000000053e4', '00000000-0000-0000-0000-0000000053d1', 3,
-   'Tulis esei.', '[]'::jsonb, '', 100, 60),
   ('00000000-0000-0000-0000-0000000053e5', '00000000-0000-0000-0000-0000000053d2', 0,
    'Ibu negara?', '[{"key":"A","text":"KL"},{"key":"B","text":"JB"}]'::jsonb, 'A', 1000, 30),
   ('00000000-0000-0000-0000-0000000053e6', '00000000-0000-0000-0000-0000000053d2', 1,
    'Dua darab tiga?', '[{"key":"A","text":"5"},{"key":"B","text":"6"}]'::jsonb, 'B', 1000, 30),
   ('00000000-0000-0000-0000-0000000053e7', '00000000-0000-0000-0000-0000000053d2', 2,
    'Bumi bentuk?', '[{"key":"A","text":"Bumi"},{"key":"B","text":"Kubus"}]'::jsonb, 'A', 1000, 30);
+-- Soalan tidak serasi (essay): kekangan options_qtype_check hanya
+-- membenarkan options kosong bagi qtype selain multiple/ox.
+insert into public.qm_live_questions (id, quiz_id, order_idx, qtype, prompt, options, correct_key, points, time_limit_sec) values
+  ('00000000-0000-0000-0000-0000000053e4', '00000000-0000-0000-0000-0000000053d1', 3,
+   'essay', 'Tulis esei.', '[]'::jsonb, '', 100, 60);
 
 -- ============================================================ 2. Medan kuiz
 -- U1: suis dan kod solo wujud; lalai mati dan kod null; unique ditolak.
