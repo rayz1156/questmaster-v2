@@ -139,6 +139,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const rafRef = useRef(0);
   /** KZ-054: sasaran offset lateral (meter) daripada jari/tetikus yang diseret; null bila tiada sentuhan. */
   const sasaranStereng = useRef<number | null>(null);
+  const tekanStereng = useRef(false);
   /** Rujukan terkini hantarJawapan untuk pengendali kekunci (effect bergantung [fasa] sahaja). */
   const hantarRef = useRef<(pilihan: string | null) => Promise<void>>(async () => {});
   const [sentuhPeranti, setSentuhPeranti] = useState(false);
@@ -314,19 +315,33 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     return () => window.clearTimeout(id);
   }, [fasa]);
 
-  /** Seret jari/tetikus: kereta bergerak ke arah kedudukan jari; tahan = pecut. */
+  /**
+   * Stereng penuding: kereta bergerak ke arah kedudukan jari atau tetikus.
+   * Jari: seret dan tahan (tahan = pecut). Tetikus (KZ-055): cukup gerakkan
+   * tetikus di atas trek; klik dan tahan = pecut.
+   */
   const seretStereng = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
     const rel = (e.clientX - r.left) / Math.max(1, r.width) - 0.5;
     sasaranStereng.current = Math.max(-1, Math.min(1, rel * 2.2)) * 4.6;
   };
-  const lepasStereng = () => {
+  const hentiStereng = () => {
+    tekanStereng.current = false;
     if (sasaranStereng.current === null) return;
     sasaranStereng.current = null;
     const i = inputRef.current;
     i.kiri = false;
     i.kanan = false;
     i.pecut = false;
+  };
+  const lepasTekan = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType !== "mouse") {
+      hentiStereng();
+      return;
+    }
+    // Tetikus: stereng ikut kedudukan diteruskan; hanya pecut dilepaskan.
+    if (tekanStereng.current) inputRef.current.pecut = false;
+    tekanStereng.current = false;
   };
 
   /** Tamatkan larian dan papar keputusan. */
@@ -421,7 +436,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
           const beza = sasaran - k.offsetM;
           i.kiri = beza < -0.25;
           i.kanan = beza > 0.25;
-          i.pecut = true;
+          if (tekanStereng.current) i.pecut = true;
         }
         langkahLumba(k, dt, inputRef.current);
 
@@ -558,19 +573,21 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
         e.preventDefault();
       }
-      // KZ-054: jawab soalan dengan kekunci 1 hingga 9, atau huruf pilihan (A, B, C, D).
+      // KZ-054/055: jawab soalan dengan kekunci nombor 1 hingga 9 sahaja. Huruf tidak
+      // menjawab kerana A dan D juga kekunci stereng (stereng aktif semasa soalan).
       const s = soalanRef.current;
-      if (s && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+      if (s && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey && /^[1-9]$/.test(e.key)) {
         const n = Number(e.key);
-        const pilihan =
-          Number.isInteger(n) && n >= 1 && n <= s.options.length
-            ? s.options[n - 1]
-            : s.options.find((o) => o.key.toUpperCase() === e.key.toUpperCase());
+        const pilihan = n <= s.options.length ? s.options[n - 1] : undefined;
         if (pilihan) {
           e.preventDefault();
           void hantarRef.current(pilihan.key);
           return;
         }
+      }
+      // Kekunci stereng mengambil alih daripada stereng tetikus.
+      if (["ArrowLeft", "ArrowRight", "a", "A", "d", "D"].includes(e.key) && !tekanStereng.current) {
+        sasaranStereng.current = null;
       }
       setKekunci(e.key, true);
     };
@@ -816,9 +833,10 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         />
         {/* KZ-054: kawasan seret untuk stereng dengan jari atau tetikus */}
         <div
-          className="absolute inset-0 rounded-xl cursor-grab active:cursor-grabbing"
+          className="absolute inset-0 rounded-xl cursor-crosshair"
           style={{ touchAction: "none" }}
           onPointerDown={(e) => {
+            tekanStereng.current = true;
             seretStereng(e);
             try {
               e.currentTarget.setPointerCapture(e.pointerId);
@@ -827,11 +845,14 @@ export default function LumbaSolo({ kod }: { kod: string }) {
             }
           }}
           onPointerMove={(e) => {
-            if (sasaranStereng.current !== null) seretStereng(e);
+            if (tekanStereng.current || e.pointerType === "mouse") seretStereng(e);
           }}
-          onPointerUp={lepasStereng}
-          onPointerCancel={lepasStereng}
-          onLostPointerCapture={lepasStereng}
+          onPointerUp={lepasTekan}
+          onPointerCancel={hentiStereng}
+          onLostPointerCapture={lepasTekan}
+          onPointerLeave={(e) => {
+            if (e.pointerType === "mouse" && !tekanStereng.current) hentiStereng();
+          }}
           aria-hidden="true"
         />
         {petunjuk && (

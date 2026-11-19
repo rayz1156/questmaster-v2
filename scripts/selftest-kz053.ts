@@ -41,6 +41,8 @@ import {
   penaltiAktif,
   perluSoalan,
   SOALAN_SETIAP_MS,
+  SOALAN_PERTAMA_MS,
+  REHAT_SOALAN_MS,
   TREK_PANJANG_M,
   TIADA_INPUT,
   tutupSoalan,
@@ -222,14 +224,17 @@ for (let i = 0; i < 60; i++) langkahLumba(k5, 100, pecut); // kekal di luar, pec
 check('keluar jalan memperlahankan walaupun pecut', k5.kelajuan < HAD_LAJU_AWAL * 0.5, k5.kelajuan);
 check('kelajuan luar jalan tidak naik', k5.kelajuan <= kelajuanLuar + 5, [kelajuanLuar, k5.kelajuan]);
 
-// Autopilot semasa soalan: kelajuan separuh had dan kereta kembali ke tengah.
+// Semasa soalan (KZ-055): kelajuan separuh had, stereng masih aktif.
 const k6 = ciptaKeadaanLumba();
 k6.offsetM = 2.5;
-for (let i = 0; i < 30; i++) langkahLumba(k6, 100, pecut); // lajur tengah
+for (let i = 0; i < 30; i++) langkahLumba(k6, 100, pecut);
 bukaSoalan(k6);
-for (let i = 0; i < 60; i++) langkahLumba(k6, 100, pecut); // 6 saat autopilot
-check('autopilot: kelajuan menghampiri separuh had', Math.abs(k6.kelajuan - hadLajuEfektif(k6) * 0.5) < 8, k6.kelajuan);
-check('autopilot: kereta kembali ke tengah', Math.abs(k6.offsetM) < 0.5, k6.offsetM);
+for (let i = 0; i < 60; i++) langkahLumba(k6, 100, pecut); // 6 saat semasa soalan
+check('semasa soalan: kelajuan menghampiri separuh had', Math.abs(k6.kelajuan - hadLajuEfektif(k6) * 0.5) < 8, k6.kelajuan);
+check('semasa soalan: offset kekal tanpa input', Math.abs(k6.offsetM - 2.5) < 0.01, k6.offsetM);
+const offSoalan = k6.offsetM;
+for (let i = 0; i < 5; i++) langkahLumba(k6, 100, { ...TIADA_INPUT, kiri: true });
+check('semasa soalan: stereng kiri masih berfungsi', k6.offsetM < offSoalan - 2, [offSoalan, k6.offsetM]);
 check('soalan dibuka dicatat', k6.soalanKe === 1 && k6.soalanDibukaMs !== null);
 check('masa soalan berlalu positif', (masaSoalanBerlalu(k6) ?? 0) > 5000);
 tutupSoalan(k6);
@@ -237,16 +242,28 @@ check('tutup soalan: dijawab dikira', k6.soalanDijawab === 1 && k6.soalanDibukaM
 tutupSoalan(k6);
 check('tutup soalan dua kali tidak berkira ganda', k6.soalanDijawab === 1);
 
-// Jadual soalan: perluSoalan setiap 15 saat.
+// Jadual soalan (KZ-055): pertama selepas 5 saat, kemudian setiap 15 saat, rehat 4 saat.
 const k7 = ciptaKeadaanLumba();
-check('perlu soalan pada mula', perluSoalan(k7) === true);
+check('tiada soalan pada saat 0', perluSoalan(k7) === false);
+k7.masaMs = SOALAN_PERTAMA_MS;
+check('soalan pertama pada 5 saat', perluSoalan(k7) === true);
 bukaSoalan(k7);
 check('tiada soalan baharu bila satu terbuka', perluSoalan(k7) === false);
+k7.masaMs = SOALAN_PERTAMA_MS + 2000;
 tutupSoalan(k7);
-k7.masaMs = SOALAN_SETIAP_MS - 1;
+k7.masaMs = SOALAN_PERTAMA_MS + SOALAN_SETIAP_MS - 1;
 check('belum 15 saat: tiada soalan baharu', perluSoalan(k7) === false);
-k7.masaMs = SOALAN_SETIAP_MS;
+k7.masaMs = SOALAN_PERTAMA_MS + SOALAN_SETIAP_MS;
 check('tepat 15 saat: soalan baharu', perluSoalan(k7) === true);
+// Soalan lambat dijawab: soalan seterusnya menunggu rehat 4 saat.
+const k7b = ciptaKeadaanLumba();
+k7b.masaMs = SOALAN_PERTAMA_MS;
+bukaSoalan(k7b);
+k7b.masaMs = SOALAN_PERTAMA_MS + 25_000;
+tutupSoalan(k7b);
+check('selepas soalan lambat: rehat dahulu', perluSoalan(k7b) === false);
+k7b.masaMs += REHAT_SOALAN_MS;
+check('selepas rehat 4 saat: soalan baharu', perluSoalan(k7b) === true);
 
 // Kedudukan lawan kereta komputer 1..3.
 const k8 = ciptaKeadaanLumba();
