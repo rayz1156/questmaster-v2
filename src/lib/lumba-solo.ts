@@ -152,6 +152,25 @@ export function kunciPemain(r: BarisLarianPapan): string {
 }
 
 /**
+ * Topeng nama untuk papan awam kuiz berkelas (PDPA, pelajar bawah umur):
+ * setiap perkataan menjadi huruf pertama diikuti titik, contoh
+ * "Siti Nur Aisyah" -> "S. N. A.". Nama kosong -> "?".
+ */
+export function topengNama(nama: string): string {
+  const huruf = nama
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((p) => Array.from(p)[0]!.toUpperCase() + '.');
+  return huruf.length ? huruf.join(' ') : '?';
+}
+
+/** Papan dengan nama bertopeng (untuk pemanggil yang bukan ahli kelas). */
+export function topengPapan(papan: readonly BarisPapan[]): BarisPapan[] {
+  return papan.map((r) => ({ ...r, nickname: topengNama(r.nickname) }));
+}
+
+/**
  * Susun papan: SATU baris terbaik bagi setiap pemain (kunci user_id jika
  * ada, jika tidak lower(nickname)), tertib markah menurun kemudian masa
  * menaik, potong kepada 10 teratas.

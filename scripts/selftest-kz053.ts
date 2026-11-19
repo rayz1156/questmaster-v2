@@ -23,6 +23,8 @@ import {
   sahkanNickname,
   susunPapan,
   tokenSama,
+  topengNama,
+  topengPapan,
   type BarisLarianPapan,
 } from '../src/lib/lumba-solo';
 import {
@@ -280,6 +282,15 @@ check('tanpa input: kelajuan ~75% had', k11.kelajuan > HAD_LAJU_AWAL * 0.6 && k1
 
 /* ===== Ringkasan ===== */
 console.log('');
+// Topeng nama papan awam kuiz berkelas (penemuan kzsec 1).
+check('topeng: tiga perkataan', topengNama('Siti Nur Aisyah') === 'S. N. A.');
+check('topeng: huruf kecil + ruang lebih', topengNama('  ali   bin abu ') === 'A. B. A.');
+check('topeng: kosong', topengNama('   ') === '?');
+{
+  const p = topengPapan([{ rank: 1, runId: 'r1', nickname: 'Ahmad Faiz', score: 9, elapsedMs: 1, finishedAt: null }]);
+  check('topengPapan: nama ditopeng, markah kekal', p[0]!.nickname === 'A. F.' && p[0]!.score === 9 && p[0]!.rank === 1);
+}
+
 console.log('LULUS: ' + pass + '  GAGAL: ' + fail);
 if (fail > 0) {
   process.exitCode = 1;

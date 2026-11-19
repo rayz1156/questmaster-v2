@@ -153,7 +153,8 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     setFasa("muat");
     setRalat(null);
     try {
-      const res = await fetch(`/api/solo/${encodeURIComponent(kod)}`, { cache: "no-store" });
+      const hInfo = await pengepala();
+      const res = await fetch(`/api/solo/${encodeURIComponent(kod)}`, { cache: "no-store", headers: hInfo });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setRalat(typeof json.error === "string" ? json.error : t("solo.loadFailed"));
@@ -172,7 +173,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       setRalat(t("solo.loadFailed"));
       setFasa("maklumat");
     }
-  }, [kod, t]);
+  }, [kod, t, pengepala]);
 
   useEffect(() => {
     void muatInfo();
@@ -318,7 +319,8 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       });
       // Papan segar supaya kedudukan terkini dipapar (dan baris pemain disorot).
       try {
-        const res2 = await fetch(`/api/solo/${encodeURIComponent(kod)}`, { cache: "no-store" });
+        const h2 = await pengepala();
+        const res2 = await fetch(`/api/solo/${encodeURIComponent(kod)}`, { cache: "no-store", headers: h2 });
         const json2 = await res2.json().catch(() => ({}));
         if (res2.ok && Array.isArray(json2.leaderboard)) {
           setPapanSegar(json2.leaderboard as BarisPapanUi[]);
