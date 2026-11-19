@@ -35,6 +35,7 @@ import {
 } from "./lumbaSoloEnjin";
 import { lukisPemandangan } from "./lumbaSoloLukis";
 import { BunyiLumba } from "./lumbaSoloBunyi";
+import type { Pemandangan3D } from "./lumbaSolo3D";
 
 /** Baris papan seperti dipulangkan API. */
 interface BarisPapanUi {
@@ -132,7 +133,16 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const tikRef = useRef(0);
   const bunyiRef = useRef<BunyiLumba | null>(null);
   const kanvasRef = useRef<HTMLCanvasElement | null>(null);
+  /** KZ-054: kanvas WebGL berasingan (konteks 2D dan WebGL tidak boleh berkongsi kanvas). */
+  const kanvas3DRef = useRef<HTMLCanvasElement | null>(null);
+  const paparan3DRef = useRef<Pemandangan3D | null>(null);
   const rafRef = useRef(0);
+  /** KZ-054: sasaran offset lateral (meter) daripada jari/tetikus yang diseret; null bila tiada sentuhan. */
+  const sasaranStereng = useRef<number | null>(null);
+  /** Rujukan terkini hantarJawapan untuk pengendali kekunci (effect bergantung [fasa] sahaja). */
+  const hantarRef = useRef<(pilihan: string | null) => Promise<void>>(async () => {});
+  const [sentuhPeranti, setSentuhPeranti] = useState(false);
+  const [petunjuk, setPetunjuk] = useState(false);
 
   const pastiBunyi = useCallback((): BunyiLumba => {
     if (!bunyiRef.current) bunyiRef.current = new BunyiLumba();
@@ -290,6 +300,34 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     },
     [kod, pengepala, pastiBunyi],
   );
+  hantarRef.current = hantarJawapan;
+
+  /* ===== KZ-054: peranti sentuh dan petunjuk kawalan ===== */
+  useEffect(() => {
+    const mq = window.matchMedia("(pointer: coarse)");
+    setSentuhPeranti(mq.matches);
+  }, []);
+  useEffect(() => {
+    if (fasa !== "lumba") return;
+    setPetunjuk(true);
+    const id = window.setTimeout(() => setPetunjuk(false), 6000);
+    return () => window.clearTimeout(id);
+  }, [fasa]);
+
+  /** Seret jari/tetikus: kereta bergerak ke arah kedudukan jari; tahan = pecut. */
+  const seretStereng = (e: React.PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const rel = (e.clientX - r.left) / Math.max(1, r.width) - 0.5;
+    sasaranStereng.current = Math.max(-1, Math.min(1, rel * 2.2)) * 4.6;
+  };
+  const lepasStereng = () => {
+    if (sasaranStereng.current === null) return;
+    sasaranStereng.current = null;
+    const i = inputRef.current;
+    i.kiri = false;
+    i.kanan = false;
+    i.pecut = false;
+  };
 
   /** Tamatkan larian dan papar keputusan. */
   const tamatkan = useCallback(async (): Promise<void> => {
@@ -336,6 +374,32 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     }
   }, [kod, muatInfo, pengepala, pastiBunyi, t]);
 
+  /* ===== KZ-054: paparan 3D (dimuat dinamik; sandaran 2D jika WebGL tiada) ===== */
+  useEffect(() => {
+    if (fasa !== "lumba") return;
+    let hidup = true;
+    void import("./lumbaSolo3D")
+      .then((m) => {
+        const kanvas = kanvas3DRef.current;
+        if (!hidup || !kanvas) return;
+        try {
+          paparan3DRef.current = new m.Pemandangan3D(kanvas);
+          kanvas.style.visibility = "visible";
+          if (kanvasRef.current) kanvasRef.current.style.visibility = "hidden";
+        } catch {
+          paparan3DRef.current = null;
+        }
+      })
+      .catch(() => {
+        paparan3DRef.current = null;
+      });
+    return () => {
+      hidup = false;
+      paparan3DRef.current?.buang();
+      paparan3DRef.current = null;
+    };
+  }, [fasa]);
+
   /* ===== Gelung utama ===== */
   useEffect(() => {
     if (fasa !== "lumba") return;
@@ -350,6 +414,15 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       const k = enjinRef.current;
 
       if (!document.hidden) {
+        // Stereng seret: tukar sasaran offset jari kepada kiri/kanan digital enjin.
+        const sasaran = sasaranStereng.current;
+        if (sasaran !== null) {
+          const i = inputRef.current;
+          const beza = sasaran - k.offsetM;
+          i.kiri = beza < -0.25;
+          i.kanan = beza > 0.25;
+          i.pecut = true;
+        }
         langkahLumba(k, dt, inputRef.current);
 
         if (!selesaiRef.current) {
@@ -377,7 +450,28 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         }
 
         // Lukis bingkai (canvas di luar React: tiada render semula per bingkai).
-        const kanvas = kanvasRef.current;
+        const paparan3D = paparan3DRef.current;
+        const kanvas3D = kanvas3DRef.current;
+        const kanvas = paparan3D ? null : kanvasRef.current;
+        if (paparan3D && kanvas3D) {
+          paparan3D.ubahSaiz(
+            kanvas3D.clientWidth || 320,
+            kanvas3D.clientHeight || 240,
+            window.devicePixelRatio || 1,
+          );
+          paparan3D.render({
+            masaMs: k.masaMs,
+            jarakM: k.jarakM,
+            offsetM: k.offsetM,
+            hadLaju: k.hadLaju,
+            penalti: penaltiAktif(k),
+            kelajuanKomputer: KELAJUAN_KOMPUTER,
+            trekPanjangM: TREK_PANJANG_M,
+            kelajuan: k.kelajuan,
+            diLuarJalan: k.diLuarJalan,
+            soalanAktif: k.soalanDibukaMs !== null,
+          });
+        }
         if (kanvas) {
           const dpr = Math.min(2, window.devicePixelRatio || 1);
           const lebarCss = kanvas.clientWidth || 320;
@@ -463,6 +557,20 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     const turun = (e: KeyboardEvent) => {
       if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
         e.preventDefault();
+      }
+      // KZ-054: jawab soalan dengan kekunci 1 hingga 9, atau huruf pilihan (A, B, C, D).
+      const s = soalanRef.current;
+      if (s && !e.repeat && !e.ctrlKey && !e.metaKey && !e.altKey) {
+        const n = Number(e.key);
+        const pilihan =
+          Number.isInteger(n) && n >= 1 && n <= s.options.length
+            ? s.options[n - 1]
+            : s.options.find((o) => o.key.toUpperCase() === e.key.toUpperCase());
+        if (pilihan) {
+          e.preventDefault();
+          void hantarRef.current(pilihan.key);
+          return;
+        }
       }
       setKekunci(e.key, true);
     };
@@ -697,9 +805,42 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       <div className="flex-1 relative mx-auto w-full max-w-2xl px-0">
         <canvas
           ref={kanvasRef}
-          className="w-full h-full min-h-[46vh] block rounded-xl"
+          className="w-full h-full min-h-[56vh] block rounded-xl"
           aria-label={t("solo.race")}
         />
+        <canvas
+          ref={kanvas3DRef}
+          className="absolute inset-0 w-full h-full block rounded-xl pointer-events-none"
+          style={{ visibility: "hidden" }}
+          aria-hidden="true"
+        />
+        {/* KZ-054: kawasan seret untuk stereng dengan jari atau tetikus */}
+        <div
+          className="absolute inset-0 rounded-xl cursor-grab active:cursor-grabbing"
+          style={{ touchAction: "none" }}
+          onPointerDown={(e) => {
+            seretStereng(e);
+            try {
+              e.currentTarget.setPointerCapture(e.pointerId);
+            } catch {
+              // Sesetengah pelayar menolak tangkapan; seretan tetap berfungsi tanpanya.
+            }
+          }}
+          onPointerMove={(e) => {
+            if (sasaranStereng.current !== null) seretStereng(e);
+          }}
+          onPointerUp={lepasStereng}
+          onPointerCancel={lepasStereng}
+          onLostPointerCapture={lepasStereng}
+          aria-hidden="true"
+        />
+        {petunjuk && (
+          <div className="absolute top-12 inset-x-3 sm:inset-x-10 pointer-events-none text-center">
+            <p className="inline-block text-[12px] sm:text-[13px] font-semibold text-white bg-slate-900/75 rounded-xl px-3 py-2">
+              {sentuhPeranti ? t("solo.hintTouch") : t("solo.hintKeys")}
+            </p>
+          </div>
+        )}
 
         {hud.penalti && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[12px] font-bold text-amber-300 bg-amber-950/80 rounded-lg px-3 py-1">
@@ -745,53 +886,70 @@ export default function LumbaSolo({ kod }: { kod: string }) {
             </div>
             <p className="text-[15px] font-semibold text-ink mb-3">{soalan.prompt}</p>
             <div className="grid grid-cols-2 sm:grid-3 gap-2">
-              {soalan.options.map((o) => (
+              {soalan.options.map((o, i) => (
                 <button
                   key={o.key}
                   type="button"
                   onClick={() => void hantarJawapan(o.key)}
-                  className="text-left px-3 py-2 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 text-[13px] text-ink"
+                  className="text-left px-3 py-2.5 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 active:bg-violet-200 text-[13px] text-ink flex items-start gap-2"
                 >
-                  <span className="font-bold text-violet-700">{o.key}.</span> {o.text}
+                  {!sentuhPeranti && (
+                    <kbd className="shrink-0 mt-px inline-flex items-center justify-center w-5 h-5 rounded-md bg-violet-600 text-white text-[11px] font-bold">
+                      {i + 1}
+                    </kbd>
+                  )}
+                  <span>
+                    <span className="font-bold text-violet-700">{o.key}.</span> {o.text}
+                  </span>
                 </button>
               ))}
             </div>
           </div>
         )}
 
-        {/* Butang sentuh */}
-        <div className="absolute right-2 top-14 flex flex-col gap-2 sm:hidden">
-          <button
-            type="button"
-            {...butangSentuh("pecut")}
-            className="w-14 h-14 rounded-full bg-violet-600 text-white text-[12px] font-bold active:bg-violet-700"
-          >
-            {t("solo.boost")}
-          </button>
-          <button
-            type="button"
-            {...butangSentuh("brek")}
-            className="w-14 h-14 rounded-full bg-slate-600 text-white text-[12px] font-bold active:bg-slate-700"
-          >
-            {t("solo.brake")}
-          </button>
-        </div>
-        <div className="absolute left-2 top-14 flex flex-col gap-2 sm:hidden">
-          <button
-            type="button"
-            {...butangSentuh("kiri")}
-            className="w-14 h-14 rounded-full bg-slate-700/90 text-white text-[12px] font-bold active:bg-slate-600"
-          >
-            {t("solo.left")}
-          </button>
-          <button
-            type="button"
-            {...butangSentuh("kanan")}
-            className="w-14 h-14 rounded-full bg-slate-700/90 text-white text-[12px] font-bold active:bg-slate-600"
-          >
-            {t("solo.right")}
-          </button>
-        </div>
+        {/* Butang sentuh (KZ-054): stereng kiri bawah, pecut/brek kanan bawah; disorok semasa soalan */}
+        {sentuhPeranti && !soalan && (
+          <>
+            <div className="absolute left-3 bottom-10 flex gap-3">
+              <button
+                type="button"
+                {...butangSentuh("kiri")}
+                aria-label={t("solo.left")}
+                style={{ touchAction: "none" }}
+                className="w-16 h-16 rounded-full bg-slate-900/70 border-2 border-white/40 text-white text-[26px] font-bold active:bg-violet-600 select-none"
+              >
+                &#9664;
+              </button>
+              <button
+                type="button"
+                {...butangSentuh("kanan")}
+                aria-label={t("solo.right")}
+                style={{ touchAction: "none" }}
+                className="w-16 h-16 rounded-full bg-slate-900/70 border-2 border-white/40 text-white text-[26px] font-bold active:bg-violet-600 select-none"
+              >
+                &#9654;
+              </button>
+            </div>
+            <div className="absolute right-3 bottom-10 flex items-end gap-3">
+              <button
+                type="button"
+                {...butangSentuh("brek")}
+                style={{ touchAction: "none" }}
+                className="w-14 h-14 rounded-full bg-slate-700/85 border-2 border-white/30 text-white text-[12px] font-bold active:bg-slate-500 select-none"
+              >
+                {t("solo.brake")}
+              </button>
+              <button
+                type="button"
+                {...butangSentuh("pecut")}
+                style={{ touchAction: "none" }}
+                className="w-20 h-20 rounded-full bg-violet-600/90 border-2 border-white/50 text-white text-[14px] font-bold active:bg-violet-700 select-none shadow-lg"
+              >
+                {t("solo.boost")}
+              </button>
+            </div>
+          </>
+        )}
       </div>
 
       {/* Butang tamat (pemain boleh berhenti bila-bila masa) */}
