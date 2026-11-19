@@ -21,6 +21,7 @@ import { useRouter } from "next/navigation";
 import { Play, X, Check, List as IkonList, Map as IkonPeta, Gem, Ghost } from "lucide-react";
 import { Button, Tabs } from "@/components/ui";
 import SeniModPermainan, { LATAR_SENI } from "@/components/live/SeniModPermainan";
+import PanelCabaranSolo from "@/components/solo/PanelCabaranSolo";
 import {
   NILAI_BONUS_SEC,
   RACE_MAX_MINUTES,
@@ -685,6 +686,18 @@ export default function PanelMulaSesi({
             </div>
           </div>
         </div>
+      </div>
+
+      {/* Kumpulan c: Cabaran Solo (bila-bila masa, top 10), KZ-053. */}
+      <div className="mt-6 pt-5" style={{ borderTop: "1px solid #e5e9f2" }}>
+        <div className="font-semibold text-sm" style={{ color: "#364a63" }}>
+          Cabaran Solo (bila-bila masa)
+        </div>
+        <p className="text-[12px] mt-0.5 mb-3" style={{ color: "#6b7a99" }}>
+          Tiada sesi langsung: hidupkan suis, kongsi pautan atau QR, dan pelajar berlumba
+          sendiri pada bila-bila masa. Markah terbaik masuk papan top 10.
+        </p>
+        <PanelCabaranSolo quizId={quizId} />
       </div>
     </div>
   );

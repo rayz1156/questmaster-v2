@@ -20,7 +20,6 @@ import { EDU_TABS } from "@/lib/eduTabs";
 import { ArrowLeft, Plus, Trash2, Play, Upload, Pencil, Download, FileSpreadsheet } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import PanelMulaSesi from "@/components/PanelMulaSesi";
-import PanelCabaranSolo from "@/components/solo/PanelCabaranSolo";
 import QuestionEditor, { QTYPE_LABEL } from "@/components/arena/QuestionEditor";
 import { BONUS_LALAI_SEC, RACE_DEFAULT_MINUTES, sahMinitLumba, type TahapRaksasa } from "@/lib/lumba-laju";
 import { isLiveCompatible, liveRowToArena, type LiveBankRow } from "@/lib/kuiz-bank";
@@ -491,11 +490,6 @@ export default function EditorKuizLangsung() {
           {t("live.educatorEditor.streakBonusDesc")}
         </p>
       </Card>
-
-      {/* KZ-053: panel Cabaran Solo, diletak di atas supaya mudah dijumpai guru. */}
-      <div className="mb-4">
-        <PanelCabaranSolo quizId={quizId} />
-      </div>
 
       {/* KZ-037: kad Outcome yang dinilai; guru memilih Outcome bagi seluruh kuiz. */}
       <Card className="mb-4">
