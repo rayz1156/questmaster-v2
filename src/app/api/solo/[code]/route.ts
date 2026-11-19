@@ -32,13 +32,14 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
 
   const ids = await soalanIdsSerasi(svc, kuiz.id);
   let papan = await papanSolo(svc, kuiz.id);
+  // Perlu log masuk hanya bila kuiz berkelas DAN pemanggil belum log masuk
+  // (Bearer sah). Pengguna log masuk yang bukan ahli ditolak di /start (403).
+  let needLogin = false;
   if (kuiz.class_id) {
     const masuk = await semakMasukSolo(req, svc, kuiz);
     if (masuk.response) papan = topengPapan(papan);
+    needLogin = masuk.keputusan === 'perlu_log_masuk';
   }
-
-  // Perlu log masuk bila kuiz berkelas: tetamu tidak dibenarkan langsung.
-  const needLogin = !!kuiz.class_id;
 
   return NextResponse.json({
     title: kuiz.title,

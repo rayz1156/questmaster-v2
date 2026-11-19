@@ -560,7 +560,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               <div className="mt-4 space-y-3">
                 <p className="text-[13px] text-ink-faint">{t("solo.needLogin")}</p>
                 <Link
-                  href="/login"
+                  href={`/login?next=${encodeURIComponent(`/solo/${kod}`)}`}
                   className="block text-center px-4 py-2.5 rounded-xl text-white text-[14px] font-semibold bg-gradient-to-r from-violet-600 to-indigo-600"
                 >
                   {t("solo.loginButton")}
