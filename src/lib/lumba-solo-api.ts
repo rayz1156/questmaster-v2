@@ -193,12 +193,19 @@ export async function soalanIdsSerasi(svc: SupaService, quizId: string): Promise
   return ((data ?? []) as unknown as { id: string }[]).map((r) => r.id);
 }
 
-/** Alamat IP permintaan (rujuk x-forwarded-for nginx). */
+/**
+ * Alamat IP permintaan. Utamakan x-real-ip kerana nginx menulis ganti
+ * pengepala itu dengan $remote_addr; entri pertama x-forwarded-for dibekalkan
+ * klien ($proxy_add_x_forwarded_for hanya menambah di hujung) dan boleh
+ * dipalsukan untuk memintas had kadar. Sandaran: entri TERAKHIR
+ * x-forwarded-for (yang ditambah oleh proksi kita).
+ */
 export function ipPermintaan(req: NextRequest): string {
-  const xf = req.headers.get('x-forwarded-for') || '';
-  const pertama = xf.split(',')[0]?.trim() || '';
-  if (pertama) return pertama;
-  return req.headers.get('x-real-ip')?.trim() || '0.0.0.0';
+  const sebenar = req.headers.get('x-real-ip')?.trim() || '';
+  if (sebenar) return sebenar;
+  const xf = (req.headers.get('x-forwarded-for') || '').split(',');
+  const terakhir = xf[xf.length - 1]?.trim() || '';
+  return terakhir || '0.0.0.0';
 }
 
 /** Had kadar: terlalu banyak larian dimulakan oleh pemain sama dalam 10 minit? */
