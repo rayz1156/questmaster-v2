@@ -2,6 +2,7 @@
 
 import type { ReactNode } from "react";
 import Link from "next/link";
+import { atributLuar } from "@/lib/activityLink";
 import { CheckSquare } from "lucide-react";
 import { InitialTile } from "./Tiles";
 import { AvatarGroup } from "./Avatar";
@@ -80,7 +81,7 @@ export default function ProjectCard({
         <InitialTile name={title} index={0} />
         <div className="min-w-0 flex-1">
           {href ? (
-            <Link href={href} className="block">
+            <Link href={href} className="block" {...atributLuar(href)}>
               <h3 className="text-[15px] font-bold text-ink leading-snug truncate hover:text-brand-purple transition">{title}</h3>
             </Link>
           ) : (

@@ -16,6 +16,7 @@
  */
 
 import Link from "next/link";
+import { lamanHantarAktiviti, atributLuar } from "@/lib/activityLink";
 import { useEffect, useMemo, useState } from "react";
 import { ArrowRight, BookOpen, ClipboardList, CopyPlus } from "lucide-react";
 import ParticipantShell from "@/components/ParticipantShell";
@@ -307,7 +308,7 @@ export default function Page() {
   const barisPapar = tabAktiviti === "Active" ? barisAktif : barisTamat;
 
   // Aktiviti "Next up": aktif dengan end_at terdekat (logik tulen).
-  const aktivitiSeterusnya: { id: string; title: string; kelasNama: string; labelTarikh: string } | null = useMemo(() => {
+  const aktivitiSeterusnya: { id: string; title: string; kelasNama: string; labelTarikh: string; href: string } | null = useMemo(() => {
     const pilihan = pilihAktivitiSeterusnya(semuaTab.aktif);
     if (!pilihan) return null;
     return {
@@ -315,6 +316,7 @@ export default function Page() {
       title: pilihan.title,
       kelasNama: namaKelas.get(pilihan.class_id ?? "") || terjemah(bahasa, "common.class"),
       labelTarikh: labelTarikhQuest(pilihan.end_at, false, new Date(), bahasa).label,
+      href: lamanHantarAktiviti(pilihan),
     };
   }, [semuaTab, namaKelas, bahasa]);
 
@@ -567,7 +569,8 @@ export default function Page() {
                         {aktivitiSeterusnya.labelTarikh ? ` · ${aktivitiSeterusnya.labelTarikh}` : ""}
                       </p>
                       <Link
-                        href={`/participant/activities?hunt=${encodeURIComponent(aktivitiSeterusnya.id)}`}
+                        href={aktivitiSeterusnya.href}
+{...atributLuar(aktivitiSeterusnya.href)}
                         className="mt-4 inline-flex text-[13px] font-bold text-brand-purple hover:underline"
                       >
                         {t("participant.continueLabel")}
@@ -621,7 +624,7 @@ export default function Page() {
                               {inisial(q.tajuk)}
                             </span>
                             <div className="min-w-0 flex-1">
-                              <Link href={q.href} className="block truncate text-[14px] font-medium text-ink hover:text-brand-purple">
+                              <Link href={q.href} {...atributLuar(q.href)} className="block truncate text-[14px] font-medium text-ink hover:text-brand-purple">
                                 {q.tajuk}
                               </Link>
                               <div className="truncate text-xs text-ink-faint">{q.kelasNama}</div>
@@ -796,7 +799,7 @@ function kawalBarisAktiviti(
         : tarikhRingkas(h.end_at, LOKAL[bahasa]) || terjemah(bahasa, "papan.open")),
       segera: label.segera,
       tamat,
-      href: `/participant/activities?hunt=${encodeURIComponent(h.id)}`,
+      href: lamanHantarAktiviti(h),
     };
   });
 }

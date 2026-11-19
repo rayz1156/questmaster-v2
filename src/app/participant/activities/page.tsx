@@ -14,6 +14,7 @@
 import { Suspense, useEffect, useMemo, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
+import { lamanHantarAktiviti } from "@/lib/activityLink";
 import {
   CheckCircle2,
   ClipboardList,
@@ -144,7 +145,7 @@ function Inner() {
           { label: t("participant.openSubmissionBoard"), icon: <ClipboardList className="w-4 h-4" />, onSelect: () => { router.push(`/participant/activities/${h.id}/submissions`); } },
         ]}
         menuLabel={t("ui.activityActions")}
-        href={`/participant/activities?hunt=${h.id}`}
+        href={lamanHantarAktiviti(h)}
       />
     );
   };
