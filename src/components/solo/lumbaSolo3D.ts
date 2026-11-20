@@ -2,10 +2,10 @@
  * KZ-054: paparan 3D Lumba Solo (Three.js / WebGL).
  *
  * Menggantikan pandangan atas-bawah Canvas 2D dengan kamera kejar di belakang
- * kereta. Enjin (lumbaSoloEnjin.ts) TIDAK berubah: trek tetap lurus 4800 m
- * dalam enjin, dan lengkok serta bukit di sini hiasan visual semata. Kereta
- * diletak pada garis tengah trek + offset lateral enjin, jadi pemain tidak
- * perlu membelok mengikut lengkok.
+ * kenderaan. Lengkok trek dikongsi dengan enjin (KZ-056: kenderaan hanyut di
+ * selekoh); bukit di sini hiasan visual semata.
+ *
+ * KZ-057: tiga tema (kereta, basikal, angkasa) berkongsi enjin yang sama.
  *
  * Semua bentuk dibina sendiri daripada geometri asas dan tekstur kanvas yang
  * dilukis dalam kod; tiada model, imej atau bunyi daripada permainan lain.
@@ -26,6 +26,7 @@ import {
   CylinderGeometry,
   DirectionalLight,
   DodecahedronGeometry,
+  DoubleSide,
   Fog,
   Group,
   HemisphereLight,
@@ -41,7 +42,10 @@ import {
   PCFSoftShadowMap,
   PerspectiveCamera,
   PlaneGeometry,
+  Points,
+  PointsMaterial,
   RepeatWrapping,
+  RingGeometry,
   Scene,
   SphereGeometry,
   Sprite,
@@ -53,6 +57,95 @@ import {
 } from 'three';
 import { WARNA_KOMPUTER, WARNA_PEMAIN, type Pemandangan } from './lumbaSoloLukis';
 import { cerunTrekX, tengahTrekX } from './lumbaSoloEnjin';
+import type { TemaLumba } from './lumbaSoloTema';
+
+/* ===== Palet setiap tema (KZ-057) ===== */
+
+interface Palet {
+  latar: string;
+  kabus: [number, number];
+  langitAtas: string;
+  langitUfuk: string;
+  hemi: [number, number, number];
+  matahari: [number, number];
+  gunung: [number, number];
+  rumput: string;
+  rumputGelap: string;
+  tanah: string;
+  rumputJauh: string;
+  jalan: number;
+  daun: [number, number];
+  tiang: number;
+  sepanduk: string;
+  debu: number;
+  /** Kamera: jarak di belakang, tinggi, jarak sasaran di hadapan. */
+  kamera: [number, number, number];
+  /** Condong kenderaan setiap m/s halaju lateral, dan had condong (radian). */
+  condong: [number, number];
+}
+
+const PALET: Record<TemaLumba, Palet> = {
+  kereta: {
+    latar: '#9fd3f5',
+    kabus: [70, 520],
+    langitAtas: '#3b82c4',
+    langitUfuk: '#cdeafc',
+    hemi: [0xd8eeff, 0x3d5a2a, 1.25],
+    matahari: [0xfff1d6, 2.1],
+    gunung: [0x6b8fb0, 0x7c9cba],
+    rumput: '#3f8f3a',
+    rumputGelap: '#2d6e2e',
+    tanah: '#7a6a45',
+    rumputJauh: '#4f7f45',
+    jalan: 0xffffff,
+    daun: [0x2f7d32, 0x3f9c3c],
+    tiang: 0x4c1d95,
+    sepanduk: '#7c3aed',
+    debu: 0xa98a5c,
+    kamera: [7.8, 3.1, 14],
+    condong: [0, 0],
+  },
+  basikal: {
+    latar: '#f7e3c8',
+    kabus: [60, 460],
+    langitAtas: '#5aa7e0',
+    langitUfuk: '#ffe6c7',
+    hemi: [0xfff0dc, 0x5a6b2a, 1.3],
+    matahari: [0xffd9a0, 2.0],
+    gunung: [0x8f86b5, 0xa79cc4],
+    rumput: '#8fbf4a',
+    rumputGelap: '#5f9a3a',
+    tanah: '#b08d57',
+    rumputJauh: '#b7c96a',
+    jalan: 0xe6d2ac,
+    daun: [0x4c9a3a, 0x7fbf45],
+    tiang: 0x9a3412,
+    sepanduk: '#ea580c',
+    debu: 0xc9a66b,
+    kamera: [5.4, 2.3, 11],
+    condong: [0.07, 0.38],
+  },
+  angkasa: {
+    latar: '#05060f',
+    kabus: [140, 950],
+    langitAtas: '#05060f',
+    langitUfuk: '#131a3a',
+    hemi: [0x8ea2ff, 0x1a0b33, 1.1],
+    matahari: [0xffffff, 1.7],
+    gunung: [0x6b7280, 0x4b5563],
+    rumput: '#000000',
+    rumputGelap: '#000000',
+    tanah: '#000000',
+    rumputJauh: '#000000',
+    jalan: 0xffffff,
+    daun: [0x6b7280, 0x4b5563],
+    tiang: 0x312e81,
+    sepanduk: '#0891b2',
+    debu: 0x67e8f9,
+    kamera: [8.4, 3.2, 15],
+    condong: [0.09, 0.5],
+  },
+};
 
 /** Data satu bingkai untuk paparan 3D: pemandangan 2D + keadaan tambahan. */
 export interface Pemandangan3DData extends Pemandangan {
@@ -133,23 +226,37 @@ function kanvasBaru(w: number, h: number): [HTMLCanvasElement, CanvasRenderingCo
   return [c, ctx];
 }
 
-function teksturJalan(): CanvasTexture {
+function teksturJalan(angkasa = false): CanvasTexture {
   const [c, ctx] = kanvasBaru(256, 512);
-  ctx.fillStyle = '#3d4148';
-  ctx.fillRect(0, 0, 256, 512);
-  const r = rawakBerbiji(7);
-  for (let i = 0; i < 2600; i++) {
-    const g = 50 + Math.floor(r() * 30);
-    ctx.fillStyle = `rgb(${g},${g + 2},${g + 6})`;
-    ctx.fillRect(r() * 256, r() * 512, 2, 2);
+  if (angkasa) {
+    // Landasan tenaga: gelap dengan grid neon.
+    ctx.fillStyle = '#0b1030';
+    ctx.fillRect(0, 0, 256, 512);
+    ctx.fillStyle = 'rgba(56,189,248,0.35)';
+    for (let x = 32; x < 256; x += 32) ctx.fillRect(x - 1, 0, 2, 512);
+    for (let y = 0; y < 512; y += 64) ctx.fillRect(0, y, 256, 2);
+    ctx.fillStyle = '#22d3ee';
+    ctx.fillRect(4, 0, 8, 512);
+    ctx.fillRect(244, 0, 8, 512);
+    ctx.fillStyle = '#e879f9';
+    ctx.fillRect(123, 0, 10, 200);
+  } else {
+    ctx.fillStyle = '#3d4148';
+    ctx.fillRect(0, 0, 256, 512);
+    const r = rawakBerbiji(7);
+    for (let i = 0; i < 2600; i++) {
+      const g = 50 + Math.floor(r() * 30);
+      ctx.fillStyle = `rgb(${g},${g + 2},${g + 6})`;
+      ctx.fillRect(r() * 256, r() * 512, 2, 2);
+    }
+    // Garis tepi putih.
+    ctx.fillStyle = '#e8ebef';
+    ctx.fillRect(8, 0, 7, 512);
+    ctx.fillRect(241, 0, 7, 512);
+    // Garis tengah putus-putus.
+    ctx.fillStyle = '#f5f7fa';
+    ctx.fillRect(124, 0, 8, 260);
   }
-  // Garis tepi putih.
-  ctx.fillStyle = '#e8ebef';
-  ctx.fillRect(8, 0, 7, 512);
-  ctx.fillRect(241, 0, 7, 512);
-  // Garis tengah putus-putus.
-  ctx.fillStyle = '#f5f7fa';
-  ctx.fillRect(124, 0, 8, 260);
   const t = new CanvasTexture(c);
   t.wrapS = RepeatWrapping;
   t.wrapT = RepeatWrapping;
@@ -274,7 +381,7 @@ function jalurTrek(
 }
 
 /** Rupa bumi berwarna titik di kiri dan kanan trek. */
-function rupaBumi(): BufferGeometry {
+function rupaBumi(palet: Palet): BufferGeometry {
   const lateral = [-220, -130, -80, -48, -28, -16, -9, -6, -4.3, 4.3, 6, 9, 16, 28, 48, 80, 130, 220];
   const mula = -LEBIHAN_TREK;
   const akhir = 4800 + LEBIHAN_TREK;
@@ -286,9 +393,10 @@ function rupaBumi(): BufferGeometry {
   const ind: number[] = [];
   const v = new Vector3();
   const c = new Color();
-  const rumput = new Color('#3f8f3a');
-  const rumputGelap = new Color('#2d6e2e');
-  const tanah = new Color('#7a6a45');
+  const rumput = new Color(palet.rumput);
+  const rumputGelap = new Color(palet.rumputGelap);
+  const tanah = new Color(palet.tanah);
+  const jauh = new Color(palet.rumputJauh);
   for (let i = 0; i < n; i++) {
     const d = mula + i * langkah;
     for (let j = 0; j < m; j++) {
@@ -299,7 +407,7 @@ function rupaBumi(): BufferGeometry {
       const h = hingar(d * 1.7, L * 2.3);
       c.copy(rumputGelap).lerp(rumput, h);
       if (Math.abs(L) < 7) c.lerp(tanah, 0.35);
-      if (Math.abs(L) > 60) c.lerp(new Color('#4f7f45'), 0.4);
+      if (Math.abs(L) > 60) c.lerp(jauh, 0.4);
       warna.set([c.r, c.g, c.b], (i * m + j) * 3);
       if (i > 0 && j > 0) {
         const a = (i - 1) * m + (j - 1);
@@ -324,8 +432,228 @@ function rupaBumi(): BufferGeometry {
 interface Kereta {
   kumpulan: Group;
   roda: Group[];
+  /** Jejari roda dalam meter dunia (untuk putaran). */
+  jejariRoda: number;
   lampuBelakang: MeshBasicMaterial;
+  /** Warna lampu belakang: [biasa, semasa membrek]. */
+  lampu: [number, number];
   badan: MeshPhongMaterial;
+  /** Tinggi terapung di atas trek (kapal angkasa). */
+  apung: number;
+  /** Kaki penunggang basikal (peha dan betis setiap sisi). */
+  kaki?: { sisi: number; peha: Mesh; betis: Mesh }[];
+  fasaKayuh: number;
+  /** Api enjin kapal angkasa. */
+  api?: Mesh[];
+}
+
+function binaKenderaan(tema: TemaLumba, warna: string, pemain: boolean): Kereta {
+  if (tema === 'basikal') return binaBasikal(warna, pemain);
+  if (tema === 'angkasa') return binaKapal(warna, pemain);
+  return binaKereta(warna, pemain);
+}
+
+/** Letak kotak (paksi panjang y) antara dua titik pada satah YZ. */
+function rentangYZ(m: Mesh, x: number, y1: number, z1: number, y2: number, z2: number): void {
+  const dy = y2 - y1;
+  const dz = z2 - z1;
+  m.position.set(x, (y1 + y2) / 2, (z1 + z2) / 2);
+  m.scale.y = Math.max(0.01, Math.hypot(dy, dz));
+  m.rotation.x = Math.atan2(dz, dy);
+}
+
+/* ===== Basikal dan penunggang (KZ-057) ===== */
+
+const SKALA_BASIKAL = 1.35;
+const PINGGUL: [number, number] = [1.0, 0.2];
+const ENGKOL: [number, number] = [0.34, 0.05];
+const JEJARI_ENGKOL = 0.17;
+const PEHA = 0.44;
+const BETIS = 0.46;
+
+function binaBasikal(warna: string, pemain: boolean): Kereta {
+  const kumpulan = new Group();
+  kumpulan.rotation.order = 'YXZ';
+  const dalam = new Group();
+  dalam.scale.setScalar(SKALA_BASIKAL);
+  kumpulan.add(dalam);
+
+  const badan = new MeshPhongMaterial({ color: warna, shininess: 70, specular: 0x555555 });
+  const rangka = new MeshPhongMaterial({ color: pemain ? 0xf8fafc : 0x334155, shininess: 90 });
+  const gelap = new MeshPhongMaterial({ color: 0x1f2937, shininess: 20 });
+  const kulit = new MeshLambertMaterial({ color: 0xe0b08a });
+
+  const kotak = (m: Material, w: number, h: number, d: number): Mesh => {
+    const mesh = new Mesh(new BoxGeometry(w, h, d), m);
+    mesh.castShadow = true;
+    dalam.add(mesh);
+    return mesh;
+  };
+  const batang = (m: Material, tebal: number, y1: number, z1: number, y2: number, z2: number, x = 0): Mesh => {
+    const mesh = kotak(m, tebal, 1, tebal);
+    rentangYZ(mesh, x, y1, z1, y2, z2);
+    return mesh;
+  };
+
+  // Rangka: hab depan (0.34,-0.56), hab belakang (0.34,0.56), kepala (0.82,-0.42), tempat duduk (0.88,0.22).
+  batang(rangka, 0.05, 0.8, -0.42, 0.84, 0.2);
+  batang(rangka, 0.055, 0.78, -0.42, ENGKOL[0], ENGKOL[1]);
+  batang(rangka, 0.05, ENGKOL[0], ENGKOL[1], 0.9, 0.22);
+  batang(rangka, 0.04, 0.34, -0.56, 0.92, -0.4);
+  batang(rangka, 0.035, ENGKOL[0], ENGKOL[1], 0.34, 0.56);
+  batang(rangka, 0.035, 0.34, 0.56, 0.84, 0.22);
+  kotak(gelap, 0.5, 0.04, 0.04).position.set(0, 0.93, -0.42);
+  kotak(gelap, 0.15, 0.05, 0.3).position.set(0, 0.92, 0.22);
+
+  // Roda dengan jejari supaya putaran kelihatan.
+  const tayar = new MeshPhongMaterial({ color: 0x111111, shininess: 10 });
+  const jejari = new MeshLambertMaterial({ color: 0xcbd5e1 });
+  const gTayar = new CylinderGeometry(0.34, 0.34, 0.06, 20);
+  const gJejari = new BoxGeometry(0.02, 0.6, 0.03);
+  const roda: Group[] = [];
+  for (const z of [-0.56, 0.56]) {
+    const r = new Group();
+    r.position.set(0, 0.34, z);
+    const t = new Mesh(gTayar, tayar);
+    t.rotation.z = Math.PI / 2;
+    t.castShadow = true;
+    const j1 = new Mesh(gJejari, jejari);
+    const j2 = new Mesh(gJejari, jejari);
+    j2.rotation.x = Math.PI / 2;
+    j1.position.x = 0.035;
+    j2.position.x = 0.035;
+    const j3 = j1.clone();
+    const j4 = j2.clone();
+    j3.position.x = -0.035;
+    j4.position.x = -0.035;
+    r.add(t, j1, j2, j3, j4);
+    dalam.add(r);
+    roda.push(r);
+  }
+
+  // Penunggang: badan condong ke hadapan, kepala, topi keledar, lengan.
+  const torso = kotak(badan, 0.36, 1, 0.22);
+  rentangYZ(torso, 0, PINGGUL[0], PINGGUL[1], 1.48, -0.24);
+  const kepala = new Mesh(new SphereGeometry(0.14, 12, 10), kulit);
+  kepala.position.set(0, 1.6, -0.33);
+  kepala.castShadow = true;
+  const topi = new Mesh(new SphereGeometry(0.165, 12, 8, 0, Math.PI * 2, 0, Math.PI / 1.9), pemain ? rangka : gelap);
+  topi.position.set(0, 1.62, -0.32);
+  topi.rotation.x = -0.35;
+  dalam.add(kepala, topi);
+  for (const x of [-0.2, 0.2]) batang(kulit, 0.075, 1.42, -0.2, 0.95, -0.42, x);
+
+  // Kaki: dikemas kini setiap bingkai (kayuhKaki).
+  const seluar = new MeshLambertMaterial({ color: 0x111827 });
+  const kaki = [-1, 1].map((sisi) => ({
+    sisi,
+    peha: kotak(seluar, 0.13, 1, 0.13),
+    betis: kotak(kulit, 0.09, 1, 0.09),
+  }));
+
+  // Lampu belakang kecil.
+  const lampuBelakang = new MeshBasicMaterial({ color: 0x7f1d1d });
+  const lampu = new Mesh(new BoxGeometry(0.07, 0.07, 0.04), lampuBelakang);
+  lampu.position.set(0, 0.8, 0.3);
+  dalam.add(lampu);
+
+  const k: Kereta = {
+    kumpulan,
+    roda,
+    jejariRoda: 0.34 * SKALA_BASIKAL,
+    lampuBelakang,
+    lampu: [0x7f1d1d, 0xff3b3b],
+    badan,
+    apung: 0,
+    kaki,
+    fasaKayuh: pemain ? 0 : 1.3,
+  };
+  kayuhKaki(k);
+  return k;
+}
+
+/** Kinematik songsang dua ruas pada satah YZ: pinggul ke pedal. */
+function kayuhKaki(k: Kereta): void {
+  if (!k.kaki) return;
+  for (const kk of k.kaki) {
+    const f = k.fasaKayuh + (kk.sisi > 0 ? Math.PI : 0);
+    const py = ENGKOL[0] + JEJARI_ENGKOL * Math.sin(f);
+    const pz = ENGKOL[1] + JEJARI_ENGKOL * Math.cos(f);
+    const dy = py - PINGGUL[0];
+    const dz = pz - PINGGUL[1];
+    const L = Math.min(PEHA + BETIS - 0.01, Math.hypot(dy, dz));
+    const a = (PEHA * PEHA - BETIS * BETIS + L * L) / (2 * L);
+    const h = Math.sqrt(Math.max(0, PEHA * PEHA - a * a));
+    // Unit sepanjang kaki dan serenjang menghala ke hadapan (lutut ke depan).
+    const uy = dy / L;
+    const uz = dz / L;
+    const ly = PINGGUL[0] + uy * a - uz * h;
+    const lz = PINGGUL[1] + uz * a + uy * h;
+    const x = kk.sisi * 0.11;
+    rentangYZ(kk.peha, x, PINGGUL[0], PINGGUL[1], ly, lz);
+    rentangYZ(kk.betis, x, ly, lz, py, pz);
+  }
+}
+
+/* ===== Kapal angkasa (KZ-057) ===== */
+
+function binaKapal(warna: string, pemain: boolean): Kereta {
+  const kumpulan = new Group();
+  kumpulan.rotation.order = 'YXZ';
+  const badan = new MeshPhongMaterial({ color: warna, shininess: 110, specular: 0x8899bb });
+  const gelap = new MeshPhongMaterial({ color: 0x1e293b, shininess: 50 });
+  const kaca = new MeshPhongMaterial({ color: 0x0ea5e9, shininess: 160, specular: 0xffffff, emissive: 0x0c4a6e });
+
+  const tambah = (g: BufferGeometry, m: Material, x: number, y: number, z: number): Mesh => {
+    const mesh = new Mesh(g, m);
+    mesh.position.set(x, y, z);
+    mesh.castShadow = true;
+    kumpulan.add(mesh);
+    return mesh;
+  };
+
+  // Badan, muncung, kokpit.
+  tambah(new BoxGeometry(0.95, 0.46, 2.4), badan, 0, 0, 0);
+  tambah(new ConeGeometry(0.52, 1.7, 8), badan, 0, 0, -2.03).rotation.x = -Math.PI / 2;
+  const kokpit = tambah(new SphereGeometry(0.4, 14, 10), kaca, 0, 0.26, -0.55);
+  kokpit.scale.set(1, 0.7, 1.7);
+
+  // Sayap sapu ke belakang, hujung sayap, sirip.
+  for (const s of [-1, 1]) {
+    const sayap = tambah(new BoxGeometry(1.55, 0.08, 1.05), badan, s * 1.1, -0.05, 0.6);
+    sayap.rotation.y = s * 0.32;
+    sayap.rotation.z = s * 0.07;
+    tambah(new BoxGeometry(0.1, 0.4, 1.0), gelap, s * 1.86, 0.08, 0.92);
+  }
+  tambah(new BoxGeometry(0.08, 0.62, 0.8), pemain ? badan : gelap, 0, 0.5, 0.85);
+  if (pemain) {
+    tambah(new BoxGeometry(0.2, 0.02, 1.9), new MeshPhongMaterial({ color: 0xffffff, shininess: 60 }), 0, 0.24, 0.45);
+  }
+
+  // Enjin berkembar, cakera cahaya dan api.
+  const lampuBelakang = new MeshBasicMaterial({ color: 0x67e8f9 });
+  const bahanApi = new MeshBasicMaterial({ color: 0x7dd3fc, transparent: true, opacity: 0.75, depthWrite: false });
+  const api: Mesh[] = [];
+  for (const s of [-1, 1]) {
+    tambah(new CylinderGeometry(0.24, 0.27, 0.95, 12), gelap, s * 0.5, 0, 1.3).rotation.x = Math.PI / 2;
+    tambah(new CylinderGeometry(0.19, 0.19, 0.05, 12), lampuBelakang, s * 0.5, 0, 1.79).rotation.x = Math.PI / 2;
+    const a = new Mesh(new ConeGeometry(0.19, 1, 10), bahanApi);
+    a.rotation.x = Math.PI / 2;
+    a.position.set(s * 0.5, 0, 2.3);
+    kumpulan.add(a);
+    api.push(a);
+  }
+  return {
+    kumpulan,
+    roda: [],
+    jejariRoda: 1,
+    lampuBelakang,
+    lampu: [0x67e8f9, 0xff7a3b],
+    badan,
+    apung: 1.0,
+    fasaKayuh: 0,
+    api,
+  };
 }
 
 function binaKereta(warna: string, pemain: boolean): Kereta {
@@ -394,7 +722,7 @@ function binaKereta(warna: string, pemain: boolean): Kereta {
     kumpulan.add(r);
     roda.push(r);
   }
-  return { kumpulan, roda, lampuBelakang, badan };
+  return { kumpulan, roda, jejariRoda: 0.38, lampuBelakang, lampu: [0x7f1d1d, 0xff3b3b], badan, apung: 0, fasaKayuh: 0 };
 }
 
 /* ===== Asap / debu (pool sprite) ===== */
@@ -433,8 +761,15 @@ export class Pemandangan3D {
   private lebar = 0;
   private tinggi = 0;
   private telefon: boolean;
+  private tema: TemaLumba;
+  private palet: Palet;
+  private offsetLepas = 0;
+  private condong = 0;
 
-  constructor(kanvas: HTMLCanvasElement) {
+  constructor(kanvas: HTMLCanvasElement, tema: TemaLumba = 'kereta') {
+    this.tema = tema;
+    this.palet = PALET[tema];
+    const pal = this.palet;
     this.telefon = typeof window !== 'undefined' && window.innerWidth < 760;
     // Lontar jika WebGL tiada; pemanggil kekal dengan 2D.
     this.renderer = new WebGLRenderer({
@@ -443,19 +778,19 @@ export class Pemandangan3D {
       powerPreference: 'high-performance',
     });
     this.renderer.outputColorSpace = SRGBColorSpace;
-    this.renderer.shadowMap.enabled = true;
+    this.renderer.shadowMap.enabled = tema !== 'angkasa';
     this.renderer.shadowMap.type = PCFSoftShadowMap;
 
-    const langitWarna = new Color('#9fd3f5');
+    const langitWarna = new Color(pal.latar);
     this.scene.background = langitWarna;
-    this.scene.fog = new Fog(langitWarna, 70, 520);
+    this.scene.fog = new Fog(langitWarna, pal.kabus[0], pal.kabus[1]);
 
     this.kamera = new PerspectiveCamera(62, 16 / 9, 0.3, 3200);
     this.scene.add(this.kamera);
 
     // Cahaya.
-    this.scene.add(new HemisphereLight(0xd8eeff, 0x3d5a2a, 1.25));
-    this.matahari = new DirectionalLight(0xfff1d6, 2.1);
+    this.scene.add(new HemisphereLight(pal.hemi[0], pal.hemi[1], pal.hemi[2]));
+    this.matahari = new DirectionalLight(pal.matahari[0], pal.matahari[1]);
     this.matahari.castShadow = true;
     const saiz = this.telefon ? 1024 : 2048;
     this.matahari.shadow.mapSize.set(saiz, saiz);
@@ -469,14 +804,17 @@ export class Pemandangan3D {
     this.matahari.shadow.bias = -0.0008;
     this.scene.add(this.matahari, this.matahari.target);
 
-    this.binaLangit();
+    if (tema === 'angkasa') this.binaLangitAngkasa();
+    else this.binaLangit();
     this.binaTrek();
-    this.binaPemandangan();
+    if (tema === 'angkasa') this.binaPemandanganAngkasa();
+    else this.binaPemandangan();
+    this.binaGerbang();
 
-    this.pemain = binaKereta(WARNA_PEMAIN, true);
+    this.pemain = binaKenderaan(tema, WARNA_PEMAIN, true);
     this.scene.add(this.pemain.kumpulan);
     this.komputer = WARNA_KOMPUTER.map((w) => {
-      const k = binaKereta(w, false);
+      const k = binaKenderaan(tema, w, false);
       this.scene.add(k.kumpulan);
       return k;
     });
@@ -521,8 +859,8 @@ export class Pemandangan3D {
     // Kubah langit kecerunan (mengikut kamera, tanpa kabus).
     const g = new SphereGeometry(2600, 32, 16);
     const warna: number[] = [];
-    const atas = new Color('#3b82c4');
-    const ufuk = new Color('#cdeafc');
+    const atas = new Color(this.palet.langitAtas);
+    const ufuk = new Color(this.palet.langitUfuk);
     const p = g.getAttribute('position');
     const c = new Color();
     for (let i = 0; i < p.count; i++) {
@@ -536,8 +874,8 @@ export class Pemandangan3D {
     // Gunung jauh.
     const r = rawakBerbiji(11);
     const gunungBahan = [
-      new MeshLambertMaterial({ color: 0x6b8fb0, fog: false, flatShading: true }),
-      new MeshLambertMaterial({ color: 0x7c9cba, fog: false, flatShading: true }),
+      new MeshLambertMaterial({ color: this.palet.gunung[0], fog: false, flatShading: true }),
+      new MeshLambertMaterial({ color: this.palet.gunung[1], fog: false, flatShading: true }),
     ];
     for (let i = 0; i < 22; i++) {
       const sudut = (i / 22) * Math.PI * 2 + r() * 0.2;
@@ -568,17 +906,71 @@ export class Pemandangan3D {
     this.scene.add(this.langit);
   }
 
+  /** Langit angkasa: bintang, planet bercincin dan bulan (KZ-057). */
+  private binaLangitAngkasa(): void {
+    const r = rawakBerbiji(77);
+    const bil = this.telefon ? 900 : 1800;
+    const pos = new Float32Array(bil * 3);
+    const warna = new Float32Array(bil * 3);
+    const c = new Color();
+    for (let i = 0; i < bil; i++) {
+      const u = r() * 2 - 1;
+      const sudut = r() * Math.PI * 2;
+      const s = Math.sqrt(1 - u * u);
+      pos.set([Math.cos(sudut) * s * 2400, u * 2400, Math.sin(sudut) * s * 2400], i * 3);
+      c.setHSL(0.55 + r() * 0.2, 0.5, 0.65 + r() * 0.35);
+      warna.set([c.r, c.g, c.b], i * 3);
+    }
+    const g = new BufferGeometry();
+    g.setAttribute('position', new BufferAttribute(pos, 3));
+    g.setAttribute('color', new BufferAttribute(warna, 3));
+    const bintang = new Points(
+      g,
+      new PointsMaterial({ size: 2.4, sizeAttenuation: false, vertexColors: true, fog: false, depthWrite: false }),
+    );
+    bintang.frustumCulled = false;
+    this.langit.add(bintang);
+
+    const planet = (x: number, y: number, z: number, jejari: number, warnaP: number, cincin: number | null): void => {
+      const m = new Mesh(
+        new SphereGeometry(jejari, 28, 18),
+        new MeshLambertMaterial({ color: warnaP, fog: false, flatShading: true }),
+      );
+      m.position.set(x, y, z);
+      this.langit.add(m);
+      if (cincin !== null) {
+        const c2 = new Mesh(
+          new RingGeometry(jejari * 1.35, jejari * 2.1, 56),
+          new MeshBasicMaterial({ color: cincin, side: DoubleSide, transparent: true, opacity: 0.55, fog: false, depthWrite: false }),
+        );
+        c2.position.set(x, y, z);
+        c2.rotation.set(Math.PI / 2 - 0.35, 0.25, 0);
+        this.langit.add(c2);
+      }
+    };
+    planet(-900, 520, -1500, 260, 0xd97706, 0xfde68a);
+    planet(1200, 300, -900, 120, 0x38bdf8, null);
+    planet(500, 760, 1400, 180, 0xa78bfa, 0xe9d5ff);
+    planet(-1500, 180, 700, 90, 0x94a3b8, null);
+    this.scene.add(this.langit);
+  }
+
   private binaTrek(): void {
-    const tJalan = teksturJalan();
+    const angkasa = this.tema === 'angkasa';
+    const tJalan = teksturJalan(angkasa);
     const jalan = new Mesh(
       jalurTrek(-SEPARUH_JALAN, SEPARUH_JALAN, 0.03, 3, 18),
-      new MeshLambertMaterial({ map: tJalan }),
+      angkasa
+        ? new MeshBasicMaterial({ map: tJalan })
+        : new MeshLambertMaterial({ map: tJalan, color: this.palet.jalan }),
     );
     jalan.receiveShadow = true;
     this.scene.add(jalan);
 
     const tBebendul = teksturBebendul();
-    const bahanBebendul = new MeshLambertMaterial({ map: tBebendul });
+    const bahanBebendul = angkasa
+      ? new MeshBasicMaterial({ color: 0xe879f9 })
+      : new MeshLambertMaterial({ map: tBebendul });
     for (const [a, b] of [
       [-SEPARUH_JALAN - LEBAR_BEBENDUL, -SEPARUH_JALAN],
       [SEPARUH_JALAN, SEPARUH_JALAN + LEBAR_BEBENDUL],
@@ -588,9 +980,11 @@ export class Pemandangan3D {
       this.scene.add(m);
     }
 
-    const tanah = new Mesh(rupaBumi(), new MeshLambertMaterial({ vertexColors: true }));
-    tanah.receiveShadow = true;
-    this.scene.add(tanah);
+    if (!angkasa) {
+      const tanah = new Mesh(rupaBumi(this.palet), new MeshLambertMaterial({ vertexColors: true }));
+      tanah.receiveShadow = true;
+      this.scene.add(tanah);
+    }
 
     // Petak mula dan penamat pada permukaan jalan.
     const tPetak = teksturPetak(14, 2);
@@ -617,8 +1011,8 @@ export class Pemandangan3D {
       new MeshLambertMaterial({ color: 0x6b4423 }),
       bil,
     );
-    const daun1 = new InstancedMesh(new ConeGeometry(1.9, 3.6, 7), new MeshLambertMaterial({ color: 0x2f7d32, flatShading: true }), bil);
-    const daun2 = new InstancedMesh(new ConeGeometry(1.4, 2.8, 7), new MeshLambertMaterial({ color: 0x3f9c3c, flatShading: true }), bil);
+    const daun1 = new InstancedMesh(new ConeGeometry(1.9, 3.6, 7), new MeshLambertMaterial({ color: this.palet.daun[0], flatShading: true }), bil);
+    const daun2 = new InstancedMesh(new ConeGeometry(1.4, 2.8, 7), new MeshLambertMaterial({ color: this.palet.daun[1], flatShading: true }), bil);
     const o = new Object3D();
     const v = new Vector3();
     for (let i = 0; i < bil; i++) {
@@ -660,9 +1054,62 @@ export class Pemandangan3D {
       batu.setMatrixAt(i, o.matrix);
     }
     this.scene.add(batu);
+    this.binaBendera();
+  }
 
-    // Gerbang: mula, penamat, dan gerbang Kuizen setiap 600 m.
-    const tiang = new MeshPhongMaterial({ color: 0x4c1d95, shininess: 60 });
+  /** Asteroid terapung dan suar neon di tepi landasan (KZ-057). */
+  private binaPemandanganAngkasa(): void {
+    const r = rawakBerbiji(909);
+    const o = new Object3D();
+    const v = new Vector3();
+    const bil = this.telefon ? 320 : 600;
+    const batu = new InstancedMesh(
+      new DodecahedronGeometry(1, 0),
+      new MeshLambertMaterial({ color: this.palet.daun[0], flatShading: true }),
+      bil,
+    );
+    for (let i = 0; i < bil; i++) {
+      const d = -LEBIHAN_TREK + r() * (4800 + LEBIHAN_TREK * 2);
+      const L = (r() < 0.5 ? -1 : 1) * (9 + Math.pow(r(), 1.5) * 150);
+      titikTrek(d, L, v);
+      const sk = 0.5 + Math.pow(r(), 2) * 6;
+      o.position.set(v.x, tinggiY(d) + (r() - 0.35) * (14 + Math.abs(L) * 0.5), v.z);
+      o.rotation.set(r() * 3, r() * 3, r() * 3);
+      o.scale.set(sk, sk * (0.6 + r() * 0.5), sk);
+      o.updateMatrix();
+      batu.setMatrixAt(i, o.matrix);
+    }
+    this.scene.add(batu);
+
+    // Suar neon di kedua-dua tepi setiap 30 m, warna berselang.
+    const jarak = 30;
+    const n = Math.floor((4800 + 400) / (jarak * 2)) * 2;
+    const gSuar = new BoxGeometry(0.25, 1.6, 0.25);
+    const tepi = SEPARUH_JALAN + LEBAR_BEBENDUL + 0.5;
+    [0x22d3ee, 0xe879f9].forEach((warnaS, w) => {
+      const suar = new InstancedMesh(gSuar, new MeshBasicMaterial({ color: warnaS }), n);
+      o.rotation.set(0, 0, 0);
+      o.scale.set(1, 1, 1);
+      for (let i = 0; i < n / 2; i++) {
+        const d = -200 + (i * 2 + w) * jarak;
+        for (const sisi of [-1, 1]) {
+          titikTrek(d, sisi * tepi, v, 0.8);
+          o.position.copy(v);
+          o.updateMatrix();
+          suar.setMatrixAt(i * 2 + (sisi > 0 ? 1 : 0), o.matrix);
+        }
+      }
+      this.scene.add(suar);
+    });
+  }
+
+  /** Gerbang: mula, penamat, dan gerbang Kuizen setiap 600 m. */
+  private binaGerbang(): void {
+    const tiang = new MeshPhongMaterial({
+      color: this.palet.tiang,
+      shininess: 60,
+      emissive: this.tema === 'angkasa' ? 0x3730a3 : 0x000000,
+    });
     const gTiang = new BoxGeometry(0.6, 6.4, 0.6);
     const lebarGerbang = (SEPARUH_JALAN + LEBAR_BEBENDUL + 0.9) * 2;
     const gerbang = (d: number, sepanduk: Material, kaki: Material): void => {
@@ -687,13 +1134,15 @@ export class Pemandangan3D {
       g.add(rasuk);
       this.scene.add(g);
     };
-    const sepandukKuizen = new MeshBasicMaterial({ map: teksturSepanduk('KUIZEN', '#7c3aed') });
+    const sepandukKuizen = new MeshBasicMaterial({ map: teksturSepanduk('KUIZEN', this.palet.sepanduk) });
     const sepandukPetak = new MeshBasicMaterial({ map: teksturPetak(16, 2) });
     gerbang(-2, sepandukPetak, tiang);
     gerbang(4800, sepandukPetak, tiang);
     for (let d = 600; d < 4800; d += 600) gerbang(d, sepandukKuizen, tiang);
+  }
 
-    // Bendera kecil berwarna di sepanjang tepi berhampiran mula.
+  /** Bendera kecil berwarna di sepanjang tepi berhampiran mula. */
+  private binaBendera(): void {
     const warnaBendera = [0x7c3aed, 0x38bdf8, 0xf87171, 0xfacc15];
     const gBendera = new BoxGeometry(0.05, 0.8, 1.1);
     const gTiangBendera = new CylinderGeometry(0.04, 0.04, 3, 5);
@@ -724,11 +1173,18 @@ export class Pemandangan3D {
     this.kamera.updateProjectionMatrix();
   }
 
-  private letakKereta(k: Kereta, d: number, offset: number, putaranRoda: number): void {
-    titikTrek(d, offset, k.kumpulan.position);
+  /** jarakGerak: meter yang dilalui sejak bingkai lepas (putaran roda, kayuhan). */
+  private letakKereta(k: Kereta, d: number, offset: number, jarakGerak: number, condong = 0, masaS = 0): void {
+    const apung = k.apung > 0 ? k.apung + Math.sin(masaS * 2.3 + offset) * 0.12 : 0;
+    titikTrek(d, offset, k.kumpulan.position, apung);
     k.kumpulan.rotation.y = Math.atan2(-cerunX(d), 1);
     k.kumpulan.rotation.x = Math.atan(cerunY(d));
-    for (const r of k.roda) r.rotation.x -= putaranRoda;
+    k.kumpulan.rotation.z = -condong;
+    for (const r of k.roda) r.rotation.x -= jarakGerak / k.jejariRoda;
+    if (k.kaki) {
+      k.fasaKayuh -= jarakGerak / (k.jejariRoda * 2.8);
+      kayuhKaki(k);
+    }
   }
 
   private semburZarah(pos: Vector3, warna: number, kelajuanMs: number): void {
@@ -754,13 +1210,25 @@ export class Pemandangan3D {
     const pecahanLaju = Math.max(0, Math.min(1, (p.kelajuan - 60) / 180));
 
     // Kereta pemain.
-    const putar = (Math.max(0, p.jarakM - this.jarakLepas) / 0.38) || 0;
+    const gerak = Math.max(0, p.jarakM - this.jarakLepas) || 0;
     this.jarakLepas = p.jarakM;
-    this.letakKereta(this.pemain, p.jarakM, p.offsetM, putar);
-    // Condong sedikit ke arah stereng (anggaran dari perubahan offset).
+    // Condong ke arah gerakan lateral (basikal dan kapal angkasa sahaja).
+    const halajuL = (p.offsetM - this.offsetLepas) / dt;
+    this.offsetLepas = p.offsetM;
+    const [pekali, had] = this.palet.condong;
+    const sasarCondong = Math.max(-had, Math.min(had, halajuL * pekali));
+    this.condong += (sasarCondong - this.condong) * Math.min(1, dt * 8);
+    this.letakKereta(this.pemain, p.jarakM, p.offsetM, gerak, this.condong, masaS);
     const brek = p.kelajuan < this.kelajuanLepas - 0.05;
     this.kelajuanLepas = p.kelajuan;
-    this.pemain.lampuBelakang.color.setHex(brek ? 0xff3b3b : 0x7f1d1d);
+    this.pemain.lampuBelakang.color.setHex(this.pemain.lampu[brek ? 1 : 0]);
+    if (this.pemain.api) {
+      const panjang = 0.25 + pecahanLaju * 1.5 + Math.random() * 0.15;
+      for (const a of this.pemain.api) {
+        a.scale.y = panjang;
+        a.position.z = 1.8 + panjang / 2;
+      }
+    }
     if (p.penalti) {
       const kelip = Math.sin(masaS * 18) > 0;
       this.pemain.badan.emissive.setHex(kelip ? 0x7c2d12 : 0x000000);
@@ -778,12 +1246,13 @@ export class Pemandangan3D {
       const k = this.komputer[i];
       const nampak = Math.abs(d - p.jarakM) < 500;
       k.kumpulan.visible = nampak;
-      if (nampak) this.letakKereta(k, d, LORONG_KOMPUTER[i] ?? 0, ((kmj / 3.6) * dt) / 0.38);
+      if (nampak) this.letakKereta(k, d, LORONG_KOMPUTER[i] ?? 0, (kmj / 3.6) * dt, 0, masaS + i * 2);
     }
 
     // Kamera kejar: belakang dan atas, melihat ke hadapan.
-    titikTrek(p.jarakM - 7.8, p.offsetM * 0.7, this.v1, 3.1 - pecahanLaju * 0.5);
-    titikTrek(p.jarakM + 14, p.offsetM * 0.85, this.v2, 1.0);
+    const [kamBelakang, kamAtas, kamHadapan] = this.palet.kamera;
+    titikTrek(p.jarakM - kamBelakang, p.offsetM * 0.7, this.v1, kamAtas - pecahanLaju * 0.5);
+    titikTrek(p.jarakM + kamHadapan, p.offsetM * 0.85, this.v2, 1.0);
     if (this.kamPos.lengthSq() === 0) {
       this.kamPos.copy(this.v1);
       this.kamSasar.copy(this.v2);
@@ -829,7 +1298,7 @@ export class Pemandangan3D {
     if (p.penalti || (p.diLuarJalan && p.kelajuan > 15)) {
       if (Math.random() < 0.6) {
         titikTrek(p.jarakM - 2.3, p.offsetM, this.v1, 0.5);
-        this.semburZarah(this.v1, p.penalti ? 0x9ca3af : 0xa98a5c, ms);
+        this.semburZarah(this.v1, p.penalti ? 0x9ca3af : this.palet.debu, ms);
       }
     }
     for (const z of this.zarah) {

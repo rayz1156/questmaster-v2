@@ -36,6 +36,21 @@ import {
 import { lukisPemandangan } from "./lumbaSoloLukis";
 import { BunyiLumba } from "./lumbaSoloBunyi";
 import type { Pemandangan3D } from "./lumbaSolo3D";
+import {
+  SENARAI_TEMA,
+  TEMA_LALAI,
+  bacaTemaTersimpan,
+  lajuPaparan,
+  simpanTema,
+  type TemaLumba,
+} from "./lumbaSoloTema";
+
+/** KZ-057: kunci i18n nama setiap tema. */
+const NAMA_TEMA = {
+  kereta: "solo.themeCar",
+  basikal: "solo.themeBike",
+  angkasa: "solo.themeSpace",
+} as const;
 
 /** Baris papan seperti dipulangkan API. */
 interface BarisPapanUi {
@@ -144,6 +159,19 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const hantarRef = useRef<(pilihan: string | null) => Promise<void>>(async () => {});
   const [sentuhPeranti, setSentuhPeranti] = useState(false);
   const [petunjuk, setPetunjuk] = useState(false);
+  /** KZ-057: tema permainan pilihan pemain (rupa sahaja; enjin dan markah sama). */
+  const [tema, setTema] = useState<TemaLumba>(TEMA_LALAI);
+  const temaRef = useRef<TemaLumba>(TEMA_LALAI);
+  useEffect(() => {
+    const tersimpan = bacaTemaTersimpan();
+    temaRef.current = tersimpan;
+    setTema(tersimpan);
+  }, []);
+  const pilihTema = useCallback((baharu: TemaLumba): void => {
+    temaRef.current = baharu;
+    setTema(baharu);
+    simpanTema(baharu);
+  }, []);
 
   const pastiBunyi = useCallback((): BunyiLumba => {
     if (!bunyiRef.current) bunyiRef.current = new BunyiLumba();
@@ -401,7 +429,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         const kanvas = kanvas3DRef.current;
         if (!hidup || !kanvas) return;
         try {
-          paparan3DRef.current = new m.Pemandangan3D(kanvas);
+          paparan3DRef.current = new m.Pemandangan3D(kanvas, temaRef.current);
           kanvas.style.visibility = "visible";
           if (kanvasRef.current) kanvasRef.current.style.visibility = "hidden";
         } catch {
@@ -693,6 +721,30 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               </div>
             ) : (
               <div className="mt-4 space-y-3">
+                <div>
+                  <span className="text-[12px] font-semibold text-ink">{t("solo.chooseVehicle")}</span>
+                  <div className="mt-1 grid grid-cols-3 gap-2" role="radiogroup" aria-label={t("solo.chooseVehicle")}>
+                    {SENARAI_TEMA.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={tema === m.id}
+                        onClick={() => pilihTema(m.id)}
+                        className={`rounded-xl border px-2 py-2.5 text-center transition ${
+                          tema === m.id
+                            ? "border-violet-600 bg-violet-50 ring-2 ring-violet-200"
+                            : "border-slate-300 bg-white hover:border-violet-300"
+                        }`}
+                      >
+                        <span className="block text-[24px] leading-none" aria-hidden="true">
+                          {m.simbol}
+                        </span>
+                        <span className="block mt-1 text-[12px] font-semibold text-ink">{t(NAMA_TEMA[m.id])}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-[12px] font-semibold text-ink">{t("solo.nickname")}</span>
                   <input
@@ -790,10 +842,10 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         </span>
         <span className="text-[13px] tabular-nums text-slate-300">{t("solo.timeLabel")} {formatMasa(hud.masaMs)}</span>
         <span className="text-[13px] tabular-nums text-slate-300">
-          {Math.round(hud.kelajuan)} <span className="text-slate-500">km/h</span>
+          {lajuPaparan(tema, hud.kelajuan)} <span className="text-slate-500">km/h</span>
         </span>
         <span className="text-[13px] tabular-nums text-slate-300">
-          {t("solo.speedLimit")} {Math.round(hud.hadLaju)}
+          {t("solo.speedLimit")} {lajuPaparan(tema, hud.hadLaju)}
         </span>
         <span className="text-[13px] tabular-nums text-slate-300">
           {t("solo.answered", { a: hud.soalanDijawab, b: totalRef.current })}
