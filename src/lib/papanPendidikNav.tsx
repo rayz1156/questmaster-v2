@@ -20,6 +20,7 @@ import { ClipboardList, LayoutGrid } from "lucide-react";
 import { listMyClasses } from "@/lib/data";
 import { statusKelas, susunKelas } from "@/lib/kelasStatus";
 import { useBahasa } from "@/lib/i18n/BahasaProvider";
+import type { KunciKamus } from "@/lib/i18n";
 import {
   KUNCI_KELAS_PENDIDIK,
   kelasDariLaluanPendidik,
@@ -78,7 +79,24 @@ export function useTabPapanPendidik<T extends TabAsas>(tabs: T[]): T[] {
     }
   }, [dariLaluan, urutan]);
 
+  // Label dan kumpulan menu pendidik diterjemah mengikut bahasa semasa;
+  // tab tanpa `kunci` kekal seperti asal.
+  const tabsT = useMemo(
+    () =>
+      tabs.map((x) => {
+        const k = x as T & { kunci?: KunciKamus; kunciGroup?: KunciKamus };
+        if (!k.kunci && !k.kunciGroup) return x;
+        return {
+          ...x,
+          label: k.kunci ? t(k.kunci) : x.label,
+          group: k.kunciGroup ? t(k.kunciGroup) : x.group,
+        };
+      }),
+    [tabs, t],
+  );
+
   return useMemo(() => {
+    const tabs = tabsT;
     if (!menuPendidik || urutan.length === 0) return tabs;
     const lalai = urutan.find((k) => statusKelas(k) === "aktif") ?? urutan[0];
     const classId = pilihKelasNav(
@@ -98,5 +116,5 @@ export function useTabPapanPendidik<T extends TabAsas>(tabs: T[]): T[] {
     ] as T[];
     const i = tabs.findIndex((t) => t.href === RUMAH_PENDIDIK);
     return [...tabs.slice(0, i + 1), ...papan, ...tabs.slice(i + 1)];
-  }, [menuPendidik, urutan, simpanan, pathname, tabs, t]);
+  }, [menuPendidik, urutan, simpanan, pathname, tabsT, t]);
 }

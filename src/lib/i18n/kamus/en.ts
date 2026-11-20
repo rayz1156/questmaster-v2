@@ -92,6 +92,17 @@ export const en = {
     groupManagement: 'Management',
     groupSecurity: 'Security',
     groupSystem: 'System',
+    // Menu pendidik (src/lib/eduTabs.tsx).
+    eduClasses: 'Classes',
+    eduLiveQuiz: 'Live Quiz',
+    eduAiChatroom: 'AI Chatroom',
+    eduLibrary: 'Library',
+    eduRankings: 'Rankings',
+    eduOutcomes: 'Outcomes',
+    eduAnalytics: 'Analytics',
+    eduInvites: 'Invites',
+    groupTeaching: 'Teaching',
+    groupAssessment: 'Assessment',
   },
   auth: {
     // Log masuk (src/app/login/page.tsx).
