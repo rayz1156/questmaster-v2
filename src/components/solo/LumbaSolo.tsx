@@ -22,6 +22,7 @@ import {
   JAWAB_TETINGKAH_MS,
   jawabBetul,
   jawabSalah,
+  jarakKomputer,
   kedudukanPemain,
   KELAJUAN_KOMPUTER,
   langkahLumba,
@@ -36,6 +37,24 @@ import {
 import { lukisPemandangan } from "./lumbaSoloLukis";
 import { BunyiLumba } from "./lumbaSoloBunyi";
 import type { Pemandangan3D } from "./lumbaSolo3D";
+import { ciptaKeadaanLompat, langkahLompat, type KeadaanLompat } from "./lompatEnjin";
+import { lukisLompat } from "./lompatLukis";
+import {
+  SENARAI_TEMA,
+  TEMA_LALAI,
+  bacaTemaTersimpan,
+  lajuPaparan,
+  simpanTema,
+  type TemaLumba,
+} from "./lumbaSoloTema";
+
+/** KZ-057: kunci i18n nama setiap tema. */
+const NAMA_TEMA = {
+  kereta: "solo.themeCar",
+  basikal: "solo.themeBike",
+  angkasa: "solo.themeSpace",
+  lompat: "solo.themeJump",
+} as const;
 
 /** Baris papan seperti dipulangkan API. */
 interface BarisPapanUi {
@@ -144,6 +163,21 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const hantarRef = useRef<(pilihan: string | null) => Promise<void>>(async () => {});
   const [sentuhPeranti, setSentuhPeranti] = useState(false);
   const [petunjuk, setPetunjuk] = useState(false);
+  /** KZ-057: tema permainan pilihan pemain (rupa sahaja; enjin dan markah sama). */
+  const [tema, setTema] = useState<TemaLumba>(TEMA_LALAI);
+  const temaRef = useRef<TemaLumba>(TEMA_LALAI);
+  /** KZ-058: keadaan permainan platform (dipakai bila tema ialah lompat). */
+  const lompatRef = useRef<KeadaanLompat | null>(null);
+  useEffect(() => {
+    const tersimpan = bacaTemaTersimpan();
+    temaRef.current = tersimpan;
+    setTema(tersimpan);
+  }, []);
+  const pilihTema = useCallback((baharu: TemaLumba): void => {
+    temaRef.current = baharu;
+    setTema(baharu);
+    simpanTema(baharu);
+  }, []);
 
   const pastiBunyi = useCallback((): BunyiLumba => {
     if (!bunyiRef.current) bunyiRef.current = new BunyiLumba();
@@ -217,6 +251,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       selesaiRef.current = false;
       tikRef.current = 0;
       enjinRef.current = ciptaKeadaanLumba();
+      lompatRef.current = temaRef.current === "lompat" ? ciptaKeadaanLompat() : null;
       setSoalan(null);
       setHud(HUD_AWAL);
       setFasa("lumba");
@@ -395,13 +430,16 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   /* ===== KZ-054: paparan 3D (dimuat dinamik; sandaran 2D jika WebGL tiada) ===== */
   useEffect(() => {
     if (fasa !== "lumba") return;
+    // KZ-058: permainan platform dilukis pada kanvas 2D; Three.js tidak dimuat.
+    const tema3D = temaRef.current;
+    if (tema3D === "lompat") return;
     let hidup = true;
     void import("./lumbaSolo3D")
       .then((m) => {
         const kanvas = kanvas3DRef.current;
         if (!hidup || !kanvas) return;
         try {
-          paparan3DRef.current = new m.Pemandangan3D(kanvas);
+          paparan3DRef.current = new m.Pemandangan3D(kanvas, tema3D);
           kanvas.style.visibility = "visible";
           if (kanvasRef.current) kanvasRef.current.style.visibility = "hidden";
         } catch {
@@ -438,7 +476,9 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         // Kekunci stereng yang ditekan sentiasa mengatasi tetikus atau jari.
         i.stereng = sasaran === null || i.kiri || i.kanan ? undefined : sasaran;
         if (sasaran !== null && tekanStereng.current) i.pecut = true;
-        langkahLumba(k, dt, inputRef.current);
+        const lompat = lompatRef.current;
+        if (lompat) langkahLompat(lompat, k, dt, inputRef.current);
+        else langkahLumba(k, dt, inputRef.current);
 
         if (!selesaiRef.current) {
           if (perluSoalan(k) && totalRef.current > 0) {
@@ -500,7 +540,15 @@ export default function LumbaSolo({ kod }: { kod: string }) {
           const ctx = kanvas.getContext("2d");
           if (ctx) {
             ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-            lukisPemandangan(ctx, lebarCss, tinggiCss, {
+            if (lompat) {
+              lukisLompat(ctx, lebarCss, tinggiCss, {
+                L: lompat,
+                masaMs: k.masaMs,
+                penalti: penaltiAktif(k),
+                kebal: k.masaMs < lompat.kebalTamatMs,
+                kemajuanKomputer: [jarakKomputer(0, k.masaMs) / TREK_PANJANG_M, jarakKomputer(1, k.masaMs) / TREK_PANJANG_M],
+              });
+            } else lukisPemandangan(ctx, lebarCss, tinggiCss, {
               masaMs: k.masaMs,
               jarakM: k.jarakM,
               offsetM: k.offsetM,
@@ -562,6 +610,10 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         case "W":
           i.pecut = turun;
           break;
+        case " ":
+          // KZ-058: bar ruang melompat dalam permainan platform sahaja.
+          if (temaRef.current === "lompat") i.pecut = turun;
+          break;
         case "ArrowDown":
         case "s":
         case "S":
@@ -573,6 +625,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       if (["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) {
         e.preventDefault();
       }
+      if (e.key === " " && temaRef.current === "lompat" && !soalanRef.current) e.preventDefault();
       // KZ-054/055: jawab soalan dengan kekunci nombor 1 hingga 9 sahaja. Huruf tidak
       // menjawab kerana A dan D juga kekunci stereng (stereng aktif semasa soalan).
       const s = soalanRef.current;
@@ -693,6 +746,30 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               </div>
             ) : (
               <div className="mt-4 space-y-3">
+                <div>
+                  <span className="text-[12px] font-semibold text-ink">{t("solo.chooseVehicle")}</span>
+                  <div className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label={t("solo.chooseVehicle")}>
+                    {SENARAI_TEMA.map((m) => (
+                      <button
+                        key={m.id}
+                        type="button"
+                        role="radio"
+                        aria-checked={tema === m.id}
+                        onClick={() => pilihTema(m.id)}
+                        className={`rounded-xl border px-2 py-2.5 text-center transition ${
+                          tema === m.id
+                            ? "border-violet-600 bg-violet-50 ring-2 ring-violet-200"
+                            : "border-slate-300 bg-white hover:border-violet-300"
+                        }`}
+                      >
+                        <span className="block text-[24px] leading-none" aria-hidden="true">
+                          {m.simbol}
+                        </span>
+                        <span className="block mt-1 text-[12px] font-semibold text-ink">{t(NAMA_TEMA[m.id])}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
                 <label className="block">
                   <span className="text-[12px] font-semibold text-ink">{t("solo.nickname")}</span>
                   <input
@@ -789,12 +866,16 @@ export default function LumbaSolo({ kod }: { kod: string }) {
           {t("solo.position")} {hud.kedudukan}/3
         </span>
         <span className="text-[13px] tabular-nums text-slate-300">{t("solo.timeLabel")} {formatMasa(hud.masaMs)}</span>
+        {tema !== "lompat" && (
         <span className="text-[13px] tabular-nums text-slate-300">
-          {Math.round(hud.kelajuan)} <span className="text-slate-500">km/h</span>
+          {lajuPaparan(tema, hud.kelajuan)} <span className="text-slate-500">km/h</span>
         </span>
+        )}
+        {tema !== "lompat" && (
         <span className="text-[13px] tabular-nums text-slate-300">
-          {t("solo.speedLimit")} {Math.round(hud.hadLaju)}
+          {t("solo.speedLimit")} {lajuPaparan(tema, hud.hadLaju)}
         </span>
+        )}
         <span className="text-[13px] tabular-nums text-slate-300">
           {t("solo.answered", { a: hud.soalanDijawab, b: totalRef.current })}
         </span>
@@ -858,7 +939,13 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         {petunjuk && (
           <div className="absolute top-12 inset-x-3 sm:inset-x-10 pointer-events-none text-center">
             <p className="inline-block text-[12px] sm:text-[13px] font-semibold text-white bg-slate-900/75 rounded-xl px-3 py-2">
-              {sentuhPeranti ? t("solo.hintTouch") : t("solo.hintKeys")}
+              {tema === "lompat"
+                ? sentuhPeranti
+                  ? t("solo.hintTouchJump")
+                  : t("solo.hintKeysJump")
+                : sentuhPeranti
+                  ? t("solo.hintTouch")
+                  : t("solo.hintKeys")}
             </p>
           </div>
         )}
@@ -952,6 +1039,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               </button>
             </div>
             <div className="absolute right-3 bottom-10 flex items-end gap-3">
+              {tema !== "lompat" && (
               <button
                 type="button"
                 {...butangSentuh("brek")}
@@ -960,13 +1048,14 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               >
                 {t("solo.brake")}
               </button>
+              )}
               <button
                 type="button"
                 {...butangSentuh("pecut")}
                 style={{ touchAction: "none" }}
                 className="w-20 h-20 rounded-full bg-violet-600/90 border-2 border-white/50 text-white text-[14px] font-bold active:bg-violet-700 select-none shadow-lg"
               >
-                {t("solo.boost")}
+                {tema === "lompat" ? t("solo.jump") : t("solo.boost")}
               </button>
             </div>
           </>
