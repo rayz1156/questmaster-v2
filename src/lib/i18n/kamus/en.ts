@@ -3166,7 +3166,7 @@ export const en = {
     brake: 'Brake',
     left: 'Left',
     right: 'Right',
-    hintKeys: 'Controls: move the mouse or use arrow keys / A D to steer, hold click or W to boost, S to brake. Answer questions with keys 1 to 4.',
-    hintTouch: 'Drag your finger left or right to steer. Hold your finger down to boost. Tap an answer when a question appears.',
+    hintKeys: 'The car drifts on bends, so keep steering! Move the mouse left or right of centre, or use arrow keys / A D. Hold click or W to boost, S to brake. Answer with keys 1 to 4.',
+    hintTouch: 'The car drifts on bends, so keep steering! Hold your finger left or right of centre to steer (holding also boosts). Tap an answer when a question appears.',
   },
 };

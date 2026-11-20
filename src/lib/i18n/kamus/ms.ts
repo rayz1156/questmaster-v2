@@ -3130,7 +3130,7 @@ export const ms: Kamus = {
     brake: 'Brek',
     left: 'Kiri',
     right: 'Kanan',
-    hintKeys: 'Kawalan: gerakkan tetikus atau guna anak panah / A D untuk stereng, klik tahan atau W untuk pecut, S brek. Jawab soalan dengan kekunci 1 hingga 4.',
-    hintTouch: 'Seret jari ke kiri atau kanan untuk stereng. Tahan jari untuk pecut. Ketik jawapan bila soalan muncul.',
+    hintKeys: 'Kereta hanyut di selekoh, jadi terus mengemudi! Gerakkan tetikus ke kiri atau kanan tengah, atau guna anak panah / A D. Klik tahan atau W untuk pecut, S brek. Jawab dengan kekunci 1 hingga 4.',
+    hintTouch: 'Kereta hanyut di selekoh, jadi terus mengemudi! Tahan jari di kiri atau kanan tengah untuk stereng (tahan juga memecut). Ketik jawapan bila soalan muncul.',
   },
 };

@@ -10,7 +10,9 @@
  *   - keluar jalan memperlahankan kereta;
  *   - soalan pertama pada 5 saat, kemudian setiap 15 saat (rehat 4 saat
  *     selepas setiap soalan); kereta perlahan semasa soalan dibuka tetapi
- *     stereng kekal aktif (KZ-055).
+ *     stereng kekal aktif (KZ-055);
+ *   - trek berselekoh: tanpa stereng, kereta hanyut ke luar selekoh dan
+ *     tersasar keluar jalan (KZ-056). Pemain mesti mengemudi sendiri.
  */
 
 /** Had laju awal km/j. */
@@ -38,7 +40,43 @@ export const SEPARUH_JALAN_M = 3.5;
 /** Offset lateral maksimum (kereta tidak boleh hilang jauh). */
 export const OFFSET_MAX_M = 6;
 /** Kadar perubahan offset lateral, meter sesaat. */
-export const KADAR_OFFSET_M_S = 5;
+export const KADAR_OFFSET_M_S = 6;
+/** KZ-056: pekali hanyutan ke luar selekoh (m/s per v^2 x kelengkungan). */
+export const PEKALI_HANYUT = 1.6;
+/** KZ-056: had kadar hanyutan, meter sesaat (sentiasa di bawah kadar stereng). */
+export const HANYUT_MAX_M_S = 4.2;
+/** KZ-056: amplitud angin sisi (m/s pada kelajuan penuh); jalan lurus pun perlu dikawal. */
+export const ANGIN_SISI_M_S = 0.8;
+
+/* ===== Geometri trek (dikongsi dengan paparan 3D supaya selekoh sepadan) ===== */
+
+/** Garis tengah trek pada paksi x dunia (positif = kanan pemandu). */
+export function tengahTrekX(d: number): number {
+  return 46 * Math.sin(d / 270) + 17 * Math.sin(d / 103 + 1.3);
+}
+/** Terbitan pertama tengahTrekX (cerun selekoh). */
+export function cerunTrekX(d: number): number {
+  return (46 / 270) * Math.cos(d / 270) + (17 / 103) * Math.cos(d / 103 + 1.3);
+}
+/**
+ * Kelengkungan trek pada jarak d (1/meter). Positif bermaksud jalan membelok
+ * ke kanan, jadi kereta hanyut ke kiri (offset negatif) jika tidak dikemudi.
+ */
+export function kelengkunganTrek(d: number): number {
+  const dd = -(46 / (270 * 270)) * Math.sin(d / 270) - (17 / (103 * 103)) * Math.sin(d / 103 + 1.3);
+  const c = cerunTrekX(d);
+  return dd / Math.pow(1 + c * c, 1.5);
+}
+
+/** Kadar hanyutan lateral (m/s) pada jarak d dan kelajuan km/j. */
+export function kadarHanyut(d: number, kelajuanKmj: number): number {
+  const v = kelajuanKmj / 3.6;
+  const masuk = Math.min(1, Math.max(0, d / 120)); // lembut dekat garisan mula
+  const selekoh = -kelengkunganTrek(d) * v * v * PEKALI_HANYUT;
+  const angin = ANGIN_SISI_M_S * Math.min(1, v / 25) * (Math.sin(d / 47 + 0.4) * 0.7 + Math.sin(d / 19 + 2.1) * 0.3);
+  const h = (selekoh + angin) * masuk;
+  return Math.max(-HANYUT_MAX_M_S, Math.min(HANYUT_MAX_M_S, h));
+}
 
 /** Input pemandu pada satu bingkai (kekunci atau butang sentuh). */
 export interface InputPemandu {
@@ -46,6 +84,8 @@ export interface InputPemandu {
   kanan: boolean;
   pecut: boolean;
   brek: boolean;
+  /** Stereng analog -1 (kiri) hingga 1 (kanan); jika ada, menggantikan kiri/kanan. */
+  stereng?: number;
 }
 
 export const TIADA_INPUT: InputPemandu = { kiri: false, kanan: false, pecut: false, brek: false };
@@ -186,8 +226,13 @@ export function langkahLumba(k: KeadaanLumba, dtMs: number, input: InputPemandu)
   else if (input.pecut) sasaran = had;
   else sasaran = had * 0.75;
   // KZ-055: stereng sentiasa aktif, termasuk semasa soalan (tiada lagi autopilot).
-  const arah = (input.kanan ? 1 : 0) - (input.kiri ? 1 : 0);
+  const arah =
+    input.stereng !== undefined
+      ? Math.max(-1, Math.min(1, input.stereng))
+      : (input.kanan ? 1 : 0) - (input.kiri ? 1 : 0);
   k.offsetM += arah * KADAR_OFFSET_M_S * dt;
+  // KZ-056: hanyutan ke luar selekoh; tiada pembetulan automatik.
+  k.offsetM += kadarHanyut(k.jarakM, k.kelajuan) * dt;
   k.offsetM = Math.max(-OFFSET_MAX_M, Math.min(OFFSET_MAX_M, k.offsetM));
 
   k.diLuarJalan = Math.abs(k.offsetM) > SEPARUH_JALAN_M;

@@ -43,6 +43,10 @@ import {
   SOALAN_SETIAP_MS,
   SOALAN_PERTAMA_MS,
   REHAT_SOALAN_MS,
+  kelengkunganTrek,
+  kadarHanyut,
+  HANYUT_MAX_M_S,
+  KADAR_OFFSET_M_S,
   TREK_PANJANG_M,
   TIADA_INPUT,
   tutupSoalan,
@@ -187,12 +191,16 @@ check('penalti masih aktik pada 7.999 saat', penaltiAktif(k2) === true);
 k2.masaMs = 10_000 + 8000;
 check('penalti tamat tepat 8 saat', penaltiAktif(k2) === false && hadLajuEfektif(k2) === 140);
 
-// Penamat: pecut berterusan tanpa soalan pada had 120.
+// Penamat: pecut berterusan tanpa soalan pada had 120, pemain mengemudi ke tengah.
 const k3 = ciptaKeadaanLumba();
 const pecut = { kiri: false, kanan: false, pecut: true, brek: false };
+/** Pemain yang mengemudi sendiri (KZ-056): stereng analog ke arah tengah jalan. */
+const kemudi = (k: { offsetM: number }, asas = pecut) => ({ ...asas, stereng: Math.max(-1, Math.min(1, -k.offsetM * 1.5)) });
+let luarJalan3 = 0;
 let langkah3 = 0;
 while (!k3.selesai && langkah3 < 5000) {
-  langkahLumba(k3, 100, pecut);
+  langkahLumba(k3, 100, kemudi(k3));
+  if (k3.diLuarJalan) luarJalan3++;
   langkah3++;
 }
 const masaPenamat3 = k3.masaMs / 1000;
@@ -208,11 +216,33 @@ const k4 = ciptaKeadaanLumba();
 for (let i = 0; i < 6; i++) jawabBetul(k4);
 let langkah4 = 0;
 while (!k4.selesai && langkah4 < 5000) {
-  langkahLumba(k4, 100, pecut);
+  langkahLumba(k4, 100, kemudi(k4));
+  if (k4.diLuarJalan) luarJalan3++;
   langkah4++;
 }
 check('penamat had 240 lebih cepat daripada had 120', k4.selesai && k4.masaMs < k3.masaMs, k4.masaMs);
 check('penamat had 240 kira-kira 72 saat', k4.masaMs / 1000 > 60 && k4.masaMs / 1000 < 100, k4.masaMs / 1000);
+check('pemain yang mengemudi kekal di atas jalan (had 120 dan 240)', luarJalan3 === 0, luarJalan3);
+
+// KZ-056: tanpa stereng, kereta hanyut di selekoh dan tersasar keluar jalan.
+const kh = ciptaKeadaanLumba();
+let hanyutLuar = false;
+for (let i = 0; i < 600 && !kh.selesai; i++) {
+  langkahLumba(kh, 100, pecut);
+  if (kh.diLuarJalan) hanyutLuar = true;
+}
+check('tanpa stereng: kereta tersasar keluar jalan dalam 60 saat', hanyutLuar, kh.offsetM);
+let kelengMax = 0;
+for (let d = 0; d <= TREK_PANJANG_M; d += 5) kelengMax = Math.max(kelengMax, Math.abs(kelengkunganTrek(d)));
+check('trek ada selekoh sebenar', kelengMax > 0.001, kelengMax);
+check('hanyutan sentiasa di bawah kadar stereng', HANYUT_MAX_M_S < KADAR_OFFSET_M_S);
+let tanda = true;
+for (let d = 200; d <= TREK_PANJANG_M; d += 37) {
+  const h = kadarHanyut(d, 120);
+  if (Math.abs(kelengkunganTrek(d)) > 1e-3 && Math.sign(h) !== -Math.sign(kelengkunganTrek(d))) tanda = false;
+}
+check('hanyutan ke luar selekoh tajam (arah bertentangan kelengkungan)', tanda);
+check('tiada hanyutan pada kelajuan 0', kadarHanyut(1000, 0) === 0);
 
 // Keluar jalan memperlahankan kereta.
 const k5 = ciptaKeadaanLumba();
@@ -220,21 +250,25 @@ const kananSahaja = { kiri: false, kanan: true, pecut: true, brek: false };
 for (let i = 0; i < 40; i++) langkahLumba(k5, 100, kananSahaja); // 4 saat
 check('offset melebihi jalan: di luar jalan', k5.diLuarJalan && k5.offsetM > 3.5, k5.offsetM);
 const kelajuanLuar = k5.kelajuan;
-for (let i = 0; i < 60; i++) langkahLumba(k5, 100, pecut); // kekal di luar, pecut
+for (let i = 0; i < 60; i++) langkahLumba(k5, 100, kananSahaja); // kekal di luar, pecut
 check('keluar jalan memperlahankan walaupun pecut', k5.kelajuan < HAD_LAJU_AWAL * 0.5, k5.kelajuan);
 check('kelajuan luar jalan tidak naik', k5.kelajuan <= kelajuanLuar + 5, [kelajuanLuar, k5.kelajuan]);
 
 // Semasa soalan (KZ-055): kelajuan separuh had, stereng masih aktif.
 const k6 = ciptaKeadaanLumba();
 k6.offsetM = 2.5;
-for (let i = 0; i < 30; i++) langkahLumba(k6, 100, pecut);
+for (let i = 0; i < 30; i++) langkahLumba(k6, 100, kemudi(k6));
 bukaSoalan(k6);
-for (let i = 0; i < 60; i++) langkahLumba(k6, 100, pecut); // 6 saat semasa soalan
+for (let i = 0; i < 60; i++) langkahLumba(k6, 100, kemudi(k6)); // 6 saat semasa soalan
 check('semasa soalan: kelajuan menghampiri separuh had', Math.abs(k6.kelajuan - hadLajuEfektif(k6) * 0.5) < 8, k6.kelajuan);
-check('semasa soalan: offset kekal tanpa input', Math.abs(k6.offsetM - 2.5) < 0.01, k6.offsetM);
-const offSoalan = k6.offsetM;
-for (let i = 0; i < 5; i++) langkahLumba(k6, 100, { ...TIADA_INPUT, kiri: true });
-check('semasa soalan: stereng kiri masih berfungsi', k6.offsetM < offSoalan - 2, [offSoalan, k6.offsetM]);
+const k6tanpa = { ...k6 };
+const k6kiri = { ...k6 };
+for (let i = 0; i < 5; i++) {
+  langkahLumba(k6tanpa, 100, TIADA_INPUT);
+  langkahLumba(k6kiri, 100, { ...TIADA_INPUT, kiri: true });
+}
+check('semasa soalan: tiada pembetulan automatik ke tengah', Math.abs(k6tanpa.offsetM) > 0.05 || Math.abs(kadarHanyut(k6.jarakM, k6.kelajuan)) < 0.01, k6tanpa.offsetM);
+check('semasa soalan: stereng kiri masih berfungsi', k6kiri.offsetM < k6tanpa.offsetM - 2.5, [k6tanpa.offsetM, k6kiri.offsetM]);
 check('soalan dibuka dicatat', k6.soalanKe === 1 && k6.soalanDibukaMs !== null);
 check('masa soalan berlalu positif', (masaSoalanBerlalu(k6) ?? 0) > 5000);
 tutupSoalan(k6);
@@ -281,7 +315,7 @@ check('kedudukan tengah: 2', kedudukanPemain(k8) === 2);
 
 // Brek menghentikan kereta.
 const k9 = ciptaKeadaanLumba();
-for (let i = 0; i < 30; i++) langkahLumba(k9, 100, pecut);
+for (let i = 0; i < 30; i++) langkahLumba(k9, 100, kemudi(k9));
 const lajuSebelum = k9.kelajuan;
 for (let i = 0; i < 120; i++) langkahLumba(k9, 100, { kiri: false, kanan: false, pecut: false, brek: true });
 check('brek memperlahankan hampir berhenti', lajuSebelum > 80 && k9.kelajuan < 5, [lajuSebelum, k9.kelajuan]);
@@ -294,7 +328,7 @@ check('selesai: masa beku', k10.masaMs === 0 && k10.jarakM === 0, k10);
 
 // Input kosong: kereta masih bergerak pada 75% had (pemanduan santai).
 const k11 = ciptaKeadaanLumba();
-for (let i = 0; i < 100; i++) langkahLumba(k11, 100, TIADA_INPUT);
+for (let i = 0; i < 100; i++) langkahLumba(k11, 100, kemudi(k11, TIADA_INPUT));
 check('tanpa input: kelajuan ~75% had', k11.kelajuan > HAD_LAJU_AWAL * 0.6 && k11.kelajuan < HAD_LAJU_AWAL * 0.85, k11.kelajuan);
 
 /* ===== Ringkasan ===== */

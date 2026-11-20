@@ -52,6 +52,7 @@ import {
   WebGLRenderer,
 } from 'three';
 import { WARNA_KOMPUTER, WARNA_PEMAIN, type Pemandangan } from './lumbaSoloLukis';
+import { cerunTrekX, tengahTrekX } from './lumbaSoloEnjin';
 
 /** Data satu bingkai untuk paparan 3D: pemandangan 2D + keadaan tambahan. */
 export interface Pemandangan3DData extends Pemandangan {
@@ -74,13 +75,9 @@ const LORONG_KOMPUTER = [-2.1, 2.1] as const;
 /** Jarak trek dibina sebelum garisan mula dan selepas penamat. */
 const LEBIHAN_TREK = 400;
 
-/** Garis tengah trek: lengkok lembut dalam paksi x. */
-function tengahX(d: number): number {
-  return 46 * Math.sin(d / 270) + 17 * Math.sin(d / 103 + 1.3);
-}
-function cerunX(d: number): number {
-  return (46 / 270) * Math.cos(d / 270) + (17 / 103) * Math.cos(d / 103 + 1.3);
-}
+/** Garis tengah trek: dikongsi dengan enjin supaya hanyutan selekoh sepadan (KZ-056). */
+const tengahX = tengahTrekX;
+const cerunX = cerunTrekX;
 /** Bukit lembut di sepanjang trek. Rata dekat garisan mula. */
 function tinggiY(d: number): number {
   const rata = Math.min(1, Math.max(0, d / 180));
