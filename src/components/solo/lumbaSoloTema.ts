@@ -4,7 +4,7 @@
  * Fail ini tiada import Three.js supaya boleh dipakai pada skrin maklumat.
  */
 
-export type TemaLumba = 'kereta' | 'basikal' | 'angkasa';
+export type TemaLumba = 'kereta' | 'basikal' | 'angkasa' | 'lompat';
 
 export interface MaklumatTema {
   id: TemaLumba;
@@ -18,6 +18,8 @@ export const SENARAI_TEMA: readonly MaklumatTema[] = [
   { id: 'kereta', simbol: '🏎️', skalaLaju: 1 },
   { id: 'basikal', simbol: '🚴', skalaLaju: 0.25 },
   { id: 'angkasa', simbol: '🚀', skalaLaju: 100 },
+  // KZ-058: permainan platform sisi (enjin dan lukisan 2D sendiri).
+  { id: 'lompat', simbol: '🦘', skalaLaju: 1 },
 ];
 
 export const TEMA_LALAI: TemaLumba = 'kereta';

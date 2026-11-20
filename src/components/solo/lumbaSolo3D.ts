@@ -57,7 +57,10 @@ import {
 } from 'three';
 import { WARNA_KOMPUTER, WARNA_PEMAIN, type Pemandangan } from './lumbaSoloLukis';
 import { cerunTrekX, tengahTrekX } from './lumbaSoloEnjin';
-import type { TemaLumba } from './lumbaSoloTema';
+import type { TemaLumba as TemaSemua } from './lumbaSoloTema';
+
+/** Tema yang dilukis dalam 3D (Lompat ada lukisan 2D sendiri). */
+export type TemaLumba = Exclude<TemaSemua, 'lompat'>;
 
 /* ===== Palet setiap tema (KZ-057) ===== */
 
