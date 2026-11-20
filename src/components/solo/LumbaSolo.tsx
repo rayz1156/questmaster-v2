@@ -311,27 +311,30 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   useEffect(() => {
     if (fasa !== "lumba") return;
     setPetunjuk(true);
-    const id = window.setTimeout(() => setPetunjuk(false), 6000);
+    const id = window.setTimeout(() => setPetunjuk(false), 8000);
     return () => window.clearTimeout(id);
   }, [fasa]);
 
   /**
-   * Stereng penuding: kereta bergerak ke arah kedudukan jari atau tetikus.
-   * Jari: seret dan tahan (tahan = pecut). Tetikus (KZ-055): cukup gerakkan
-   * tetikus di atas trek; klik dan tahan = pecut.
+   * Stereng penuding gaya kayu bedik (KZ-056): kedudukan jari atau tetikus
+   * dari tengah trek menentukan arah dan kekuatan stereng, bukan kedudukan
+   * kereta. Penuding di tengah = tiada stereng, jadi kereta tetap hanyut di
+   * selekoh. Jari: seret dan tahan (tahan = pecut). Tetikus: gerakkan sahaja;
+   * klik dan tahan = pecut.
    */
   const seretStereng = (e: React.PointerEvent<HTMLDivElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const rel = (e.clientX - r.left) / Math.max(1, r.width) - 0.5;
-    sasaranStereng.current = Math.max(-1, Math.min(1, rel * 2.2)) * 4.6;
+    const rel = ((e.clientX - r.left) / Math.max(1, r.width) - 0.5) * 2; // -1..1
+    const zonMati = 0.12;
+    const a = Math.abs(rel) <= zonMati ? 0 : (Math.abs(rel) - zonMati) / (0.8 - zonMati);
+    sasaranStereng.current = Math.sign(rel) * Math.min(1, a);
   };
   const hentiStereng = () => {
     tekanStereng.current = false;
     if (sasaranStereng.current === null) return;
     sasaranStereng.current = null;
     const i = inputRef.current;
-    i.kiri = false;
-    i.kanan = false;
+    i.stereng = undefined;
     i.pecut = false;
   };
   const lepasTekan = (e: React.PointerEvent<HTMLDivElement>) => {
@@ -429,15 +432,12 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       const k = enjinRef.current;
 
       if (!document.hidden) {
-        // Stereng seret: tukar sasaran offset jari kepada kiri/kanan digital enjin.
+        // Stereng penuding: nilai analog terus ke enjin (tiada pembetulan automatik).
         const sasaran = sasaranStereng.current;
-        if (sasaran !== null) {
-          const i = inputRef.current;
-          const beza = sasaran - k.offsetM;
-          i.kiri = beza < -0.25;
-          i.kanan = beza > 0.25;
-          if (tekanStereng.current) i.pecut = true;
-        }
+        const i = inputRef.current;
+        // Kekunci stereng yang ditekan sentiasa mengatasi tetikus atau jari.
+        i.stereng = sasaran === null || i.kiri || i.kanan ? undefined : sasaran;
+        if (sasaran !== null && tekanStereng.current) i.pecut = true;
         langkahLumba(k, dt, inputRef.current);
 
         if (!selesaiRef.current) {
