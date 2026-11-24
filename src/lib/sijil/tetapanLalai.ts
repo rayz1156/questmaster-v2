@@ -38,18 +38,18 @@ const RE_EMEL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
  */
 export function normaliseTemplatEmel(input: unknown): { nilai?: TemplatEmel; ralat?: string } {
   if (input === null) return { nilai: {} };
-  if (typeof input !== 'object' || Array.isArray(input)) return { ralat: 'email_template mesti objek.' };
+  if (typeof input !== 'object' || Array.isArray(input)) return { ralat: 'email_template must be an object.' };
   const s = input as Record<string, unknown>;
   const out: TemplatEmel = {};
   const had: Record<keyof TemplatEmel, number> = { subject: 200, body: 8000, from_name: 80, reply_to: 200 };
   for (const k of Object.keys(had) as (keyof TemplatEmel)[]) {
     const v = s[k];
     if (v === undefined || v === null) continue;
-    if (typeof v !== 'string') return { ralat: `email_template.${k} mesti rentetan.` };
+    if (typeof v !== 'string') return { ralat: `email_template.${k} must be a string.` };
     const t = k === 'body' ? v.replace(/\r\n/g, '\n').trim() : v.replace(/[\r\n]+/g, ' ').trim();
     if (!t) continue;
-    if (t.length > had[k]) return { ralat: `email_template.${k} melebihi ${had[k]} aksara.` };
-    if (k === 'reply_to' && !RE_EMEL.test(t)) return { ralat: 'email_template.reply_to bukan alamat e-mel yang sah.' };
+    if (t.length > had[k]) return { ralat: `email_template.${k} exceeds ${had[k]} characters.` };
+    if (k === 'reply_to' && !RE_EMEL.test(t)) return { ralat: 'email_template.reply_to is not a valid email address.' };
     out[k] = t;
   }
   return { nilai: out };
@@ -112,4 +112,72 @@ export function bentukAwam(t: TetapanLalai | null) {
     supported_email_variables: PEMBOLEH_UBAH_EMEL,
     updated_at: t.updated_at,
   };
+}
+
+/**
+ * Semakan bebas KZ-B (T1): salin aset lalai ke folder templat dan lekatkan.
+ * Hanya bila pelan pemilik kelas berbayar (selari asset-finalize). Objek
+ * disalin dengan service role SELEPAS pemanggil disahkan pendidik kelas;
+ * kemas kini templat melalui klien Bearer (RLS dan pencetus pelan).
+ * Gagal kemas kini: objek salinan dibuang. Aset lama templat dipadam hanya
+ * jika tiada rujukan lain.
+ */
+export async function salinAsetLalai(
+  supa: SupabaseClient,
+  lalai: TetapanLalai,
+  classId: string,
+  templateId: string,
+  jenis: { background?: boolean; logo?: boolean; signature?: boolean },
+): Promise<{ dikemaskini: Record<string, unknown> | null; disalin: string[]; dilangkau_pelan: boolean }> {
+  const { getServiceSupabase } = await import('@/lib/supabase-route');
+  const { pelanSijilBerbayar, pelanPemilikKelas } = await import('@/lib/sijil/pelanSijil');
+  const { salinAsetKeTemplat, buangObjek, padamJikaTidakDipakai } = await import('@/lib/sijil/asetMasuk');
+
+  const peta: [keyof typeof jenis, 'background_path' | 'logo_path' | 'signature_path'][] = [
+    ['background', 'background_path'],
+    ['logo', 'logo_path'],
+    ['signature', 'signature_path'],
+  ];
+  const diminta = peta.filter(([k, lajur]) => jenis[k] && lalai[lajur]);
+  if (diminta.length === 0) return { dikemaskini: null, disalin: [], dilangkau_pelan: false };
+  if (!pelanSijilBerbayar(await pelanPemilikKelas(supa, classId))) {
+    return { dikemaskini: null, disalin: [], dilangkau_pelan: true };
+  }
+
+  const svc = getServiceSupabase();
+  const { data: lama } = await supa
+    .from('qm_certificate_templates')
+    .select('background_path, logo_path, signature_path')
+    .eq('id', templateId)
+    .eq('class_id', classId)
+    .maybeSingle();
+  const kemas: Record<string, string> = {};
+  const baru: string[] = [];
+  const disalin: string[] = [];
+  for (const [k, lajur] of diminta) {
+    const p = await salinAsetKeTemplat(svc, String(lalai[lajur]), classId, templateId, k);
+    if (p) {
+      kemas[lajur] = p;
+      baru.push(p);
+      disalin.push(k);
+    }
+  }
+  if (baru.length === 0) return { dikemaskini: null, disalin: [], dilangkau_pelan: false };
+
+  const { data, error } = await supa
+    .from('qm_certificate_templates')
+    .update({ ...kemas, updated_at: new Date().toISOString() })
+    .eq('id', templateId)
+    .eq('class_id', classId)
+    .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
+    .single();
+  if (error || !data) {
+    await buangObjek(svc, baru);
+    return { dikemaskini: null, disalin: [], dilangkau_pelan: false };
+  }
+  for (const [, lajur] of diminta) {
+    const p = (lama as Record<string, string | null> | null)?.[lajur];
+    if (p && p !== kemas[lajur]) await padamJikaTidakDipakai(svc, p);
+  }
+  return { dikemaskini: data as Record<string, unknown>, disalin, dilangkau_pelan: false };
 }

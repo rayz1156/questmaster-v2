@@ -16,7 +16,7 @@ import { dalamHad } from '@/lib/hadKadar';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { normaliseMedan } from '@/lib/sijil/medan';
 import { ralatJson } from '@/lib/i18n/ralatApi';
-import { bacaTetapanLalai, layoutLalai, medanPenandatangan } from '@/lib/sijil/tetapanLalai';
+import { bacaTetapanLalai, layoutLalai, medanPenandatangan, salinAsetLalai } from '@/lib/sijil/tetapanLalai';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -102,7 +102,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       : null;
 
   // KZ-B: warisi tetapan lalai sijil pemanggil bagi medan yang tidak diberi
-  // (use_defaults: false untuk mematikan). Aset lalai dirujuk, bukan disalin.
+  // (use_defaults: false untuk mematikan). Layout dan penandatangan terus;
+  // aset lalai DISALIN ke folder templat selepas insert (kekangan 0066
+  // mewajibkan tandatangan dalam folder kelas) dan hanya untuk pelan berbayar.
   const lalai = body.use_defaults === false ? null : await bacaTetapanLalai(auth.supa, userId);
   const layoutDiberi = body.layout !== undefined && body.layout !== null;
   const layoutAkhir = layoutDiberi ? normaliseSusunAtur(body.layout) : (layoutLalai(lalai) ?? normaliseSusunAtur(body.layout));
@@ -110,14 +112,6 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     ? (body.fields as Record<string, unknown>)
     : {};
   const medanAkhir = normaliseMedan({ ...medanPenandatangan(lalai), ...medanDiberi });
-  const diwarisi: string[] = [];
-  if (lalai) {
-    if (!layoutDiberi && layoutLalai(lalai)) diwarisi.push('layout');
-    if (Object.keys(medanPenandatangan(lalai)).length > 0) diwarisi.push('signer');
-    if (!backgroundPath && lalai.background_path) diwarisi.push('background');
-    if (!logoPath && lalai.logo_path) diwarisi.push('logo');
-    if (lalai.signature_path) diwarisi.push('signature');
-  }
 
   const { data, error } = await auth.supa
     .from('qm_certificate_templates')
@@ -125,9 +119,8 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       class_id: classId,
       title,
       criteria,
-      background_path: backgroundPath ?? lalai?.background_path ?? null,
-      logo_path: logoPath ?? lalai?.logo_path ?? null,
-      signature_path: lalai?.signature_path ?? null,
+      background_path: backgroundPath,
+      logo_path: logoPath,
       // Layout sentiasa dinormalkan (V2-015): kunci asing dibuang dan
       // semua nombor diapit sebelum disimpan.
       layout: layoutAkhir,
@@ -136,8 +129,28 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     })
     .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
     .single();
-  if (error) return ralatJson(error.message, 400);
-  const { signature_path, ...templatBaru } = data ?? {};
+  if (error || !data) return ralatJson(error?.message ?? 'Could not create the template.', 400);
+
+  let templat = data as Record<string, unknown>;
+  if (lalai) {
+    const aset = await salinAsetLalai(auth.supa, lalai, classId, String(templat.id), {
+      background: !backgroundPath,
+      logo: !logoPath,
+      signature: true,
+    });
+    if (aset.dikemaskini) templat = aset.dikemaskini;
+  }
+  // Senarai diwarisi dikira daripada baris AKHIR (pencetus pelan boleh
+  // membuang latar/logo untuk pelan percuma).
+  const diwarisi: string[] = [];
+  if (lalai) {
+    if (!layoutDiberi && layoutLalai(lalai)) diwarisi.push('layout');
+    if (Object.keys(medanPenandatangan(lalai)).length > 0) diwarisi.push('signer');
+    if (!backgroundPath && lalai.background_path && templat.background_path) diwarisi.push('background');
+    if (!logoPath && lalai.logo_path && templat.logo_path) diwarisi.push('logo');
+    if (lalai.signature_path && templat.signature_path) diwarisi.push('signature');
+  }
+  const { signature_path, ...templatBaru } = templat;
   return NextResponse.json(
     { template: { ...templatBaru, has_signature: !!signature_path }, ...(diwarisi.length ? { inherited_defaults: diwarisi } : {}) },
     { status: 201 },

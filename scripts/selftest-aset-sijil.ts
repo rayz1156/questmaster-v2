@@ -38,6 +38,18 @@ catch (e) { semak("bukan imej ditolak", e instanceof RalatAset && e.status === 4
 try { imejDariBase64(Buffer.alloc(1_200_000, 1).toString("base64")); semak("base64 > 1 MB ditolak", false); }
 catch (e) { semak("base64 > 1 MB ditolak", e instanceof RalatAset && e.status === 413); }
 
+// Bom nyahmampat: IHDR 22000x22000 ditolak SEBELUM nyahkod (semakan bebas T2).
+{
+  const bom = Buffer.alloc(33);
+  Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]).copy(bom, 0);
+  bom.writeUInt32BE(13, 8); bom.write("IHDR", 12, "ascii");
+  bom.writeUInt32BE(22000, 16); bom.writeUInt32BE(22000, 20);
+  bom[24] = 8; bom[25] = 0;
+  const mula = Date.now();
+  try { buangLatarPutih({ bytes: new Uint8Array(bom), mime: "image/png" }); semak("bom PNG ditolak", false); }
+  catch (e) { semak("bom PNG ditolak sebelum nyahkod", e instanceof RalatAset && e.status === 413 && Date.now() - mula < 200, `${Date.now() - mula} ms`); }
+}
+
 semak("pautan Drive ditukar",
   pautanMuatTurun("https://drive.google.com/file/d/AbC_12-x/view?usp=sharing") === "https://drive.google.com/uc?export=download&id=AbC_12-x");
 semak("pautan lain kekal", pautanMuatTurun("https://export.canva.com/x.png") === "https://export.canva.com/x.png");

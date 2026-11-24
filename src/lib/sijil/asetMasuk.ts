@@ -73,12 +73,12 @@ export async function imejDariUrl(sourceUrl: string, maxBytes: number): Promise<
     });
   } catch (e) {
     if (e instanceof UploadGuardError) throw new RalatAset(e.message, (e as { status?: number }).status ?? 400);
-    throw new RalatAset('Fail tidak dapat dimuat turun daripada source_url.', 502);
+    throw new RalatAset('Could not download the file from source_url.', 502);
   }
   try {
     const bytes = new Uint8Array(await readFile(fail.tmpPath));
     const mime = jenisMime(bytes);
-    if (!mime) throw new RalatAset('Fail bukan imej PNG atau JPEG yang sah.', 415);
+    if (!mime) throw new RalatAset('The file is not a valid PNG or JPEG image.', 415);
     return { bytes, mime };
   } finally {
     await fail.cleanup();
@@ -88,15 +88,15 @@ export async function imejDariUrl(sourceUrl: string, maxBytes: number): Promise<
 /** Nyahkod base64 (dengan atau tanpa awalan data:) dan sahkan imej. */
 export function imejDariBase64(b64: string, maxBytes: number = HAD_BASE64): ImejMasuk {
   const bersih = b64.replace(/^data:[^;]+;base64,/, '').replace(/\s+/g, '');
-  if (!/^[A-Za-z0-9+/=_-]+$/.test(bersih)) throw new RalatAset('content_base64 bukan base64 yang sah.');
+  if (!/^[A-Za-z0-9+/=_-]+$/.test(bersih)) throw new RalatAset('content_base64 is not valid base64.');
   // Anggaran saiz sebelum menyahkod supaya rentetan besar ditolak awal.
   if (Math.floor((bersih.length * 3) / 4) > maxBytes + 3) {
-    throw new RalatAset(`Fail melebihi had ${Math.round(maxBytes / 1024)} KB.`, 413);
+    throw new RalatAset(`File exceeds the ${Math.round(maxBytes / 1024)} KB limit.`, 413);
   }
   const bytes = new Uint8Array(Buffer.from(bersih, 'base64'));
-  if (bytes.length > maxBytes) throw new RalatAset(`Fail melebihi had ${Math.round(maxBytes / 1024)} KB.`, 413);
+  if (bytes.length > maxBytes) throw new RalatAset(`File exceeds the ${Math.round(maxBytes / 1024)} KB limit.`, 413);
   const mime = jenisMime(bytes);
-  if (!mime) throw new RalatAset('Fail bukan imej PNG atau JPEG yang sah.', 415);
+  if (!mime) throw new RalatAset('The file is not a valid PNG or JPEG image.', 415);
   return { bytes, mime };
 }
 
@@ -115,6 +115,16 @@ export function buangLatarPutih(imej: ImejMasuk): ImejMasuk {
   let lebar: number;
   let tinggi: number;
   let data: Uint8Array;
+  // Semakan bebas KZ-B (T2): baca dimensi IHDR SEBELUM nyahkod supaya bom
+  // nyahmampat (PNG kecil, piksel berjuta) ditolak tanpa memakan memori.
+  if (imej.mime === 'image/png') {
+    const b = imej.bytes;
+    if (b.length < 24) throw new RalatAset('The PNG file is truncated.', 415);
+    const dv = new DataView(b.buffer, b.byteOffset, b.byteLength);
+    const lebarIhdr = dv.getUint32(16);
+    const tinggiIhdr = dv.getUint32(20);
+    if (lebarIhdr * tinggiIhdr > MAX_PIKSEL) throw new RalatAset('The image is too large to remove a white background.', 413);
+  }
   try {
     if (imej.mime === 'image/png') {
       const png = PNG.sync.read(Buffer.from(imej.bytes));
@@ -128,9 +138,9 @@ export function buangLatarPutih(imej: ImejMasuk): ImejMasuk {
       data = j.data;
     }
   } catch {
-    throw new RalatAset('Imej tidak dapat dinyahkod untuk membuang latar putih.', 415);
+    throw new RalatAset('The image could not be decoded to remove the white background.', 415);
   }
-  if (lebar * tinggi > MAX_PIKSEL) throw new RalatAset('Imej terlalu besar untuk membuang latar putih.', 413);
+  if (lebar * tinggi > MAX_PIKSEL) throw new RalatAset('The image is too large to remove a white background.', 413);
 
   const keluar = new PNG({ width: lebar, height: tinggi });
   for (let i = 0; i < lebar * tinggi * 4; i += 4) {
@@ -187,12 +197,43 @@ export async function bacaImejPermintaan(
   const url = typeof body.source_url === 'string' ? body.source_url.trim() : '';
   const b64 = typeof body.content_base64 === 'string' ? body.content_base64 : '';
   if ((url ? 1 : 0) + (b64 ? 1 : 0) !== 1) {
-    throw new RalatAset('Beri tepat satu daripada source_url atau content_base64.');
+    throw new RalatAset('Provide exactly one of source_url or content_base64.');
   }
   let imej = url ? await imejDariUrl(url, HAD_ASET[kind]) : imejDariBase64(b64, Math.min(HAD_BASE64, HAD_ASET[kind]));
   if (body.remove_white_background === true) imej = buangLatarPutih(imej);
   if (imej.bytes.length > HAD_ASET[kind]) {
-    throw new RalatAset(`Fail melebihi had ${Math.round(HAD_ASET[kind] / 1024 / 1024)} MB untuk ${kind}.`, 413);
+    throw new RalatAset(`File exceeds the ${Math.round(HAD_ASET[kind] / 1024 / 1024)} MB limit for ${kind}.`, 413);
   }
   return imej;
+}
+
+/**
+ * Semakan bebas KZ-B (T1): salin objek aset (contoh aset lalai) ke ruang
+ * nama templat `<class_id>/<template_id>/<kind>-<hex>.<ext>`, kerana
+ * kekangan 0066 mewajibkan tandatangan templat berada dalam folder kelas.
+ * Pulangkan laluan baharu, atau null jika sumber tidak dapat dibaca.
+ */
+export async function salinAsetKeTemplat(
+  svc: SupabaseClient,
+  sumber: string,
+  classId: string,
+  templateId: string,
+  kind: JenisAset,
+): Promise<string | null> {
+  const { data: fail, error } = await svc.storage.from('certificate-assets').download(sumber);
+  if (error || !fail) return null;
+  const bytes = new Uint8Array(await fail.arrayBuffer());
+  const mime = jenisMime(bytes);
+  if (!mime) return null;
+  const path = laluanAset(`${classId}/${templateId}/`, kind, mime);
+  const { error: upErr } = await svc.storage
+    .from('certificate-assets')
+    .upload(path, bytes, { contentType: mime, upsert: false });
+  return upErr ? null : path;
+}
+
+/** Buang objek yang baru disalin bila langkah seterusnya gagal. */
+export async function buangObjek(svc: SupabaseClient, paths: string[]): Promise<void> {
+  if (paths.length === 0) return;
+  await svc.storage.from('certificate-assets').remove(paths).catch(() => undefined);
 }

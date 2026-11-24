@@ -3,8 +3,8 @@
  *
  * Salin tetapan lalai sijil pemanggil ke templat sedia ada. Badan:
  *   { include?: ('assets' | 'signer' | 'layout')[] }  lalai: semua.
- * assets: latar/logo/tandatangan lalai yang ADA sahaja dirujuk (laluan
- *   dikongsi; qm_certificate_asset_in_use melindungi objek daripada dipadam).
+ * assets: latar/logo/tandatangan lalai yang ADA disalin ke folder templat
+ *   (kekangan 0066), hanya untuk pelan pemilik kelas berbayar.
  * signer: signer_name dan signer_title digabung ke fields templat.
  * layout: layout lalai menggantikan layout templat (dinormalkan).
  * Tulisan melalui klien Bearer: RLS pendidik dan pencetus pelan terpakai.
@@ -16,7 +16,7 @@ import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
 import { normaliseMedan } from '@/lib/sijil/medan';
 import { ralatJson } from '@/lib/i18n/ralatApi';
-import { bacaTetapanLalai, layoutLalai, medanPenandatangan } from '@/lib/sijil/tetapanLalai';
+import { bacaTetapanLalai, layoutLalai, medanPenandatangan, salinAsetLalai } from '@/lib/sijil/tetapanLalai';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,22 +42,17 @@ export async function POST(
   const template = await bacaTemplatKelas(auth.supa, params.templateId, classId);
   if (!template) return ralatJson('Certificate template not found.', 404);
   const lalai = await bacaTetapanLalai(auth.supa, userId);
-  if (!lalai) return ralatJson('Tiada tetapan lalai sijil. Simpan dahulu dengan set_certificate_defaults.', 404);
+  if (!lalai) return ralatJson('No certificate defaults saved yet. Save them first with set_certificate_defaults.', 404);
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const semua: Bahagian[] = ['assets', 'signer', 'layout'];
   const include = Array.isArray(body.include)
     ? (body.include as unknown[]).filter((x): x is Bahagian => semua.includes(x as Bahagian))
     : semua;
-  if (include.length === 0) return ralatJson('include mesti mengandungi assets, signer atau layout.', 400);
+  if (include.length === 0) return ralatJson('include must contain assets, signer or layout.', 400);
 
   const kemas: Record<string, unknown> = {};
   const digunakan: string[] = [];
-  if (include.includes('assets')) {
-    if (lalai.background_path) { kemas.background_path = lalai.background_path; digunakan.push('background'); }
-    if (lalai.logo_path) { kemas.logo_path = lalai.logo_path; digunakan.push('logo'); }
-    if (lalai.signature_path) { kemas.signature_path = lalai.signature_path; digunakan.push('signature'); }
-  }
   if (include.includes('signer')) {
     const p = medanPenandatangan(lalai);
     if (Object.keys(p).length > 0) {
@@ -69,24 +64,45 @@ export async function POST(
     const l = layoutLalai(lalai);
     if (l) { kemas.layout = l; digunakan.push('layout'); }
   }
-  if (Object.keys(kemas).length === 0) return ralatJson('Tetapan lalai tiada nilai untuk bahagian yang diminta.', 400);
-  kemas.updated_at = new Date().toISOString();
+  const mahuAset = include.includes('assets') && !!(lalai.background_path || lalai.logo_path || lalai.signature_path);
+  if (Object.keys(kemas).length === 0 && !mahuAset) {
+    return ralatJson('The certificate defaults have no values for the requested parts.', 400);
+  }
 
-  const { data, error } = await auth.supa
-    .from('qm_certificate_templates')
-    .update(kemas)
-    .eq('id', params.templateId)
-    .eq('class_id', classId)
-    .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
-    .single();
-  if (error || !data) return ralatJson(error?.message ?? 'Could not update the template.', 400);
+  let data: Record<string, unknown> | null = null;
+  if (Object.keys(kemas).length > 0) {
+    kemas.updated_at = new Date().toISOString();
+    const r = await auth.supa
+      .from('qm_certificate_templates')
+      .update(kemas)
+      .eq('id', params.templateId)
+      .eq('class_id', classId)
+      .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
+      .single();
+    if (r.error || !r.data) return ralatJson(r.error?.message ?? 'Could not update the template.', 400);
+    data = r.data as Record<string, unknown>;
+  }
 
-  // Pencetus pelan boleh memaksa latar/logo NULL untuk pelan percuma.
-  const dibuang = (kemas.background_path && !data.background_path) || (kemas.logo_path && !data.logo_path);
+  // Aset lalai disalin ke folder templat (kekangan 0066), pelan berbayar sahaja.
+  let nota: string | null = null;
+  if (mahuAset) {
+    const aset = await salinAsetLalai(auth.supa, lalai, classId, params.templateId, {
+      background: true,
+      logo: true,
+      signature: true,
+    });
+    if (aset.dikemaskini) data = aset.dikemaskini;
+    digunakan.push(...aset.disalin);
+    if (aset.dilangkau_pelan) nota = 'Default assets were not applied because the class owner is on the free plan.';
+  }
+  if (!data) {
+    const semula = await bacaTemplatKelas(auth.supa, params.templateId, classId);
+    data = (semula as unknown as Record<string, unknown>) ?? {};
+  }
   const { signature_path, ...lain } = data as Record<string, unknown>;
   return NextResponse.json({
     template: { ...lain, has_signature: !!signature_path },
     applied: digunakan,
-    ...(dibuang ? { note: 'Latar atau logo dibuang kerana pelan pemilik kelas percuma.' } : {}),
+    ...(nota ? { note: nota } : {}),
   });
 }

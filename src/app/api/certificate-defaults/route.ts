@@ -22,7 +22,8 @@ import { ralatJson } from '@/lib/i18n/ralatApi';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { bacaTemplatKelas } from '@/lib/sijil/keluarkan';
 import { tandatanganImej } from '@/lib/sijil/aset';
-import { laluanAset, padamJikaTidakDipakai, type JenisAset } from '@/lib/sijil/asetMasuk';
+import { buangObjek, laluanAset, padamJikaTidakDipakai, type JenisAset } from '@/lib/sijil/asetMasuk';
+import { pelanSijilBerbayar } from '@/lib/sijil/pelanSijil';
 import {
   bacaTetapanLalai,
   bentukAwam,
@@ -49,10 +50,10 @@ export async function GET(req: NextRequest) {
 
 function teksPilihan(v: unknown, had: number, nama: string): { nilai?: string | null; ralat?: string } {
   if (v === null) return { nilai: null };
-  if (typeof v !== 'string') return { ralat: `${nama} mesti rentetan atau null.` };
+  if (typeof v !== 'string') return { ralat: `${nama} must be a string or null.` };
   const t = v.trim().replace(/\s+/g, ' ');
   if (!t) return { nilai: null };
-  if (t.length > had) return { ralat: `${nama} melebihi ${had} aksara.` };
+  if (t.length > had) return { ralat: `${nama} exceeds ${had} characters.` };
   return { nilai: t };
 }
 
@@ -80,7 +81,7 @@ export async function PATCH(req: NextRequest) {
   }
   if (body.layout !== undefined) {
     if (body.layout !== null && (typeof body.layout !== 'object' || Array.isArray(body.layout))) {
-      return ralatJson('layout mesti objek atau null.', 400);
+      return ralatJson('layout must be an object or null.', 400);
     }
     kemas.layout = body.layout === null ? {} : normaliseSusunAtur(body.layout);
   }
@@ -102,17 +103,23 @@ export async function PATCH(req: NextRequest) {
 
   // Salin aset templat kelas ke ruang nama defaults/<pemanggil>/.
   const disalin: JenisAset[] = [];
+  const salinanBaru: string[] = [];
   const svc = getServiceSupabase();
   if (body.copy_assets_from !== undefined) {
     const src = (body.copy_assets_from ?? {}) as Record<string, unknown>;
     const classId = typeof src.class_id === 'string' ? src.class_id : '';
     const templateId = typeof src.template_id === 'string' ? src.template_id : '';
-    if (!classId || !templateId) return ralatJson('copy_assets_from memerlukan class_id dan template_id.', 400);
+    if (!classId || !templateId) return ralatJson('copy_assets_from needs class_id and template_id.', 400);
     const { data: kelas } = await auth.supa.from('qm_classes').select('owner_id').eq('id', classId).maybeSingle();
     const bolehBaca = kelas && (kelas.owner_id === userId || (await semakPendidikKelas(auth.supa, classId, userId)));
     if (!bolehBaca) return ralatJson('Forbidden', 403);
     const template = await bacaTemplatKelas(auth.supa, templateId, classId);
     if (!template) return ralatJson('Certificate template not found.', 404);
+    // Selaras dengan /certificate-defaults/asset: aset lalai untuk pelan berbayar.
+    const { data: pelan, error: pelanErr } = await auth.supa.rpc('qm_effective_plan', { p_user: userId });
+    if (pelanErr || !pelanSijilBerbayar(typeof pelan === 'string' ? pelan : 'free')) {
+      return ralatJson('Certificate backgrounds, logos and signatures are available on Pro, Institution and Unlimited plans.', 402);
+    }
     const jenis = Array.isArray(src.kinds)
       ? (src.kinds as unknown[]).filter((k): k is JenisAset => k === 'background' || k === 'logo' || k === 'signature')
       : (['background', 'logo', 'signature'] as JenisAset[]);
@@ -120,15 +127,25 @@ export async function PATCH(req: NextRequest) {
       const sumber = template[LAJUR[k]];
       if (!sumber) continue;
       const { data: fail, error: dlErr } = await svc.storage.from('certificate-assets').download(sumber);
-      if (dlErr || !fail) return ralatJson(`Aset ${k} templat tidak dapat dibaca.`, 500);
+      if (dlErr || !fail) {
+        await buangObjek(svc, salinanBaru);
+        return ralatJson(`Could not read the template ${k} image.`, 500);
+      }
       const bait = new Uint8Array(await fail.arrayBuffer());
-      if (!tandatanganImej(bait)) return ralatJson(`Aset ${k} templat bukan PNG atau JPEG.`, 400);
+      if (!tandatanganImej(bait)) {
+        await buangObjek(svc, salinanBaru);
+        return ralatJson(`The template ${k} image is not a PNG or JPEG.`, 400);
+      }
       const mime = bait[0] === 0x89 ? 'image/png' : 'image/jpeg';
       const sasaran = laluanAset(`defaults/${userId}/`, k, mime);
       const { error: upErr } = await svc.storage
         .from('certificate-assets')
         .upload(sasaran, bait, { contentType: mime, upsert: false });
-      if (upErr) return ralatJson(upErr.message, 500);
+      if (upErr) {
+        await buangObjek(svc, salinanBaru);
+        return ralatJson(upErr.message, 500);
+      }
+      salinanBaru.push(sasaran);
       kemas[LAJUR[k]] = sasaran;
       const p = lama?.[LAJUR[k]];
       if (p) untukDipadam.push(p);
@@ -136,13 +153,16 @@ export async function PATCH(req: NextRequest) {
     }
   }
 
-  if (Object.keys(kemas).length === 0) return ralatJson('Tiada medan untuk dikemas kini.', 400);
+  if (Object.keys(kemas).length === 0) return ralatJson('No fields to update.', 400);
   kemas.updated_at = new Date().toISOString();
 
   const { error } = await auth.supa
     .from('qm_certificate_defaults')
     .upsert({ educator_id: userId, ...kemas }, { onConflict: 'educator_id' });
-  if (error) return ralatJson(error.message, 400);
+  if (error) {
+    await buangObjek(svc, salinanBaru);
+    return ralatJson(error.message, 400);
+  }
 
   for (const p of untukDipadam) await padamJikaTidakDipakai(svc, p);
 
