@@ -1147,8 +1147,9 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
     title: "Jana semula sijil",
     description:
       "Jana semula PDF sijil yang sudah dikeluarkan (contohnya selepas templat diubah). Kod sijil kekal. " +
-      "Tanpa certificate_ids, semua sijil aktif kelas dijana semula (dalam kumpulan 50). template_id pilihan: " +
-      "templat itu dijadikan templat AKTIF kelas dahulu, kemudian sijil diikat ke templat itu dan dijana semula.",
+      "Tanpa certificate_ids, semua sijil templat aktif dijana semula (kumpulan 50). template_id pilihan: templat " +
+      "kelas itu dijadikan templat AKTIF dahulu, kemudian semua sijil aktif kelas (atau certificate_ids) diikat ke " +
+      "templat itu dan dijana semula. Jika terhenti (contoh had kadar), remaining_ids dipulangkan untuk disambung.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -1162,34 +1163,70 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
     },
     handler: async (args, s) => {
       const classId = wajib(args, "class_id");
-      if (typeof args.template_id === "string" && args.template_id.trim()) {
-        await panggilRpc(s, "qm_set_active_certificate_template", { p_template: args.template_id.trim() }, "Tetapkan templat aktif");
+      const templateId = typeof args.template_id === "string" ? args.template_id.trim() : "";
+      if (templateId) {
+        // Templat mesti milik kelas ini sebelum dijadikan aktif.
+        const t = await s.db
+          .from("qm_certificate_templates")
+          .select("id")
+          .eq("id", templateId)
+          .eq("class_id", classId)
+          .maybeSingle();
+        semakRalat(t, "Semak templat");
+        if (!t.data) throw new Error("template_id bukan templat sijil kelas ini");
+        await panggilRpc(s, "qm_set_active_certificate_template", { p_template: templateId }, "Tetapkan templat aktif");
       }
       let ids: string[];
       if (Array.isArray(args.certificate_ids) && args.certificate_ids.length > 0) {
         ids = (args.certificate_ids as unknown[]).filter((x): x is string => typeof x === "string");
       } else {
-        const res = await s.db
+        // Tanpa id: hanya sijil templat AKTIF (atau templat yang baru diberi).
+        // Sijil templat lain (contoh Johan berbanding Penyertaan) tidak diikat
+        // semula secara senyap; beri certificate_ids untuk memindahkannya.
+        let aktifId = templateId;
+        if (!aktifId) {
+          const a = await s.db
+            .from("qm_certificate_templates")
+            .select("id")
+            .eq("class_id", classId)
+            .eq("is_active", true)
+            .maybeSingle();
+          semakRalat(a, "Templat aktif");
+          aktifId = (a.data as { id?: string } | null)?.id ?? "";
+          if (!aktifId) throw new Error("Kelas ini tiada templat sijil aktif");
+        }
+        const q = s.db
           .from("qm_certificates")
           .select("id")
           .eq("class_id", classId)
           .is("revoked_at", null);
+        const res = templateId ? await q : await q.eq("template_id", aktifId);
         semakRalat(res, "Senarai sijil");
         ids = ((res.data ?? []) as { id: string }[]).map((r) => r.id);
       }
       if (ids.length === 0) return { updated: 0, skipped: 0, failed: 0, note: "Tiada sijil aktif untuk dijana semula." };
       const jumlah = { updated: 0, skipped: 0, failed: 0 };
       for (let i = 0; i < ids.length; i += 50) {
-        const r = await callApi<{ updated?: number; skipped?: number; failed?: number }>(
-          s.accessToken,
-          `/api/classes/${classId}/certificates/regenerate`,
-          { method: "POST", body: { certificate_ids: ids.slice(i, i + 50) } }
-        );
-        jumlah.updated += r?.updated ?? 0;
-        jumlah.skipped += r?.skipped ?? 0;
-        jumlah.failed += r?.failed ?? 0;
+        try {
+          const r = await callApi<{ updated?: number; skipped?: number; failed?: number }>(
+            s.accessToken,
+            `/api/classes/${classId}/certificates/regenerate`,
+            { method: "POST", body: { certificate_ids: ids.slice(i, i + 50) } }
+          );
+          jumlah.updated += r?.updated ?? 0;
+          jumlah.skipped += r?.skipped ?? 0;
+          jumlah.failed += r?.failed ?? 0;
+        } catch (e) {
+          // Kekalkan kiraan separa dan id yang belum diproses (contoh had kadar).
+          return {
+            ...jumlah,
+            stopped_early: true,
+            error: e instanceof Error ? e.message : String(e),
+            remaining_ids: ids.slice(i),
+          };
+        }
       }
-      return { ...jumlah, ...(args.template_id ? { active_template_id: String(args.template_id).trim() } : {}) };
+      return { ...jumlah, ...(templateId ? { active_template_id: templateId } : {}) };
     },
   },
   {

@@ -1,9 +1,10 @@
 -- KZ-A.sql: ujian penerimaan nama sijil oleh pendidik (migrasi 0078).
 --
--- Jalankan pada pelayan SELEPAS 0078 dalam transaksi yang sama:
---   psql -v ON_ERROR_STOP=1 -f 0078_nama_sijil_pendidik.sql -f KZ-A.sql
--- Fail ini bermula dengan begin dan berakhir dengan rollback, jadi tiada
--- data ujian kekal. "KZ-A: SEMUA UJIAN LULUS" bermakna semua lulus.
+-- Ujian sebelum migrasi kekal: gabungkan fail supaya 0078 berada DI DALAM
+-- transaksi fail ini, contohnya:
+--   { echo 'begin;'; cat 0078_nama_sijil_pendidik.sql; sed '1,/^begin;$/d' KZ-A.sql; } | psql -v ON_ERROR_STOP=1
+-- Fail ini berakhir dengan rollback, jadi migrasi dan data ujian tidak
+-- kekal. "KZ-A: SEMUA UJIAN LULUS" bermakna semua lulus.
 
 begin;
 
@@ -144,6 +145,22 @@ begin
     raise exception 'UJIAN 5 GAGAL: scope salah diterima';
   exception when others then
     if sqlerrm not like 'scope must be%' then raise; end if;
+  end;
+end $u$;
+
+-- Ujian 5b: scope profile ditolak untuk akaun bukan peserta.
+reset role;
+insert into public.qm_class_members (class_id, user_id) values
+  ('00000000-0000-0000-0000-0000000a0c01', '00000000-0000-0000-0000-0000000a00e2');
+set local role authenticated;
+do $u$
+begin
+  begin
+    perform public.qm_set_member_certificate_name('00000000-0000-0000-0000-0000000a0c01',
+      '00000000-0000-0000-0000-0000000a00e2', 'Nama Godam Pendidik', 'profile');
+    raise exception 'UJIAN 5b GAGAL: profil pendidik ditukar';
+  exception when others then
+    if sqlerrm not like 'Profile names can only%' then raise; end if;
   end;
 end $u$;
 

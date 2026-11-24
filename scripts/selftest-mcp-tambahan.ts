@@ -91,7 +91,11 @@ function reset() {
   ops.length = 0;
   panggilan = [];
   balasFetch = { status: 200, payload: { ok: true } };
-  jawab = () => ({ data: [{ id: "x" }], error: null });
+  // maybeSingle/single memulangkan objek seperti klien sebenar (KZ-A).
+  jawab = (op) =>
+    op.chain.some((c) => c.m === "maybeSingle" || c.m === "single")
+      ? { data: { id: "x" }, error: null }
+      : { data: [{ id: "x" }], error: null };
 }
 
 /* ===== Bahagian 1: pendaftaran ===== */

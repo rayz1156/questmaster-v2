@@ -58,7 +58,8 @@ create policy p_class_cert_names_read on public.qm_class_certificate_names
   for select to authenticated
   using (public.qm_certificate_is_educator(class_id) or user_id = auth.uid());
 -- Tiada polisi tulis: tulisan hanya melalui qm_set_member_certificate_name.
-revoke insert, update, delete on public.qm_class_certificate_names from anon, authenticated;
+revoke all on public.qm_class_certificate_names from anon, authenticated;
+grant select on public.qm_class_certificate_names to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 3. Log audit nama
@@ -85,7 +86,8 @@ create policy p_cert_name_log_read on public.qm_certificate_name_log
     (class_id is not null and public.qm_certificate_is_educator(class_id))
     or public.qm_is_admin()
   );
-revoke insert, update, delete on public.qm_certificate_name_log from anon, authenticated;
+revoke all on public.qm_certificate_name_log from anon, authenticated;
+grant select on public.qm_certificate_name_log to authenticated;
 
 -- ---------------------------------------------------------------------
 -- 4. Tukar nama sijil
@@ -122,6 +124,14 @@ begin
      where m.class_id = p_class and m.user_id = p_user
   ) then
     raise exception 'Participant is not a member of this class.';
+  end if;
+  -- Semakan bebas KZ-A: nama profil hanya untuk akaun peserta. Pendidik atau
+  -- pentadbir yang menyertai kelas orang lain tidak boleh ditukar nama
+  -- globalnya (nama itu juga dicetak sebagai pengeluar sijil mereka).
+  if p_scope = 'profile' and not exists (
+    select 1 from public.qm_profiles p where p.id = p_user and p.role = 'participant'
+  ) then
+    raise exception 'Profile names can only be changed for participant accounts. Use scope certificate.';
   end if;
 
   -- Nama lama berkesan untuk kelas ini (susunan sama dengan pengeluaran).

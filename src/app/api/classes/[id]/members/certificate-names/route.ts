@@ -16,7 +16,6 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
-import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import { amaranNama, janaSemulaIkutTemplat } from '@/lib/sijil/namaSijil';
@@ -41,12 +40,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
 
   const { data: klass } = await supa
     .from('qm_classes')
-    .select('id, owner_id')
+    .select('id')
     .eq('id', classId)
     .maybeSingle();
   if (!klass) return ralatJson('Not found', 404);
-  const ok = klass.owner_id === user!.id || (await semakPendidikKelas(supa, classId, user!.id));
-  if (!ok) return ralatJson('Forbidden', 403);
+  // Semakan bebas KZ-A: satu semakan yang sama dengan RPC tulis
+  // (qm_certificate_is_educator: pemilik atau pendidik diterima), ditambah
+  // akaun tidak digantung, supaya dry run dan confirm konsisten.
+  const { data: prof } = await supa.from('qm_profiles').select('suspended').eq('id', user!.id).maybeSingle();
+  const { data: pendidik } = await supa.rpc('qm_certificate_is_educator', { p_class: classId });
+  if (!prof || prof.suspended || pendidik !== true) return ralatJson('Forbidden', 403);
 
   if (!dalamHad(`cert-names:${user!.id}`, 20)) {
     return ralatJson('Too many requests. Please wait a minute and try again.', 429, { retry_after_seconds: 60 });

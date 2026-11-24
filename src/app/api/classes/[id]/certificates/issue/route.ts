@@ -117,7 +117,26 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // ------------------------------------------------------------------
   // Pengeluaran: fungsi SQL menyemak semula kebenaran dan kelayakan.
   // ------------------------------------------------------------------
+  // Semakan bebas KZ-A: sahkan semua override ahli kelas DAHULU, supaya
+  // tiada nama disimpan bila satu override tidak sah.
+  if (overrides.size > 0) {
+    const { data: ahliOverride, error: ahliErr } = await auth.supa
+      .from('qm_class_members')
+      .select('user_id')
+      .eq('class_id', classId)
+      .in('user_id', Array.from(overrides.keys()));
+    if (ahliErr) return ralatJson(ahliErr.message, 500);
+    const sah = new Set((ahliOverride ?? []).map((r: { user_id: string }) => r.user_id));
+    const bukanAhli = Array.from(overrides.keys()).filter((pid) => !sah.has(pid));
+    if (bukanAhli.length > 0) {
+      return ralatJson('Some name overrides are not members of this class. Nothing was saved or issued.', 400, {
+        not_members: bukanAhli,
+      });
+    }
+  }
+
   const gagalNama: { participant_id: string; error: string }[] = [];
+  const disimpan: string[] = [];
   const idJanaSemula: string[] = [];
   for (const [pid, nm] of Array.from(overrides.entries())) {
     const { data: hasilNama, error } = await auth.supa.rpc('qm_set_member_certificate_name', {
@@ -130,12 +149,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       gagalNama.push({ participant_id: pid, error: error.message });
       continue;
     }
+    disimpan.push(pid);
     const baris = Array.isArray(hasilNama) ? hasilNama[0] : hasilNama;
     for (const id of (baris?.certificate_ids ?? []) as string[]) idJanaSemula.push(id);
   }
   if (gagalNama.length > 0) {
+    // Nama yang sudah disimpan kekal; PDF sijil sedia ada mereka dijana semula
+    // supaya PDF dan halaman pengesahan tidak bercanggah.
+    const pdfSebahagian = idJanaSemula.length > 0
+      ? await janaSemulaIkutTemplat(getServiceSupabase(), classId, idJanaSemula)
+      : null;
     return ralatJson('Some name overrides could not be saved. No certificates were issued.', 400, {
       name_override_errors: gagalNama,
+      names_saved: disimpan,
+      ...(pdfSebahagian ? { renamed_regenerated: pdfSebahagian.regenerated } : {}),
     });
   }
 
