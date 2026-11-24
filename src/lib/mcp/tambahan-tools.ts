@@ -1613,6 +1613,7 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
         consent_confirmed: { type: "boolean", description: "Wajib true untuk penghantaran sebenar" },
         confirm: { type: "boolean", description: "true untuk menghantar; tanpa ini dry run" },
         force_resync: { type: "boolean", default: false },
+        resync_since: { type: "string", description: "Untuk menyambung force_resync: nilai resync_since daripada respons sebelum" },
       },
       required: ["class_ids"],
     },
@@ -1630,6 +1631,7 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
           consent_confirmed: args.consent_confirmed === true,
           confirm: args.confirm === true,
           force_resync: args.force_resync === true,
+          ...(typeof args.resync_since === "string" ? { resync_since: args.resync_since } : {}),
         },
       });
     },

@@ -50,6 +50,11 @@ export async function POST(req: NextRequest) {
   const confirm = body.confirm === true;
   const consent = body.consent_confirmed === true;
   const force = body.force_resync === true;
+  // force_resync disambung: resync_since daripada panggilan pertama.
+  const resyncSinceMasuk = typeof body.resync_since === 'string' && !Number.isNaN(Date.parse(body.resync_since))
+    ? new Date(body.resync_since).toISOString()
+    : null;
+  const resyncSince = force ? (resyncSinceMasuk ?? new Date(mula - 1000).toISOString()) : undefined;
   const statusSah: StatusKelas[] = ['active', 'ended', 'archived'];
   const include: StatusKelas[] = Array.isArray(body.include_status)
     ? (body.include_status as unknown[]).filter((s): s is StatusKelas => statusSah.includes(s as StatusKelas))
@@ -154,7 +159,7 @@ export async function POST(req: NextRequest) {
   let logGagal = false;
   for (const k of kelas) {
     if (Date.now() - mula > BAJET_MS || jumlahKenalan >= HAD_KENALAN) break;
-    const r = await rancangKelas(svc, user.id, k, force);
+    const r = await rancangKelas(svc, user.id, k, force, resyncSince);
     const h = await hantarKelas(svc, penyedia, kunci, user.id, r, user.id, 'mcp', {
       tamatPada: mula + BAJET_MS,
       hadKenalan: HAD_KENALAN - jumlahKenalan,
@@ -166,7 +171,7 @@ export async function POST(req: NextRequest) {
     } else {
       diproses += 1;
     }
-    if (r.to_send > 0) {
+    if (h.sent + h.failed > 0) {
       // Log agregat lama supaya paparan "last sync" UI kekal tepat.
       await svc.from('qm_email_sync_log').insert({
         owner_id: user.id,
@@ -208,7 +213,9 @@ export async function POST(req: NextRequest) {
     ...(diproses < kelas.length
       ? {
           remaining_class_ids: kelas.slice(diproses).map((k) => k.id),
-          note: 'Call again with remaining_class_ids and the same include_status; already-sent participants are skipped.',
+          note: 'Call again with remaining_class_ids and the same include_status' +
+            (force ? ', force_resync and resync_since' : '') + '; already-sent participants are skipped.',
+          ...(force ? { resync_since: resyncSince } : {}),
         }
       : {}),
     ...(separuh ? { partial: true } : {}),

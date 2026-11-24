@@ -29,20 +29,17 @@ async function bacaBendera(): Promise<BenderaUi> {
 }
 
 async function bacaBenderaPengguna(uid: string): Promise<BenderaUi> {
-  try {
-    const session = { user: { id: uid } };
-    const { data } = await supabase
-      .from("qm_profiles")
-      .select("ui_hide_encharge, ui_hide_certificates")
-      .eq("id", session.user.id)
-      .maybeSingle();
-    return {
-      hideEncharge: data?.ui_hide_encharge === true,
-      hideCertificates: data?.ui_hide_certificates === true,
-    };
-  } catch {
-    return LALAI;
-  }
+  // Ralat dibaling (bukan LALAI) supaya cache dibuang dan dicuba semula.
+  const { data, error } = await supabase
+    .from("qm_profiles")
+    .select("ui_hide_encharge, ui_hide_certificates")
+    .eq("id", uid)
+    .maybeSingle();
+  if (error) throw error;
+  return {
+    hideEncharge: data?.ui_hide_encharge === true,
+    hideCertificates: data?.ui_hide_certificates === true,
+  };
 }
 
 export function useBenderaUi(): BenderaUi {

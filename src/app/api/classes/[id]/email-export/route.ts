@@ -216,7 +216,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   // KZ-D: log per peserta supaya connector tidak menghantar semula.
   // Kejayaan sentiasa ditulis; kegagalan tidak menurunkan 'sent' sedia ada.
   if (hasil.results && hasil.results.length === contacts.length) {
-    const setSudah = await emelSudahDihantar(svc, user.id, params.id).catch(() => new Set<string>());
+    // Bacaan gagal: anggap semua sudah dihantar supaya kegagalan tidak
+    // menurunkan baris 'sent' (hanya kejayaan ditulis).
+    const setSudah = await emelSudahDihantar(svc, user.id, params.id).catch(
+      () => new Set<string>(hasil.results!.map((r) => r.email.trim().toLowerCase())),
+    );
     const barisLog = hasil.results
       .map((r, i) => ({
         owner_id: user.id,

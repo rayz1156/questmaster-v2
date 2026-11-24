@@ -55,7 +55,9 @@ export async function pesertaKelas(svc: SupabaseClient, classId: string): Promis
  * E-mel yang sudah 'sent' untuk pemilik dan kelas ini. Dibaca berhalaman
  * (1000 baris setiap halaman) kerana PostgREST mengehadkan baris balasan.
  */
-export async function emelSudahDihantar(svc: SupabaseClient, ownerId: string, classId: string): Promise<Set<string>> {
+// sejak (pilihan): hanya baris synced_at >= sejak, untuk force_resync yang
+// disambung merentas panggilan.
+export async function emelSudahDihantar(svc: SupabaseClient, ownerId: string, classId: string, sejak?: string): Promise<Set<string>> {
   const hasil = new Set<string>();
   for (let dari = 0; ; dari += 1000) {
     const { data, error } = await svc
@@ -64,6 +66,7 @@ export async function emelSudahDihantar(svc: SupabaseClient, ownerId: string, cl
       .eq('owner_id', ownerId)
       .eq('class_id', classId)
       .eq('status', 'sent')
+      .gte('synced_at', sejak ?? '1970-01-01T00:00:00Z')
       .order('email', { ascending: true })
       .range(dari, dari + 999);
     if (error) throw new Error(`Could not read the Encharge sync log: ${error.message}`);
@@ -90,9 +93,14 @@ export async function rancangKelas(
   ownerId: string,
   k: { id: string; name: string; ended_at: string | null; is_archived: boolean | null },
   forceResync: boolean,
+  resyncSince?: string,
 ): Promise<RancanganKelas> {
   const peserta = await pesertaKelas(svc, k.id);
-  const sudah = forceResync ? new Set<string>() : await emelSudahDihantar(svc, ownerId, k.id);
+  // force_resync: hanya yang sudah dihantar SEMULA dalam pusingan resync ini
+  // (synced_at >= resyncSince) dilangkau, supaya panggilan sambungan maju.
+  const sudah = forceResync
+    ? resyncSince ? await emelSudahDihantar(svc, ownerId, k.id, resyncSince) : new Set<string>()
+    : await emelSudahDihantar(svc, ownerId, k.id);
   const adaEmel = peserta.filter((p) => !!p.email);
   const dilangkau = adaEmel.filter((p) => sudah.has(p.email as string));
   const hantar = adaEmel.filter((p) => !sudah.has(p.email as string));
