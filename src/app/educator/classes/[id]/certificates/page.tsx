@@ -753,6 +753,9 @@ export default function CertificatesPage() {
       let jumlahSent = 0;
       let jumlahGagal = 0;
       let jumlahTanpaLampiran = 0;
+      // KZ-C: e-mel kini melalui baris gilir; yang belum selesai dipaparkan.
+      let jumlahMenunggu = 0;
+      let anggaranSaat = 0;
       let ralatPertama: string | undefined;
       for (let pusingan = 0; pusingan < kelompok.length; pusingan++) {
         const senaraiIds = kelompok[pusingan];
@@ -771,6 +774,8 @@ export default function CertificatesPage() {
         jumlahSent += j.sent ?? 0;
         jumlahGagal += gagal.length;
         jumlahTanpaLampiran += j.no_attachment ?? 0;
+        jumlahMenunggu += j.pending ?? 0;
+        anggaranSaat = Math.max(anggaranSaat, j.estimated_seconds ?? 0);
         ralatPertama = ralatPertama ?? gagal[0]?.error;
         // Kemajuan semasa gelung kelompok; diganti oleh mesej akhir.
         setMsg(t("certificates.classPage.sending", { n: jumlahSent }));
@@ -784,6 +789,9 @@ export default function CertificatesPage() {
         t("certificates.classPage.emailsSent", { hantar: jumlahSent, gagal: jumlahGagal }) +
           (jumlahTanpaLampiran > 0
             ? ` ${t("certificates.classPage.emailsNoPdf", { n: jumlahTanpaLampiran })}`
+            : "") +
+          (jumlahMenunggu > 0
+            ? ` ${t("certificates.classPage.emailsQueued", { n: jumlahMenunggu, saat: anggaranSaat })}`
             : "") +
           (ralatPertama ? ` ${ralatPertama}` : ""),
       );

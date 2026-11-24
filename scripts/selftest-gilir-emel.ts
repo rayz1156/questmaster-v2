@@ -26,7 +26,7 @@ semak("maksimum 5 cubaan", MAX_CUBAAN === 5);
 delete process.env.EMAIL_MAX_PER_SECOND;
 semak("kadar lalai 1", kadarSesaat() === 1);
 process.env.EMAIL_MAX_PER_SECOND = "5";
-semak("kadar diapit 2", kadarSesaat() === 2);
+semak("kadar diapit 1.5", kadarSesaat() === 1.5);
 process.env.EMAIL_MAX_PER_SECOND = "abc";
 semak("kadar tidak sah jadi 1", kadarSesaat() === 1);
 

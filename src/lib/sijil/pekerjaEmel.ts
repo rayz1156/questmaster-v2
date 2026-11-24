@@ -6,12 +6,13 @@
  * BREVO_SMTP_*. Had Emailit: 2 mesej sesaat bagi setiap akaun; melebihinya
  * memulangkan "452 4.4.5 Messages per second limit exceeded (2/2)".
  * Pekerja ini menghantar satu demi satu dengan kadar EMAIL_MAX_PER_SECOND
- * (lalai 1, maksimum 2) supaya kekal di bawah had itu.
+ * (lalai 1, maksimum 1.5) supaya kekal di bawah had itu walaupun masa
+ * terima di penyedia berhimpit.
  *
  * Cubaan semula:
  *   - sementara: SMTP 4xx (421, 450, 451, 452, ...), HTTP 429/5xx, dan
  *     ralat rangkaian (ETIMEDOUT, ECONNECTION, ESOCKET, ECONNRESET, EDNS).
- *     Backoff eksponen dengan jitter: kira-kira 2s, 4s, 8s, 16s, 32s.
+ *     Backoff eksponen dengan jitter antara cubaan: kira-kira 2s, 4s, 8s, 16s.
  *   - kekal: SMTP 5xx (contoh alamat tidak wujud) dan ralat lain: 'failed'
  *     serta-merta tanpa cubaan semula.
  *   - paling banyak MAX_CUBAAN (5) cubaan.
@@ -32,11 +33,16 @@ import { formatTarikhBm } from '@/lib/sijil/janaPdf';
 
 export const MAX_CUBAAN = 5;
 
-/** Kadar maksimum sesaat daripada EMAIL_MAX_PER_SECOND, diapit 0.1 hingga 2. */
+/** Kadar maksimum sesaat daripada EMAIL_MAX_PER_SECOND, diapit 0.1 hingga 1.5. */
 export function kadarSesaat(): number {
   const n = Number(process.env.EMAIL_MAX_PER_SECOND ?? '1');
   if (!Number.isFinite(n) || n <= 0) return 1;
-  return Math.min(2, Math.max(0.1, n));
+  return Math.min(1.5, Math.max(0.1, n));
+}
+
+/** Ralat pangkalan data atau GoTrue yang sementara: sentiasa dicuba semula. */
+function ralatSementara(mesej: string): Error {
+  return Object.assign(new Error(mesej), { code: 'ECONNRESET' });
 }
 
 export type JenisRalat = 'sementara' | 'kekal';
@@ -145,15 +151,17 @@ function dapatkanPengangkut(): { t: Transporter; dari: string } | null {
 const RE_EMEL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
 
 /** Hantar satu baris. Membaling ralat untuk dikelaskan oleh pemanggil. */
-async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<'sent' | 'cancelled'> {
-  const { data: sijil } = await svc
+async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<{ hasil: 'sent' | 'cancelled'; lampiran: boolean }> {
+  const { data: sijil, error: sijilErr } = await svc
     .from('qm_certificates')
     .select('id, code, class_id, template_id, participant_id, name_snapshot, program_snapshot, issued_at, pdf_path, revoked_at')
     .eq('id', b.certificate_id)
     .maybeSingle();
-  if (!sijil || sijil.revoked_at || sijil.class_id !== b.class_id) return 'cancelled';
+  if (sijilErr) throw ralatSementara(`Certificate lookup failed: ${sijilErr.message}`);
+  if (!sijil || sijil.revoked_at || sijil.class_id !== b.class_id) return { hasil: 'cancelled', lampiran: false };
 
-  const { data: pengguna } = await svc.auth.admin.getUserById(String(sijil.participant_id));
+  const { data: pengguna, error: penggunaErr } = await svc.auth.admin.getUserById(String(sijil.participant_id));
+  if (penggunaErr && penggunaErr.status !== 404) throw ralatSementara(`User lookup failed: ${penggunaErr.message}`);
   const emel = pengguna?.user?.email ?? '';
   if (!emel || !RE_EMEL.test(emel)) {
     const e = new Error('No valid email address for this participant.') as Error & { responseCode?: number };
@@ -252,31 +260,50 @@ async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<'sent' |
     attachments: lampiran ? [lampiran] : undefined,
   });
 
-  await svc
-    .from('qm_certificates')
-    .update({ emailed_at: new Date().toISOString() })
-    .eq('id', b.certificate_id)
-    .is('revoked_at', null);
-  return 'sent';
+  return { hasil: 'sent', lampiran: !!lampiran };
+}
+
+/** Kemas kini baris gilir dengan cubaan semula (ralat rangkaian sekejap). */
+async function denganUlang(fn: () => PromiseLike<{ error: { message: string } | null }>, apa: string): Promise<void> {
+  for (let i = 0; i < 4; i += 1) {
+    const { error } = await fn();
+    if (!error) return;
+    if (i === 3) {
+      console.error(`[emel-sijil] ${apa} gagal: ${error.message}`);
+      return;
+    }
+    await tidur(500 * (i + 1));
+  }
 }
 
 const tidur = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-type KeadaanPekerja = { berjalan: boolean };
+// bangun: ditetapkan bila kerja baharu masuk semasa pekerja sedang berjalan,
+// supaya pekerja tidak berhenti sejurus selepas semakan "tiada kerja" yang
+// dibuat sebelum sisipan baharu di-commit (semakan bebas KZ-C S1).
+type KeadaanPekerja = { berjalan: boolean; bangun: boolean };
 const g = globalThis as unknown as { __kzPekerjaEmel?: KeadaanPekerja };
 
 /** Mulakan pekerja jika belum berjalan dalam proses ini. Tidak menunggu. */
 export function mulaPekerja(): void {
-  if (!g.__kzPekerjaEmel) g.__kzPekerjaEmel = { berjalan: false };
+  if (!g.__kzPekerjaEmel) g.__kzPekerjaEmel = { berjalan: false, bangun: false };
   const k = g.__kzPekerjaEmel;
-  if (k.berjalan) return;
+  if (k.berjalan) {
+    k.bangun = true;
+    return;
+  }
   k.berjalan = true;
-  void gelung().finally(() => {
-    k.berjalan = false;
-  });
+  k.bangun = false;
+  void gelung(k)
+    .catch((e) => console.error('[emel-sijil] pekerja berhenti kerana ralat:', e))
+    .finally(() => {
+      k.berjalan = false;
+      // Kerja masuk semasa pekerja menamatkan diri: mulakan semula.
+      if (k.bangun) mulaPekerja();
+    });
 }
 
-async function gelung(): Promise<void> {
+async function gelung(k: KeadaanPekerja): Promise<void> {
   const svc = getServiceSupabase();
   const selang = Math.ceil(1000 / kadarSesaat());
   let hantarTerakhir = 0;
@@ -297,7 +324,13 @@ async function gelung(): Promise<void> {
         .in('status', ['queued', 'retrying'])
         .order('next_attempt_at', { ascending: true })
         .limit(1);
-      if (!tunggu || tunggu.length === 0) return;
+      if (!tunggu || tunggu.length === 0) {
+        if (k.bangun) {
+          k.bangun = false;
+          continue;
+        }
+        return;
+      }
       const ms = new Date(String(tunggu[0].next_attempt_at)).getTime() - Date.now();
       await tidur(Math.min(30_000, Math.max(500, ms)));
       continue;
@@ -308,33 +341,50 @@ async function gelung(): Promise<void> {
       const tunggu = hantarTerakhir + selang - Date.now();
       if (tunggu > 0) await tidur(tunggu);
       hantarTerakhir = Date.now();
+      let keputusan: { hasil: 'sent' | 'cancelled'; lampiran: boolean };
       try {
-        const hasil = await hantarBaris(svc, b);
-        await svc
-          .from('qm_certificate_email_queue')
-          .update({
-            status: hasil,
-            sent_at: hasil === 'sent' ? new Date().toISOString() : null,
-            last_error: hasil === 'cancelled' ? 'Certificate revoked or not found.' : null,
-            locked_at: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', b.id);
+        keputusan = await hantarBaris(svc, b);
       } catch (e) {
         const mesej = (e instanceof Error ? e.message : String(e)).slice(0, 500);
         const jenis = kelaskanRalat(e);
         const ulang = jenis === 'sementara' && b.attempts < MAX_CUBAAN;
-        await svc
-          .from('qm_certificate_email_queue')
-          .update({
-            status: ulang ? 'retrying' : 'failed',
-            last_error: `${jenis === 'sementara' ? '[sementara]' : '[kekal]'} ${mesej}`,
-            next_attempt_at: new Date(Date.now() + (ulang ? tundaMs(b.attempts) : 0)).toISOString(),
-            locked_at: null,
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', b.id);
+        await denganUlang(
+          () =>
+            svc
+              .from('qm_certificate_email_queue')
+              .update({
+                status: ulang ? 'retrying' : 'failed',
+                last_error: `${jenis === 'sementara' ? '[sementara]' : '[kekal]'} ${mesej}`,
+                next_attempt_at: new Date(Date.now() + (ulang ? tundaMs(b.attempts) : 0)).toISOString(),
+                locked_at: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', b.id),
+          'kemas kini ralat baris gilir',
+        );
         if (jenis === 'sementara') console.warn(`[emel-sijil] ${b.certificate_id} cubaan ${b.attempts}: ${mesej}`);
+        continue;
+      }
+      if (keputusan.hasil === 'sent') {
+        // Baris gilir 'sent' dan emailed_at dalam satu transaksi (S3).
+        await denganUlang(
+          () => svc.rpc('qm_mark_certificate_email_sent', { p_queue: b.id, p_had_attachment: keputusan.lampiran }),
+          'tanda dihantar',
+        );
+      } else {
+        await denganUlang(
+          () =>
+            svc
+              .from('qm_certificate_email_queue')
+              .update({
+                status: 'cancelled',
+                last_error: 'Certificate revoked or not found.',
+                locked_at: null,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', b.id),
+          'tanda dibatalkan',
+        );
       }
     }
   }

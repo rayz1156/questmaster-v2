@@ -1977,6 +1977,7 @@ export const en = {
       sending: 'Sending... {n} sent so far.',
       emailsSent: 'Emails sent: {hantar}. Failed: {gagal}.',
       emailsNoPdf: '{n} sent without the PDF attached (file missing or too large).',
+      emailsQueued: '{n} more are queued and will be sent in the background (about {saat} s).',
       updateDesignTitle: 'Update certificate design',
       updateDesignDescOne: 'Regenerate {n} certificate PDF with the active template "{templat}"? Codes and names stay the same. Use Resend afterwards to email the new PDF.',
       updateDesignDescOther: 'Regenerate {n} certificate PDFs with the active template "{templat}"? Codes and names stay the same. Use Resend afterwards to email the new PDF.',

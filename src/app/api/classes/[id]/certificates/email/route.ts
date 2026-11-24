@@ -173,7 +173,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     const siap = await tungguSelesai(svc, dimasukkan.map((d) => d.id), HAD_TUNGGU_MS);
     const { data: hasil } = await svc
       .from('qm_certificate_email_queue')
-      .select('id, certificate_id, status, last_error, attempts')
+      .select('id, certificate_id, status, last_error, attempts, had_attachment')
       .in('id', dimasukkan.map((d) => d.id));
     const senarai = hasil ?? [];
     respons.completed = siap;
@@ -185,11 +185,13 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ...skipped.map((s) => ({ certificate_id: s.certificate_id, error: s.reason })),
     ];
     respons.pending = senarai.filter((r) => !['sent', 'failed', 'cancelled'].includes(String(r.status))).length;
+    respons.no_attachment = senarai.filter((r) => r.status === 'sent' && r.had_attachment === false).length;
   } else {
     respons.sent = 0;
     respons.failed = skipped.map((s) => ({ certificate_id: s.certificate_id, error: s.reason }));
     respons.pending = dimasukkan.length;
+    respons.no_attachment = 0;
   }
-  respons.no_attachment = 0;
+
   return NextResponse.json(respons);
 }

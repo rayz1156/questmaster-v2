@@ -85,8 +85,19 @@ begin
   end if;
 end $u$;
 
--- Ujian 4: selepas 'sent', baris aktif baharu untuk sijil itu dibenarkan (resend).
-update public.qm_certificate_email_queue set status = 'sent', sent_at = now() where idempotency_key = 'kzc:1:a';
+-- Ujian 4: qm_mark_certificate_email_sent menanda baris dan emailed_at bersama;
+-- selepas 'sent', baris aktif baharu untuk sijil itu dibenarkan (resend).
+do $u$
+declare v_id uuid; v_status text; v_lampiran boolean; v_emel timestamptz;
+begin
+  select id into v_id from public.qm_certificate_email_queue where idempotency_key = 'kzc:1:a';
+  perform public.qm_mark_certificate_email_sent(v_id, false);
+  select status, had_attachment into v_status, v_lampiran from public.qm_certificate_email_queue where id = v_id;
+  select emailed_at into v_emel from public.qm_certificates where id = '00000000-0000-0000-0000-0000000c0e01';
+  if v_status <> 'sent' or v_lampiran is distinct from false or v_emel is null then
+    raise exception 'UJIAN 4 GAGAL: % % %', v_status, v_lampiran, v_emel;
+  end if;
+end $u$;
 insert into public.qm_certificate_email_queue (certificate_id, class_id, idempotency_key)
 values ('00000000-0000-0000-0000-0000000c0e01', '00000000-0000-0000-0000-0000000c0c01', 'kzc:1:resend');
 
@@ -106,6 +117,11 @@ begin
   begin
     perform public.qm_claim_certificate_emails(1);
     raise exception 'UJIAN 5 GAGAL: claim dibenarkan untuk authenticated';
+  exception when insufficient_privilege then null;
+  end;
+  begin
+    perform public.qm_mark_certificate_email_sent(gen_random_uuid(), true);
+    raise exception 'UJIAN 5 GAGAL: mark dibenarkan untuk authenticated';
   exception when insufficient_privilege then null;
   end;
   perform set_config('request.jwt.claims', '{"sub": "00000000-0000-0000-0000-0000000c00e2", "role": "authenticated"}', true);

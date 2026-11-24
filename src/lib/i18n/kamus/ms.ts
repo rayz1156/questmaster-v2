@@ -1940,6 +1940,7 @@ export const ms: Kamus = {
       sending: 'Menghantar... {n} dihantar setakat ini.',
       emailsSent: 'Emel dihantar: {hantar}. Gagal: {gagal}.',
       emailsNoPdf: '{n} dihantar tanpa PDF dilampirkan (fail hilang atau terlalu besar).',
+      emailsQueued: '{n} lagi dalam baris gilir dan akan dihantar di latar (kira-kira {saat} saat).',
       updateDesignTitle: 'Kemas kini reka bentuk sijil',
       updateDesignDescOne: 'Jana semula {n} PDF sijil dengan templat aktif "{templat}"? Kod dan nama kekal sama. Guna Hantar semula selepas itu untuk mengemel PDF baharu.',
       updateDesignDescOther: 'Jana semula {n} PDF sijil dengan templat aktif "{templat}"? Kod dan nama kekal sama. Guna Hantar semula selepas itu untuk mengemel PDF baharu.',

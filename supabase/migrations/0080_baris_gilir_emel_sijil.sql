@@ -30,6 +30,7 @@ create table if not exists public.qm_certificate_email_queue (
   next_attempt_at  timestamptz not null default now(),
   locked_at        timestamptz,
   sent_at          timestamptz,
+  had_attachment   boolean,
   subject_override text check (subject_override is null or char_length(subject_override) <= 200),
   body_override    text check (body_override is null or char_length(body_override) <= 8000),
   created_at       timestamptz not null default now(),
@@ -94,5 +95,40 @@ $fn$;
 
 revoke all on function public.qm_claim_certificate_emails(int) from public, anon, authenticated;
 grant execute on function public.qm_claim_certificate_emails(int) to service_role;
+
+-- Tanda berjaya dalam SATU transaksi: baris gilir 'sent' dan emailed_at
+-- sijil, supaya kegagalan separa tidak menyebabkan penghantaran berganda
+-- (baris tertinggal 'sending' dipulihkan, atau sijil tanpa emailed_at
+-- dipilih semula oleh "Email all unsent"). Pelayan sahaja.
+create or replace function public.qm_mark_certificate_email_sent(p_queue uuid, p_had_attachment boolean)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $fn$
+declare
+  v_cert uuid;
+begin
+  update public.qm_certificate_email_queue q
+     set status = 'sent',
+         sent_at = now(),
+         had_attachment = p_had_attachment,
+         last_error = null,
+         locked_at = null,
+         updated_at = now()
+   where q.id = p_queue
+  returning q.certificate_id into v_cert;
+  if v_cert is null then
+    raise exception 'Queue row not found.';
+  end if;
+  update public.qm_certificates c
+     set emailed_at = now()
+   where c.id = v_cert
+     and c.revoked_at is null;
+end;
+$fn$;
+
+revoke all on function public.qm_mark_certificate_email_sent(uuid, boolean) from public, anon, authenticated;
+grant execute on function public.qm_mark_certificate_email_sent(uuid, boolean) to service_role;
 
 notify pgrst, 'reload schema';
