@@ -15,6 +15,7 @@
  * menu akaun, log keluar, Help dan keadaan aktif `match` semuanya kekal.
  */
 
+import { useBenderaUi } from "@/lib/benderaUi";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -109,7 +110,11 @@ export default function Shell({
   // Bar sisi desktop boleh dikecilkan kepada lajur ikon (seperti ChatGPT/Claude).
   const [kecil, togolKecil] = useBarSisiKecil();
   // KZ-022d: Intro Board dan Learning Board kelas semasa untuk menu pendidik.
-  const tabsPenuh = useTabPapanPendidik(tabs);
+  // KZ-D: menu Certificates pendidik disembunyikan bila ui_hide_certificates aktif.
+  const { hideCertificates } = useBenderaUi();
+  const tabsPenuh = useTabPapanPendidik(tabs).filter(
+    (t) => !hideCertificates || t.href !== "/educator/certificates",
+  );
 
   useEffect(() => {
     let cancelled = false;

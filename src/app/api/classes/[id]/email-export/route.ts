@@ -169,9 +169,9 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     }
   }
 
-  // Kenalan untuk penyedia.
-  const contacts: EmailProviderContact[] = pesertaIds
-    .filter((uid) => !!emelMap.get(uid))
+  // Kenalan untuk penyedia. idKenalan selari dengan contacts (KZ-D log).
+  const idKenalan = pesertaIds.filter((uid) => !!emelMap.get(uid));
+  const contacts: EmailProviderContact[] = idKenalan
     .map((uid) => {
       const { firstName, lastName } = splitName(namaMap.get(uid) || "");
       return { email: emelMap.get(uid) as string, firstName, lastName, tags };
@@ -211,6 +211,35 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       .update({ last_sync_at: now, updated_at: now })
       .eq("owner_id", user.id),
   ]);
+
+  // KZ-D: log per peserta supaya connector tidak menghantar semula.
+  // Kejayaan sentiasa ditulis; kegagalan tidak menurunkan 'sent' sedia ada.
+  if (hasil.results && hasil.results.length === contacts.length) {
+    const { data: sudah } = await svc
+      .from("qm_encharge_sync_log")
+      .select("email")
+      .eq("owner_id", user.id)
+      .eq("class_id", params.id)
+      .eq("status", "sent");
+    const setSudah = new Set((sudah || []).map((r: { email: string }) => r.email));
+    const barisLog = hasil.results
+      .map((r, i) => ({
+        owner_id: user.id,
+        class_id: params.id,
+        participant_id: idKenalan[i],
+        email: r.email.trim().toLowerCase(),
+        tags,
+        status: r.ok ? "sent" : "failed",
+        encharge_response: { http_status: r.status },
+        consent_confirmed_by: user.id,
+        source: "ui",
+        synced_at: now,
+      }))
+      .filter((b) => b.status === "sent" || !setSudah.has(b.email));
+    for (let i = 0; i < barisLog.length; i += 500) {
+      await svc.from("qm_encharge_sync_log").upsert(barisLog.slice(i, i + 500), { onConflict: "owner_id,class_id,email" });
+    }
+  }
 
   // Maksimum 5 ralat; mesej penyedia tidak mengandungi e-mel penuh mahupun kunci.
   return NextResponse.json({

@@ -25,6 +25,7 @@
  * laluan yang sama seperti sebelum ini.
  */
 
+import { useBenderaUi } from "@/lib/benderaUi";
 import { useEffect, useState } from "react";
 import { Copy, Check, UserPlus } from "lucide-react";
 import { getClass, type Klass } from "@/lib/data";
@@ -86,7 +87,11 @@ export default function ClassShell({
     { key: "peer-review", label: t("kelas.peerReview"), kunci: "kelas.peerReview", href: `/educator/classes/${classId}/peer-review` },
   ];
   // Tab Peer review disembunyikan bersama ciri (src/lib/ciriPaparan.ts).
-  const tabs = semuaTab.filter((t) => PAPAR_PENILAIAN_RAKAN || t.key !== "peer-review");
+  // KZ-D: tab Certificates disembunyikan bila bendera ui_hide_certificates aktif.
+  const { hideCertificates } = useBenderaUi();
+  const tabs = semuaTab
+    .filter((t) => PAPAR_PENILAIAN_RAKAN || t.key !== "peer-review")
+    .filter((t) => !hideCertificates || t.key !== "certificates");
 
   const copyCode = async () => {
     if (!klass?.join_code) return;

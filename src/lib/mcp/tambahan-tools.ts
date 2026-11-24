@@ -1588,6 +1588,86 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
       );
     },
   },
+  // === Encharge dan bendera UI (KZ-D) ===
+  {
+    name: "send_to_encharge",
+    title: "Hantar peserta ke Encharge",
+    description:
+      "Hantar peserta kelas ke Encharge dengan tag kuizen dan kuizen-<slug-kelas> (sama seperti butang UI). " +
+      "class_ids: senarai UUID kelas atau \"all\" (semua kelas anda). include_status lalai [\"active\",\"ended\"]. " +
+      "Tanpa confirm: true, pulangkan dry run bagi setiap kelas (jumlah peserta, akan dihantar, dilangkau kerana " +
+      "sudah dihantar, tanpa e-mel, tag). Penghantaran sebenar memerlukan confirm: true DAN consent_confirmed: true " +
+      "(pengesahan bahawa peserta bersetuju menerima e-mel daripada anda). Kenalan sedia ada dikemas kini (upsert), " +
+      "peserta yang sudah dihantar dilangkau kecuali force_resync: true. Jika remaining_class_ids dipulangkan, " +
+      "panggil semula dengan senarai itu.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_ids: {
+          description: "Senarai UUID kelas, atau rentetan \"all\"",
+          anyOf: [{ type: "array", items: { type: "string" }, maxItems: 200 }, { type: "string", enum: ["all"] }],
+        },
+        include_status: { type: "array", items: { type: "string", enum: ["active", "ended", "archived"] } },
+        consent_confirmed: { type: "boolean", description: "Wajib true untuk penghantaran sebenar" },
+        confirm: { type: "boolean", description: "true untuk menghantar; tanpa ini dry run" },
+        force_resync: { type: "boolean", default: false },
+      },
+      required: ["class_ids"],
+    },
+    handler: async (args, s) => {
+      const classIds = args.class_ids === "all" ? "all" : Array.isArray(args.class_ids) ? args.class_ids : null;
+      if (!classIds) throw new Error("class_ids mesti senarai UUID kelas atau \"all\"");
+      if (args.confirm === true && args.consent_confirmed !== true) {
+        throw new Error("consent_confirmed: true wajib untuk menghantar ke Encharge");
+      }
+      return callApi(s.accessToken, "/api/encharge/sync", {
+        method: "POST",
+        body: {
+          class_ids: classIds,
+          ...(Array.isArray(args.include_status) ? { include_status: args.include_status } : {}),
+          consent_confirmed: args.consent_confirmed === true,
+          confirm: args.confirm === true,
+          force_resync: args.force_resync === true,
+        },
+      });
+    },
+  },
+  {
+    name: "get_encharge_sync_status",
+    title: "Status penghantaran Encharge",
+    description:
+      "Status Send to Encharge bagi satu kelas (class_id) atau semua kelas anda: bilangan sudah dihantar, tarikh " +
+      "terakhir, peserta baharu yang belum dihantar, dan rekod yang diisi semula daripada butang UI lama.",
+    roles: STAFF,
+    write: false,
+    inputSchema: { type: "object", properties: { class_id: { type: "string" } } },
+    handler: async (args, s) =>
+      callApi(s.accessToken, `/api/encharge/sync-status${qs({ class_id: typeof args.class_id === "string" ? args.class_id.trim() : "" })}`),
+  },
+  {
+    name: "set_ui_flags",
+    title: "Bendera UI akaun",
+    description:
+      "Sembunyikan atau paparkan UI untuk akaun anda: ui_hide_encharge (butang Send to Encharge) dan " +
+      "ui_hide_certificates (tab dan menu Certificates). Alat connector dan laluan API terus berfungsi. " +
+      "Tanpa medan: pulangkan nilai semasa.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        ui_hide_encharge: { type: "boolean" },
+        ui_hide_certificates: { type: "boolean" },
+      },
+    },
+    handler: async (args, s) => {
+      const body = pilih(args, ["ui_hide_encharge", "ui_hide_certificates"]);
+      if (Object.keys(body).length === 0) return callApi(s.accessToken, "/api/profile/ui-flags");
+      return callApi(s.accessToken, "/api/profile/ui-flags", { method: "PATCH", body });
+    },
+  },
   {
     name: "delete_certificate_library_item",
     title: "Padam item pustaka sijil",

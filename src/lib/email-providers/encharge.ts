@@ -94,6 +94,8 @@ export const encharge: EmailProvider = {
     let sent = 0;
     let failed = 0;
     const errors: string[] = [];
+    // KZ-D: hasil setiap kenalan untuk qm_encharge_sync_log.
+    const results: { email: string; ok: boolean; status: number }[] = new Array(contacts.length);
 
     // Bahagi kepada kumpulan 4 untuk keserentakan.
     for (let mula = 0; mula < contacts.length; mula += KESESERENTAKAN) {
@@ -109,6 +111,7 @@ export const encharge: EmailProvider = {
               body: badanKenalan(c),
             }),
           );
+          results[idx] = { email: c.email, ok: !!(res && res.ok), status: res ? res.status : 0 };
           if (res && res.ok) {
             sent++;
           } else {
@@ -122,6 +125,6 @@ export const encharge: EmailProvider = {
         }),
       );
     }
-    return { sent, failed, errors };
+    return { sent, failed, errors, results };
   },
 };

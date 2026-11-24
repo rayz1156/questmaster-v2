@@ -25,8 +25,11 @@ export type EmailProviderContact = {
 /** Hasil pengesahan kunci: status HTTP mentah supaya pemanggil boleh membezakan "tidak sah" daripada "penyedia bermasalah". */
 export type KeyValidation = { ok: boolean; status: number };
 
-/** Hasil penghantaran sekumpulan kenalan. */
-export type UpsertResult = { sent: number; failed: number; errors: string[] };
+/** Hasil seorang kenalan (KZ-D): untuk log per peserta. Tiada kunci di sini. */
+export type ContactResult = { email: string; ok: boolean; status: number };
+
+/** Hasil penghantaran sekumpulan kenalan. results mengikut susunan input. */
+export type UpsertResult = { sent: number; failed: number; errors: string[]; results?: ContactResult[] };
 
 export interface EmailProvider {
   id: string;

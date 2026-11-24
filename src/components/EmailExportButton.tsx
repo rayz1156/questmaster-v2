@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { pelanBerbayar } from "@/lib/pelan";
 import { useBahasa } from "@/lib/i18n/BahasaProvider";
 import { terjemahBilangan } from "@/lib/i18n";
+import { useBenderaUi } from "@/lib/benderaUi";
 
 // Pelan berkesan dari GET /api/integrations/email; 'unlimited' dipaparkan
 // sebagai 'pro' oleh pelayan, jadi jenis ini cukup.
@@ -23,6 +24,13 @@ type DryRun = { total: number; withEmail: number; withoutEmail: number; tags: st
 type Hasil = { sent: number; skipped: number; failed: number; errors: string[] };
 
 export default function EmailExportButton({ classId }: { classId: string }) {
+  // KZ-D: disembunyikan bila bendera ui_hide_encharge aktif (connector kekal).
+  const { hideEncharge } = useBenderaUi();
+  if (hideEncharge) return null;
+  return <EmailExportButtonDalam classId={classId} />;
+}
+
+function EmailExportButtonDalam({ classId }: { classId: string }) {
   const { t, bahasa } = useBahasa();
   const [status, setStatus] = useState<Status | null>(null);
   const [buka, setBuka] = useState(false);
