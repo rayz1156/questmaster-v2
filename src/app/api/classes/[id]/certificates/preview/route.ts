@@ -12,7 +12,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { pelanSijilBerbayar, pelanPemilikKelas } from '@/lib/sijil/pelanSijil';
 import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
-import { dalamHad } from '@/lib/hadKadar';
+import { dalamHad, bakiSaat } from '@/lib/hadKadar';
+
+// KZ-A: had pratonton pendidik dinaikkan daripada 5 kepada 30 seminit.
+const HAD_PRATONTON = 30;
 import { janaPdfSijil } from '@/lib/sijil/janaPdf';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { ralatJson } from '@/lib/i18n/ralatApi';
@@ -26,8 +29,11 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const classId = params.id;
   const userId = auth.user!.id;
 
-  if (!dalamHad(`cert-preview:${userId}`)) {
-    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
+  if (!dalamHad(`cert-preview:${userId}`, HAD_PRATONTON)) {
+    const saat = bakiSaat(`cert-preview:${userId}`);
+    const res = ralatJson('Too many requests. Please wait a minute and try again.', 429, { retry_after_seconds: saat });
+    res.headers.set('Retry-After', String(saat));
+    return res;
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);

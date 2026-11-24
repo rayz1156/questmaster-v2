@@ -12,11 +12,12 @@
  * digunakan HANYA untuk storage dan bacaan selepas kebenaran disahkan.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUser } from '@/lib/supabase-route';
+import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas, keluarkanSijil } from '@/lib/sijil/keluarkan';
 import { ralatJson } from '@/lib/i18n/ralatApi';
+import { amaranNama, janaSemulaIkutTemplat } from '@/lib/sijil/namaSijil';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -41,6 +42,25 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     : null;
   if (!templateId) {
     return ralatJson('template_id is required.', 400);
+  }
+  // KZ-A: nama_overrides [{participant_id, certificate_name}] mengatasi nama
+  // sijil untuk kelas ini. Pratonton: dipaparkan sahaja. confirm: disimpan
+  // melalui qm_set_member_certificate_name (scope certificate) sebelum
+  // sijil dikeluarkan, jadi nama itu kekal untuk sijil kelas ini.
+  const overrides = new Map<string, string>();
+  if (Array.isArray(body.name_overrides)) {
+    for (const o of body.name_overrides as unknown[]) {
+      const rec = (o ?? {}) as Record<string, unknown>;
+      const pid = typeof rec.participant_id === 'string' ? rec.participant_id.trim() : '';
+      const nm = typeof rec.certificate_name === 'string' ? rec.certificate_name.trim().replace(/\s+/g, ' ') : '';
+      if (!pid || nm.length < 2 || nm.length > 120) {
+        return ralatJson('Each name override needs participant_id and a certificate_name of 2 to 120 characters.', 400);
+      }
+      overrides.set(pid, nm);
+    }
+    if (overrides.size > MAX_ID_PERMINTAAN) {
+      return ralatJson('Too many name overrides in one request.', 400);
+    }
   }
 
   // KZ-011: kunci berasingan mengikut jenis permintaan; pratonton dan
@@ -78,17 +98,57 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (error) {
       return ralatJson(error.message, 400);
     }
-    return NextResponse.json({ preview: data ?? [] });
+    // KZ-A: amaran nama (belum disahkan, kurungan, nama pendek, gelaran).
+    const preview = ((data ?? []) as Record<string, unknown>[]).map((r): Record<string, unknown> & { warnings: ReturnType<typeof amaranNama> } => {
+      const pid = String(r.participant_id);
+      const ganti = overrides.get(pid);
+      const nama = ganti ?? (r.certificate_name as string | null);
+      const disahkan = ganti ? true : r.name_confirmed === true;
+      return {
+        ...r,
+        ...(ganti ? { certificate_name: ganti, name_confirmed: true, name_override: true } : {}),
+        warnings: amaranNama(nama, disahkan),
+      };
+    });
+    const namaBerisiko = preview.filter((r) => r.eligible === true && r.warnings.length > 0).length;
+    return NextResponse.json({ preview, name_warnings_count: namaBerisiko });
   }
 
   // ------------------------------------------------------------------
   // Pengeluaran: fungsi SQL menyemak semula kebenaran dan kelayakan.
   // ------------------------------------------------------------------
+  const gagalNama: { participant_id: string; error: string }[] = [];
+  const idJanaSemula: string[] = [];
+  for (const [pid, nm] of Array.from(overrides.entries())) {
+    const { data: hasilNama, error } = await auth.supa.rpc('qm_set_member_certificate_name', {
+      p_class: classId,
+      p_user: pid,
+      p_name: nm,
+      p_scope: 'certificate',
+    });
+    if (error) {
+      gagalNama.push({ participant_id: pid, error: error.message });
+      continue;
+    }
+    const baris = Array.isArray(hasilNama) ? hasilNama[0] : hasilNama;
+    for (const id of (baris?.certificate_ids ?? []) as string[]) idJanaSemula.push(id);
+  }
+  if (gagalNama.length > 0) {
+    return ralatJson('Some name overrides could not be saved. No certificates were issued.', 400, {
+      name_override_errors: gagalNama,
+    });
+  }
+
   try {
     const hasil = await keluarkanSijil(auth.supa, template, participantIds, userId);
+    // Sijil sedia ada yang namanya baru ditukar: jana semula PDF.
+    const janaSemula = idJanaSemula.length > 0
+      ? await janaSemulaIkutTemplat(getServiceSupabase(), classId, idJanaSemula)
+      : null;
     return NextResponse.json({
       issued: hasil.issued,
       certificates: hasil.certificates,
+      ...(janaSemula ? { renamed_regenerated: janaSemula.regenerated, renamed_failed: janaSemula.failed } : {}),
       ...(hasil.skipped ? { skipped: true } : {}),
     });
   } catch (e) {

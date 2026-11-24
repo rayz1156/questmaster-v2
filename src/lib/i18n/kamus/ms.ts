@@ -529,6 +529,8 @@ export const ms: Kamus = {
     openForm: 'Buka borang',
     confirmNameToPrint: 'Sahkan nama untuk dicetak pada sijil anda',
     confirmName: 'Sahkan nama',
+    nameUpdatedByEducator: 'Pendidik anda telah mengemas kini nama anda kepada "{nama}". Nama ini akan dicetak pada sijil anda.',
+    dismiss: 'OK',
   },
   sijil: {
     active: 'Aktif',

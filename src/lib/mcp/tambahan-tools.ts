@@ -244,12 +244,16 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
     name: "export_members",
     title: "Eksport peserta dan markah",
     description:
-      "Senarai peserta kelas bersama pecahan markah (task_score, live_score, adjustment_score, total_score), " +
-      "sama seperti butang Export di halaman People.",
+      "Senarai peserta kelas dalam JSON: {members:[{participant_id, name, email, certificate_name, name_confirmed, " +
+      "task_score, live_score, adjustment_score, total_score}], csv}. Medan email diperlukan untuk padanan nama " +
+      "dengan bulk_update_member_names. csv sama seperti butang Export di halaman People.",
     roles: STAFF,
     write: false,
     inputSchema: { type: "object", properties: { class_id: { type: "string" } }, required: ["class_id"] },
-    handler: async (args, s) => callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/members/export`),
+    // KZ-A: route memulangkan JSON {members, csv}; CSV mentah di peringkat
+    // atas dahulu menyebabkan ralat "is not valid JSON" pada klien MCP.
+    handler: async (args, s) =>
+      callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/members/export?format=json`),
   },
   {
     name: "get_member_scores",
@@ -1141,19 +1145,159 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
   {
     name: "regenerate_certificates",
     title: "Jana semula sijil",
-    description: "Jana semula PDF sijil yang sudah dikeluarkan (contohnya selepas templat atau nama diubah). Tanpa certificate_ids, semua sijil kelas dijana semula.",
+    description:
+      "Jana semula PDF sijil yang sudah dikeluarkan (contohnya selepas templat diubah). Kod sijil kekal. " +
+      "Tanpa certificate_ids, semua sijil aktif kelas dijana semula (dalam kumpulan 50). template_id pilihan: " +
+      "templat itu dijadikan templat AKTIF kelas dahulu, kemudian sijil diikat ke templat itu dan dijana semula.",
     roles: STAFF,
     write: true,
     inputSchema: {
       type: "object",
-      properties: { class_id: { type: "string" }, certificate_ids: { type: "array", items: { type: "string" } } },
+      properties: {
+        class_id: { type: "string" },
+        certificate_ids: { type: "array", items: { type: "string" } },
+        template_id: { type: "string", description: "Pilihan; tukar sijil ke templat lain kelas ini" },
+      },
       required: ["class_id"],
     },
+    handler: async (args, s) => {
+      const classId = wajib(args, "class_id");
+      if (typeof args.template_id === "string" && args.template_id.trim()) {
+        await panggilRpc(s, "qm_set_active_certificate_template", { p_template: args.template_id.trim() }, "Tetapkan templat aktif");
+      }
+      let ids: string[];
+      if (Array.isArray(args.certificate_ids) && args.certificate_ids.length > 0) {
+        ids = (args.certificate_ids as unknown[]).filter((x): x is string => typeof x === "string");
+      } else {
+        const res = await s.db
+          .from("qm_certificates")
+          .select("id")
+          .eq("class_id", classId)
+          .is("revoked_at", null);
+        semakRalat(res, "Senarai sijil");
+        ids = ((res.data ?? []) as { id: string }[]).map((r) => r.id);
+      }
+      if (ids.length === 0) return { updated: 0, skipped: 0, failed: 0, note: "Tiada sijil aktif untuk dijana semula." };
+      const jumlah = { updated: 0, skipped: 0, failed: 0 };
+      for (let i = 0; i < ids.length; i += 50) {
+        const r = await callApi<{ updated?: number; skipped?: number; failed?: number }>(
+          s.accessToken,
+          `/api/classes/${classId}/certificates/regenerate`,
+          { method: "POST", body: { certificate_ids: ids.slice(i, i + 50) } }
+        );
+        jumlah.updated += r?.updated ?? 0;
+        jumlah.skipped += r?.skipped ?? 0;
+        jumlah.failed += r?.failed ?? 0;
+      }
+      return { ...jumlah, ...(args.template_id ? { active_template_id: String(args.template_id).trim() } : {}) };
+    },
+  },
+  {
+    name: "update_member_name",
+    title: "Tukar nama peserta (sijil atau profil)",
+    description:
+      "Tukar nama seorang peserta. scope \"certificate\": nama sijil untuk kelas ini sahaja. scope \"profile\": " +
+      "nama paparan dan nama sijil profil (terpakai di semua kelas; peserta dimaklumkan dalam aplikasi). " +
+      "Nama ditanda disahkan oleh pendidik dan nama lama disimpan dalam log audit. regenerate_issued (lalai true) " +
+      "menjana semula PDF sijil kelas ini yang sudah dikeluarkan. Tanpa confirm: true, pulangkan pratonton sahaja.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        participant_id: { type: "string" },
+        full_name: { type: "string", description: "Nama penuh, 2 hingga 120 aksara" },
+        scope: { type: "string", enum: ["certificate", "profile"], default: "certificate" },
+        regenerate_issued: { type: "boolean", default: true },
+        confirm: { type: "boolean", description: "true untuk menyimpan; tanpa ini pratonton sahaja" },
+      },
+      required: ["class_id", "participant_id", "full_name"],
+    },
     handler: async (args, s) =>
-      callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/certificates/regenerate`, {
+      callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/members/certificate-names`, {
         method: "POST",
-        body: Array.isArray(args.certificate_ids) ? { certificate_ids: args.certificate_ids } : {},
+        body: {
+          updates: [{ participant_id: wajib(args, "participant_id"), full_name: wajib(args, "full_name") }],
+          scope: args.scope === "profile" ? "profile" : "certificate",
+          regenerate_issued: args.regenerate_issued !== false,
+          confirm: args.confirm === true,
+        },
       }),
+  },
+  {
+    name: "bulk_update_member_names",
+    title: "Tukar nama peserta secara pukal",
+    description:
+      "Tukar banyak nama sekali gus. Setiap item {participant_id atau email, full_name}; e-mel dipadankan tanpa " +
+      "mengira huruf besar atau kecil. Tanpa confirm: true, pulangkan jadual nama lama berbanding nama baharu " +
+      "serta senarai yang tidak dapat dipadankan. scope dan regenerate_issued sama seperti update_member_name.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        updates: {
+          type: "array",
+          maxItems: 200,
+          items: {
+            type: "object",
+            properties: {
+              participant_id: { type: "string" },
+              email: { type: "string" },
+              full_name: { type: "string" },
+            },
+            required: ["full_name"],
+          },
+        },
+        scope: { type: "string", enum: ["certificate", "profile"], default: "certificate" },
+        regenerate_issued: { type: "boolean", default: true },
+        confirm: { type: "boolean" },
+      },
+      required: ["class_id", "updates"],
+    },
+    handler: async (args, s) => {
+      if (!Array.isArray(args.updates) || args.updates.length === 0) throw new Error("updates diperlukan");
+      return callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/members/certificate-names`, {
+        method: "POST",
+        body: {
+          updates: args.updates,
+          scope: args.scope === "profile" ? "profile" : "certificate",
+          regenerate_issued: args.regenerate_issued !== false,
+          confirm: args.confirm === true,
+        },
+      });
+    },
+  },
+  {
+    name: "preview_certificates_batch",
+    title: "Pratonton sijil berkumpulan",
+    description:
+      "Jana pratonton PDF untuk sehingga 20 nama contoh dalam satu panggilan (mengganti panggilan " +
+      "preview_certificate berulang). mode \"single_pdf\" (lalai): satu PDF berbilang halaman. mode " +
+      "\"per_name\": satu URL bagi setiap nama. URL sah 10 minit. Tiada sijil sah dicipta.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        template_id: { type: "string" },
+        sample_names: { type: "array", items: { type: "string" }, minItems: 1, maxItems: 20 },
+        mode: { type: "string", enum: ["single_pdf", "per_name"], default: "single_pdf" },
+      },
+      required: ["class_id", "template_id", "sample_names"],
+    },
+    handler: async (args, s) => {
+      if (!Array.isArray(args.sample_names) || args.sample_names.length === 0) throw new Error("sample_names diperlukan");
+      if (args.sample_names.length > 20) throw new Error("Paling banyak 20 nama setiap pratonton");
+      return callApi(
+        s.accessToken,
+        `/api/classes/${wajib(args, "class_id")}/certificates/templates/${wajib(args, "template_id")}/sample-batch`,
+        { method: "POST", body: { names: args.sample_names, mode: args.mode === "per_name" ? "per_name" : "single_pdf" } }
+      );
+    },
   },
   {
     name: "email_certificates",

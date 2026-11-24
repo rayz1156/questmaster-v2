@@ -562,6 +562,8 @@ export const en = {
     openForm: 'Open form',
     confirmNameToPrint: 'Confirm the name to print on your certificates',
     confirmName: 'Confirm name',
+    nameUpdatedByEducator: 'Your educator updated your name to "{nama}". It will appear on your certificates.',
+    dismiss: 'OK',
   },
   sijil: {
     // Status sijil (src/lib/sijil/ui.tsx statusSijil).

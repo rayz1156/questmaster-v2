@@ -36,7 +36,12 @@ async function readError(res: Response): Promise<{ text: string; payload?: unkno
   const text = await res.text().catch(() => "");
   try {
     const j = JSON.parse(text);
-    return { text: j.error ?? j.message ?? text ?? res.statusText, payload: j };
+    let mesej = j.error ?? j.message ?? text ?? res.statusText;
+    // KZ-A: had kadar memberitahu klien MCP berapa lama perlu menunggu.
+    if (typeof j.retry_after_seconds === "number") {
+      mesej = `${mesej} (retry_after_seconds: ${j.retry_after_seconds})`;
+    }
+    return { text: mesej, payload: j };
   } catch {
     return { text: text || res.statusText };
   }

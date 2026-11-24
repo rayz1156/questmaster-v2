@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUser } from '@/lib/supabase-route';
+import { requireUser, getServiceSupabase } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { binaCsvPeserta, slugFail, type BarisPeserta } from '@/lib/csvPeserta';
@@ -146,6 +146,52 @@ export async function GET(req: NextRequest, { params }: { params: { id: string }
   }
 
   const csv = binaCsvPeserta(baris);
+
+  // KZ-A: ?format=json untuk connector MCP. JSON sah dengan participant_id,
+  // emel dan nama sijil berkesan (nama kelas, nama sijil profil, nama
+  // paparan), serta CSV yang sama dalam medan `csv`. Kebenaran sudah
+  // disahkan di atas; service role hanya untuk lajur nama sijil profil.
+  if (req.nextUrl.searchParams.get('format') === 'json') {
+    const svc = getServiceSupabase();
+    const namaProfil = new Map<string, { sijil: string | null; paparan: string | null }>();
+    const namaKelas = new Map<string, string>();
+    if (ids.length > 0) {
+      const { data: prof } = await svc
+        .from('qm_profiles')
+        .select('id, certificate_name, display_name')
+        .in('id', ids);
+      for (const p of prof || []) {
+        namaProfil.set(String(p.id), { sijil: p.certificate_name ?? null, paparan: p.display_name ?? null });
+      }
+      const { data: kn } = await svc
+        .from('qm_class_certificate_names')
+        .select('user_id, certificate_name')
+        .eq('class_id', params.id);
+      for (const n of kn || []) namaKelas.set(String(n.user_id), String(n.certificate_name));
+    }
+    const ahli = (members || []).map((m: { user_id: string }) => {
+      const dir = dirMap.get(m.user_id);
+      const mk = petaMarkah.get(m.user_id);
+      const pr = namaProfil.get(m.user_id);
+      const kelasNama = namaKelas.get(m.user_id) ?? null;
+      const paparan = pr?.paparan && pr.paparan.trim() ? pr.paparan.trim() : null;
+      return {
+        participant_id: m.user_id,
+        name: dir?.nama ?? paparan,
+        email: dir?.emel ?? null,
+        certificate_name: kelasNama ?? pr?.sijil ?? paparan,
+        name_confirmed: !!(kelasNama || pr?.sijil),
+        task_score: mk?.task ?? 0,
+        live_score: mk?.live ?? 0,
+        adjustment_score: mk?.adj ?? 0,
+        total_score: mk?.jumlah ?? 0,
+      };
+    });
+    return NextResponse.json(
+      { members: ahli, csv },
+      { headers: { 'cache-control': 'no-store' } },
+    );
+  }
 
   // Nama fail: slug ASCII daripada nama kelas, jadi tiada CR/LF atau
   // aksara berisiko boleh menembusi pengepala content-disposition.

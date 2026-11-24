@@ -37,3 +37,14 @@ export function dalamHad(kunci: string, maks: number = KADAR_MAKS): boolean {
   tabung.set(kunci, senarai);
   return true;
 }
+
+/**
+ * KZ-A: saat sehingga satu slot kosong dalam tetingkap (untuk
+ * retry_after_seconds dan pengepala Retry-After). Minimum 1.
+ */
+export function bakiSaat(kunci: string): number {
+  const senarai = (tabung.get(kunci) ?? []).filter((t) => t > Date.now() - TETINGKAP_MS);
+  if (senarai.length === 0) return 1;
+  const tertua = Math.min(...senarai);
+  return Math.max(1, Math.ceil((tertua + TETINGKAP_MS - Date.now()) / 1000));
+}

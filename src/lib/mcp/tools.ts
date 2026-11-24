@@ -2376,7 +2376,9 @@ export const TOOLS: ToolDef[] = [
     title: "Keluarkan sijil",
     description:
       "Keluarkan sijil kepada peserta layak. Tanpa confirm: pulangkan pratonton " +
-      "kelayakan (nama, layak, sebab, sudah dikeluarkan). Dengan confirm: true, " +
+      "kelayakan (nama, layak, sebab, sudah dikeluarkan) dengan warnings bagi nama yang " +
+      "belum disahkan, berkurungan, satu atau dua perkataan, atau bergelaran panggilan; " +
+      "semak name_warnings_count sebelum mengeluarkan. Dengan confirm: true, " +
       "keluarkan sijil kepada participant_ids yang diberi (atau semua yang layak " +
       "jika tiada). Guna fungsi pelayan yang sama dengan laluan API.",
     roles: STAFF,
@@ -2387,6 +2389,16 @@ export const TOOLS: ToolDef[] = [
         class_id: { type: "string", description: "UUID kelas" },
         template_id: { type: "string", description: "UUID templat sijil" },
         participant_ids: { type: "array", items: { type: "string" }, description: "Pilihan; UUID peserta" },
+        name_overrides: {
+          type: "array",
+          maxItems: 50,
+          description: "Pilihan; [{participant_id, certificate_name}] nama sijil untuk kelas ini, disimpan semasa confirm",
+          items: {
+            type: "object",
+            properties: { participant_id: { type: "string" }, certificate_name: { type: "string" } },
+            required: ["participant_id", "certificate_name"],
+          },
+        },
         confirm: { type: "boolean", description: "Wajib true untuk mengeluarkan sebenar" },
       },
       required: ["class_id", "template_id"],
@@ -2398,6 +2410,7 @@ export const TOOLS: ToolDef[] = [
         body: {
           template_id: args.template_id,
           ...(Array.isArray(args.participant_ids) ? { participant_ids: args.participant_ids } : {}),
+          ...(Array.isArray(args.name_overrides) ? { name_overrides: args.name_overrides } : {}),
           confirm: args.confirm === true,
         },
       });
