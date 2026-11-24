@@ -2,6 +2,9 @@
 const nextConfig = {
   eslint: { ignoreDuringBuilds: true },
 
+  // KZ-C: instrumentation.ts memulakan pekerja e-mel sijil semasa pelayan bermula.
+  experimental: { instrumentationHook: true },
+
   // Next.js tidak melayani folder yang bermula dengan titik dalam app/,
   // jadi app/.well-known/... tidak berfungsi. Rewrite memetakan URL piawai
   // .well-known kepada route handler sebenar.

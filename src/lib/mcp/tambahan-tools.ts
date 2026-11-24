@@ -1528,9 +1528,14 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
     name: "email_certificates",
     title: "Emel sijil kepada peserta",
     description:
-      "Hantar sijil sebagai lampiran PDF ke emel peserta. Tanpa certificate_ids, semua sijil yang belum diemel dihantar. " +
-      "resend: true menghantar semula yang sudah diemel. Pelan Pro dan Institution sahaja. Menghantar emel sebenar, " +
-      "jadi wajib confirm: true.",
+      "Masukkan sijil ke baris gilir e-mel Kuizen (lampiran PDF). Pekerja menghantar paling banyak 1 e-mel " +
+      "sesaat (di bawah had Emailit 2 sesaat) dengan cubaan semula automatik untuk ralat sementara (SMTP 4xx " +
+      "seperti 452). Tanpa certificate_ids: semua sijil yang belum diemel (maksimum 200). resend: true menghantar " +
+      "semula yang sudah diemel. email_subject dan email_body (kedua-duanya) mengatasi templat untuk penghantaran " +
+      "ini; pemboleh ubah {nama} {kursus} {tarikh} {tempat} {kod_sijil} {pautan_pengesahan}. Pulangkan queued, " +
+      "already_queued, already_sent, skipped dan estimated_seconds; untuk 20 sijil atau kurang, menunggu dan " +
+      "memulangkan sent dan failed sebenar. Semak kemudian dengan get_certificate_email_status. Pelan Pro dan " +
+      "Institution sahaja. Menghantar emel sebenar, jadi wajib confirm: true.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -1539,6 +1544,8 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
         class_id: { type: "string" },
         certificate_ids: { type: "array", items: { type: "string" }, maxItems: 200 },
         resend: { type: "boolean", default: false },
+        email_subject: { type: "string", description: "Pilihan; subjek untuk penghantaran ini sahaja" },
+        email_body: { type: "string", description: "Pilihan; isi teks biasa untuk penghantaran ini sahaja" },
         confirm: { type: "boolean", description: "Wajib true. Emel sebenar dihantar kepada peserta." },
       },
       required: ["class_id", "confirm"],
@@ -1549,7 +1556,36 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
       const body: Record<string, unknown> = {};
       if (Array.isArray(args.certificate_ids)) body.certificate_ids = args.certificate_ids;
       if (args.resend === true) body.resend = true;
+      if (typeof args.email_subject === "string") body.email_subject = args.email_subject;
+      if (typeof args.email_body === "string") body.email_body = args.email_body;
       return callApi(s.accessToken, `/api/classes/${classId}/certificates/email`, { method: "POST", body });
+    },
+  },
+  {
+    name: "get_certificate_email_status",
+    title: "Status e-mel sijil",
+    description:
+      "Status e-mel setiap sijil daripada baris gilir: queued, sending, sent, retrying, failed, cancelled, " +
+      "not_queued atau sent_before_queue, dengan attempts, last_error, next_attempt_at dan emailed_at. " +
+      "Tanpa certificate_ids: semua sijil kelas.",
+    roles: STAFF,
+    write: false,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        certificate_ids: { type: "array", items: { type: "string" }, maxItems: 200 },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      const ids = Array.isArray(args.certificate_ids)
+        ? (args.certificate_ids as unknown[]).filter((x): x is string => typeof x === "string")
+        : [];
+      return callApi(
+        s.accessToken,
+        `/api/classes/${wajib(args, "class_id")}/certificates/email/status${qs({ certificate_ids: ids.join(",") })}`
+      );
     },
   },
   {

@@ -189,6 +189,8 @@ async function ujianRoute() {
     ["set_certificate_defaults", { signer_name: "Dr. A", layout: { mode: "full_background" } }, "PATCH", "/api/certificate-defaults", { signer_name: "Dr. A", layout: { mode: "full_background" } }],
     ["apply_defaults_to_template", { class_id: "k1", template_id: "t1" }, "POST", "/api/classes/k1/certificates/templates/t1/apply-defaults", {}],
     ["duplicate_certificate_template", { class_id: "k1", template_id: "t1", title: "Salinan" }, "POST", "/api/classes/k1/certificates/templates/t1/duplicate", { title: "Salinan" }],
+    ["get_certificate_email_status", { class_id: "k1", certificate_ids: ["c1", "c2"] }, "GET", "/api/classes/k1/certificates/email/status?certificate_ids=c1%2Cc2"],
+    ["email_certificates", { class_id: "k1", confirm: true, email_subject: "S {nama}", email_body: "B" }, "POST", "/api/classes/k1/certificates/email", { email_subject: "S {nama}", email_body: "B" }],
     ["preview_certificates_batch", { class_id: "k1", template_id: "t1", sample_names: ["A B C", "D E F"] }, "POST", "/api/classes/k1/certificates/templates/t1/sample-batch", { names: ["A B C", "D E F"], mode: "single_pdf" }],
     ["email_certificates", { class_id: "k1", confirm: true, resend: true }, "POST", "/api/classes/k1/certificates/email", { resend: true }],
     ["delete_certificate_library_item", { library_id: "l1", confirm: true }, "DELETE", "/api/certificate-library/l1"],
