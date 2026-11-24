@@ -36,6 +36,8 @@ create table if not exists public.qm_certificate_email_queue (
   created_at       timestamptz not null default now(),
   updated_at       timestamptz not null default now()
 );
+-- Lajur ditambah selepas semakan; idempoten jika jadual sudah wujud.
+alter table public.qm_certificate_email_queue add column if not exists had_attachment boolean;
 alter table public.qm_certificate_email_queue enable row level security;
 
 create unique index if not exists qm_cert_email_queue_satu_aktif
