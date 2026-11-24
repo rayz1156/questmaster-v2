@@ -16,6 +16,7 @@ import { dalamHad } from '@/lib/hadKadar';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { normaliseMedan } from '@/lib/sijil/medan';
 import { ralatJson } from '@/lib/i18n/ralatApi';
+import { bacaTetapanLalai, layoutLalai, medanPenandatangan } from '@/lib/sijil/tetapanLalai';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -100,23 +101,47 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       ? body.logo_path
       : null;
 
+  // KZ-B: warisi tetapan lalai sijil pemanggil bagi medan yang tidak diberi
+  // (use_defaults: false untuk mematikan). Aset lalai dirujuk, bukan disalin.
+  const lalai = body.use_defaults === false ? null : await bacaTetapanLalai(auth.supa, userId);
+  const layoutDiberi = body.layout !== undefined && body.layout !== null;
+  const layoutAkhir = layoutDiberi ? normaliseSusunAtur(body.layout) : (layoutLalai(lalai) ?? normaliseSusunAtur(body.layout));
+  const medanDiberi = typeof body.fields === 'object' && body.fields !== null && !Array.isArray(body.fields)
+    ? (body.fields as Record<string, unknown>)
+    : {};
+  const medanAkhir = normaliseMedan({ ...medanPenandatangan(lalai), ...medanDiberi });
+  const diwarisi: string[] = [];
+  if (lalai) {
+    if (!layoutDiberi && layoutLalai(lalai)) diwarisi.push('layout');
+    if (Object.keys(medanPenandatangan(lalai)).length > 0) diwarisi.push('signer');
+    if (!backgroundPath && lalai.background_path) diwarisi.push('background');
+    if (!logoPath && lalai.logo_path) diwarisi.push('logo');
+    if (lalai.signature_path) diwarisi.push('signature');
+  }
+
   const { data, error } = await auth.supa
     .from('qm_certificate_templates')
     .insert({
       class_id: classId,
       title,
       criteria,
-      background_path: backgroundPath,
-      logo_path: logoPath,
+      background_path: backgroundPath ?? lalai?.background_path ?? null,
+      logo_path: logoPath ?? lalai?.logo_path ?? null,
+      signature_path: lalai?.signature_path ?? null,
       // Layout sentiasa dinormalkan (V2-015): kunci asing dibuang dan
       // semua nombor diapit sebelum disimpan.
-      layout: normaliseSusunAtur(body.layout),
+      layout: layoutAkhir,
+      fields: medanAkhir,
       created_by: userId,
     })
-    .select('id, title, criteria, background_path, logo_path, layout, fields')
+    .select('id, title, criteria, background_path, logo_path, layout, fields, signature_path')
     .single();
   if (error) return ralatJson(error.message, 400);
-  return NextResponse.json({ template: data }, { status: 201 });
+  const { signature_path, ...templatBaru } = data ?? {};
+  return NextResponse.json(
+    { template: { ...templatBaru, has_signature: !!signature_path }, ...(diwarisi.length ? { inherited_defaults: diwarisi } : {}) },
+    { status: 201 },
+  );
 }
 
 export async function PATCH(req: NextRequest, { params }: { params: { id: string } }) {

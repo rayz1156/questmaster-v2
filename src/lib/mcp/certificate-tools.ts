@@ -35,6 +35,8 @@ export async function createCertificateTemplate(
     title?: string;
     criteria?: unknown;
     layout?: unknown;
+    use_defaults?: unknown;
+    fields?: unknown;
   }
 ): Promise<Record<string, unknown>> {
   if (!args.class_id) throw new Error("class_id diperlukan");
@@ -52,10 +54,16 @@ export async function createCertificateTemplate(
         title,
         criteria: args.criteria,
         ...(args.layout !== undefined && args.layout !== null ? { layout: args.layout } : {}),
+        ...(args.use_defaults === false ? { use_defaults: false } : {}),
+        ...(args.fields && typeof args.fields === "object" ? { fields: args.fields } : {}),
       },
     }
   );
-  return (res.template ?? res) as Record<string, unknown>;
+  // KZ-B: kekalkan inherited_defaults supaya pemanggil tahu apa yang diwarisi.
+  const r = res as { template?: Record<string, unknown>; inherited_defaults?: string[] };
+  return r.template
+    ? { ...r.template, ...(r.inherited_defaults ? { inherited_defaults: r.inherited_defaults } : {}) }
+    : (res as Record<string, unknown>);
 }
 
 /**

@@ -123,6 +123,31 @@ const CONFIRM_PROP = { type: "boolean", description: "Wajib true. Tindakan ini t
 // Senarai tool
 // ---------------------------------------------------------------------------
 
+/**
+ * KZ-B: muat naik aset sijil tanpa shell ke templat atau tetapan lalai.
+ * Route yang menyemak kebenaran, pelan, SSRF, saiz dan bait imej.
+ */
+async function muatNaikAsetSijil(
+  args: Record<string, unknown>,
+  s: McpSession,
+  sumber: { source_url?: string; content_base64?: string }
+): Promise<unknown> {
+  const kind = args.kind;
+  if (kind !== "background" && kind !== "logo" && kind !== "signature") {
+    throw new Error("kind mesti background, logo atau signature");
+  }
+  const body = { kind, ...sumber, remove_white_background: args.remove_white_background === true };
+  if (args.target === "defaults") {
+    return callApi(s.accessToken, "/api/certificate-defaults/asset", { method: "POST", body });
+  }
+  const classId = wajib(args, "class_id");
+  const templateId = wajib(args, "template_id");
+  return callApi(s.accessToken, `/api/classes/${classId}/certificates/templates/${templateId}/asset-upload`, {
+    method: "POST",
+    body,
+  });
+}
+
 export const TOOLS_TAMBAHAN: ToolDef[] = [
   // === Kelas ===
   {
@@ -1335,6 +1360,169 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
         { method: "POST", body: { names: args.sample_names, mode: args.mode === "per_name" ? "per_name" : "single_pdf" } }
       );
     },
+  },
+  {
+    name: "upload_certificate_asset_from_url",
+    title: "Muat naik aset sijil daripada URL",
+    description:
+      "Lekatkan latar, logo atau tandatangan sijil TANPA shell: pelayan memuat turun sendiri fail PNG/JPEG " +
+      "daripada source_url https (contoh pautan eksport Canva atau pautan Google Drive awam). Sasaran: " +
+      "template_id (dengan class_id) atau target \"defaults\" (tetapan lalai sijil anda). Had: latar dan logo " +
+      "8 MB, tandatangan 1 MB. Alamat rangkaian dalaman disekat. remove_white_background: true menjadikan " +
+      "latar putih lutsinar (hasil PNG).",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string", description: "UUID kelas (wajib jika template_id)" },
+        template_id: { type: "string", description: "UUID templat sijil" },
+        target: { type: "string", enum: ["template", "defaults"], description: "Lalai template; defaults untuk tetapan lalai" },
+        kind: { type: "string", enum: ["background", "logo", "signature"] },
+        source_url: { type: "string", description: "URL https fail PNG atau JPEG" },
+        remove_white_background: { type: "boolean", default: false },
+      },
+      required: ["kind", "source_url"],
+    },
+    handler: async (args, s) => muatNaikAsetSijil(args, s, { source_url: wajib(args, "source_url") }),
+  },
+  {
+    name: "upload_certificate_asset_base64",
+    title: "Muat naik aset sijil kecil (base64)",
+    description:
+      "Lekatkan logo atau tandatangan kecil (sehingga 1 MB selepas dinyahkod) daripada kandungan base64, untuk " +
+      "klien tanpa shell. Sasaran seperti upload_certificate_asset_from_url. remove_white_background: true " +
+      "menjadikan latar putih tandatangan lutsinar di pelayan (hasil PNG). Untuk fail besar guna " +
+      "upload_certificate_asset_from_url kerana base64 mahal dari segi token.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        template_id: { type: "string" },
+        target: { type: "string", enum: ["template", "defaults"] },
+        kind: { type: "string", enum: ["background", "logo", "signature"] },
+        content_base64: { type: "string", description: "Kandungan PNG/JPEG dalam base64 (boleh berawalan data:)" },
+        remove_white_background: { type: "boolean", default: false },
+      },
+      required: ["kind", "content_base64"],
+    },
+    handler: async (args, s) => {
+      const b64 = typeof args.content_base64 === "string" ? args.content_base64 : "";
+      if (!b64) throw new Error("content_base64 diperlukan");
+      if (b64.length > 1_500_000) throw new Error("content_base64 melebihi had 1 MB");
+      return muatNaikAsetSijil(args, s, { content_base64: b64 });
+    },
+  },
+  {
+    name: "get_certificate_defaults",
+    title: "Tetapan lalai sijil",
+    description:
+      "Baca tetapan lalai sijil anda: ada latar/logo/tandatangan, nama dan jawatan penandatangan, layout dan " +
+      "templat e-mel (subject, body, from_name, reply_to) serta pemboleh ubah e-mel yang disokong.",
+    roles: STAFF,
+    write: false,
+    inputSchema: { type: "object", properties: {} },
+    handler: async (_args, s) => callApi(s.accessToken, "/api/certificate-defaults"),
+  },
+  {
+    name: "set_certificate_defaults",
+    title: "Simpan tetapan lalai sijil",
+    description:
+      "Kemas kini separa tetapan lalai sijil anda; hanya medan yang diberi diubah. signer_name, signer_title, " +
+      "layout (bentuk sama seperti layout templat), email_template {subject, body, from_name, reply_to} dengan " +
+      "pemboleh ubah {nama} {kursus} {tarikh} {tempat} {kod_sijil} {pautan_pengesahan}. null membuang nilai. " +
+      "clear_background/clear_logo/clear_signature membuang aset. copy_assets_from {class_id, template_id, kinds?} " +
+      "menyalin aset templat kelas anda ke tetapan lalai. Templat baharu mewarisi tetapan ini.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        signer_name: { type: ["string", "null"] },
+        signer_title: { type: ["string", "null"] },
+        layout: { type: ["object", "null"] },
+        email_template: {
+          type: ["object", "null"],
+          properties: {
+            subject: { type: "string" },
+            body: { type: "string" },
+            from_name: { type: "string" },
+            reply_to: { type: "string" },
+          },
+        },
+        clear_background: { type: "boolean" },
+        clear_logo: { type: "boolean" },
+        clear_signature: { type: "boolean" },
+        copy_assets_from: {
+          type: "object",
+          properties: {
+            class_id: { type: "string" },
+            template_id: { type: "string" },
+            kinds: { type: "array", items: { type: "string", enum: ["background", "logo", "signature"] } },
+          },
+          required: ["class_id", "template_id"],
+        },
+      },
+    },
+    handler: async (args, s) => {
+      const body = pilih(args, [
+        "signer_name", "signer_title", "layout", "email_template",
+        "clear_background", "clear_logo", "clear_signature", "copy_assets_from",
+      ]);
+      if (Object.keys(body).length === 0) throw new Error("Tiada medan untuk dikemas kini");
+      return callApi(s.accessToken, "/api/certificate-defaults", { method: "PATCH", body });
+    },
+  },
+  {
+    name: "apply_defaults_to_template",
+    title: "Guna tetapan lalai pada templat",
+    description:
+      "Salin tetapan lalai sijil anda ke templat sedia ada. include pilihan: assets (latar/logo/tandatangan yang " +
+      "ada), signer (nama dan jawatan penandatangan ke fields), layout. Lalai: semua.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        template_id: { type: "string" },
+        include: { type: "array", items: { type: "string", enum: ["assets", "signer", "layout"] } },
+      },
+      required: ["class_id", "template_id"],
+    },
+    handler: async (args, s) =>
+      callApi(
+        s.accessToken,
+        `/api/classes/${wajib(args, "class_id")}/certificates/templates/${wajib(args, "template_id")}/apply-defaults`,
+        { method: "POST", body: Array.isArray(args.include) ? { include: args.include } : {} }
+      ),
+  },
+  {
+    name: "duplicate_certificate_template",
+    title: "Salin templat sijil (kelas sama)",
+    description:
+      "Salin templat sijil dalam kelas yang sama: layout, fields, kriteria dan aset (rujukan laluan sama). " +
+      "Tajuk lalai \"<tajuk> (salinan)\". Salinan tidak dijadikan templat aktif. Untuk kelas lain guna " +
+      "copy_certificate_template.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        template_id: { type: "string" },
+        title: { type: "string" },
+      },
+      required: ["class_id", "template_id"],
+    },
+    handler: async (args, s) =>
+      callApi(
+        s.accessToken,
+        `/api/classes/${wajib(args, "class_id")}/certificates/templates/${wajib(args, "template_id")}/duplicate`,
+        { method: "POST", body: typeof args.title === "string" && args.title.trim() ? { title: args.title.trim() } : {} }
+      ),
   },
   {
     name: "email_certificates",

@@ -2126,9 +2126,11 @@ export const TOOLS: ToolDef[] = [
       "halaman, qr {x, y, size} atau false, code {x, y, size, color, align} atau false, " +
       "course, details dan signer {x, y, maxWidth, size, color, align} atau false, " +
       "signature {x, y, width} atau false (V2-016b). " +
-      "Latar dan logo dimuat naik melalui aliran tiket: create_certificate_asset_ticket, " +
-      "curl -X PUT --upload-file ke upload_url, kemudian finalize_certificate_asset. " +
-      "Pratonton hasil akhir dengan preview_certificate. Hanya pendidik kelas.",
+      "Medan yang tidak diberi mewarisi tetapan lalai sijil pendidik (get_certificate_defaults): " +
+      "layout, latar, logo, tandatangan dan penandatangan; use_defaults: false untuk mematikannya. " +
+      "Tanpa shell, lekatkan aset dengan upload_certificate_asset_from_url atau " +
+      "upload_certificate_asset_base64. Dengan shell, aliran tiket create_certificate_asset_ticket " +
+      "kekal tersedia. Pratonton dengan preview_certificates_batch. Hanya pendidik kelas.",
     roles: STAFF,
     write: true,
     inputSchema: {
@@ -2165,6 +2167,8 @@ export const TOOLS: ToolDef[] = [
             signature: { type: "object", description: "Kotak imej tandatangan {x, y, width} atau false" },
           },
         },
+        use_defaults: { type: "boolean", description: "Lalai true: warisi tetapan lalai sijil untuk medan yang tidak diberi" },
+        fields: { type: "object", description: "Medan isian pilihan: course, date_start, date_end, location, signer_name, signer_title" },
       },
       required: ["class_id", "title", "criteria"],
     },

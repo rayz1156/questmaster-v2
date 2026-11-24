@@ -117,7 +117,7 @@ async function ujianPendaftaran() {
   check("TOOLS mengandungi semua tool tambahan", TOOLS_TAMBAHAN.every((t) => nama.includes(t.name)));
   for (const t of TOOLS_TAMBAHAN) {
     const ok =
-      /^[a-z_]+$/.test(t.name) &&
+      /^[a-z][a-z0-9_]*$/.test(t.name) &&
       t.roles.length > 0 &&
       typeof t.handler === "function" &&
       t.inputSchema?.type === "object" &&
@@ -182,6 +182,13 @@ async function ujianRoute() {
     ["regenerate_certificates", { class_id: "k1", certificate_ids: ["c1", "c2"] }, "POST", "/api/classes/k1/certificates/regenerate", { certificate_ids: ["c1", "c2"] }],
     ["update_member_name", { class_id: "k1", participant_id: "p1", full_name: "TAUFIQ BIN MOHD YUSOF" }, "POST", "/api/classes/k1/members/certificate-names", { updates: [{ participant_id: "p1", full_name: "TAUFIQ BIN MOHD YUSOF" }], scope: "certificate", regenerate_issued: true, confirm: false }],
     ["bulk_update_member_names", { class_id: "k1", updates: [{ email: "A@B.COM", full_name: "Ali bin Abu" }], scope: "profile", confirm: true }, "POST", "/api/classes/k1/members/certificate-names", { updates: [{ email: "A@B.COM", full_name: "Ali bin Abu" }], scope: "profile", regenerate_issued: true, confirm: true }],
+    ["upload_certificate_asset_from_url", { class_id: "k1", template_id: "t1", kind: "background", source_url: "https://x/y.png" }, "POST", "/api/classes/k1/certificates/templates/t1/asset-upload", { kind: "background", source_url: "https://x/y.png", remove_white_background: false }],
+    ["upload_certificate_asset_from_url", { target: "defaults", kind: "logo", source_url: "https://x/y.png" }, "POST", "/api/certificate-defaults/asset", { kind: "logo", source_url: "https://x/y.png", remove_white_background: false }],
+    ["upload_certificate_asset_base64", { class_id: "k1", template_id: "t1", kind: "signature", content_base64: "iVBOR", remove_white_background: true }, "POST", "/api/classes/k1/certificates/templates/t1/asset-upload", { kind: "signature", content_base64: "iVBOR", remove_white_background: true }],
+    ["get_certificate_defaults", {}, "GET", "/api/certificate-defaults"],
+    ["set_certificate_defaults", { signer_name: "Dr. A", layout: { mode: "full_background" } }, "PATCH", "/api/certificate-defaults", { signer_name: "Dr. A", layout: { mode: "full_background" } }],
+    ["apply_defaults_to_template", { class_id: "k1", template_id: "t1" }, "POST", "/api/classes/k1/certificates/templates/t1/apply-defaults", {}],
+    ["duplicate_certificate_template", { class_id: "k1", template_id: "t1", title: "Salinan" }, "POST", "/api/classes/k1/certificates/templates/t1/duplicate", { title: "Salinan" }],
     ["preview_certificates_batch", { class_id: "k1", template_id: "t1", sample_names: ["A B C", "D E F"] }, "POST", "/api/classes/k1/certificates/templates/t1/sample-batch", { names: ["A B C", "D E F"], mode: "single_pdf" }],
     ["email_certificates", { class_id: "k1", confirm: true, resend: true }, "POST", "/api/classes/k1/certificates/email", { resend: true }],
     ["delete_certificate_library_item", { library_id: "l1", confirm: true }, "DELETE", "/api/certificate-library/l1"],
