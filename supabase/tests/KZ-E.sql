@@ -104,20 +104,15 @@ begin
   end;
   select * into r from public.qm_confirm_name_token(repeat('b', 64), 'Norfarahin binti Amat @ Adnin', 'iphash2');
   if r.certificate_ids <> array[]::uuid[] then raise exception 'UJIAN 5 GAGAL: ids sepatutnya kosong'; end if;
-  -- Tiada templat aktif dan token tiada templat: ralat jelas.
-  begin
-    perform public.qm_issue_certificate_for_token('00000000-0000-0000-0000-0000000e7a02');
-    raise exception 'UJIAN 5 GAGAL: tiada templat tetapi lulus';
-  exception when others then
-    if sqlerrm <> 'No certificate template for this class.' then raise exception 'UJIAN 5 GAGAL: %', sqlerrm; end if;
-  end;
-  update public.qm_name_update_tokens set template_id = '00000000-0000-0000-0000-0000000e0701'
-   where id = '00000000-0000-0000-0000-0000000e7a02';
+  -- Token tanpa template_id guna templat aktif kelas (templat tunggal aktif secara lalai).
   v_cert := public.qm_issue_certificate_for_token('00000000-0000-0000-0000-0000000e7a02');
   v_cert2 := public.qm_issue_certificate_for_token('00000000-0000-0000-0000-0000000e7a02');
   if v_cert is null or v_cert <> v_cert2 then raise exception 'UJIAN 5 GAGAL: tidak idempoten'; end if;
   select c.name_snapshot into v_txt from public.qm_certificates c where c.id = v_cert;
   if v_txt <> 'Norfarahin binti Amat @ Adnin' then raise exception 'UJIAN 5 GAGAL: nama sijil %', v_txt; end if;
+  if (select template_id from public.qm_certificates where id = v_cert) <> '00000000-0000-0000-0000-0000000e0701' then
+    raise exception 'UJIAN 5 GAGAL: templat salah';
+  end if;
   if (select issued_by from public.qm_certificates where id = v_cert) <> '00000000-0000-0000-0000-0000000e00e1' then
     raise exception 'UJIAN 5 GAGAL: issued_by';
   end if;
