@@ -2382,7 +2382,9 @@ export const TOOLS: ToolDef[] = [
       "Keluarkan sijil kepada peserta layak. Tanpa confirm: pulangkan pratonton " +
       "kelayakan (nama, layak, sebab, sudah dikeluarkan) dengan warnings bagi nama yang " +
       "belum disahkan, berkurungan, satu atau dua perkataan, atau bergelaran panggilan; " +
-      "semak name_warnings_count sebelum mengeluarkan. Dengan confirm: true, " +
+      "semak name_warnings_count sebelum mengeluarkan. Amaran turut merangkumi deleted, organization, " +
+      "has_digits_or_underscore dan duplicate; akaun dipadam sentiasa dilangkau. summary_only: true memulangkan " +
+      "kiraan dan senarai beramaran sahaja. exclude_participant_ids mengecualikan peserta. Dengan confirm: true, " +
       "keluarkan sijil kepada participant_ids yang diberi (atau semua yang layak " +
       "jika tiada). Guna fungsi pelayan yang sama dengan laluan API.",
     roles: STAFF,
@@ -2403,6 +2405,8 @@ export const TOOLS: ToolDef[] = [
             required: ["participant_id", "certificate_name"],
           },
         },
+        exclude_participant_ids: { type: "array", items: { type: "string" }, description: "Peserta yang tidak dikeluarkan sijil" },
+        summary_only: { type: "boolean", description: "Pratonton ringkas: kiraan dan senarai nama beramaran sahaja" },
         confirm: { type: "boolean", description: "Wajib true untuk mengeluarkan sebenar" },
       },
       required: ["class_id", "template_id"],
@@ -2415,6 +2419,8 @@ export const TOOLS: ToolDef[] = [
           template_id: args.template_id,
           ...(Array.isArray(args.participant_ids) ? { participant_ids: args.participant_ids } : {}),
           ...(Array.isArray(args.name_overrides) ? { name_overrides: args.name_overrides } : {}),
+          ...(Array.isArray(args.exclude_participant_ids) ? { exclude_participant_ids: args.exclude_participant_ids } : {}),
+          ...(args.summary_only === true ? { summary_only: true } : {}),
           confirm: args.confirm === true,
         },
       });

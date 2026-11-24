@@ -17,7 +17,15 @@ import {
   type BarisPdfSijil,
 } from '@/lib/sijil/keluarkan';
 
-export type KodAmaranNama = 'unconfirmed' | 'brackets' | 'short' | 'nickname';
+export type KodAmaranNama =
+  | 'unconfirmed'
+  | 'brackets'
+  | 'short'
+  | 'nickname'
+  | 'deleted'
+  | 'organization'
+  | 'has_digits_or_underscore'
+  | 'duplicate';
 
 /** Gelaran panggilan biasa yang jarang muncul pada nama rasmi. */
 const PANGGILAN = /^(bro|sis|kak|akak|abg|abang|adik|dik|cik|kakak|bang|mak|pak|uncle|auntie|aunty|cikgu|ustaz|ustazah|mr|mrs|ms|miss)\b\.?/i;
@@ -27,7 +35,14 @@ const MESEJ_AMARAN: Record<KodAmaranNama, string> = {
   brackets: 'Nama mengandungi kurungan, contohnya nama organisasi.',
   short: 'Nama hanya satu atau dua perkataan; mungkin nama panggilan.',
   nickname: 'Nama bermula dengan gelaran panggilan.',
+  deleted: 'Akaun telah dipadam.',
+  organization: 'Nama kelihatan seperti akaun organisasi, bukan individu.',
+  has_digits_or_underscore: 'Nama mengandungi nombor atau garis bawah.',
+  duplicate: 'Kemungkinan pendua: nama atau e-mel sama dengan peserta lain dalam kelas ini.',
 };
+
+/** Awalan nama yang lazim bagi akaun organisasi (KZ-E). */
+const ORGANISASI = /^(ppk|ppd|jpn|jabatan|pejabat|bahagian|unit|sekolah|sk|smk|kolej|universiti|majlis|lembaga|kementerian|syarikat|persatuan|lpp|kemas|jkm|pusat)\b/i;
 
 export type AmaranNama = { code: KodAmaranNama; message: string };
 
@@ -41,7 +56,92 @@ export function amaranNama(nama: string | null | undefined, disahkan: boolean): 
   const perkataan = n.split(/\s+/).filter(Boolean);
   if (perkataan.length <= 2) hasil.push({ code: 'short', message: MESEJ_AMARAN.short });
   if (PANGGILAN.test(n)) hasil.push({ code: 'nickname', message: MESEJ_AMARAN.nickname });
+  if (/^\[deleted\]/i.test(n)) hasil.push({ code: 'deleted', message: MESEJ_AMARAN.deleted });
+  if (/[0-9_]/.test(n)) hasil.push({ code: 'has_digits_or_underscore', message: MESEJ_AMARAN.has_digits_or_underscore });
+  if (ORGANISASI.test(n) && !/\b(bin|binti|bt|bte|a\/l|a\/p)\b/i.test(n)) {
+    hasil.push({ code: 'organization', message: MESEJ_AMARAN.organization });
+  }
   return hasil;
+}
+
+/** Akaun dipadam: nama bermula "[Deleted]". */
+export function akaunDipadam(nama: string | null | undefined): boolean {
+  return /^\s*\[deleted\]/i.test(nama ?? '');
+}
+
+// Bendera 'u' melalui konstruktor (sasaran tsconfig ES5).
+const BUKAN_HURUF = new RegExp('[^\\p{L}\\s/]', 'gu');
+
+/** Huruf sahaja, huruf kecil, tanpa kandungan kurungan dan tanda "[Deleted]". */
+function hurufSahaja(nama: string): string {
+  return nama
+    .toLowerCase()
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\[deleted\]/g, ' ')
+    .replace(BUKAN_HURUF, ' ');
+}
+
+const RE_BIN = /\b(bin|binti|bt|bte|a\/l|a\/p)\b/;
+
+/**
+ * Kunci pendua bagi satu nama (KZ-E):
+ *   penuh: semua huruf tanpa ruang dan tanpa perkataan bin/binti,
+ *     jadi "SITI MARYANI BINTI MOKHTAR (LPP-JOHOR)" = "sitimaryani mokhtar".
+ *   diri: nama sebelum bin/binti (hanya bagi nama yang ada bin/binti),
+ *     dipadankan dengan "penuh" nama yang TIADA bin/binti, jadi
+ *     "Siti Noor Fatinhana" = "Siti Noor Fatinhana binti jabar", tetapi dua
+ *     nama "Muhammad Ali bin ..." yang berbeza bapa tidak dianggap sama.
+ */
+export function kunciPendua(nama: string): { penuh: string; diri: string | null; adaBin: boolean } {
+  const h = hurufSahaja(nama);
+  const adaBin = RE_BIN.test(h);
+  const penuh = h.replace(new RegExp(RE_BIN.source, 'g'), ' ').replace(/[\s/]+/g, '');
+  const diri = adaBin ? h.split(RE_BIN)[0].replace(/[\s/]+/g, '') : null;
+  return { penuh, diri, adaBin };
+}
+
+/** Kekal untuk keserasian: kunci penuh. */
+export function namaTernormal(nama: string): string {
+  return kunciPendua(nama).penuh;
+}
+
+/**
+ * Tanda pendua dalam satu kelas: e-mel sama, atau kunci nama sepadan
+ * (lihat kunciPendua). Pulangkan set participant_id yang berpendua.
+ */
+export function cariPendua(senarai: { participant_id: string; nama: string | null; email?: string | null }[]): Set<string> {
+  const k = senarai.map((p) => ({ id: p.participant_id, e: p.email?.trim().toLowerCase() || null, ...kunciPendua(p.nama ?? '') }));
+  const hasil = new Set<string>();
+  for (let i = 0; i < k.length; i += 1) {
+    for (let j = i + 1; j < k.length; j += 1) {
+      const a = k[i];
+      const b = k[j];
+      const sama =
+        (a.e && a.e === b.e) ||
+        (a.penuh.length >= 4 && a.penuh === b.penuh) ||
+        (a.diri && !b.adaBin && a.diri.length >= 6 && a.diri === b.penuh) ||
+        (b.diri && !a.adaBin && b.diri.length >= 6 && b.diri === a.penuh);
+      if (sama) {
+        hasil.add(a.id);
+        hasil.add(b.id);
+      }
+    }
+  }
+  return hasil;
+}
+
+/** Gabung amaran individu dan pendua untuk satu senarai. */
+export function amaranSenarai(
+  senarai: { participant_id: string; nama: string | null; disahkan: boolean; email?: string | null }[],
+): Map<string, AmaranNama[]> {
+  const pendua = cariPendua(senarai);
+  const out = new Map<string, AmaranNama[]>();
+  for (const p of senarai) {
+    const a = amaranNama(p.nama, p.disahkan);
+    if (pendua.has(p.participant_id)) a.push({ code: 'duplicate', message: MESEJ_AMARAN.duplicate });
+    out.set(p.participant_id, a);
+  }
+  return out;
 }
 
 /**

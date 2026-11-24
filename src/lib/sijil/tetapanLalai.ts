@@ -8,6 +8,8 @@ import { normaliseSusunAtur, type SusunAturSijil } from '@/lib/sijil/susunAtur';
 export type TemplatEmel = {
   subject?: string;
   body?: string;
+  /** KZ-E: isi e-mel permintaan nama sebelum sijil dikeluarkan. */
+  body_before_issue?: string;
   from_name?: string;
   reply_to?: string;
 };
@@ -28,7 +30,7 @@ export const LAJUR_LALAI =
   'educator_id, background_path, logo_path, signature_path, signer_name, signer_title, layout, email_template, updated_at';
 
 /** Pemboleh ubah yang disokong dalam subjek dan isi e-mel sijil. */
-export const PEMBOLEH_UBAH_EMEL = ['{nama}', '{kursus}', '{tarikh}', '{tempat}', '{kod_sijil}', '{pautan_pengesahan}'];
+export const PEMBOLEH_UBAH_EMEL = ['{nama}', '{kursus}', '{tarikh}', '{tempat}', '{kod_sijil}', '{pautan_pengesahan}', '{nama_semasa}', '{pautan_kemaskini_nama}'];
 
 const RE_EMEL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
 
@@ -41,12 +43,12 @@ export function normaliseTemplatEmel(input: unknown): { nilai?: TemplatEmel; ral
   if (typeof input !== 'object' || Array.isArray(input)) return { ralat: 'email_template must be an object.' };
   const s = input as Record<string, unknown>;
   const out: TemplatEmel = {};
-  const had: Record<keyof TemplatEmel, number> = { subject: 200, body: 8000, from_name: 80, reply_to: 200 };
+  const had: Record<keyof TemplatEmel, number> = { subject: 200, body: 8000, body_before_issue: 8000, from_name: 80, reply_to: 200 };
   for (const k of Object.keys(had) as (keyof TemplatEmel)[]) {
     const v = s[k];
     if (v === undefined || v === null) continue;
     if (typeof v !== 'string') return { ralat: `email_template.${k} must be a string.` };
-    const t = k === 'body' ? v.replace(/\r\n/g, '\n').trim() : v.replace(/[\r\n]+/g, ' ').trim();
+    const t = k === 'body' || k === 'body_before_issue' ? v.replace(/\r\n/g, '\n').trim() : v.replace(/[\r\n]+/g, ' ').trim();
     if (!t) continue;
     if (t.length > had[k]) return { ralat: `email_template.${k} exceeds ${had[k]} characters.` };
     if (k === 'reply_to' && !RE_EMEL.test(t)) return { ralat: 'email_template.reply_to is not a valid email address.' };

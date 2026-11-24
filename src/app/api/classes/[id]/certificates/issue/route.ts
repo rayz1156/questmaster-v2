@@ -17,7 +17,7 @@ import { semakPendidikKelas } from '@/lib/peer-server';
 import { dalamHad } from '@/lib/hadKadar';
 import { bacaTemplatKelas, keluarkanSijil } from '@/lib/sijil/keluarkan';
 import { ralatJson } from '@/lib/i18n/ralatApi';
-import { amaranNama, janaSemulaIkutTemplat } from '@/lib/sijil/namaSijil';
+import { akaunDipadam, amaranSenarai, janaSemulaIkutTemplat } from '@/lib/sijil/namaSijil';
 
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
@@ -37,9 +37,16 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const body = await req.json().catch(() => ({}));
   const templateId = typeof body.template_id === 'string' ? body.template_id : '';
   const confirm = body.confirm === true;
-  const participantIds: string[] | null = Array.isArray(body.participant_ids)
+  let participantIds: string[] | null = Array.isArray(body.participant_ids)
     ? body.participant_ids.filter((x: unknown) => typeof x === 'string')
     : null;
+  // KZ-E: pengecualian, ringkasan sahaja dan langkau akaun dipadam.
+  const kecuali = new Set<string>(
+    Array.isArray(body.exclude_participant_ids)
+      ? body.exclude_participant_ids.filter((x: unknown) => typeof x === 'string')
+      : [],
+  );
+  const ringkas = body.summary_only === true;
   if (!templateId) {
     return ralatJson('template_id is required.', 400);
   }
@@ -98,19 +105,54 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     if (error) {
       return ralatJson(error.message, 400);
     }
-    // KZ-A: amaran nama (belum disahkan, kurungan, nama pendek, gelaran).
-    const preview = ((data ?? []) as Record<string, unknown>[]).map((r): Record<string, unknown> & { warnings: ReturnType<typeof amaranNama> } => {
+    // KZ-A/KZ-E: amaran nama (belum disahkan, kurungan, pendek, gelaran,
+    // dipadam, organisasi, nombor/garis bawah, pendua dalam kelas).
+    const mentah = (data ?? []) as Record<string, unknown>[];
+    const amaran = amaranSenarai(
+      mentah.map((r) => {
+        const pid = String(r.participant_id);
+        const ganti = overrides.get(pid);
+        return { participant_id: pid, nama: ganti ?? (r.certificate_name as string | null), disahkan: ganti ? true : r.name_confirmed === true };
+      }),
+    );
+    type BarisPratonton = Record<string, unknown> & { warnings: ReturnType<typeof amaranSenarai> extends Map<string, infer V> ? V : never; excluded?: boolean };
+    const preview = mentah.map((r): BarisPratonton => {
       const pid = String(r.participant_id);
       const ganti = overrides.get(pid);
-      const nama = ganti ?? (r.certificate_name as string | null);
-      const disahkan = ganti ? true : r.name_confirmed === true;
       return {
         ...r,
         ...(ganti ? { certificate_name: ganti, name_confirmed: true, name_override: true } : {}),
-        warnings: amaranNama(nama, disahkan),
+        ...(kecuali.has(pid) ? { excluded: true } : {}),
+        warnings: amaran.get(pid) ?? [],
       };
     });
-    const namaBerisiko = preview.filter((r) => r.eligible === true && r.warnings.length > 0).length;
+    const sasaran = preview.filter((r) => !r.excluded && !akaunDipadam(String(r.certificate_name ?? '')));
+    const namaBerisiko = sasaran.filter((r) => r.eligible === true && r.warnings.length > 0).length;
+    if (ringkas) {
+      const kira = (kod: string) => sasaran.filter((r) => r.warnings.some((w) => w.code === kod)).length;
+      return NextResponse.json({
+        summary: {
+          participants: preview.length,
+          eligible: sasaran.filter((r) => r.eligible === true).length,
+          already_issued: sasaran.filter((r) => r.already_issued === true).length,
+          to_issue: sasaran.filter((r) => r.eligible === true && r.already_issued !== true).length,
+          excluded: preview.filter((r) => r.excluded).length,
+          deleted_accounts: preview.filter((r) => akaunDipadam(String(r.certificate_name ?? ''))).length,
+          name_warnings_count: namaBerisiko,
+          warnings_by_code: Object.fromEntries(
+            ['unconfirmed', 'short', 'brackets', 'nickname', 'organization', 'has_digits_or_underscore', 'duplicate', 'deleted'].map((k) => [k, kira(k)]),
+          ),
+        },
+        // Hanya nama dengan amaran selain 'unconfirmed' (senarai pendek).
+        flagged: sasaran
+          .filter((r) => r.warnings.some((w) => w.code !== 'unconfirmed'))
+          .map((r) => ({
+            participant_id: r.participant_id,
+            certificate_name: r.certificate_name,
+            warnings: r.warnings.map((w) => w.code).filter((c) => c !== 'unconfirmed'),
+          })),
+      });
+    }
     return NextResponse.json({ preview, name_warnings_count: namaBerisiko });
   }
 
@@ -164,6 +206,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
       names_saved: disimpan,
       ...(pdfSebahagian ? { renamed_regenerated: pdfSebahagian.regenerated } : {}),
     });
+  }
+
+  // KZ-E: kecualikan peserta dan akaun dipadam ("[Deleted] ...") secara automatik.
+  {
+    const { data: layak } = await auth.supa.rpc('qm_certificate_eligibility', { p_template: templateId });
+    const semua = ((layak ?? []) as { participant_id: string; certificate_name: string | null }[]);
+    const tolak = new Set(semua.filter((r) => akaunDipadam(r.certificate_name)).map((r) => r.participant_id));
+    kecuali.forEach((id) => tolak.add(id));
+    if (tolak.size > 0) {
+      const asas = participantIds ?? semua.map((r) => r.participant_id);
+      participantIds = asas.filter((id) => !tolak.has(id));
+      if (participantIds.length === 0) return NextResponse.json({ issued: 0, certificates: [], skipped: true });
+      if (participantIds.length > MAX_ID_PERMINTAAN) participantIds = participantIds.slice(0, 500);
+    }
   }
 
   try {

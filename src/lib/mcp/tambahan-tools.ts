@@ -1432,7 +1432,8 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
     description:
       "Kemas kini separa tetapan lalai sijil anda; hanya medan yang diberi diubah. signer_name, signer_title, " +
       "layout (bentuk sama seperti layout templat), email_template {subject, body, from_name, reply_to} dengan " +
-      "pemboleh ubah {nama} {kursus} {tarikh} {tempat} {kod_sijil} {pautan_pengesahan}. null membuang nilai. " +
+      "body_before_issue (isi e-mel permintaan nama sebelum sijil), pemboleh ubah {nama} {nama_semasa} {kursus} {tarikh} " +
+      "{tempat} {kod_sijil} {pautan_pengesahan} {pautan_kemaskini_nama}. null membuang nilai. " +
       "clear_background/clear_logo/clear_signature membuang aset. copy_assets_from {class_id, template_id, kinds?} " +
       "menyalin aset templat kelas anda ke tetapan lalai. Templat baharu mewarisi tetapan ini.",
     roles: STAFF,
@@ -1448,6 +1449,7 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
           properties: {
             subject: { type: "string" },
             body: { type: "string" },
+            body_before_issue: { type: "string" },
             from_name: { type: "string" },
             reply_to: { type: "string" },
           },
@@ -1532,7 +1534,8 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
       "sesaat (di bawah had Emailit 2 sesaat) dengan cubaan semula automatik untuk ralat sementara (SMTP 4xx " +
       "seperti 452). Tanpa certificate_ids: semua sijil yang belum diemel (maksimum 200). resend: true menghantar " +
       "semula yang sudah diemel. email_subject dan email_body (kedua-duanya) mengatasi templat untuk penghantaran " +
-      "ini; pemboleh ubah {nama} {kursus} {tarikh} {tempat} {kod_sijil} {pautan_pengesahan}. Pulangkan queued, " +
+      "ini; pemboleh ubah {nama} {nama_semasa} {kursus} {tarikh} {tempat} {kod_sijil} {pautan_pengesahan} " +
+      "{pautan_kemaskini_nama} (pautan nama mencipta token after_issue untuk setiap penerima). Pulangkan queued, " +
       "already_queued, already_sent, skipped dan estimated_seconds; untuk 20 sijil atau kurang, menunggu dan " +
       "memulangkan sent dan failed sebenar. Semak kemudian dengan get_certificate_email_status. Pelan Pro dan " +
       "Institution sahaja. Menghantar emel sebenar, jadi wajib confirm: true.",
@@ -1588,6 +1591,114 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
       );
     },
   },
+  // === Pengesahan nama penuh oleh peserta (KZ-E) ===
+  {
+    name: "request_name_confirmation",
+    title: "Minta peserta sahkan nama penuh",
+    description:
+      "Hantar e-mel kepada peserta dengan pautan unik /nama/<token> untuk mengesahkan nama penuh seperti dalam " +
+      "kad pengenalan; profil dikemas kini dan sijil dijana semula serta dihantar automatik selepas pengesahan. " +
+      "mode after_issue: sijil dikeluarkan dan dihantar sekarang dengan nama sedia ada, e-mel yang sama membawa " +
+      "pautan kemas kini nama. mode before_issue: sijil hanya dikeluarkan selepas peserta mengesahkan nama. " +
+      "Penerima: participant_ids, atau filter unconfirmed (lalai), flagged (nama beramaran) atau all. " +
+      "exclude_participant_ids dan skip_warnings (contoh [\"organization\",\"duplicate\"]) untuk mengecualikan. " +
+      "Akaun dipadam, tiada e-mel dan peserta yang sudah ada permintaan aktif sentiasa dilangkau. Tanpa confirm: " +
+      "true, pulangkan dry run (penerima, amaran, yang dilangkau dengan sebab, contoh e-mel yang sudah diisi). " +
+      "Maksimum 150 penerima setiap panggilan.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        participant_ids: { type: "array", items: { type: "string" } },
+        filter: { type: "string", enum: ["unconfirmed", "flagged", "all"], default: "unconfirmed" },
+        mode: { type: "string", enum: ["after_issue", "before_issue"] },
+        template_id: { type: "string", description: "Lalai templat aktif kelas" },
+        email_subject: { type: "string" },
+        email_body: { type: "string", description: "Pemboleh ubah: {nama} {nama_semasa} {kursus} {tarikh} {tempat} {kod_sijil} {pautan_pengesahan} {pautan_kemaskini_nama}" },
+        expires_in_days: { type: "number", default: 30 },
+        exclude_participant_ids: { type: "array", items: { type: "string" } },
+        skip_warnings: {
+          type: "array",
+          items: { type: "string", enum: ["brackets", "short", "nickname", "organization", "has_digits_or_underscore", "duplicate", "deleted", "unconfirmed"] },
+        },
+        confirm: { type: "boolean", description: "true untuk menghantar; tanpa ini dry run" },
+      },
+      required: ["class_id", "mode"],
+    },
+    handler: async (args, s) => {
+      const body = pilih(args, [
+        "participant_ids", "filter", "mode", "template_id", "email_subject", "email_body",
+        "expires_in_days", "exclude_participant_ids", "skip_warnings",
+      ]);
+      body.confirm = args.confirm === true;
+      return callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/name-confirmation`, { method: "POST", body });
+    },
+  },
+  {
+    name: "get_name_confirmation_status",
+    title: "Status pengesahan nama",
+    description:
+      "Status pautan kemas kini nama bagi satu kelas (class_id) atau semua kelas yang ada permintaan: dihantar, " +
+      "disahkan, belum disahkan, tamat tempoh, dibatalkan, e-mel dalam baris gilir, dan senarai nama lama " +
+      "berbanding nama baharu.",
+    roles: STAFF,
+    write: false,
+    inputSchema: { type: "object", properties: { class_id: { type: "string" } } },
+    handler: async (args, s) =>
+      callApi(s.accessToken, `/api/name-confirmation/status${qs({ class_id: typeof args.class_id === "string" ? args.class_id.trim() : "" })}`),
+  },
+  {
+    name: "resend_name_confirmation",
+    title: "Hantar peringatan pengesahan nama",
+    description:
+      "Hantar peringatan kepada peserta yang belum mengesahkan nama (token pending atau tamat tempoh) dan " +
+      "permintaannya lebih lama daripada older_than_days (lalai 7). Token baharu dicipta dan token lama dibatalkan. " +
+      "Tanpa confirm: true, pulangkan dry run.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        older_than_days: { type: "number", default: 7 },
+        expires_in_days: { type: "number", default: 30 },
+        participant_ids: { type: "array", items: { type: "string" } },
+        confirm: { type: "boolean" },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      const body = pilih(args, ["older_than_days", "expires_in_days", "participant_ids"]);
+      body.confirm = args.confirm === true;
+      return callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/name-confirmation/resend`, { method: "POST", body });
+    },
+  },
+  {
+    name: "revoke_name_confirmation",
+    title: "Batalkan pautan pengesahan nama",
+    description:
+      "Batalkan token pautan nama yang belum digunakan bagi participant_ids atau semua peserta kelas, dan " +
+      "batalkan e-mel permintaan nama yang belum dihantar. Tanpa confirm: true, pulangkan bilangan sahaja.",
+    roles: STAFF,
+    write: true,
+    inputSchema: {
+      type: "object",
+      properties: {
+        class_id: { type: "string" },
+        participant_ids: { type: "array", items: { type: "string" } },
+        confirm: { type: "boolean" },
+      },
+      required: ["class_id"],
+    },
+    handler: async (args, s) => {
+      const body = pilih(args, ["participant_ids"]);
+      body.confirm = args.confirm === true;
+      return callApi(s.accessToken, `/api/classes/${wajib(args, "class_id")}/name-confirmation/revoke`, { method: "POST", body });
+    },
+  },
+
   // === Encharge dan bendera UI (KZ-D) ===
   {
     name: "send_to_encharge",

@@ -30,6 +30,7 @@ import { getServiceSupabase } from '@/lib/supabase-route';
 import { MAKS_LAMPIRAN, pathSelamat } from '@/lib/sijil/emelSijil';
 import { emelSijil } from '@/lib/i18n/emel';
 import { formatTarikhBm } from '@/lib/sijil/janaPdf';
+import { janaToken, urlKemaskiniNama } from '@/lib/sijil/namaPenuh';
 
 export const MAX_CUBAAN = 5;
 
@@ -84,40 +85,91 @@ export type NilaiTemplat = {
   tempat: string;
   kod_sijil: string;
   pautan_pengesahan: string;
+  /** KZ-E: nama yang tercetak pada sijil sekarang. */
+  nama_semasa?: string;
+  /** KZ-E: pautan unik /nama/<token> (kosong jika tiada). */
+  pautan_kemaskini_nama?: string;
 };
 
-/** Gantikan {nama} {kursus} {tarikh} {tempat} {kod_sijil} {pautan_pengesahan}. */
+const RE_PEMBOLEH_UBAH = /\{(nama|kursus|tarikh|tempat|kod_sijil|pautan_pengesahan|nama_semasa|pautan_kemaskini_nama)\}/g;
+
+/** Gantikan pemboleh ubah templat e-mel sijil. */
 export function isiTemplat(teks: string, nilai: NilaiTemplat, html = false): string {
-  return teks.replace(/\{(nama|kursus|tarikh|tempat|kod_sijil|pautan_pengesahan)\}/g, (_m, k: keyof NilaiTemplat) =>
+  return teks.replace(RE_PEMBOLEH_UBAH, (_m, k: keyof NilaiTemplat) =>
     html ? escapeHtml(nilai[k] ?? '') : (nilai[k] ?? ''),
   );
+}
+
+/** Templat menggunakan pautan kemas kini nama? */
+export function gunaPautanNama(...teks: (string | null | undefined)[]): boolean {
+  return teks.some((t) => !!t && t.includes('{pautan_kemaskini_nama}'));
 }
 
 /** Bina e-mel daripada templat tersuai (subjek dan isi teks biasa). */
 export function emelTersuai(subjek: string, isi: string, nilai: NilaiTemplat, adaLampiran: boolean) {
   const subject = isiTemplat(subjek, nilai).replace(/[\r\n]+/g, ' ').slice(0, 200);
   const text = isiTemplat(isi, nilai);
+  // URL dalam isi dijadikan pautan boleh klik selepas di-escape.
   const htmlIsi = escapeHtml(isiTemplat(isi, nilai))
+    .replace(/https:\/\/[^\s<]+/g, (u) => `<a href="${u}">${u}</a>`)
     .split(/\n{2,}/)
     .map((p) => `<p style="color:#374151;line-height:1.5;">${p.replace(/\n/g, '<br>')}</p>`)
     .join('');
   const pautan = escapeHtml(nilai.pautan_pengesahan);
+  const kaki = [
+    adaLampiran ? 'Sijil dilampirkan sebagai PDF.' : '',
+    pautan && !isi.includes('{pautan_pengesahan}') ? `Pengesahan: <a href="${pautan}">${pautan}</a>` : '',
+  ].filter(Boolean).join(' ');
   const html = `
     <div style="font-family:Arial,sans-serif;max-width:560px;margin:0 auto;padding:24px;background:#f9fafb;">
       <div style="background:#fff;border-radius:12px;padding:24px;border:1px solid #e5e7eb;">
         ${htmlIsi}
-        <p style="color:#6b7280;font-size:12px;margin-top:24px;">
-          ${adaLampiran ? 'Sijil dilampirkan sebagai PDF. ' : ''}Pengesahan: <a href="${pautan}">${pautan}</a>
-        </p>
+        ${kaki ? `<p style="color:#6b7280;font-size:12px;margin-top:24px;">${kaki}</p>` : ''}
       </div>
     </div>`;
   return { subject, text, html };
 }
 
+/** Isi terbina dalam (BM) bila pendidik tiada templat, mengikut jenis e-mel. */
+export const ISI_LALAI = {
+  after_issue: {
+    subject: 'Sijil Penyertaan: {kursus}',
+    body:
+      'Assalamualaikum dan salam sejahtera {nama},\n\n' +
+      'Terima kasih atas penyertaan anda dalam {kursus} pada {tarikh}.\n\n' +
+      'Bersama-sama ini dilampirkan sijil penyertaan anda (kod sijil: {kod_sijil}).\n\n' +
+      'Nama yang tercetak pada sijil ialah: {nama_semasa}\n' +
+      'Jika nama ini bukan nama penuh anda seperti dalam kad pengenalan, sila kemas kini di pautan berikut. Sijil baharu akan dihantar secara automatik selepas anda mengesahkan nama:\n' +
+      '{pautan_kemaskini_nama}\n\n' +
+      'Pautan ini sah selama {hari} hari.\n\nPengesahan sijil: {pautan_pengesahan}\n\nSekian, terima kasih.',
+  },
+  name_request: {
+    subject: 'Sahkan nama penuh untuk sijil: {kursus}',
+    body:
+      'Assalamualaikum dan salam sejahtera {nama},\n\n' +
+      'Terima kasih atas penyertaan anda dalam {kursus}.\n\n' +
+      'Sijil penyertaan anda sedia untuk dikeluarkan. Sebelum itu, sila sahkan nama penuh anda seperti dalam kad pengenalan di pautan berikut. Sijil akan dihantar secara automatik ke e-mel ini sebaik sahaja anda mengesahkan nama:\n' +
+      '{pautan_kemaskini_nama}\n\n' +
+      'Pautan ini sah selama {hari} hari.\n\nSekian, terima kasih.',
+  },
+  name_updated: {
+    subject: 'Sijil dikemas kini: {kursus}',
+    body:
+      'Assalamualaikum dan salam sejahtera {nama},\n\n' +
+      'Terima kasih kerana mengesahkan nama penuh anda. Bersama-sama ini dilampirkan sijil {kursus} yang telah dikemas kini dengan nama {nama} (kod sijil: {kod_sijil}).\n\n' +
+      'Pengesahan sijil: {pautan_pengesahan}\n\nSekian, terima kasih.',
+  },
+};
+
 type BarisGilir = {
   id: string;
-  certificate_id: string;
+  certificate_id: string | null;
   class_id: string;
+  participant_id: string | null;
+  template_id: string | null;
+  kind: 'certificate' | 'name_updated' | 'name_request';
+  name_link_purpose: 'after_issue' | 'before_issue' | null;
+  name_link_days: number | null;
   requested_by: string | null;
   idempotency_key: string;
   attempts: number;
@@ -150,17 +202,89 @@ function dapatkanPengangkut(): { t: Transporter; dari: string } | null {
 
 const RE_EMEL = /^[^\s@<>"']+@[^\s@<>"']+\.[^\s@<>"']+$/;
 
+/** Tarikh kursus daripada fields templat, sandaran tarikh yang diberi. */
+function tarikhKursus(f: Record<string, string>, sandaran: string | null): string {
+  if (f.date_start) {
+    return f.date_end && f.date_end !== f.date_start
+      ? `${formatTarikhBm(new Date(f.date_start))} hingga ${formatTarikhBm(new Date(f.date_end))}`
+      : formatTarikhBm(new Date(f.date_start));
+  }
+  return formatTarikhBm(new Date(sandaran ?? Date.now()));
+}
+
+/**
+ * KZ-E: cipta token pautan nama semasa menghantar (token mentah hanya wujud
+ * dalam e-mel; hash disimpan). Token aktif lama untuk peserta dan kelas ini
+ * dibatalkan dahulu supaya hanya satu token aktif.
+ */
+async function ciptaTokenNama(
+  svc: SupabaseClient,
+  b: BarisGilir,
+  participantId: string,
+  certificateId: string | null,
+  templateId: string | null,
+): Promise<string> {
+  const hari = Math.min(90, Math.max(1, b.name_link_days ?? 30));
+  for (let cuba = 0; cuba < 2; cuba += 1) {
+    await svc
+      .from('qm_name_update_tokens')
+      .update({ status: 'revoked' })
+      .eq('participant_id', participantId)
+      .eq('class_id', b.class_id)
+      .eq('status', 'pending');
+    const { token, hash } = janaToken();
+    const { error } = await svc.from('qm_name_update_tokens').insert({
+      token_hash: hash,
+      participant_id: participantId,
+      class_id: b.class_id,
+      certificate_id: certificateId,
+      template_id: templateId,
+      purpose: b.name_link_purpose ?? 'after_issue',
+      expires_at: new Date(Date.now() + hari * 86_400_000).toISOString(),
+      created_by: b.requested_by,
+    });
+    if (!error) return urlKemaskiniNama(token);
+    if ((error as { code?: string }).code !== '23505') throw ralatSementara(`Token insert failed: ${error.message}`);
+  }
+  throw ralatSementara('Token insert conflict.');
+}
+
 /** Hantar satu baris. Membaling ralat untuk dikelaskan oleh pemanggil. */
 async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<{ hasil: 'sent' | 'cancelled'; lampiran: boolean }> {
-  const { data: sijil, error: sijilErr } = await svc
-    .from('qm_certificates')
-    .select('id, code, class_id, template_id, participant_id, name_snapshot, program_snapshot, issued_at, pdf_path, revoked_at')
-    .eq('id', b.certificate_id)
-    .maybeSingle();
-  if (sijilErr) throw ralatSementara(`Certificate lookup failed: ${sijilErr.message}`);
-  if (!sijil || sijil.revoked_at || sijil.class_id !== b.class_id) return { hasil: 'cancelled', lampiran: false };
+  type Sijil = {
+    id: string; code: string; class_id: string; template_id: string; participant_id: string;
+    name_snapshot: string; program_snapshot: string; issued_at: string | null; pdf_path: string | null; revoked_at: string | null;
+  };
+  let sijil: Sijil | null = null;
+  let participantId = b.participant_id;
+  let templateId = b.template_id;
+  if (b.certificate_id) {
+    const { data, error: sijilErr } = await svc
+      .from('qm_certificates')
+      .select('id, code, class_id, template_id, participant_id, name_snapshot, program_snapshot, issued_at, pdf_path, revoked_at')
+      .eq('id', b.certificate_id)
+      .maybeSingle();
+    if (sijilErr) throw ralatSementara(`Certificate lookup failed: ${sijilErr.message}`);
+    sijil = data as Sijil | null;
+    if (!sijil || sijil.revoked_at || sijil.class_id !== b.class_id) return { hasil: 'cancelled', lampiran: false };
+    participantId = sijil.participant_id;
+    templateId = sijil.template_id;
+  }
+  if (!participantId) return { hasil: 'cancelled', lampiran: false };
 
-  const { data: pengguna, error: penggunaErr } = await svc.auth.admin.getUserById(String(sijil.participant_id));
+  // name_request: peserta mesti masih ahli kelas.
+  if (b.kind === 'name_request') {
+    const { data: ahli, error: ahliErr } = await svc
+      .from('qm_class_members')
+      .select('user_id')
+      .eq('class_id', b.class_id)
+      .eq('user_id', participantId)
+      .maybeSingle();
+    if (ahliErr) throw ralatSementara(`Membership lookup failed: ${ahliErr.message}`);
+    if (!ahli) return { hasil: 'cancelled', lampiran: false };
+  }
+
+  const { data: pengguna, error: penggunaErr } = await svc.auth.admin.getUserById(String(participantId));
   if (penggunaErr && penggunaErr.status !== 404) throw ralatSementara(`User lookup failed: ${penggunaErr.message}`);
   const emel = pengguna?.user?.email ?? '';
   if (!emel || !RE_EMEL.test(emel)) {
@@ -178,7 +302,7 @@ async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<{ hasil:
 
   // Lampiran PDF (pathSelamat: folder kelas, nama selamat, .pdf).
   let lampiran: { filename: string; content: Buffer; contentType: string } | null = null;
-  if (pathSelamat(sijil.pdf_path, b.class_id)) {
+  if (sijil && pathSelamat(sijil.pdf_path, b.class_id)) {
     try {
       const { data: pdf } = await svc.storage.from('certificates').download(String(sijil.pdf_path));
       if (pdf) {
@@ -193,10 +317,10 @@ async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<{ hasil:
   }
 
   const siteUrl = (process.env.NEXT_PUBLIC_SITE_URL || 'https://kuizen.fun').replace(/\/$/, '');
-  const sahUrl = `${siteUrl}/sijil/${encodeURIComponent(sijil.code)}`;
+  const sahUrl = sijil ? `${siteUrl}/sijil/${encodeURIComponent(sijil.code)}` : '';
 
   // Templat: override penghantaran, kemudian tetapan lalai pendidik yang
-  // meminta, kemudian templat terbina dalam mengikut bahasa penerima.
+  // meminta, kemudian templat terbina dalam.
   let subjek = b.subject_override ?? '';
   let isi = b.body_override ?? '';
   let namaPengirim: string | null = null;
@@ -208,38 +332,74 @@ async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<{ hasil:
       .eq('educator_id', b.requested_by)
       .maybeSingle();
     const t = (lalai?.email_template ?? {}) as Record<string, string>;
-    if (!subjek && t.subject) subjek = t.subject;
-    if (!isi && t.body) isi = t.body;
+    if (b.kind === 'name_request') {
+      if (!subjek && t.subject) subjek = t.subject;
+      if (!isi && t.body_before_issue) isi = t.body_before_issue;
+    } else if (b.kind === 'certificate') {
+      if (!subjek && t.subject) subjek = t.subject;
+      if (!isi && t.body) isi = t.body;
+    }
     if (t.from_name) namaPengirim = t.from_name;
     if (t.reply_to && RE_EMEL.test(t.reply_to)) balasKe = t.reply_to;
+  }
+  const jenisLalai =
+    b.kind === 'certificate' ? (b.name_link_purpose === 'after_issue' ? 'after_issue' : null) : b.kind;
+  if (jenisLalai && (!subjek || !isi)) {
+    const lalaiJenis = ISI_LALAI[jenisLalai];
+    subjek = subjek || lalaiJenis.subject;
+    isi = isi || lalaiJenis.body;
+  }
+  isi = isi.replace(/\{hari\}/g, String(b.name_link_days ?? 30));
+
+  // Pautan nama: name_request sentiasa; certificate bila diminta atau bila
+  // templat memakai {pautan_kemaskini_nama}. name_updated tidak pernah.
+  let pautanNama = '';
+  const perluPautan =
+    b.kind === 'name_request' ||
+    (b.kind === 'certificate' && (b.name_link_purpose === 'after_issue' || gunaPautanNama(subjek, isi)));
+  if (perluPautan) {
+    pautanNama = await ciptaTokenNama(svc, { ...b, name_link_purpose: b.kind === 'name_request' ? 'before_issue' : 'after_issue' }, participantId, sijil?.id ?? null, templateId);
+    // Templat tanpa pemboleh ubah pautan: tambah perenggan pautan di hujung.
+    if (isi && !gunaPautanNama(isi)) {
+      isi += '\n\nJika nama pada sijil bukan nama penuh anda seperti dalam kad pengenalan, sila kemas kini di pautan berikut. Sijil baharu akan dihantar secara automatik:\n{pautan_kemaskini_nama}';
+    }
   }
 
   let kandungan: { subject: string; text: string; html: string };
   if (subjek && isi) {
-    const { data: tpl } = await svc
-      .from('qm_certificate_templates')
-      .select('fields')
-      .eq('id', sijil.template_id)
-      .maybeSingle();
-    const f = (tpl?.fields ?? {}) as Record<string, string>;
-    const tarikh = f.date_start
-      ? f.date_end && f.date_end !== f.date_start
-        ? `${formatTarikhBm(new Date(f.date_start))} hingga ${formatTarikhBm(new Date(f.date_end))}`
-        : formatTarikhBm(new Date(f.date_start))
-      : formatTarikhBm(new Date(sijil.issued_at ?? Date.now()));
+    let f: Record<string, string> = {};
+    let kursus = sijil?.program_snapshot ?? '';
+    if (templateId) {
+      const { data: tpl } = await svc.from('qm_certificate_templates').select('fields, title').eq('id', templateId).maybeSingle();
+      f = (tpl?.fields ?? {}) as Record<string, string>;
+      if (!kursus) kursus = f.course || '';
+    }
+    if (!kursus) {
+      const { data: k } = await svc.from('qm_classes').select('name').eq('id', b.class_id).maybeSingle();
+      kursus = k?.name ?? '';
+    }
+    let namaSemasa = sijil?.name_snapshot ?? '';
+    if (!namaSemasa) {
+      const { data: kn } = await svc.from('qm_class_certificate_names').select('certificate_name')
+        .eq('class_id', b.class_id).eq('user_id', participantId).maybeSingle();
+      const { data: pr } = await svc.from('qm_profiles').select('certificate_name, display_name').eq('id', participantId).maybeSingle();
+      namaSemasa = kn?.certificate_name ?? pr?.certificate_name ?? pr?.display_name ?? '';
+    }
     kandungan = emelTersuai(subjek, isi, {
-      nama: sijil.name_snapshot ?? '',
-      kursus: sijil.program_snapshot ?? '',
-      tarikh,
+      nama: namaSemasa,
+      kursus,
+      tarikh: tarikhKursus(f, sijil?.issued_at ?? null),
       tempat: f.location ?? '',
-      kod_sijil: sijil.code,
+      kod_sijil: sijil?.code ?? '',
       pautan_pengesahan: sahUrl,
+      nama_semasa: namaSemasa,
+      pautan_kemaskini_nama: pautanNama,
     }, !!lampiran);
   } else {
-    const { data: prof } = await svc.from('qm_profiles').select('bahasa').eq('id', sijil.participant_id).maybeSingle();
+    const { data: prof } = await svc.from('qm_profiles').select('bahasa').eq('id', participantId).maybeSingle();
     kandungan = emelSijil(prof?.bahasa === 'ms' ? 'ms' : 'en', {
-      program: sijil.program_snapshot,
-      kod: sijil.code,
+      program: sijil!.program_snapshot,
+      kod: sijil!.code,
       senaraiUrl: `${siteUrl}/participant/certificates`,
       sahUrl,
       adaLampiran: !!lampiran,

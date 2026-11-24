@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUser } from '@/lib/supabase-route';
 import { semakPendidikKelas } from '@/lib/peer-server';
-import { dalamHad } from '@/lib/hadKadar';
+import { dalamHad, bakiSaat } from '@/lib/hadKadar';
 import { normaliseSusunAtur } from '@/lib/sijil/susunAtur';
 import { normaliseMedan } from '@/lib/sijil/medan';
 import { ralatJson } from '@/lib/i18n/ralatApi';
@@ -75,8 +75,10 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const classId = params.id;
   const userId = auth.user!.id;
 
-  if (!dalamHad(`cert-tpl:${userId}`)) {
-    return ralatJson('Too many requests. Please wait a minute and try again.', 429);
+  // KZ-E: had 30 seminit untuk pendidik, dengan retry_after_seconds.
+  if (!dalamHad(`cert-tpl:${userId}`, 30)) {
+    const saat = bakiSaat(`cert-tpl:${userId}`);
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429, { retry_after_seconds: saat });
   }
 
   const ok = await semakPendidikKelas(auth.supa, classId, userId);
@@ -164,6 +166,11 @@ export async function PATCH(req: NextRequest, { params }: { params: { id: string
 
   const ok = await semakPendidikKelas(auth.supa, classId, auth.user!.id);
   if (!ok) return ralatJson('Forbidden', 403);
+  // KZ-E: had 60 seminit untuk kemas kini templat.
+  if (!dalamHad(`cert-tpl-patch:${auth.user!.id}`, 60)) {
+    const saat = bakiSaat(`cert-tpl-patch:${auth.user!.id}`);
+    return ralatJson('Too many requests. Please wait a minute and try again.', 429, { retry_after_seconds: saat });
+  }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   const templateId = typeof body.template_id === 'string' ? body.template_id : '';
