@@ -178,6 +178,29 @@ begin
     raise exception 'UJIAN 9 GAGAL: status tidak boleh dibaca pendidik';
   end if;
 
+  -- Ujian 10: akaun dipadam atau bukan ahli tidak boleh menggunakan token.
+  delete from public.qm_name_update_tokens where participant_id = '00000000-0000-0000-0000-0000000e00a1' and status = 'pending';
+  insert into public.qm_name_update_tokens (token_hash, participant_id, class_id, purpose)
+  values (repeat('9', 64), '00000000-0000-0000-0000-0000000e00a1', '00000000-0000-0000-0000-0000000e0c01', 'after_issue');
+  update public.qm_profiles set display_name = '[Deleted] Ujian' where id = '00000000-0000-0000-0000-0000000e00a1';
+  begin
+    perform * from public.qm_confirm_name_token(repeat('9', 64), 'Nama Penuh Ada', null);
+    raise exception 'UJIAN 10 GAGAL: akaun dipadam diterima';
+  exception when others then
+    if sqlerrm <> 'TOKEN_REVOKED' then raise exception 'UJIAN 10 GAGAL: %', sqlerrm; end if;
+  end;
+  if (select display_name from public.qm_profiles where id = '00000000-0000-0000-0000-0000000e00a1') <> '[Deleted] Ujian' then
+    raise exception 'UJIAN 10 GAGAL: profil dipadam ditulis ganti';
+  end if;
+  update public.qm_profiles set display_name = 'Pulih' where id = '00000000-0000-0000-0000-0000000e00a1';
+  delete from public.qm_class_members where user_id = '00000000-0000-0000-0000-0000000e00a1';
+  begin
+    perform * from public.qm_confirm_name_token(repeat('9', 64), 'Nama Penuh Ada', null);
+    raise exception 'UJIAN 10 GAGAL: bukan ahli diterima';
+  exception when others then
+    if sqlerrm <> 'TOKEN_REVOKED' then raise exception 'UJIAN 10 GAGAL: %', sqlerrm; end if;
+  end;
+
   raise notice 'KZ-E: SEMUA UJIAN LULUS';
 end $u$;
 

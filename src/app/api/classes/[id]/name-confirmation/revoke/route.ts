@@ -46,7 +46,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
     .update({ status: 'cancelled', last_error: 'Name confirmation revoked by educator.', updated_at: new Date().toISOString() })
     .eq('class_id', classId)
     .in('status', ['queued', 'retrying'])
-    .not('name_link_purpose', 'is', null);
+    .eq('kind', 'name_request');
   if (ids) uGilir = uGilir.in('participant_id', ids);
   const { data: gilir } = await uGilir.select('id');
 

@@ -24,6 +24,7 @@ const MESEJ_STATUS: Record<string, string> = {
   used: 'Pautan ini sudah digunakan. Nama anda telah dikemas kini. Jika anda perlu membuat pembetulan lagi, sila hubungi pendidik anda.',
   expired: 'Pautan ini telah tamat tempoh. Sila hubungi pendidik anda untuk mendapatkan pautan baharu.',
   revoked: 'Pautan ini tidak lagi sah. Sila hubungi pendidik anda untuk mendapatkan pautan baharu.',
+  superseded: 'Pautan ini telah diganti dengan pautan yang lebih baharu. Sila guna pautan dalam e-mel terkini daripada Kuizen.',
   not_found: 'Pautan ini tidak sah. Pastikan anda membuka pautan penuh daripada e-mel, atau hubungi pendidik anda.',
 };
 
@@ -31,34 +32,42 @@ function jawab(body: Record<string, unknown>, status = 200) {
   return NextResponse.json(body, { status, headers: { 'cache-control': 'no-store', 'x-robots-tag': 'noindex' } });
 }
 
-function hadIp(req: NextRequest, jenis: string, maks: number): NextResponse | null {
-  const kunci = `nama-${jenis}:${ipPermintaan(req)}`;
+// Had per IP longgar (peserta bengkel sering berkongsi satu NAT), ditambah
+// had per token yang lebih ketat.
+function hadIp(req: NextRequest, jenis: string, maks: number, token?: string): NextResponse | null {
+  const kunci = token ? `nama-${jenis}-t:${token.slice(0, 16)}` : `nama-${jenis}:${ipPermintaan(req)}`;
   if (dalamHad(kunci, maks)) return null;
   const saat = bakiSaat(kunci);
   return jawab({ error: 'Terlalu banyak cubaan. Sila tunggu sebentar dan cuba lagi.', retry_after_seconds: saat }, 429);
 }
 
 export async function GET(req: NextRequest, { params }: { params: { token: string } }) {
-  const had = hadIp(req, 'baca', 30);
+  const had = hadIp(req, 'baca', 240) ?? hadIp(req, 'baca', 30, params.token);
   if (had) return had;
   if (!tokenBerbentukSah(params.token)) return jawab({ status: 'not_found', message: MESEJ_STATUS.not_found }, 404);
   const svc = getServiceSupabase();
   const t = await cariToken(svc, params.token);
   if (!t) return jawab({ status: 'not_found', message: MESEJ_STATUS.not_found }, 404);
   const status = statusBerkesan(t);
-  if (status !== 'pending') return jawab({ status, message: MESEJ_STATUS[status] });
+  if (status !== 'pending') {
+    const mesej = status === 'revoked' && t.superseded ? MESEJ_STATUS.superseded : MESEJ_STATUS[status];
+    return jawab({ status, message: mesej });
+  }
   return jawab({ status, ...(await maklumatHalaman(svc, t)) });
 }
 
 export async function POST(req: NextRequest, { params }: { params: { token: string } }) {
-  const had = hadIp(req, 'hantar', 10);
+  const had = hadIp(req, 'hantar', 60) ?? hadIp(req, 'hantar', 10, params.token);
   if (had) return had;
   if (!tokenBerbentukSah(params.token)) return jawab({ status: 'not_found', error: MESEJ_STATUS.not_found }, 404);
   const svc = getServiceSupabase();
   const t = await cariToken(svc, params.token);
   if (!t) return jawab({ status: 'not_found', error: MESEJ_STATUS.not_found }, 404);
   const status = statusBerkesan(t);
-  if (status !== 'pending') return jawab({ status, error: MESEJ_STATUS[status] }, 409);
+  if (status !== 'pending') {
+    const mesej = status === 'revoked' && t.superseded ? MESEJ_STATUS.superseded : MESEJ_STATUS[status];
+    return jawab({ status, error: mesej }, 409);
+  }
 
   const body = (await req.json().catch(() => ({}))) as Record<string, unknown>;
   if (body.confirmed !== true) {

@@ -27,6 +27,7 @@ const HAD_KELAYAKAN = 20;
 const HAD_ISSUE = 20;
 // KZ-011: satu permintaan pengeluaran tidak boleh membawa lebih 50 id.
 const MAX_ID_PERMINTAAN = 50;
+const PERINGKAT = 100;
 
 export async function POST(req: NextRequest, { params }: { params: { id: string } }) {
   const auth = await requireUser(req);
@@ -209,21 +210,38 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   }
 
   // KZ-E: kecualikan peserta dan akaun dipadam ("[Deleted] ...") secara automatik.
+  // Jika participant_ids tidak diberi, asasnya ialah peserta LAYAK yang belum
+  // menerima sijil (bukan semua ahli), dan pengeluaran dibuat berperingkat
+  // tanpa memotong senarai.
+  let senaraiPenuh = false;
   {
     const { data: layak } = await auth.supa.rpc('qm_certificate_eligibility', { p_template: templateId });
-    const semua = ((layak ?? []) as { participant_id: string; certificate_name: string | null }[]);
+    const semua = (layak ?? []) as { participant_id: string; certificate_name: string | null; eligible?: boolean; already_issued?: boolean }[];
     const tolak = new Set(semua.filter((r) => akaunDipadam(r.certificate_name)).map((r) => r.participant_id));
     kecuali.forEach((id) => tolak.add(id));
     if (tolak.size > 0) {
-      const asas = participantIds ?? semua.map((r) => r.participant_id);
+      const asas = participantIds ?? semua.filter((r) => r.eligible === true && r.already_issued !== true).map((r) => r.participant_id);
+      senaraiPenuh = participantIds === null;
       participantIds = asas.filter((id) => !tolak.has(id));
       if (participantIds.length === 0) return NextResponse.json({ issued: 0, certificates: [], skipped: true });
-      if (participantIds.length > MAX_ID_PERMINTAAN) participantIds = participantIds.slice(0, 500);
     }
   }
 
   try {
-    const hasil = await keluarkanSijil(auth.supa, template, participantIds, userId);
+    let hasil: Awaited<ReturnType<typeof keluarkanSijil>>;
+    if (senaraiPenuh && participantIds && participantIds.length > PERINGKAT) {
+      // Berperingkat supaya satu panggilan RPC/PDF tidak terlalu besar.
+      const gabung = { issued: 0, certificates: [] as unknown[], skipped: false } as unknown as typeof hasil;
+      for (let i = 0; i < participantIds.length; i += PERINGKAT) {
+        const h = await keluarkanSijil(auth.supa, template, participantIds.slice(i, i + PERINGKAT), userId);
+        (gabung as { issued: number }).issued += h.issued;
+        (gabung as { certificates: unknown[] }).certificates.push(...(h.certificates as unknown[]));
+      }
+      (gabung as { skipped: boolean }).skipped = (gabung as { issued: number }).issued === 0;
+      hasil = gabung;
+    } else {
+      hasil = await keluarkanSijil(auth.supa, template, participantIds, userId);
+    }
     // Sijil sedia ada yang namanya baru ditukar: jana semula PDF.
     const janaSemula = idJanaSemula.length > 0
       ? await janaSemulaIkutTemplat(getServiceSupabase(), classId, idJanaSemula)

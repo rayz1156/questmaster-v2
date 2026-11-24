@@ -10,12 +10,15 @@ for (const n of ["Bro J", "MzN88", "dee", "Rogayah_Estar", "Puan Aminah binti Al
   const h = sahkanNamaPenuh(n);
   semak(`ditolak: ${n}`, !h.ok, h.ok ? "" : h.mesej);
 }
-for (const n of ["Norfarahin binti Amat @ Adnin", "UJIAN BIN NAMA PENUH", "Muthu a/l Raju", "Nur 'Aisyah binti Abd. Rahman", "  Siti   Aminah  binti Ali "]) {
+for (const n of ["Mak Wai Kit", "Tuan Nor Azlina binti Tuan Ismail", "Nur’Ain binti Ali", "Haji Ahmad bin Ali", "Norfarahin binti Amat @ Adnin", "UJIAN BIN NAMA PENUH", "Muthu a/l Raju", "Nur 'Aisyah binti Abd. Rahman", "  Siti   Aminah  binti Ali "]) {
   const h = sahkanNamaPenuh(n);
   semak(`diterima: ${n}`, h.ok, h.ok ? h.nama : h.mesej);
 }
 const h = sahkanNamaPenuh("  Siti   Aminah  binti Ali ");
 semak("ruang dipadatkan", h.ok && h.nama === "Siti Aminah binti Ali");
+
+const ap = sahkanNamaPenuh("Nur’Ain binti Ali");
+semak("apostrof telefon ditukar", ap.ok && ap.nama === "Nur'Ain binti Ali");
 
 const t = janaToken();
 semak("token 43 aksara base64url", tokenBerbentukSah(t.token) && t.token.length === 43);

@@ -11,6 +11,7 @@
  */
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useParams } from "next/navigation";
+import { sahkanNamaPenuh } from "@/lib/sijil/namaPenuhSah";
 
 type Pratonton = {
   background_url: string | null;
@@ -33,11 +34,8 @@ const A4_W = 841.89;
 const A4_H = 595.28;
 
 function semakSegera(nama: string): string | null {
-  const n = nama.replace(/\s+/g, " ").trim();
-  if (n.length < 5) return "Nama terlalu pendek.";
-  if (/[0-9_]/.test(n)) return "Nama tidak boleh mengandungi nombor atau garis bawah.";
-  if (n.split(" ").length < 2) return "Tulis nama penuh sekurang-kurangnya dua perkataan.";
-  return null;
+  const h = sahkanNamaPenuh(nama);
+  return h.ok ? null : h.mesej;
 }
 
 function NamaPadaSijil({ nama, p }: { nama: string; p: Pratonton }) {
@@ -129,6 +127,12 @@ export default function HalamanNama() {
       .then((r) => r.json())
       .then((j: Maklumat) => {
         if (!hidup) return;
+        // Respons tanpa status (contoh 429): paparkan mesej ralat, bukan kotak kosong.
+        if (!j || !j.status) {
+          const e = (j as { error?: string } | null)?.error;
+          setM({ status: "not_found", message: e ?? "Halaman tidak dapat dimuatkan. Sila cuba lagi sebentar." });
+          return;
+        }
         setM(j);
         if (j.current_name) setNama(j.current_name);
       })

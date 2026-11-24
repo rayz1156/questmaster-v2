@@ -20,13 +20,14 @@ export type BarisToken = {
   status: 'pending' | 'used' | 'expired' | 'revoked';
   expires_at: string;
   failed_attempts: number;
+  superseded?: boolean;
   created_by: string | null;
 };
 
 export async function cariToken(svc: SupabaseClient, token: string): Promise<BarisToken | null> {
   const { data } = await svc
     .from('qm_name_update_tokens')
-    .select('id, participant_id, class_id, certificate_id, template_id, purpose, status, expires_at, failed_attempts, created_by')
+    .select('id, participant_id, class_id, certificate_id, template_id, purpose, status, expires_at, failed_attempts, superseded, created_by')
     .eq('token_hash', hashToken(token))
     .maybeSingle();
   return (data as BarisToken | null) ?? null;
@@ -155,25 +156,50 @@ async function masukGilir(
  * keluarkan (before_issue) sijil, kemudian masukkan ke baris gilir e-mel.
  * Kegagalan di sini tidak membatalkan pengesahan nama; ia dilog.
  */
+/** Rekod kegagalan susulan pada token supaya pendidik melihatnya dalam status. */
+async function rekodRalat(svc: SupabaseClient, tokenId: string, mesej: string | null): Promise<void> {
+  await svc.from('qm_name_update_tokens').update({ followup_error: mesej }).eq('id', tokenId);
+}
+
 export async function selepasPengesahan(svc: SupabaseClient, r: HasilRpc): Promise<{ queued: number }> {
   let ids: string[] = [];
   let kind: 'certificate' | 'name_updated' = 'name_updated';
-  if (r.purpose === 'after_issue') {
-    ids = r.certificate_ids ?? [];
-  } else {
-    const { data, error } = await svc.rpc('qm_issue_certificate_for_token', { p_token_id: r.token_id });
-    if (error) {
-      console.error('[nama] keluarkan sijil selepas pengesahan gagal:', error.message);
+  try {
+    if (r.purpose === 'after_issue') {
+      ids = r.certificate_ids ?? [];
+    } else {
+      const { data, error } = await svc.rpc('qm_issue_certificate_for_token', { p_token_id: r.token_id });
+      if (error) {
+        console.error('[nama] keluarkan sijil selepas pengesahan gagal:', error.message);
+        await rekodRalat(svc, r.token_id, `Certificate could not be issued: ${error.message}`);
+        return { queued: 0 };
+      }
+      ids = data ? [String(data)] : [];
+      kind = 'certificate';
+    }
+    if (ids.length === 0) {
+      if (r.purpose === 'after_issue') await rekodRalat(svc, r.token_id, 'No active certificate to regenerate.');
       return { queued: 0 };
     }
-    ids = data ? [String(data)] : [];
-    kind = 'certificate';
+    // Jana semula satu demi satu: sijil yang PDFnya gagal TIDAK dihantar,
+    // supaya peserta tidak menerima PDF bernama lama.
+    const gagal: string[] = [];
+    let queued = 0;
+    for (const id of ids) {
+      const pdf = await janaSemulaIkutTemplat(svc, r.class_id, [id]);
+      if (pdf.regenerated < 1) {
+        gagal.push(id);
+        continue;
+      }
+      if (await masukGilir(svc, r, id, kind)) queued += 1;
+    }
+    await rekodRalat(svc, r.token_id, gagal.length > 0 ? `PDF regeneration failed for ${gagal.length} certificate(s).` : null);
+    if (queued > 0) mulaPekerja();
+    return { queued };
+  } catch (e) {
+    const m = e instanceof Error ? e.message : String(e);
+    console.error('[nama] selepas pengesahan gagal:', m);
+    await rekodRalat(svc, r.token_id, `Follow-up failed: ${m}`).catch(() => undefined);
+    return { queued: 0 };
   }
-  if (ids.length === 0) return { queued: 0 };
-  const pdf = await janaSemulaIkutTemplat(svc, r.class_id, ids);
-  if (pdf.failed > 0) console.error(`[nama] jana PDF gagal untuk ${pdf.failed} sijil (token ${r.token_id})`);
-  let queued = 0;
-  for (const id of ids) if (await masukGilir(svc, r, id, kind)) queued += 1;
-  mulaPekerja();
-  return { queued };
 }

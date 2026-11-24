@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
   for (let dari = 0; ; dari += 1000) {
     const { data, error } = await svc
       .from('qm_name_update_tokens')
-      .select('class_id, participant_id, status, purpose, expires_at, created_at, used_at, old_name, new_name')
+      .select('class_id, participant_id, status, purpose, expires_at, created_at, used_at, old_name, new_name, failed_attempts, superseded, followup_error')
       .in('class_id', ids)
       .order('created_at', { ascending: false })
       .range(dari, dari + 999);
@@ -75,6 +75,12 @@ export async function GET(req: NextRequest) {
       expired: nilai.filter((t) => status(t) === 'expired').length,
       revoked: nilai.filter((t) => status(t) === 'revoked').length,
       queued_emails: (gilir ?? []).filter((g) => g.class_id === k.id).length,
+      // Disahkan tetapi sijil tidak dapat dijana/dikeluarkan: perlu tindakan pendidik.
+      followup_errors: disahkan
+        .filter((t) => t.followup_error)
+        .map((t) => ({ participant_id: t.participant_id, new_name: t.new_name, error: t.followup_error })),
+      // Dibatalkan selepas 5 cubaan gagal (boleh dihantar semula).
+      locked_after_failed_attempts: nilai.filter((t) => t.status === 'revoked' && !t.superseded && Number(t.failed_attempts) >= 5).length,
       changes: disahkan.map((t) => ({ participant_id: t.participant_id, old_name: t.old_name, new_name: t.new_name, confirmed_at: t.used_at })),
     });
   }

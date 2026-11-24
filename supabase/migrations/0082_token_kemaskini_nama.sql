@@ -33,6 +33,8 @@ create table if not exists public.qm_name_update_tokens (
   old_name         text,
   new_name         text,
   failed_attempts  int not null default 0,
+  superseded       boolean not null default false,
+  followup_error   text,
   created_by       uuid references public.qm_profiles(id) on delete set null,
   created_at       timestamptz not null default now()
 );
@@ -43,6 +45,10 @@ create index if not exists qm_name_update_tokens_kelas
   on public.qm_name_update_tokens (class_id, created_at desc);
 alter table public.qm_name_update_tokens enable row level security;
 
+-- Lajur tambahan untuk pemasangan semula (idempoten).
+alter table public.qm_name_update_tokens add column if not exists superseded boolean not null default false;
+alter table public.qm_name_update_tokens add column if not exists followup_error text;
+
 -- Pendidik kelas membaca status (token_hash tidak boleh dibalikkan).
 drop policy if exists p_name_tokens_read on public.qm_name_update_tokens;
 create policy p_name_tokens_read on public.qm_name_update_tokens
@@ -50,7 +56,8 @@ create policy p_name_tokens_read on public.qm_name_update_tokens
   using (public.qm_certificate_is_educator(class_id));
 revoke all on public.qm_name_update_tokens from anon, authenticated;
 grant select (id, participant_id, class_id, certificate_id, template_id, purpose, status,
-              expires_at, used_at, old_name, new_name, failed_attempts, created_by, created_at)
+              expires_at, used_at, old_name, new_name, failed_attempts, superseded, followup_error,
+              created_by, created_at)
   on public.qm_name_update_tokens to authenticated;
 
 -- ---------------------------------------------------------------------
@@ -128,12 +135,23 @@ begin
   if not found then
     raise exception 'TOKEN_NOT_FOUND';
   end if;
+  -- Nota: kemas kini sebelum raise akan dibatalkan, jadi status tamat tempoh
+  -- dikira daripada expires_at (statusBerkesan) dan tidak ditulis di sini.
   if t.status = 'pending' and t.expires_at <= now() then
-    update public.qm_name_update_tokens q set status = 'expired' where q.id = t.id;
     raise exception 'TOKEN_EXPIRED';
   end if;
   if t.status <> 'pending' then
     raise exception 'TOKEN_%', upper(t.status);
+  end if;
+  -- Akaun dipadam atau bukan lagi ahli kelas: token tidak boleh digunakan.
+  if exists (
+       select 1 from public.qm_profiles p
+        where p.id = t.participant_id and coalesce(p.display_name, '') like '[Deleted]%'
+     ) or not exists (
+       select 1 from public.qm_class_members m
+        where m.class_id = t.class_id and m.user_id = t.participant_id
+     ) then
+    raise exception 'TOKEN_REVOKED';
   end if;
 
   v_name := regexp_replace(btrim(coalesce(p_name, '')), '\s+', ' ', 'g');

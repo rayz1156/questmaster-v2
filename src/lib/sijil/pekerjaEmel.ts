@@ -228,7 +228,7 @@ async function ciptaTokenNama(
   for (let cuba = 0; cuba < 2; cuba += 1) {
     await svc
       .from('qm_name_update_tokens')
-      .update({ status: 'revoked' })
+      .update({ status: 'revoked', superseded: true })
       .eq('participant_id', participantId)
       .eq('class_id', b.class_id)
       .eq('status', 'pending');

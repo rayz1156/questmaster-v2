@@ -41,17 +41,20 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   const svc = getServiceSupabase();
   const { data: token, error } = await svc
     .from('qm_name_update_tokens')
-    .select('participant_id, certificate_id, template_id, purpose, status, created_at, expires_at')
+    .select('participant_id, certificate_id, template_id, purpose, status, created_at, expires_at, failed_attempts, superseded')
     .eq('class_id', classId)
     .order('created_at', { ascending: false });
   if (error) return ralatJson(error.message, 500);
   // Token terkini bagi setiap peserta.
-  const terkini = new Map<string, Record<string, string | null>>();
+  const terkini = new Map<string, Record<string, string | number | boolean | null>>();
   for (const t of token ?? []) if (!terkini.has(String(t.participant_id))) terkini.set(String(t.participant_id), t);
   const sempadan = Date.now() - lebihHari * 86_400_000;
   const calon = Array.from(terkini.values()).filter(
     (t) =>
-      (t.status === 'pending' || t.status === 'expired') &&
+      // Pending, tamat tempoh, atau dikunci selepas 5 cubaan gagal (bukan
+      // dibatalkan oleh pendidik).
+      (t.status === 'pending' || t.status === 'expired' ||
+        (t.status === 'revoked' && !t.superseded && Number(t.failed_attempts) >= 5)) &&
       new Date(String(t.created_at)).getTime() <= sempadan &&
       (!hadPeserta || hadPeserta.has(String(t.participant_id))),
   );
@@ -67,7 +70,7 @@ export async function POST(req: NextRequest, { params }: { params: { id: string 
   for (const t of calon) {
     const selepas = t.purpose === 'after_issue' && t.certificate_id;
     const { error: e } = await svc.from('qm_certificate_email_queue').insert({
-      certificate_id: selepas ? t.certificate_id : null,
+      certificate_id: selepas ? String(t.certificate_id) : null,
       class_id: classId,
       participant_id: t.participant_id,
       template_id: t.template_id,
