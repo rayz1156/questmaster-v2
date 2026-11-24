@@ -39,7 +39,8 @@ alter table public.qm_encharge_sync_log enable row level security;
 drop policy if exists p_encharge_sync_log_read on public.qm_encharge_sync_log;
 create policy p_encharge_sync_log_read on public.qm_encharge_sync_log
   for select to authenticated
-  using (owner_id = auth.uid() or public.qm_certificate_is_educator(class_id) or public.qm_is_admin());
+  -- Hanya pemilik log (akaun Encharge) dan pentadbir, selaras qm_email_sync_log.
+  using (owner_id = auth.uid() or public.qm_is_admin());
 revoke all on public.qm_encharge_sync_log from anon, authenticated;
 grant select on public.qm_encharge_sync_log to authenticated;
 
@@ -59,6 +60,7 @@ begin
     select l.id, l.owner_id, l.class_id, l.sent, l.created_at
       from public.qm_email_sync_log l
      where l.provider = 'encharge'
+       and l.consent_confirmed = true
        and coalesce(l.failed, 0) = 0
        and coalesce(l.sent, 0) > 0
   ),
@@ -88,9 +90,12 @@ begin
   select distinct on (p.owner_id, p.class_id, p.email)
          p.owner_id, p.class_id, p.user_id, p.email,
          -- Sama dengan classTags() dalam src/lib/email-providers/index.ts.
-         array['kuizen', left(regexp_replace('kuizen-' ||
-           left(trim(both '-' from regexp_replace(lower(p.nama_kelas), '[^a-z0-9]+', '-', 'g')), 60),
-           '-+$', ''), 40)],
+         case
+           when trim(both '-' from regexp_replace(lower(p.nama_kelas), '[^a-z0-9]+', '-', 'g')) = '' then array['kuizen']
+           else array['kuizen', left(regexp_replace('kuizen-' ||
+             left(trim(both '-' from regexp_replace(lower(p.nama_kelas), '[^a-z0-9]+', '-', 'g')), 60),
+             '-+$', ''), 40)]
+         end,
          'sent',
          jsonb_build_object('note', 'Backfilled from UI export log', 'export_log_id', p.log_id),
          p.owner_id, 'backfill', p.created_at

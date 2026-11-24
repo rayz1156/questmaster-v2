@@ -24,6 +24,9 @@ export async function GET(req: NextRequest) {
   const classId = req.nextUrl.searchParams.get('class_id') ?? '';
   if (classId && !UUID.test(classId)) return ralatJson('Invalid class_id.', 400);
 
+  const { data: prof } = await auth.supa.from('qm_profiles').select('suspended').eq('id', user.id).maybeSingle();
+  if (!prof || prof.suspended) return ralatJson('Forbidden', 403);
+
   const svc = getServiceSupabase();
   const [{ data: milik }, { data: bersama }] = await Promise.all([
     svc.from('qm_classes').select('id').eq('owner_id', user.id),
@@ -38,15 +41,24 @@ export async function GET(req: NextRequest) {
   if (ids.length === 0) return NextResponse.json({ classes: [] });
 
   const { data: kelas } = await svc.from('qm_classes').select('id, name, ended_at, is_archived').in('id', ids);
-  const { data: log } = await svc
-    .from('qm_encharge_sync_log')
-    .select('class_id, email, status, synced_at, source')
-    .eq('owner_id', user.id)
-    .in('class_id', ids);
+  // Berhalaman: PostgREST mengehadkan 1000 baris setiap balasan.
+  const log: { class_id: string; email: string; status: string; synced_at: string; source: string }[] = [];
+  for (let dari = 0; ; dari += 1000) {
+    const { data, error } = await svc
+      .from('qm_encharge_sync_log')
+      .select('class_id, email, status, synced_at, source')
+      .eq('owner_id', user.id)
+      .in('class_id', ids)
+      .order('id', { ascending: true })
+      .range(dari, dari + 999);
+    if (error) return ralatJson(error.message, 500);
+    log.push(...((data ?? []) as typeof log));
+    if (!data || data.length < 1000) break;
+  }
 
   const hasil = [];
   for (const k of (kelas ?? []) as { id: string; name: string; ended_at: string | null; is_archived: boolean | null }[]) {
-    const baris = (log ?? []).filter((l) => l.class_id === k.id);
+    const baris = log.filter((l) => l.class_id === k.id);
     const dihantar = new Set(baris.filter((l) => l.status === 'sent').map((l) => l.email));
     const terakhir = baris.reduce<string | null>((t, l) => (!t || l.synced_at > t ? l.synced_at : t), null);
     const entri: Record<string, unknown> = {

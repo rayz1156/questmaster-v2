@@ -1594,12 +1594,12 @@ export const TOOLS_TAMBAHAN: ToolDef[] = [
     title: "Hantar peserta ke Encharge",
     description:
       "Hantar peserta kelas ke Encharge dengan tag kuizen dan kuizen-<slug-kelas> (sama seperti butang UI). " +
-      "class_ids: senarai UUID kelas atau \"all\" (semua kelas anda). include_status lalai [\"active\",\"ended\"]. " +
+      "class_ids: senarai UUID kelas atau \"all\" (semua kelas yang anda miliki atau ajar bersama). include_status lalai [\"active\",\"ended\"]. " +
       "Tanpa confirm: true, pulangkan dry run bagi setiap kelas (jumlah peserta, akan dihantar, dilangkau kerana " +
       "sudah dihantar, tanpa e-mel, tag). Penghantaran sebenar memerlukan confirm: true DAN consent_confirmed: true " +
       "(pengesahan bahawa peserta bersetuju menerima e-mel daripada anda). Kenalan sedia ada dikemas kini (upsert), " +
-      "peserta yang sudah dihantar dilangkau kecuali force_resync: true. Jika remaining_class_ids dipulangkan, " +
-      "panggil semula dengan senarai itu.",
+      "peserta yang sudah dihantar dilangkau kecuali force_resync: true. Setiap panggilan memproses kira-kira 200 " +
+      "kenalan; jika remaining_class_ids dipulangkan, panggil semula dengan senarai itu DAN include_status yang sama.",
     roles: STAFF,
     write: true,
     inputSchema: {

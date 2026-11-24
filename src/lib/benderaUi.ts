@@ -11,12 +11,26 @@ import { supabase } from "@/lib/supabase";
 export type BenderaUi = { hideEncharge: boolean; hideCertificates: boolean };
 
 const LALAI: BenderaUi = { hideEncharge: false, hideCertificates: false };
-let cache: Promise<BenderaUi> | null = null;
+// Cache mengikut pengguna supaya log keluar/masuk dalam tab sama tidak
+// memakai bendera pengguna lain.
+const cache = new Map<string, Promise<BenderaUi>>();
 
 async function bacaBendera(): Promise<BenderaUi> {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session?.user) return LALAI;
+  const uid = session.user.id;
+  let p = cache.get(uid);
+  if (!p) {
+    p = bacaBenderaPengguna(uid);
+    cache.set(uid, p);
+    p.catch(() => cache.delete(uid));
+  }
+  return p;
+}
+
+async function bacaBenderaPengguna(uid: string): Promise<BenderaUi> {
   try {
-    const { data: { session } } = await supabase.auth.getSession();
-    if (!session?.user) return LALAI;
+    const session = { user: { id: uid } };
     const { data } = await supabase
       .from("qm_profiles")
       .select("ui_hide_encharge, ui_hide_certificates")
@@ -35,8 +49,7 @@ export function useBenderaUi(): BenderaUi {
   const [b, setB] = useState<BenderaUi>(LALAI);
   useEffect(() => {
     let hidup = true;
-    if (!cache) cache = bacaBendera();
-    cache.then((v) => { if (hidup) setB(v); });
+    bacaBendera().then((v) => { if (hidup) setB(v); }).catch(() => undefined);
     return () => { hidup = false; };
   }, []);
   return b;

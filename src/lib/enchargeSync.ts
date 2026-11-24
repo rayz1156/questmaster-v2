@@ -51,15 +51,25 @@ export async function pesertaKelas(svc: SupabaseClient, classId: string): Promis
   return ids.map((id: string) => ({ participant_id: id, email: emel.get(id) ?? null, nama: nama.get(id) ?? '' }));
 }
 
-/** E-mel yang sudah 'sent' untuk pemilik dan kelas ini. */
+/**
+ * E-mel yang sudah 'sent' untuk pemilik dan kelas ini. Dibaca berhalaman
+ * (1000 baris setiap halaman) kerana PostgREST mengehadkan baris balasan.
+ */
 export async function emelSudahDihantar(svc: SupabaseClient, ownerId: string, classId: string): Promise<Set<string>> {
-  const { data } = await svc
-    .from('qm_encharge_sync_log')
-    .select('email')
-    .eq('owner_id', ownerId)
-    .eq('class_id', classId)
-    .eq('status', 'sent');
-  return new Set((data ?? []).map((r: { email: string }) => r.email));
+  const hasil = new Set<string>();
+  for (let dari = 0; ; dari += 1000) {
+    const { data, error } = await svc
+      .from('qm_encharge_sync_log')
+      .select('email')
+      .eq('owner_id', ownerId)
+      .eq('class_id', classId)
+      .eq('status', 'sent')
+      .order('email', { ascending: true })
+      .range(dari, dari + 999);
+    if (error) throw new Error(`Could not read the Encharge sync log: ${error.message}`);
+    for (const r of data ?? []) hasil.add((r as { email: string }).email);
+    if (!data || data.length < 1000) return hasil;
+  }
 }
 
 export type RancanganKelas = {
@@ -99,9 +109,25 @@ export async function rancangKelas(
   };
 }
 
+/** Saiz potongan kenalan: log ditulis dan bajet masa disemak antara potongan. */
+const SAIZ_POTONGAN = 40;
+
+export type HasilHantarKelas = {
+  sent: number;
+  failed: number;
+  failures: { email: string; status: number }[];
+  /** Kelas belum selesai kerana bajet masa atau had kenalan; panggil semula. */
+  partial: boolean;
+  /** Bilangan kenalan yang belum diproses dalam kelas ini. */
+  remaining: number;
+  log_write_failed: boolean;
+};
+
 /**
- * Hantar satu kelas dan tulis log per peserta (upsert pada pemilik, kelas,
- * e-mel). Pulangkan kiraan dan senarai kegagalan (tanpa kunci).
+ * Hantar satu kelas dalam potongan SAIZ_POTONGAN kenalan dan tulis log per
+ * peserta selepas setiap potongan (upsert pada pemilik, kelas, e-mel), jadi
+ * kerja yang terhenti boleh disambung tanpa menghantar semula. Berhenti bila
+ * tamatPada dilepasi atau hadKenalan dicapai.
  */
 export async function hantarKelas(
   svc: SupabaseClient,
@@ -111,41 +137,67 @@ export async function hantarKelas(
   r: RancanganKelas,
   consentBy: string,
   source: 'mcp' | 'ui',
-): Promise<{ sent: number; failed: number; failures: { email: string; status: number }[] }> {
-  if (r.hantar.length === 0) return { sent: 0, failed: 0, failures: [] };
-  const kenalan: EmailProviderContact[] = r.hantar.map((p) => {
-    const { firstName, lastName } = splitName(p.nama);
-    return { email: p.email as string, firstName, lastName, tags: r.tags };
-  });
-  const hasil = await penyedia.upsertContacts(kunci, kenalan);
-  const keputusan = hasil.results ?? [];
-  const sekarang = new Date().toISOString();
-  const baris = r.hantar.map((p, i) => {
-    const k = keputusan[i];
-    const ok = !!k?.ok;
-    return {
+  had: { tamatPada: number; hadKenalan: number } = { tamatPada: Number.POSITIVE_INFINITY, hadKenalan: Number.POSITIVE_INFINITY },
+): Promise<HasilHantarKelas> {
+  const keluar: HasilHantarKelas = { sent: 0, failed: 0, failures: [], partial: false, remaining: 0, log_write_failed: false };
+  let diproses = 0;
+  while (diproses < r.hantar.length) {
+    if (Date.now() > had.tamatPada || diproses >= had.hadKenalan) {
+      keluar.partial = true;
+      break;
+    }
+    const potongan = r.hantar.slice(diproses, Math.min(diproses + SAIZ_POTONGAN, diproses + Math.max(1, had.hadKenalan - diproses)));
+    const kenalan: EmailProviderContact[] = potongan.map((p) => {
+      const { firstName, lastName } = splitName(p.nama);
+      return { email: p.email as string, firstName, lastName, tags: r.tags };
+    });
+    const hasil = await penyedia.upsertContacts(kunci, kenalan);
+    diproses += potongan.length;
+    keluar.sent += hasil.sent;
+    keluar.failed += hasil.failed;
+    const keputusan = hasil.results;
+    if (!keputusan || keputusan.length !== potongan.length) {
+      // Tanpa hasil per kenalan, log tidak ditulis supaya kejayaan tidak
+      // direkodkan sebagai kegagalan (atau sebaliknya).
+      keluar.log_write_failed = true;
+      continue;
+    }
+    const sekarang = new Date().toISOString();
+    const baris = potongan.map((p, i) => ({
       owner_id: ownerId,
       class_id: r.class_id,
       participant_id: p.participant_id,
       email: p.email as string,
       tags: r.tags,
-      status: ok ? 'sent' : 'failed',
-      encharge_response: { http_status: k?.status ?? 0 },
+      status: keputusan[i].ok ? 'sent' : 'failed',
+      encharge_response: { http_status: keputusan[i].status },
       consent_confirmed_by: consentBy,
       source,
       synced_at: sekarang,
-    };
-  });
-  // Baris 'sent' sedia ada tidak diturunkan kepada 'failed' oleh cubaan
-  // force_resync yang gagal: hanya kegagalan baharu atau kejayaan ditulis.
-  const sudah = await emelSudahDihantar(svc, ownerId, r.class_id);
-  const tulis = baris.filter((b) => b.status === 'sent' || !sudah.has(b.email));
-  for (let i = 0; i < tulis.length; i += 500) {
-    await svc.from('qm_encharge_sync_log').upsert(tulis.slice(i, i + 500), { onConflict: 'owner_id,class_id,email' });
+    }));
+    // Kegagalan tidak menurunkan baris 'sent' sedia ada (force_resync).
+    const gagal = baris.filter((b) => b.status === 'failed');
+    let tulis = baris;
+    if (gagal.length > 0) {
+      const { data: sudah } = await svc
+        .from('qm_encharge_sync_log')
+        .select('email')
+        .eq('owner_id', ownerId)
+        .eq('class_id', r.class_id)
+        .eq('status', 'sent')
+        .in('email', gagal.map((b) => b.email));
+      const setSudah = new Set((sudah ?? []).map((x: { email: string }) => x.email));
+      tulis = baris.filter((b) => b.status === 'sent' || !setSudah.has(b.email));
+    }
+    const { error } = await svc.from('qm_encharge_sync_log').upsert(tulis, { onConflict: 'owner_id,class_id,email' });
+    if (error) {
+      console.error('[encharge] tulis log gagal:', error.message);
+      keluar.log_write_failed = true;
+    }
+    for (const b of gagal) {
+      keluar.failures.push({ email: b.email.replace(/^(.).*(@.*)$/, '$1***$2'), status: Number(b.encharge_response.http_status) });
+    }
   }
-  const failures = baris.filter((b) => b.status === 'failed').map((b) => ({
-    email: b.email.replace(/^(.).*(@.*)$/, '$1***$2'),
-    status: Number((b.encharge_response as { http_status: number }).http_status),
-  }));
-  return { sent: hasil.sent, failed: hasil.failed, failures };
+  keluar.remaining = r.hantar.length - diproses;
+  return keluar;
 }

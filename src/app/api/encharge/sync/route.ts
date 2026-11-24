@@ -31,7 +31,8 @@ export const fetchCache = 'force-no-store';
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const BAJET_MS = 40_000;
-const HAD_KENALAN = 1000;
+/** Had kenalan setiap panggilan supaya kekal di bawah timeout nginx 60 s. */
+const HAD_KENALAN = 200;
 
 type Kelas = { id: string; name: string; owner_id: string; ended_at: string | null; is_archived: boolean | null };
 
@@ -149,13 +150,22 @@ export async function POST(req: NextRequest) {
   const hasilKelas = [];
   let jumlahKenalan = 0;
   let diproses = 0;
+  let separuh = false;
+  let logGagal = false;
   for (const k of kelas) {
-    if (Date.now() - mula > BAJET_MS) break;
+    if (Date.now() - mula > BAJET_MS || jumlahKenalan >= HAD_KENALAN) break;
     const r = await rancangKelas(svc, user.id, k, force);
-    if (jumlahKenalan + r.to_send > HAD_KENALAN && diproses > 0) break;
-    const h = await hantarKelas(svc, penyedia, kunci, user.id, r, user.id, 'mcp');
-    jumlahKenalan += r.to_send;
-    diproses += 1;
+    const h = await hantarKelas(svc, penyedia, kunci, user.id, r, user.id, 'mcp', {
+      tamatPada: mula + BAJET_MS,
+      hadKenalan: HAD_KENALAN - jumlahKenalan,
+    });
+    jumlahKenalan += r.to_send - h.remaining;
+    if (h.log_write_failed) logGagal = true;
+    if (h.partial) {
+      separuh = true;
+    } else {
+      diproses += 1;
+    }
     if (r.to_send > 0) {
       // Log agregat lama supaya paparan "last sync" UI kekal tepat.
       await svc.from('qm_email_sync_log').insert({
@@ -164,7 +174,7 @@ export async function POST(req: NextRequest) {
         provider: integ.provider,
         total: r.total_participants,
         sent: h.sent,
-        skipped: r.without_email + r.skipped_already_sent,
+        skipped: r.without_email + r.skipped_already_sent + h.remaining,
         failed: h.failed,
         consent_confirmed: true,
       });
@@ -178,9 +188,11 @@ export async function POST(req: NextRequest) {
       without_email: r.without_email,
       failed: h.failed,
       failures: h.failures.slice(0, 20),
+      ...(h.partial ? { partial: true, remaining_in_class: h.remaining } : {}),
     });
+    if (h.partial) break;
   }
-  if (diproses > 0) {
+  if (hasilKelas.length > 0) {
     const now = new Date().toISOString();
     await svc.from('qm_email_integrations').update({ last_sync_at: now, updated_at: now }).eq('owner_id', user.id);
   }
@@ -193,6 +205,13 @@ export async function POST(req: NextRequest) {
       without_email: hasilKelas.reduce((n, r) => n + r.without_email, 0),
       failed: hasilKelas.reduce((n, r) => n + r.failed, 0),
     },
-    ...(diproses < kelas.length ? { remaining_class_ids: kelas.slice(diproses).map((k) => k.id) } : {}),
+    ...(diproses < kelas.length
+      ? {
+          remaining_class_ids: kelas.slice(diproses).map((k) => k.id),
+          note: 'Call again with remaining_class_ids and the same include_status; already-sent participants are skipped.',
+        }
+      : {}),
+    ...(separuh ? { partial: true } : {}),
+    ...(logGagal ? { log_write_failed: true, warning: 'Some sync records could not be saved; a later call may resend those contacts (Encharge upserts, so no duplicates).' } : {}),
   });
 }
