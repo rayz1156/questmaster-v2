@@ -3,7 +3,7 @@ import { ralatJson } from '@/lib/i18n/ralatApi';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { requireQuizHost } from '@/lib/live-quiz';
 import { papanSolo } from '@/lib/lumba-solo-api';
-import { janaKodSolo } from '@/lib/lumba-solo';
+import { janaKodSolo, sahkanTitikUkur } from '@/lib/lumba-solo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -11,13 +11,13 @@ export const fetchCache = 'force-no-store';
 
 /** Pemalar laluan supaya GET dan POST berkongsi. */
 const LAJUR_LARIAN_GURU =
-  'id, nickname, user_id, score, correct, wrong, elapsed_ms, status, started_at, finished_at';
+  'id, nickname, user_id, score, correct, wrong, elapsed_ms, status, started_at, finished_at, test_mode, measure_point, next_idx';
 
 async function muatMedanSolo(quizId: string) {
   const svc = getServiceSupabase();
   const { data } = await svc
     .from('qm_live_quizzes')
-    .select('id, solo_enabled, solo_code, title, class_id')
+    .select('id, solo_enabled, solo_code, title, class_id, solo_test_mode, solo_measure_point')
     .eq('id', quizId)
     .maybeSingle();
   return (data ?? null) as {
@@ -26,6 +26,8 @@ async function muatMedanSolo(quizId: string) {
     solo_code: string | null;
     title: string;
     class_id: string | null;
+    solo_test_mode: boolean | null;
+    solo_measure_point: string | null;
   } | null;
 }
 
@@ -60,6 +62,8 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
     enabled: medan.solo_enabled === true,
     code: medan.solo_code ?? null,
     link: medan.solo_code ? pautanSolo(req, medan.solo_code) : null,
+    testMode: medan.solo_test_mode === true,
+    measurePoint: sahkanTitikUkur(medan.solo_measure_point),
     leaderboard: await papanSolo(svc, params.quizId),
     runs: (runs ?? []) as unknown as {
       id: string;
@@ -72,12 +76,21 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
       status: string;
       started_at: string;
       finished_at: string | null;
+      test_mode: boolean;
+      measure_point: string | null;
+      next_idx: number;
     }[],
   });
 }
 
 /**
- * POST /api/live/quizzes/[quizId]/solo, badan { enabled: boolean }.
+ * POST /api/live/quizzes/[quizId]/solo, badan { enabled?: boolean,
+ * testMode?: boolean, measurePoint?: 'T1' | 'T2' | 'T3' | null }.
+ *
+ * KZ-UTT: testMode menghidupkan mod ujian (log masuk wajib, satu larian
+ * setiap titik, tiada maklum balas betul/salah). measurePoint ialah titik
+ * yang sedang dibuka; null menutup ujian (pautan masih wujud tetapi /start
+ * menolak dengan TEST_NOT_OPEN).
  *
  * Hidup atau matikan Cabaran Solo. Bila dihidupkan kali pertama, kod solo
  * unik dijana pelayan (6 aksara tanpa 0/O/1/I); pelanggaran unik dicuba
@@ -88,16 +101,31 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
   if (host.response) return host.response;
 
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
-  if (typeof body.enabled !== 'boolean') {
+  const adaEnabled = body.enabled !== undefined;
+  const adaUjian = body.testMode !== undefined;
+  const adaTitik = body.measurePoint !== undefined;
+  if (!adaEnabled && !adaUjian && !adaTitik) {
     return ralatJson('enabled must be true or false.', 400);
+  }
+  if (adaEnabled && typeof body.enabled !== 'boolean') {
+    return ralatJson('enabled must be true or false.', 400);
+  }
+  if (adaUjian && typeof body.testMode !== 'boolean') {
+    return ralatJson('testMode must be true or false.', 400);
+  }
+  const titik = body.measurePoint === null ? null : sahkanTitikUkur(body.measurePoint);
+  if (adaTitik && body.measurePoint !== null && !titik) {
+    return ralatJson('measurePoint must be T1, T2, T3 or null.', 400);
   }
 
   const svc = getServiceSupabase();
   const medan = await muatMedanSolo(params.quizId);
   if (!medan) return ralatJson('Quiz not found.', 404);
 
+  const enabled = adaEnabled ? (body.enabled as boolean) : medan.solo_enabled === true;
+
   let kod = medan.solo_code;
-  if (body.enabled && !kod) {
+  if (enabled && !kod) {
     // Jana kod unik: kemas kini bersyarat is null mengelakkan perlumbaan;
     // jika berlanggar, cuba kod baharu.
     for (let cuba = 0; cuba < 10 && !kod; cuba++) {
@@ -114,15 +142,21 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     if (!kod) return ralatJson('Could not generate a solo code.', 503);
   }
 
+  const kemas: Record<string, unknown> = { solo_enabled: enabled };
+  if (adaUjian) kemas.solo_test_mode = body.testMode;
+  if (adaTitik) kemas.solo_measure_point = titik;
   const { error } = await svc
     .from('qm_live_quizzes')
-    .update({ solo_enabled: body.enabled })
+    .update(kemas)
     .eq('id', params.quizId);
   if (error) return ralatJson(error.message, 500);
 
+  const selepas = await muatMedanSolo(params.quizId);
   return NextResponse.json({
-    enabled: body.enabled,
+    enabled,
     code: kod ?? null,
     link: kod ? pautanSolo(req, kod) : null,
+    testMode: selepas?.solo_test_mode === true,
+    measurePoint: sahkanTitikUkur(selepas?.solo_measure_point ?? null),
   });
 }

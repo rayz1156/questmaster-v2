@@ -7,7 +7,7 @@ import {
   msJawap,
   semakLarian,
 } from '@/lib/lumba-solo-api';
-import { kiraMata, SOALAN_TETINGKAH_MS } from '@/lib/lumba-solo';
+import { kiraMata, tetingkahSoalan } from '@/lib/lumba-solo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -56,12 +56,16 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     return ralatJson('Could not read the question.', 500);
   }
 
-  const ms = msJawap(larian.served_at);
+  // KZ-UTT: tetingkap 45 s dalam mod ujian, 30 s biasa. Mod ujian diberi
+  // 1.5 s kelonggaran rangkaian (corak Live Quiz); mod biasa tidak berubah.
+  const ujian = larian.test_mode === true;
+  const tetingkah = tetingkahSoalan(ujian);
+  const ms = msJawap(larian.served_at, ujian);
   const choice = typeof body.choice === 'string' && body.choice ? body.choice : null;
-  // Tamat masa (melebihi 30 saat) atau tiada pilihan: dikira salah.
+  // Tamat masa atau tiada pilihan: dikira salah.
   const betul =
-    ms <= SOALAN_TETINGKAH_MS && choice !== null && choice === kunci.correct_key;
-  const mata = kiraMata(kunci.points, ms, betul);
+    ms <= tetingkah + (ujian ? 1500 : 0) && choice !== null && choice === kunci.correct_key;
+  const mata = kiraMata(kunci.points, Math.min(ms, tetingkah), betul, tetingkah);
 
   // Kemas kini bersyarat next_idx: jawapan berganda serentak ditolak
   // (sifar baris dikemas kini).
@@ -95,6 +99,12 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     points: mata,
   });
   if (ralatJawapan) return ralatJson('Could not save the answer.', 503);
+
+  // KZ-UTT: mod ujian TIDAK mendedahkan betul, salah, kunci atau mata soalan
+  // ini (mengelak kesan ujian antara T1, T2 dan T3). Markah hanya pada akhir.
+  if (ujian) {
+    return NextResponse.json({ accepted: true, answered: idx + 1 });
+  }
 
   return NextResponse.json({
     correct: betul,

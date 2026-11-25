@@ -26,11 +26,16 @@ import {
   kedudukanPemain,
   KELAJUAN_KOMPUTER,
   langkahLumba,
+  masaPandu,
   masaSoalanBerlalu,
   penaltiAktif,
   perluSoalan,
+  sambungUjian,
+  tetingkahJawab,
   TREK_PANJANG_M,
   tutupSoalan,
+  ujianSelesai,
+  batalSoalan,
   type InputPemandu,
   type KeadaanLumba,
 } from "./lumbaSoloEnjin";
@@ -71,6 +76,11 @@ interface InfoSolo {
   totalQuestions: number;
   needLogin: boolean;
   leaderboard: BarisPapanUi[];
+  /** KZ-UTT: mod ujian T1, T2, T3. */
+  testMode: boolean;
+  measurePoint: string | null;
+  testOpen: boolean;
+  alreadyDone: boolean;
 }
 
 interface SoalanAktif {
@@ -82,6 +92,7 @@ interface SoalanAktif {
 }
 
 interface KeputusanLarian {
+  testMode: boolean;
   score: number;
   correct: number;
   wrong: number;
@@ -139,7 +150,11 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const [papanSegar, setPapanSegar] = useState<BarisPapanUi[]>([]);
   const [hud, setHud] = useState<Hud>(HUD_AWAL);
   const [soalan, setSoalan] = useState<SoalanAktif | null>(null);
-  const [balasan, setBalasan] = useState<{ betul: boolean; mata: number } | null>(null);
+  const [balasan, setBalasan] = useState<{ betul: boolean; mata: number; diterima?: boolean } | null>(null);
+  /** KZ-UTT: larian semasa ialah mod ujian (dari respons /start). */
+  const ujianRef = useRef(false);
+  const [ujian, setUjian] = useState(false);
+  const [disambung, setDisambung] = useState(false);
 
   const enjinRef = useRef<KeadaanLumba>(ciptaKeadaanLumba());
   const inputRef = useRef<InputPemandu>({ kiri: false, kanan: false, pecut: false, brek: false });
@@ -211,6 +226,10 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         totalQuestions: Number(json.totalQuestions) || 0,
         needLogin: json.needLogin === true,
         leaderboard: Array.isArray(json.leaderboard) ? (json.leaderboard as BarisPapanUi[]) : [],
+        testMode: json.testMode === true,
+        measurePoint: typeof json.measurePoint === "string" ? json.measurePoint : null,
+        testOpen: json.testOpen !== false,
+        alreadyDone: json.alreadyDone === true,
       });
       setPapanSegar(Array.isArray(json.leaderboard) ? (json.leaderboard as BarisPapanUi[]) : []);
       setFasa("maklumat");
@@ -245,12 +264,22 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       }
       tokenRef.current = { runId: String(json.runId), runToken: String(json.runToken) };
       totalRef.current = Number(json.totalQuestions) || 0;
+      const modUjian = json.testMode === true;
+      ujianRef.current = modUjian;
+      setUjian(modUjian);
+      setDisambung(json.resumed === true);
+      if (modUjian && temaRef.current === "lompat") {
+        // KZ-UTT: permainan lompat tidak dipakai dalam mod ujian (enjin lain).
+        temaRef.current = "kereta";
+        setTema("kereta");
+      }
       markahRef.current = 0;
       soalanRef.current = null;
       menjawabRef.current = false;
       selesaiRef.current = false;
       tikRef.current = 0;
-      enjinRef.current = ciptaKeadaanLumba();
+      enjinRef.current = ciptaKeadaanLumba(modUjian);
+      if (modUjian) sambungUjian(enjinRef.current, Number(json.answered) || 0);
       lompatRef.current = temaRef.current === "lompat" ? ciptaKeadaanLompat() : null;
       setSoalan(null);
       setHud(HUD_AWAL);
@@ -274,12 +303,20 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         if (typeof json.error === "string") setRalat(json.error);
+        // KZ-UTT: kereta berhenti semasa soalan; jangan biar ia tersekat.
+        if (ujianRef.current) batalSoalan(enjinRef.current);
         return;
       }
       if (json.done === true) {
         // Bank soalan habis sebelum penamat: teruskan berlumba tanpa soalan.
         soalanRef.current = null;
         setSoalan(null);
+        if (ujianRef.current) {
+          // KZ-UTT: semua soalan sudah dijawab di pelayan; tamatkan larian.
+          const k = enjinRef.current;
+          tutupSoalan(k);
+          k.soalanDijawab = Math.max(k.soalanDijawab, totalRef.current);
+        }
         return;
       }
       const s: SoalanAktif = {
@@ -294,6 +331,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       pastiBunyi().main("soalan");
     } catch {
       // Rangkaian terganggu: gelung akan cuba lagi pada soalan berikutnya.
+      if (ujianRef.current) batalSoalan(enjinRef.current);
     }
   }, [kod, pengepala, pastiBunyi]);
 
@@ -316,6 +354,20 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         if (!res.ok) {
           // 409 bermakna soalan ini sudah dijawab (atau larian tamat): teruskan.
           if (res.status !== 409 && typeof json.error === "string") setRalat(json.error);
+          if (ujianRef.current) {
+            // KZ-UTT: 409 = sudah direkod, tutup; ralat lain = soalan sama
+            // dihidang semula oleh /next (masa terus dikira dari served_at).
+            if (res.status === 409) tutupSoalan(enjinRef.current);
+            else batalSoalan(enjinRef.current);
+          }
+          return;
+        }
+        if (ujianRef.current) {
+          // KZ-UTT: tiada maklum balas betul/salah, tiada penalti atau bonus.
+          tutupSoalan(enjinRef.current);
+          pastiBunyi().main("betul");
+          setBalasan({ betul: true, mata: 0, diterima: true });
+          window.setTimeout(() => setBalasan(null), 1200);
           return;
         }
         const betul = json.correct === true;
@@ -330,6 +382,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         window.setTimeout(() => setBalasan(null), 1600);
       } catch {
         // Biarkan gelung cuba lagi; soalan semasa sudah ditutup.
+        if (ujianRef.current) batalSoalan(enjinRef.current);
       } finally {
         menjawabRef.current = false;
       }
@@ -401,6 +454,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         return;
       }
       setKeputusan({
+        testMode: json.testMode === true,
         score: Number(json.score) || 0,
         correct: Number(json.correct) || 0,
         wrong: Number(json.wrong) || 0,
@@ -481,16 +535,21 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         else langkahLumba(k, dt, inputRef.current);
 
         if (!selesaiRef.current) {
-          if (perluSoalan(k) && totalRef.current > 0) {
+          if (
+            perluSoalan(k) &&
+            totalRef.current > 0 &&
+            (!k.ujian || k.soalanKe < totalRef.current)
+          ) {
             bukaSoalan(k);
             void mintaSoalan();
           }
           const berlalu = masaSoalanBerlalu(k);
           if (soalanRef.current && berlalu !== null) {
-            if (berlalu >= JAWAB_TETINGKAH_MS) {
+            const tetingkah = tetingkahJawab(k);
+            if (berlalu >= tetingkah) {
               // Tamat masa: kirim choice kosong, pelayan kira salah.
               void hantarJawapan(null);
-            } else if (berlalu >= JAWAB_TETINGKAH_MS - 5000) {
+            } else if (berlalu >= tetingkah - 5000) {
               const saat = Math.floor(berlalu / 1000);
               if (saat > tikRef.current) {
                 tikRef.current = saat;
@@ -498,7 +557,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               }
             }
           }
-          if (k.selesai) {
+          if (k.selesai || ujianSelesai(k, totalRef.current)) {
             selesaiRef.current = true;
             void tamatkan();
           }
@@ -515,7 +574,9 @@ export default function LumbaSolo({ kod }: { kod: string }) {
             window.devicePixelRatio || 1,
           );
           paparan3D.render({
-            masaMs: k.masaMs,
+            // KZ-UTT: masa memandu (tolak masa soalan) supaya kereta lawan
+            // tidak terus bergerak ketika pemain berhenti menjawab.
+            masaMs: k.ujian ? masaPandu(k) : k.masaMs,
             jarakM: k.jarakM,
             offsetM: k.offsetM,
             hadLaju: k.hadLaju,
@@ -549,7 +610,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                 kemajuanKomputer: [jarakKomputer(0, k.masaMs) / TREK_PANJANG_M, jarakKomputer(1, k.masaMs) / TREK_PANJANG_M],
               });
             } else lukisPemandangan(ctx, lebarCss, tinggiCss, {
-              masaMs: k.masaMs,
+              masaMs: k.ujian ? masaPandu(k) : k.masaMs,
               jarakM: k.jarakM,
               offsetM: k.offsetM,
               hadLaju: k.hadLaju,
@@ -732,11 +793,27 @@ export default function LumbaSolo({ kod }: { kod: string }) {
             </h1>
             <p className="text-[13px] text-ink-faint mt-1">
               {info ? t("solo.questionsCount", { n: info.totalQuestions }) : ""}
+              {info?.testMode && info.measurePoint && (
+                <span className="ml-2 inline-block text-[11px] font-bold text-violet-700 bg-violet-50 border border-violet-200 rounded-lg px-2 py-0.5">
+                  {t("solo.testBadge", { p: info.measurePoint })}
+                </span>
+              )}
             </p>
+            {info?.testMode && (
+              <p className="mt-3 text-[12px] text-ink bg-violet-50 border border-violet-200 rounded-xl p-3">
+                {t("solo.testIntro")}
+              </p>
+            )}
 
-            {info?.needLogin ? (
+            {info?.testMode && !info.needLogin && (!info.testOpen || info.alreadyDone) ? (
+              <div className="mt-4">
+                <p className="text-[13px] text-ink-faint">
+                  {info.alreadyDone ? t("solo.testDone") : t("solo.testNotOpen")}
+                </p>
+              </div>
+            ) : info?.needLogin ? (
               <div className="mt-4 space-y-3">
-                <p className="text-[13px] text-ink-faint">{t("solo.needLogin")}</p>
+                <p className="text-[13px] text-ink-faint">{info.testMode ? t("solo.testLogin") : t("solo.needLogin")}</p>
                 <Link
                   href={`/login?next=${encodeURIComponent(`/solo/${kod}`)}`}
                   className="block text-center px-4 py-2.5 rounded-xl text-white text-[14px] font-semibold bg-gradient-to-r from-violet-600 to-indigo-600"
@@ -749,7 +826,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                 <div>
                   <span className="text-[12px] font-semibold text-ink">{t("solo.chooseVehicle")}</span>
                   <div className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-2" role="radiogroup" aria-label={t("solo.chooseVehicle")}>
-                    {SENARAI_TEMA.map((m) => (
+                    {SENARAI_TEMA.filter((m) => !(info?.testMode && m.id === "lompat")).map((m) => (
                       <button
                         key={m.id}
                         type="button"
@@ -770,6 +847,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                     ))}
                   </div>
                 </div>
+                {!info?.testMode && (
                 <label className="block">
                   <span className="text-[12px] font-semibold text-ink">{t("solo.nickname")}</span>
                   <input
@@ -780,6 +858,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                     className="mt-1 w-full rounded-xl border border-slate-300 bg-white px-3 py-2.5 text-[14px] text-ink outline-none focus:border-violet-500"
                   />
                 </label>
+                )}
                 <button
                   type="button"
                   disabled={sibuk}
@@ -810,8 +889,13 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               {k ? k.score : 0}
             </p>
             <p className="text-[12px] text-ink-faint mt-1">{t("solo.points")}</p>
+            {k?.testMode && (
+              <p className="mt-3 text-[13px] text-ink">{t("solo.testThanks")}</p>
+            )}
 
             <div className="grid grid-cols-2 gap-3 mt-4 text-center">
+              {!k?.testMode && (
+              <>
               <div className="rounded-xl bg-emerald-50 border border-emerald-200 py-2">
                 <p className="text-[18px] font-bold text-emerald-700">{k ? k.correct : 0}</p>
                 <p className="text-[11px] text-emerald-700/80">{t("solo.correctCount")}</p>
@@ -820,6 +904,8 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                 <p className="text-[18px] font-bold text-red-700">{k ? k.wrong : 0}</p>
                 <p className="text-[11px] text-red-700/80">{t("solo.wrongCount")}</p>
               </div>
+              </>
+              )}
               <div className="rounded-xl bg-slate-50 border border-slate-200 py-2">
                 <p className="text-[18px] font-bold text-ink">
                   {k && k.elapsedMs != null ? formatMasa(k.elapsedMs) : "-"}
@@ -840,6 +926,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               </p>
             )}
 
+            {!k?.testMode && (
             <button
               type="button"
               onClick={() => void mulaLumba()}
@@ -847,6 +934,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
             >
               {t("solo.raceAgain")}
             </button>
+            )}
           </div>
           {paparPapan(papanSegar, k?.rank ?? null)}
         </div>
@@ -855,16 +943,19 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   }
 
   /* ===== Skrin lumba ===== */
-  const pecahanMasa = hud.masaSoalan == null ? 0 : Math.min(1, Math.max(0, hud.masaSoalan / JAWAB_TETINGKAH_MS));
+  const tetingkahPapar = ujian ? tetingkahJawab(enjinRef.current) : JAWAB_TETINGKAH_MS;
+  const pecahanMasa = hud.masaSoalan == null ? 0 : Math.min(1, Math.max(0, hud.masaSoalan / tetingkahPapar));
   const progresTrek = Math.min(1, hud.jarakM / TREK_PANJANG_M);
 
   return (
     <div className="min-h-screen bg-slate-900 flex flex-col select-none">
       {/* HUD atas */}
       <div className="px-4 pt-3 pb-2 flex items-center gap-3 flex-wrap text-white">
+        {!ujian && (
         <span className="text-[13px] font-bold bg-violet-600/90 rounded-lg px-2.5 py-1">
           {t("solo.position")} {hud.kedudukan}/3
         </span>
+        )}
         <span className="text-[13px] tabular-nums text-slate-300">{t("solo.timeLabel")} {formatMasa(hud.masaMs)}</span>
         {tema !== "lompat" && (
         <span className="text-[13px] tabular-nums text-slate-300">
@@ -879,9 +970,11 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         <span className="text-[13px] tabular-nums text-slate-300">
           {t("solo.answered", { a: hud.soalanDijawab, b: totalRef.current })}
         </span>
+        {!ujian && (
         <span className="text-[13px] font-bold tabular-nums text-violet-300">
           {t("solo.score")} {hud.markah}
         </span>
+        )}
         <button
           type="button"
           onClick={tukarBisu}
@@ -950,6 +1043,11 @@ export default function LumbaSolo({ kod }: { kod: string }) {
           </div>
         )}
 
+        {ujian && disambung && hud.soalanKe === hud.soalanDijawab && hud.masaMs < 6000 && (
+          <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[12px] font-bold text-violet-100 bg-violet-900/80 rounded-lg px-3 py-1">
+            {t("solo.testResumed")}
+          </div>
+        )}
         {hud.penalti && (
           <div className="absolute top-3 left-1/2 -translate-x-1/2 text-[12px] font-bold text-amber-300 bg-amber-950/80 rounded-lg px-3 py-1">
             {t("solo.penalty")}
@@ -962,6 +1060,11 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         )}
         {balasan && (
           <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 text-center">
+            {balasan.diterima ? (
+              <p className="text-[20px] font-bold rounded-xl px-4 py-2 bg-violet-600/90 text-white">
+                {t("solo.accepted")}
+              </p>
+            ) : (
             <p
               className={`text-[22px] font-bold rounded-xl px-4 py-2 ${
                 balasan.betul ? "bg-emerald-500/90 text-white" : "bg-red-500/90 text-white"
@@ -972,6 +1075,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                 +{balasan.mata}
               </span>
             </p>
+            )}
           </div>
         )}
 
@@ -983,7 +1087,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                 {t("solo.questionN", { n: soalan.index + 1, total: soalan.total })}
               </span>
               <span className="text-[11px] text-ink-faint tabular-nums">
-                {Math.max(0, Math.ceil((JAWAB_TETINGKAH_MS - (hud.masaSoalan ?? 0)) / 1000))}s
+                {Math.max(0, Math.ceil((tetingkahPapar - (hud.masaSoalan ?? 0)) / 1000))}s
               </span>
             </div>
             <div className="h-1.5 rounded-full bg-slate-200 overflow-hidden mb-3">
@@ -1001,13 +1105,14 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                   onClick={() => void hantarJawapan(o.key)}
                   className="text-left px-3 py-2.5 rounded-xl border border-violet-200 bg-violet-50 hover:bg-violet-100 active:bg-violet-200 text-[13px] text-ink flex items-start gap-2"
                 >
-                  {!sentuhPeranti && (
+                  {(!sentuhPeranti || ujian) && (
                     <kbd className="shrink-0 mt-px inline-flex items-center justify-center w-5 h-5 rounded-md bg-violet-600 text-white text-[11px] font-bold">
                       {i + 1}
                     </kbd>
                   )}
                   <span>
-                    <span className="font-bold text-violet-700">{o.key}.</span> {o.text}
+                    {/* KZ-UTT: pilihan dikocok dalam mod ujian, jadi huruf kunci tidak dipapar. */}
+                    {!ujian && <span className="font-bold text-violet-700">{o.key}.</span>} {o.text}
                   </span>
                 </button>
               ))}
@@ -1062,7 +1167,8 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         )}
       </div>
 
-      {/* Butang tamat (pemain boleh berhenti bila-bila masa) */}
+      {/* Butang tamat (pemain boleh berhenti bila-bila masa); tiada dalam mod ujian */}
+      {!ujian && (
       <div className="px-4 py-3">
         <button
           type="button"
@@ -1075,6 +1181,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
           {t("solo.finishButton")}
         </button>
       </div>
+      )}
 
       {ralat && (
         <div className="px-4 pb-3">

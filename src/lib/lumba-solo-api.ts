@@ -30,7 +30,9 @@ import {
   PAPAR_MAX_DB,
   SOLO_MAX_SOALAN,
   SOLO_MIN_SOALAN,
-  SOALAN_TETINGKAH_MS,
+  sahkanTitikUkur,
+  tetingkahSoalan,
+  type TitikUkur,
   susunPapan,
   kedudukanPapan,
   kunciPemain,
@@ -47,6 +49,10 @@ export interface KuizSolo {
   owner_id: string;
   title: string;
   solo_code: string | null;
+  /** KZ-UTT: mod ujian T1, T2, T3 (log masuk wajib, satu larian setiap titik). */
+  test_mode: boolean;
+  /** KZ-UTT: titik pengukuran yang sedang dibuka pendidik, atau null. */
+  measure_point: TitikUkur | null;
 }
 
 interface BarisKuizDb {
@@ -56,6 +62,8 @@ interface BarisKuizDb {
   title: string;
   solo_enabled: boolean | null;
   solo_code: string | null;
+  solo_test_mode: boolean | null;
+  solo_measure_point: string | null;
 }
 
 /**
@@ -88,10 +96,12 @@ export interface LarianSolo {
   wrong: number;
   elapsed_ms: number | null;
   status: string;
+  test_mode: boolean;
+  measure_point: string | null;
 }
 
 const LAJUR_LARIAN =
-  'id, quiz_id, user_id, nickname, token_hash, question_ids, next_idx, served_at, started_at, finished_at, score, correct, wrong, elapsed_ms, status';
+  'id, quiz_id, user_id, nickname, token_hash, question_ids, next_idx, served_at, started_at, finished_at, score, correct, wrong, elapsed_ms, status, test_mode, measure_point';
 
 export interface PenggunaRingkas {
   id: string;
@@ -107,7 +117,7 @@ export async function muatKuizSolo(svc: SupaService, kod: unknown): Promise<Kuiz
   if (!sahkanKodSolo(bersih)) return null;
   const { data } = await svc
     .from('qm_live_quizzes')
-    .select('id, class_id, owner_id, title, solo_enabled, solo_code')
+    .select('id, class_id, owner_id, title, solo_enabled, solo_code, solo_test_mode, solo_measure_point')
     .eq('solo_code', bersih)
     .maybeSingle();
   const r = (data ?? null) as BarisKuizDb | null;
@@ -118,6 +128,8 @@ export async function muatKuizSolo(svc: SupaService, kod: unknown): Promise<Kuiz
     owner_id: r.owner_id,
     title: r.title,
     solo_code: r.solo_code,
+    test_mode: r.solo_test_mode === true,
+    measure_point: sahkanTitikUkur(r.solo_measure_point),
   };
 }
 
@@ -264,6 +276,7 @@ export async function ciptaLarian(
   nickname: string,
   userId: string | null,
   ipHash: string | null,
+  ujian: { testMode: boolean; measurePoint: TitikUkur | null } = { testMode: false, measurePoint: null },
 ): Promise<{ larian: LarianSolo | null; token: string | null; sebab: 'ok' | 'kurang' | 'gagal' }> {
   const ids = await soalanIdsSerasi(svc, kuiz.id);
   if (ids.length < SOLO_MIN_SOALAN) return { larian: null, token: null, sebab: 'kurang' };
@@ -281,12 +294,59 @@ export async function ciptaLarian(
       next_idx: 0,
       status: 'playing',
       ip_hash: ipHash,
+      test_mode: ujian.testMode,
+      measure_point: ujian.testMode ? ujian.measurePoint : null,
     })
     .select(LAJUR_LARIAN)
     .single();
 
   if (error || !data) return { larian: null, token: null, sebab: 'gagal' };
   return { larian: data as unknown as LarianSolo, token, sebab: 'ok' };
+}
+
+/**
+ * KZ-UTT: larian mod ujian sedia ada bagi pengguna pada satu titik
+ * pengukuran (paling banyak satu, dijaga indeks unik migrasi 0083).
+ */
+export async function larianUjianSedia(
+  svc: SupaService,
+  quizId: string,
+  userId: string,
+  titik: TitikUkur,
+): Promise<LarianSolo | null> {
+  const { data } = await svc
+    .from('qm_solo_runs')
+    .select(LAJUR_LARIAN)
+    .eq('quiz_id', quizId)
+    .eq('user_id', userId)
+    .eq('measure_point', titik)
+    .eq('test_mode', true)
+    .limit(1)
+    .maybeSingle();
+  return (data ?? null) as unknown as LarianSolo | null;
+}
+
+/**
+ * KZ-UTT: sambung larian mod ujian yang belum selesai (contohnya rangkaian
+ * terputus atau tab ditutup): token baharu dijana dan hash lama diganti,
+ * jadi token lama tidak lagi sah. Soalan yang sudah dihidangkan terus
+ * dikira dari served_at asal (masa tidak dipanjangkan).
+ */
+export async function sambungLarianUjian(
+  svc: SupaService,
+  larian: LarianSolo,
+): Promise<{ larian: LarianSolo | null; token: string | null }> {
+  const token = tokenLarianBaru();
+  const { data } = await svc
+    .from('qm_solo_runs')
+    .update({ token_hash: hashToken(token), status: 'playing' })
+    .eq('id', larian.id)
+    .eq('test_mode', true)
+    .in('status', ['playing', 'expired'])
+    .select(LAJUR_LARIAN)
+    .maybeSingle();
+  if (!data) return { larian: null, token: null };
+  return { larian: data as unknown as LarianSolo, token };
 }
 
 /** Muat larian melalui token mentah (hash + perbandingan timing-safe). */
@@ -375,9 +435,9 @@ export async function kunciJawapan(
 }
 
 /** Tetingkah masa jawap sekarang berbanding masa soalan dihidangkan (pelayan). */
-export function msJawap(servedAt: string | null): number {
+export function msJawap(servedAt: string | null, ujian = false): number {
   const dihidang = Date.parse(servedAt ?? '');
-  if (!Number.isFinite(dihidang)) return SOALAN_TETINGKAH_MS;
+  if (!Number.isFinite(dihidang)) return tetingkahSoalan(ujian);
   return Math.max(0, Date.now() - dihidang);
 }
 

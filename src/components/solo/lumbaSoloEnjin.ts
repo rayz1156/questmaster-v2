@@ -35,6 +35,21 @@ export const JAWAB_TETINGKAH_MS = 30_000;
 export const SOALAN_PERTAMA_MS = 5_000;
 /** KZ-055: rehat memandu minimum selepas satu soalan ditutup. */
 export const REHAT_SOALAN_MS = 4_000;
+/**
+ * KZ-UTT (mod ujian T1, T2, T3): pemanduan 8 saat antara soalan, tetingkap
+ * jawab 45 saat, kereta BERHENTI semasa soalan (tiada hanyutan, stereng atau
+ * terbabas), tiada penalti atau bonus had laju (pelayan tidak mendedahkan
+ * betul atau salah), dan larian tamat selepas soalan terakhir dijawab,
+ * bukan ikut jarak trek.
+ */
+export const UJIAN_PEMANDUAN_MS = 8_000;
+/** KZ-UTT: tetingkap jawab mod ujian. Mesti sama dengan pelayan (lumba-solo.ts). */
+export const UJIAN_JAWAB_TETINGKAH_MS = 45_000;
+/** KZ-UTT: masa memandu selepas soalan terakhir sebelum larian ditamatkan. */
+export const UJIAN_LARIAN_KELUAR_MS = 3_000;
+/** KZ-UTT: jarak berhenti sebelum garisan penamat jika soalan belum habis. */
+export const UJIAN_RUANG_PENAMAT_M = 40;
+
 /** Separuh lebar jalan: |offset| melebihi ini bermakna keluar jalan. */
 export const SEPARUH_JALAN_M = 3.5;
 /** Offset lateral maksimum (kereta tidak boleh hilang jauh). */
@@ -116,10 +131,14 @@ export interface KeadaanLumba {
   soalanDitutupMs: number | null;
   /** Kereta sampai garisan penamat. */
   selesai: boolean;
+  /** KZ-UTT: larian mod ujian (kereta berhenti semasa soalan). */
+  ujian: boolean;
+  /** KZ-UTT: jumlah masa simulasi ketika soalan terbuka dalam mod ujian, ms. */
+  jedaMs: number;
 }
 
 /** Keadaan awal larian. */
-export function ciptaKeadaanLumba(): KeadaanLumba {
+export function ciptaKeadaanLumba(ujian = false): KeadaanLumba {
   return {
     masaMs: 0,
     jarakM: 0,
@@ -133,7 +152,48 @@ export function ciptaKeadaanLumba(): KeadaanLumba {
     soalanDijawab: 0,
     soalanDitutupMs: null,
     selesai: false,
+    ujian,
+    jedaMs: 0,
   };
+}
+
+/** KZ-UTT: tetingkap jawab bagi larian ini (45 s mod ujian, 30 s biasa). */
+export function tetingkahJawab(k: KeadaanLumba): number {
+  return k.ujian ? UJIAN_JAWAB_TETINGKAH_MS : JAWAB_TETINGKAH_MS;
+}
+
+/**
+ * KZ-UTT: masa memandu sebenar (tolak masa soalan dalam mod ujian). Dipakai
+ * untuk kereta komputer dan kedudukan supaya lawan tidak terus memecut
+ * ketika pemain berhenti menjawab.
+ */
+export function masaPandu(k: KeadaanLumba): number {
+  return Math.max(0, k.masaMs - k.jedaMs);
+}
+
+/**
+ * KZ-UTT: semua soalan mod ujian sudah dijawab dan masa memandu keluar
+ * selepas soalan terakhir sudah berlalu. Pemanggil kemudian menamatkan larian.
+ */
+export function ujianSelesai(k: KeadaanLumba, jumlahSoalan: number): boolean {
+  return (
+    k.ujian &&
+    jumlahSoalan > 0 &&
+    k.soalanDijawab >= jumlahSoalan &&
+    k.soalanDibukaMs === null &&
+    k.soalanDitutupMs !== null &&
+    k.masaMs >= k.soalanDitutupMs + UJIAN_LARIAN_KELUAR_MS
+  );
+}
+
+/** KZ-UTT: sambung larian mod ujian yang sudah menjawab n soalan. */
+export function sambungUjian(k: KeadaanLumba, dijawab: number): void {
+  const n = Math.max(0, Math.floor(dijawab));
+  k.soalanKe = n;
+  k.soalanDijawab = n;
+  // Rujukan masa untuk soalan seterusnya (8 s dari mula) dan untuk
+  // ujianSelesai jika semua soalan sudah dijawab sebelum terputus.
+  k.soalanDitutupMs = n > 0 ? 0 : null;
 }
 
 /** Penalti sedang berkesan pada masa simulasi sekarang. */
@@ -171,6 +231,19 @@ export function tutupSoalan(k: KeadaanLumba): void {
   }
 }
 
+/**
+ * KZ-UTT: batalkan soalan yang dibuka tetapi tidak sampai kepada pemain
+ * (rangkaian gagal). Soalan tidak dikira dijawab; ia dibuka semula selepas
+ * tempoh pemanduan seterusnya dan pelayan menghidang soalan yang sama.
+ */
+export function batalSoalan(k: KeadaanLumba): void {
+  if (k.soalanDibukaMs !== null) {
+    k.soalanDibukaMs = null;
+    k.soalanKe = Math.max(k.soalanDijawab, k.soalanKe - 1);
+    k.soalanDitutupMs = k.masaMs;
+  }
+}
+
 /** Masa berlalu sejak soalan semasa dibuka, atau null bila tiada soalan. */
 export function masaSoalanBerlalu(k: KeadaanLumba): number | null {
   return k.soalanDibukaMs === null ? null : k.masaMs - k.soalanDibukaMs;
@@ -182,6 +255,11 @@ export function masaSoalanBerlalu(k: KeadaanLumba): number | null {
  * 4 saat selepas soalan sebelumnya ditutup.
  */
 export function perluSoalan(k: KeadaanLumba): boolean {
+  if (k.ujian) {
+    // KZ-UTT: 8 saat memandu sebelum soalan pertama dan selepas setiap soalan.
+    const rujukan = k.soalanDitutupMs ?? 0;
+    return !k.selesai && k.soalanDibukaMs === null && k.masaMs >= rujukan + UJIAN_PEMANDUAN_MS;
+  }
   return (
     !k.selesai &&
     k.soalanDibukaMs === null &&
@@ -202,8 +280,9 @@ export function jarakKomputer(index: 0 | 1, masaMs: number): number {
  */
 export function kedudukanPemain(k: KeadaanLumba): 1 | 2 | 3 {
   let pos: 1 | 2 | 3 = 1;
-  if (jarakKomputer(0, k.masaMs) > k.jarakM) pos = (pos + 1) as 1 | 2 | 3;
-  if (jarakKomputer(1, k.masaMs) > k.jarakM) pos = (pos + 1) as 1 | 2 | 3;
+  const m = masaPandu(k);
+  if (jarakKomputer(0, m) > k.jarakM) pos = (pos + 1) as 1 | 2 | 3;
+  if (jarakKomputer(1, m) > k.jarakM) pos = (pos + 1) as 1 | 2 | 3;
   return pos;
 }
 
@@ -217,6 +296,16 @@ export function langkahLumba(k: KeadaanLumba, dtMs: number, input: InputPemandu)
   const dt = Math.min(100, Math.max(0, dtMs)) / 1000;
   if (dt <= 0) return;
   k.masaMs += Math.max(0, dtMs);
+
+  if (k.ujian && k.soalanDibukaMs !== null) {
+    // KZ-UTT: kereta berhenti semasa soalan. Tiada stereng, hanyutan atau
+    // angin, jadi kereta tidak boleh terbabas ketika pemain menjawab.
+    k.jedaMs += Math.max(0, dtMs);
+    k.kelajuan += (0 - k.kelajuan) * Math.min(1, dt / 0.3);
+    if (k.kelajuan < 0.5) k.kelajuan = 0;
+    k.jarakM = Math.min(TREK_PANJANG_M - UJIAN_RUANG_PENAMAT_M, k.jarakM + (k.kelajuan / 3.6) * dt);
+    return;
+  }
 
   const had = hadLajuEfektif(k);
 
@@ -243,6 +332,12 @@ export function langkahLumba(k: KeadaanLumba, dtMs: number, input: InputPemandu)
   if (k.kelajuan < 0) k.kelajuan = 0;
 
   k.jarakM += (k.kelajuan / 3.6) * dt;
+  if (k.ujian) {
+    // KZ-UTT: larian ujian tamat selepas soalan terakhir (ujianSelesai),
+    // bukan di garisan penamat; kereta menunggu sebelum garisan.
+    k.jarakM = Math.min(TREK_PANJANG_M - UJIAN_RUANG_PENAMAT_M, k.jarakM);
+    return;
+  }
   if (k.jarakM >= TREK_PANJANG_M) {
     k.jarakM = TREK_PANJANG_M;
     k.selesai = true;

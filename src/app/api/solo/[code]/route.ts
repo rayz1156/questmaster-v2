@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import {
+  larianUjianSedia,
   muatKuizSolo,
   soalanIdsSerasi,
   papanSolo,
@@ -35,10 +36,16 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   // Perlu log masuk hanya bila kuiz berkelas DAN pemanggil belum log masuk
   // (Bearer sah). Pengguna log masuk yang bukan ahli ditolak di /start (403).
   let needLogin = false;
-  if (kuiz.class_id) {
+  let alreadyDone = false;
+  if (kuiz.class_id || kuiz.test_mode) {
     const masuk = await semakMasukSolo(req, svc, kuiz);
-    if (masuk.response) papan = topengPapan(papan);
-    needLogin = masuk.keputusan === 'perlu_log_masuk';
+    if (kuiz.class_id && masuk.response) papan = topengPapan(papan);
+    needLogin = masuk.keputusan === 'perlu_log_masuk' || (kuiz.test_mode && !masuk.user);
+    // KZ-UTT: beritahu klien jika pengguna sudah menamatkan titik semasa.
+    if (kuiz.test_mode && masuk.user && kuiz.measure_point) {
+      const sedia = await larianUjianSedia(svc, kuiz.id, masuk.user.id, kuiz.measure_point);
+      alreadyDone = sedia?.status === 'finished';
+    }
   }
 
   return NextResponse.json({
@@ -46,5 +53,9 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     totalQuestions: ids.length,
     needLogin,
     leaderboard: papan,
+    testMode: kuiz.test_mode,
+    measurePoint: kuiz.measure_point,
+    testOpen: !kuiz.test_mode || kuiz.measure_point !== null,
+    alreadyDone,
   });
 }

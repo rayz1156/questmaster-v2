@@ -32,12 +32,18 @@ interface LarianGuru {
   status: string;
   started_at: string;
   finished_at: string | null;
+  test_mode?: boolean;
+  measure_point?: string | null;
+  next_idx?: number;
 }
 
 interface KeadaanSolo {
   enabled: boolean;
   code: string | null;
   link: string | null;
+  /** KZ-UTT: mod ujian kajian dan titik yang dibuka. */
+  testMode?: boolean;
+  measurePoint?: string | null;
   leaderboard: BarisPapan[];
   runs: LarianGuru[];
 }
@@ -103,6 +109,29 @@ export default function PanelCabaranSolo({ quizId }: { quizId: string }) {
           ? t("solo.enabledNotice")
           : t("solo.disabledNotice"),
       );
+    } catch (e) {
+      setRalat(e instanceof Error && e.message ? e.message : t("solo.loadFailed"));
+    } finally {
+      setSibuk(false);
+    }
+  };
+
+  /** KZ-UTT: hidup/matikan mod ujian atau tukar titik dibuka (T1, T2, T3, ditutup). */
+  const simpanUjian = async (perubahan: { testMode?: boolean; measurePoint?: string | null }) => {
+    setSibuk(true);
+    setMesej(null);
+    setRalat(null);
+    try {
+      await authedFetch(`/api/live/quizzes/${quizId}/solo`, {
+        method: "POST",
+        body: JSON.stringify(perubahan),
+      });
+      await muat();
+      if (perubahan.testMode !== undefined) {
+        setMesej(perubahan.testMode ? t("solo.testModeOnNotice") : t("solo.testModeOffNotice"));
+      } else {
+        setMesej(t("solo.measureSavedNotice"));
+      }
     } catch (e) {
       setRalat(e instanceof Error && e.message ? e.message : t("solo.loadFailed"));
     } finally {
@@ -196,6 +225,48 @@ export default function PanelCabaranSolo({ quizId }: { quizId: string }) {
         </span>
       </div>
 
+      {/* KZ-UTT: mod ujian kajian T1, T2, T3 */}
+      {keadaan.enabled && (
+        <div className="mt-4 bg-violet-50 border border-violet-200 rounded-xl p-4">
+          <label className="flex items-start gap-2 cursor-pointer">
+            <input
+              type="checkbox"
+              className="mt-0.5 h-4 w-4 accent-violet-600"
+              checked={keadaan.testMode === true}
+              disabled={sibuk}
+              onChange={(e) => void simpanUjian({ testMode: e.target.checked })}
+            />
+            <span>
+              <span className="block text-[13px] font-semibold text-ink">{t("solo.testModeLabel")}</span>
+              <span className="block text-[12px] text-ink-faint mt-0.5">{t("solo.testModeDesc")}</span>
+            </span>
+          </label>
+          {keadaan.testMode && (
+            <div className="mt-3 flex items-center gap-2 flex-wrap">
+              <span className="text-[12px] font-semibold text-ink">{t("solo.measurePointLabel")}</span>
+              {(["T1", "T2", "T3", null] as const).map((titik) => {
+                const aktif = (keadaan.measurePoint ?? null) === titik;
+                return (
+                  <button
+                    key={titik ?? "tutup"}
+                    type="button"
+                    disabled={sibuk || aktif}
+                    onClick={() => void simpanUjian({ measurePoint: titik })}
+                    className={`text-[12px] font-semibold rounded-lg px-3 py-1.5 border transition ${
+                      aktif
+                        ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-transparent"
+                        : "bg-white text-ink border-violet-200 hover:border-violet-400"
+                    }`}
+                  >
+                    {titik ?? t("solo.measureClosed")}
+                  </button>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      )}
+
       {keadaan.enabled && keadaan.code && (
         <div className="mt-4 flex items-start gap-4 flex-wrap">
           <div className="flex-1 min-w-[220px]">
@@ -271,6 +342,11 @@ export default function PanelCabaranSolo({ quizId }: { quizId: string }) {
                 className="flex items-center gap-2 text-[12px] rounded-lg bg-slate-50 px-3 py-2"
               >
                 <span className="flex-1 truncate font-medium text-ink">{r.nickname}</span>
+                {r.test_mode && r.measure_point && (
+                  <span className="text-[11px] font-bold text-violet-700 bg-violet-50 border border-violet-200 rounded px-1.5">
+                    {t("solo.runPoint")} {r.measure_point}
+                  </span>
+                )}
                 <span className="text-ink-faint tabular-nums">{t("solo.score")} {r.score}</span>
                 <span className="text-ink-faint tabular-nums">{formatMasa(r.elapsed_ms)}</span>
                 <span className="text-[11px] text-ink-faint">{labelStatus(r.status)}</span>

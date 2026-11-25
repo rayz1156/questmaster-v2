@@ -22,6 +22,25 @@ export const SOLO_MAX_SOALAN = 30;
 export const SOLO_MIN_SOALAN = 3;
 /** Tetingkap jawab setiap soal, dikira di pelayan daripada served_at. */
 export const SOALAN_TETINGKAH_MS = 30_000;
+/**
+ * KZ-UTT: tetingkap jawab mod ujian (T1, T2, T3). Mesti sama dengan
+ * UJIAN_JAWAB_TETINGKAH_MS dalam enjin klien (lumbaSoloEnjin.ts).
+ */
+export const UJIAN_SOALAN_TETINGKAH_MS = 45_000;
+/** KZ-UTT: titik pengukuran yang sah. */
+export const TITIK_UKUR = ['T1', 'T2', 'T3'] as const;
+export type TitikUkur = (typeof TITIK_UKUR)[number];
+
+/** KZ-UTT: titik pengukuran sah atau null. */
+export function sahkanTitikUkur(t: unknown): TitikUkur | null {
+  return typeof t === 'string' && (TITIK_UKUR as readonly string[]).includes(t) ? (t as TitikUkur) : null;
+}
+
+/** KZ-UTT: tetingkap jawab pelayan bagi larian (45 s mod ujian, 30 s biasa). */
+export function tetingkahSoalan(ujian: boolean): number {
+  return ujian ? UJIAN_SOALAN_TETINGKAH_MS : SOALAN_TETINGKAH_MS;
+}
+
 /** Larian playing lebih lama daripada ini dianggap tergendala (expired). */
 export const LARIAN_EXP_MS = 30 * 60 * 1000;
 /** Had kadar: maksimum larian dimulakan dalam tetingkap kadar. */
@@ -80,11 +99,16 @@ export function sahkanNickname(nama: unknown): string | null {
  */
 
 /** Kira mata satu jawapan Lumba Solo. Satu-satunya tempat formula ini wujud. */
-export function kiraMata(points: number, ms: number, betul: boolean): number {
+export function kiraMata(
+  points: number,
+  ms: number,
+  betul: boolean,
+  tetingkah: number = SOALAN_TETINGKAH_MS,
+): number {
   if (!betul) return 0;
   const t = Math.max(0, ms);
-  if (t > SOALAN_TETINGKAH_MS) return 0;
-  const bonus = 0.5 * Math.max(0, 1 - t / SOALAN_TETINGKAH_MS);
+  if (t > tetingkah) return 0;
+  const bonus = 0.5 * Math.max(0, 1 - t / tetingkah);
   const asas = Math.max(0, Math.floor(points));
   return Math.round(asas * (1 + bonus));
 }

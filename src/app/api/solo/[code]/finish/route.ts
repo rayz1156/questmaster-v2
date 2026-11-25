@@ -45,7 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
     .eq('id', larian.id)
     .eq('status', 'playing')
     .select(
-      'id, quiz_id, user_id, nickname, token_hash, question_ids, next_idx, served_at, started_at, finished_at, score, correct, wrong, elapsed_ms, status',
+      'id, quiz_id, user_id, nickname, token_hash, question_ids, next_idx, served_at, started_at, finished_at, score, correct, wrong, elapsed_ms, status, test_mode, measure_point',
     )
     .maybeSingle();
   if (error) return ralatJson('Could not finish the run.', 503);
@@ -53,6 +53,17 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   const selesai = upd as unknown as typeof larian & { elapsed_ms: number | null };
   const { rank, best } = await kedudukanLarian(svc, kuiz.id, barisPapanLarian(selesai));
+
+  // KZ-UTT: mod ujian tidak memulangkan bilangan betul atau salah.
+  if (selesai.test_mode === true) {
+    return NextResponse.json({
+      score: selesai.score,
+      elapsedMs: selesai.elapsed_ms,
+      rank,
+      best,
+      testMode: true,
+    });
+  }
 
   return NextResponse.json({
     score: selesai.score,

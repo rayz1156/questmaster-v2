@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { ralatJson } from '@/lib/i18n/ralatApi';
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { muatKuizSolo, semakLarian, soalanSelamat } from '@/lib/lumba-solo-api';
+import { kocok } from '@/lib/lumba-solo';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,7 +58,9 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   return NextResponse.json({
     questionId: soalan.id,
     prompt: soalan.prompt,
-    options: soalan.options,
+    // KZ-UTT: susunan pilihan dikocok bagi setiap peserta dalam mod ujian
+    // (kunci pilihan kekal, jadi pemarkahan pelayan tidak berubah).
+    options: larian.test_mode === true ? kocok(soalan.options) : soalan.options,
     index: idx,
     total,
   });
