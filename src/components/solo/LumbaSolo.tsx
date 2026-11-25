@@ -574,9 +574,10 @@ export default function LumbaSolo({ kod }: { kod: string }) {
             window.devicePixelRatio || 1,
           );
           paparan3D.render({
-            // KZ-UTT: masa memandu (tolak masa soalan) supaya kereta lawan
-            // tidak terus bergerak ketika pemain berhenti menjawab.
-            masaMs: k.ujian ? masaPandu(k) : k.masaMs,
+            // KZ-UTT: masaMs mesti sentiasa bergerak (dt animasi); hanya
+            // kereta lawan memakai masa memandu (tolak masa soalan).
+            masaMs: k.masaMs,
+            masaKomputerMs: k.ujian ? masaPandu(k) : undefined,
             jarakM: k.jarakM,
             offsetM: k.offsetM,
             hadLaju: k.hadLaju,
@@ -610,7 +611,8 @@ export default function LumbaSolo({ kod }: { kod: string }) {
                 kemajuanKomputer: [jarakKomputer(0, k.masaMs) / TREK_PANJANG_M, jarakKomputer(1, k.masaMs) / TREK_PANJANG_M],
               });
             } else lukisPemandangan(ctx, lebarCss, tinggiCss, {
-              masaMs: k.ujian ? masaPandu(k) : k.masaMs,
+              masaMs: k.masaMs,
+              masaKomputerMs: k.ujian ? masaPandu(k) : undefined,
               jarakM: k.jarakM,
               offsetM: k.offsetM,
               hadLaju: k.hadLaju,
@@ -948,7 +950,10 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const progresTrek = Math.min(1, hud.jarakM / TREK_PANJANG_M);
 
   return (
-    <div className="min-h-screen bg-slate-900 flex flex-col select-none">
+    // KZ-UTT: tinggi tepat skrin yang kelihatan (100dvh), bukan min-h-screen.
+    // Pada telefon 100vh termasuk bar alamat pelayar, jadi butang sentuh di
+    // bawah kanvas terpotong pada permulaan larian.
+    <div className="h-[100dvh] overflow-hidden bg-slate-900 flex flex-col select-none">
       {/* HUD atas */}
       <div className="px-4 pt-3 pb-2 flex items-center gap-3 flex-wrap text-white">
         {!ujian && (
@@ -993,10 +998,10 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       </div>
 
       {/* Kanvas permainan */}
-      <div className="flex-1 relative mx-auto w-full max-w-2xl px-0">
+      <div className="flex-1 min-h-0 relative mx-auto w-full max-w-2xl px-0">
         <canvas
           ref={kanvasRef}
-          className="w-full h-full min-h-[56vh] block rounded-xl"
+          className="w-full h-full block rounded-xl"
           aria-label={t("solo.race")}
         />
         <canvas

@@ -22,6 +22,8 @@ const PANDANGAN_M = 160;
 export interface Pemandangan {
   /** Masa simulasi, ms (untuk animasi seperti garis jalan). */
   masaMs: number;
+  /** KZ-UTT: masa untuk kereta komputer (tolak masa soalan mod ujian); lalai masaMs. */
+  masaKomputerMs?: number;
   /** Jarak pemain, meter. */
   jarakM: number;
   /** Offset lateral pemain, meter. */
@@ -98,7 +100,7 @@ export function lukisPemandangan(
   const pemainY = tinggi * 0.8;
   for (let i = 0; i < 2; i++) {
     const kelajuan = p.kelajuanKomputer[i] ?? 150;
-    const jarakKomputer = (kelajuan / 3.6) * (p.masaMs / 1000);
+    const jarakKomputer = (kelajuan / 3.6) * ((p.masaKomputerMs ?? p.masaMs) / 1000);
     const deltaM = jarakKomputer - p.jarakM;
     if (deltaM < 2 || deltaM > PANDANGAN_M) continue;
     const y = pemainY - deltaM * pxm;

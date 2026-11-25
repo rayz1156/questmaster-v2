@@ -1206,7 +1206,9 @@ export class Pemandangan3D {
   render(p: Pemandangan3DData): void {
     if (!this.sedia) return;
     let dt = (p.masaMs - this.masaLepas) / 1000;
-    if (dt < 0 || dt > 0.25) dt = 0.016;
+    // dt <= 0 (masa tidak bergerak) menghasilkan 0/0 = NaN dalam halaju
+    // lateral; NaN melekat pada this.condong dan kereta pemain hilang.
+    if (!(dt > 0) || dt > 0.25) dt = 0.016;
     this.masaLepas = p.masaMs;
     const masaS = p.masaMs / 1000;
     const ms = p.kelajuan / 3.6;
@@ -1221,6 +1223,7 @@ export class Pemandangan3D {
     const [pekali, had] = this.palet.condong;
     const sasarCondong = Math.max(-had, Math.min(had, halajuL * pekali));
     this.condong += (sasarCondong - this.condong) * Math.min(1, dt * 8);
+    if (!Number.isFinite(this.condong)) this.condong = 0;
     this.letakKereta(this.pemain, p.jarakM, p.offsetM, gerak, this.condong, masaS);
     const brek = p.kelajuan < this.kelajuanLepas - 0.05;
     this.kelajuanLepas = p.kelajuan;
@@ -1245,7 +1248,9 @@ export class Pemandangan3D {
     // Kereta komputer.
     for (let i = 0; i < this.komputer.length; i++) {
       const kmj = p.kelajuanKomputer[i] ?? 150;
-      const d = Math.min(p.trekPanjangM + 30, (kmj / 3.6) * masaS);
+      // KZ-UTT: mod ujian memberi masaKomputerMs (tolak masa soalan) supaya
+      // lawan berhenti bersama pemain; animasi lain kekal pada masaMs.
+      const d = Math.min(p.trekPanjangM + 30, (kmj / 3.6) * ((p.masaKomputerMs ?? p.masaMs) / 1000));
       const k = this.komputer[i];
       const nampak = Math.abs(d - p.jarakM) < 500;
       k.kumpulan.visible = nampak;
