@@ -54,7 +54,8 @@ begin
       add constraint qm_solo_runs_measure_point_check
       check (
         (test_mode = false and measure_point is null)
-        or (test_mode = true and measure_point in ('T1','T2','T3'))
+        -- 'is not null' wajib: NULL in (...) bernilai NULL dan CHECK menerimanya.
+        or (test_mode = true and measure_point is not null and measure_point in ('T1','T2','T3'))
         -- user_id sengaja tidak diwajibkan di sini: lajur itu ON DELETE SET
         -- NULL, dan kekangan akan menghalang pemadaman akaun. API menolak
         -- tetamu dalam mod ujian.
