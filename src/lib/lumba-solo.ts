@@ -274,3 +274,77 @@ export function kiraElapsedMs(startedAt: string, finishedAt: string): number {
 export function hashIp(ip: string): string {
   return createHash('sha256').update('qm-solo:' + ip, 'utf8').digest('hex');
 }
+
+/* ============================================================
+ * KZ-UTT Fasa 2: item tinjauan (logik tulen, diuji selftest-kz-utt)
+ * ============================================================ */
+
+/** Had bilangan item tinjauan bagi satu kuiz. */
+export const TINJAUAN_MAX_ITEM = 40;
+
+/** Item tinjauan yang sudah disahkan (bentuk simpanan). */
+export interface ItemTinjauan {
+  code: string | null;
+  construct: string | null;
+  prompt: string;
+  scale_min: number;
+  scale_max: number;
+  label_min: string | null;
+  label_max: string | null;
+  points: TitikUkur[];
+}
+
+function teksPilihan(v: unknown, max: number): string | null {
+  if (typeof v !== 'string') return null;
+  const t = v.trim();
+  return t ? t.slice(0, max) : null;
+}
+
+/**
+ * Sahkan satu item tinjauan daripada badan permintaan pendidik. Skala hanya
+ * 0 hingga 10 (MAILS) atau 1 hingga N (N 2 hingga 10). Pulangkan ralat dalam
+ * Bahasa Inggeris kerana klien memaparkannya terus (istilah UI).
+ */
+export function sahkanItemTinjauan(raw: unknown): { item: ItemTinjauan | null; ralat: string | null } {
+  if (!raw || typeof raw !== 'object') return { item: null, ralat: 'Invalid item.' };
+  const r = raw as Record<string, unknown>;
+  const prompt = typeof r.prompt === 'string' ? r.prompt.trim() : '';
+  if (!prompt || prompt.length > 500) return { item: null, ralat: 'Each item needs a prompt of 1 to 500 characters.' };
+  const min = Number(r.scale_min);
+  const max = Number(r.scale_max);
+  if (!Number.isInteger(min) || (min !== 0 && min !== 1)) {
+    return { item: null, ralat: 'scale_min must be 0 or 1.' };
+  }
+  if (!Number.isInteger(max) || max < 2 || max > 10 || max <= min) {
+    return { item: null, ralat: 'scale_max must be 2 to 10 and above scale_min.' };
+  }
+  const titikMentah = Array.isArray(r.points) ? r.points : ['T1', 'T2', 'T3'];
+  const points: TitikUkur[] = [];
+  for (const t of titikMentah) {
+    const s = sahkanTitikUkur(t);
+    if (!s) return { item: null, ralat: 'points must contain only T1, T2 or T3.' };
+    if (!points.includes(s)) points.push(s);
+  }
+  if (points.length === 0) return { item: null, ralat: 'Each item needs at least one point (T1, T2 or T3).' };
+  points.sort();
+  return {
+    item: {
+      code: teksPilihan(r.code, 40),
+      construct: teksPilihan(r.construct, 40),
+      prompt,
+      scale_min: min,
+      scale_max: max,
+      label_min: teksPilihan(r.label_min, 80),
+      label_max: teksPilihan(r.label_max, 80),
+      points,
+    },
+    ralat: null,
+  };
+}
+
+/** Nilai jawapan tinjauan sah jika integer dalam julat skala item. */
+export function nilaiTinjauanSah(item: { scale_min: number; scale_max: number }, v: unknown): number | null {
+  const n = typeof v === 'number' ? v : Number.NaN;
+  if (!Number.isInteger(n) || n < item.scale_min || n > item.scale_max) return null;
+  return n;
+}

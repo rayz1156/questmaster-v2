@@ -91,6 +91,16 @@ interface SoalanAktif {
   total: number;
 }
 
+/** KZ-UTT Fasa 2: item tinjauan seperti dipulangkan GET /api/solo/[code]/survey. */
+interface ItemTinjauanUi {
+  id: string;
+  prompt: string;
+  scale_min: number;
+  scale_max: number;
+  label_min: string | null;
+  label_max: string | null;
+}
+
 interface KeputusanLarian {
   testMode: boolean;
   score: number;
@@ -140,7 +150,11 @@ function formatMasa(ms: number): string {
 export default function LumbaSolo({ kod }: { kod: string }) {
   const { t } = useBahasa();
 
-  const [fasa, setFasa] = useState<"muat" | "maklumat" | "lumba" | "keputusan">("muat");
+  const [fasa, setFasa] = useState<"muat" | "maklumat" | "lumba" | "tinjauan" | "keputusan">("muat");
+  /** KZ-UTT Fasa 2: item tinjauan selepas garisan penamat (mod ujian). */
+  const [tinjauan, setTinjauan] = useState<ItemTinjauanUi[]>([]);
+  const [nilaiTinjauan, setNilaiTinjauan] = useState<Record<string, number>>({});
+  const [hantarTinjauanSibuk, setHantarTinjauanSibuk] = useState(false);
   const [info, setInfo] = useState<InfoSolo | null>(null);
   const [ralat, setRalat] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
@@ -481,6 +495,59 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     }
   }, [kod, muatInfo, pengepala, pastiBunyi, t]);
 
+  /**
+   * KZ-UTT Fasa 2: selepas soalan terakhir mod ujian, papar item tinjauan
+   * bagi titik ini sebelum larian ditamatkan. Tiada item atau ralat
+   * rangkaian: terus tamatkan (larian tidak boleh tersekat di sini).
+   */
+  const mulaTinjauan = useCallback(async (): Promise<void> => {
+    soalanRef.current = null;
+    setSoalan(null);
+    try {
+      const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/survey`, {
+        cache: "no-store",
+        headers: await pengepala(),
+      });
+      const json = await res.json().catch(() => ({}));
+      const item = Array.isArray(json.items) ? (json.items as ItemTinjauanUi[]) : [];
+      if (!res.ok || item.length === 0) {
+        void tamatkan();
+        return;
+      }
+      setTinjauan(item);
+      setNilaiTinjauan(
+        json.values && typeof json.values === "object" ? (json.values as Record<string, number>) : {},
+      );
+      setFasa("tinjauan");
+    } catch {
+      void tamatkan();
+    }
+  }, [kod, pengepala, tamatkan]);
+
+  const hantarTinjauan = useCallback(async (): Promise<void> => {
+    setHantarTinjauanSibuk(true);
+    setRalat(null);
+    try {
+      const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/survey`, {
+        method: "POST",
+        headers: { ...(await pengepala()), "content-type": "application/json" },
+        body: JSON.stringify({
+          answers: tinjauan.map((it) => ({ itemId: it.id, value: nilaiTinjauan[it.id] })),
+        }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        setRalat(typeof json.error === "string" ? json.error : t("solo.surveySaveFailed"));
+        return;
+      }
+      await tamatkan();
+    } catch {
+      setRalat(t("solo.surveySaveFailed"));
+    } finally {
+      setHantarTinjauanSibuk(false);
+    }
+  }, [kod, pengepala, tinjauan, nilaiTinjauan, tamatkan, t]);
+
   /* ===== KZ-054: paparan 3D (dimuat dinamik; sandaran 2D jika WebGL tiada) ===== */
   useEffect(() => {
     if (fasa !== "lumba") return;
@@ -559,7 +626,8 @@ export default function LumbaSolo({ kod }: { kod: string }) {
           }
           if (k.selesai || ujianSelesai(k, totalRef.current)) {
             selesaiRef.current = true;
-            void tamatkan();
+            // KZ-UTT Fasa 2: mod ujian melalui tinjauan dahulu.
+            void (k.ujian ? mulaTinjauan() : tamatkan());
           }
         }
 
@@ -650,7 +718,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       hidup = false;
       cancelAnimationFrame(rafRef.current);
     };
-  }, [fasa, mintaSoalan, hantarJawapan, tamatkan, pastiBunyi]);
+  }, [fasa, mintaSoalan, hantarJawapan, tamatkan, mulaTinjauan, pastiBunyi]);
 
   /* ===== Kekunci ===== */
   useEffect(() => {
@@ -873,6 +941,76 @@ export default function LumbaSolo({ kod }: { kod: string }) {
             )}
           </div>
           {info && paparPapan(info.leaderboard)}
+        </div>
+      </div>
+    );
+  }
+
+  if (fasa === "tinjauan") {
+    const lengkap = tinjauan.every((it) => Number.isInteger(nilaiTinjauan[it.id]));
+    const dijawab = tinjauan.filter((it) => Number.isInteger(nilaiTinjauan[it.id])).length;
+    return (
+      <div className="min-h-[100dvh] bg-slate-50 p-4">
+        <div className="w-full max-w-xl mx-auto space-y-4">
+          <div className="rounded-2xl bg-white border border-slate-200 p-5 shadow-sm">
+            <p className="text-[11px] font-bold uppercase tracking-wider text-violet-600">
+              {t("solo.surveyTitle")}
+            </p>
+            <p className="text-[13px] text-ink-faint mt-1">{t("solo.surveyIntro")}</p>
+            <p className="text-[12px] text-ink-faint mt-2">
+              {t("solo.surveyProgress", { a: dijawab, b: tinjauan.length })}
+            </p>
+          </div>
+          {tinjauan.map((it, n) => {
+            const pilihan: number[] = [];
+            for (let v = it.scale_min; v <= it.scale_max; v++) pilihan.push(v);
+            return (
+              <div key={it.id} className="rounded-2xl bg-white border border-slate-200 p-4 shadow-sm">
+                <p className="text-[14px] text-ink">
+                  <span className="font-bold text-violet-700">{n + 1}.</span> {it.prompt}
+                </p>
+                <div className="mt-3 flex flex-wrap gap-1.5" role="radiogroup">
+                  {pilihan.map((v) => {
+                    const dipilih = nilaiTinjauan[it.id] === v;
+                    return (
+                      <button
+                        key={v}
+                        type="button"
+                        role="radio"
+                        aria-checked={dipilih}
+                        onClick={() => setNilaiTinjauan((lama) => ({ ...lama, [it.id]: v }))}
+                        className={`min-w-[2.5rem] h-10 rounded-xl border text-[14px] font-semibold transition ${
+                          dipilih
+                            ? "bg-gradient-to-r from-violet-600 to-indigo-600 text-white border-transparent"
+                            : "bg-white text-ink border-violet-200 hover:border-violet-400"
+                        }`}
+                      >
+                        {v}
+                      </button>
+                    );
+                  })}
+                </div>
+                {(it.label_min || it.label_max) && (
+                  <div className="mt-1.5 flex justify-between gap-4 text-[11px] text-ink-faint">
+                    <span>{it.label_min ? `${it.scale_min} = ${it.label_min}` : ""}</span>
+                    <span className="text-right">{it.label_max ? `${it.scale_max} = ${it.label_max}` : ""}</span>
+                  </div>
+                )}
+              </div>
+            );
+          })}
+          {ralat && (
+            <p className="text-[13px] text-red-700 bg-red-50 border border-red-200 rounded-xl p-3">{ralat}</p>
+          )}
+          <button
+            type="button"
+            disabled={!lengkap || hantarTinjauanSibuk}
+            onClick={() => void hantarTinjauan()}
+            className="w-full px-4 py-3 rounded-xl text-white text-[14px] font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50"
+          >
+            {hantarTinjauanSibuk ? t("solo.surveySaving") : t("solo.surveySubmit")}
+          </button>
+          {!lengkap && <p className="text-[12px] text-ink-faint text-center">{t("solo.surveyAnswerAll")}</p>}
         </div>
       </div>
     );

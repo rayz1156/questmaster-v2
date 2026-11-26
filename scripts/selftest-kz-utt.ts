@@ -25,8 +25,11 @@ import {
   UJIAN_RUANG_PENAMAT_M,
   type InputPemandu,
 } from '../src/components/solo/lumbaSoloEnjin';
+import { barisTinjauan, huraiBarisTinjauan } from '../src/lib/tinjauan-solo';
 import {
   kiraMata,
+  nilaiTinjauanSah,
+  sahkanItemTinjauan,
   sahkanTitikUkur,
   SOALAN_TETINGKAH_MS,
   tetingkahSoalan,
@@ -164,6 +167,36 @@ check('ujian: salah = 0', kiraMata(1000, 1000, false, 45000) === 0);
 console.log('KZ-UTT: titik pengukuran');
 check('T1, T2, T3 sah', sahkanTitikUkur('T1') === 'T1' && sahkanTitikUkur('T2') === 'T2' && sahkanTitikUkur('T3') === 'T3');
 check('lain ditolak', sahkanTitikUkur('T4') === null && sahkanTitikUkur('t1') === null && sahkanTitikUkur(null) === null);
+
+console.log('KZ-UTT Fasa 2: item tinjauan');
+{
+  const ok = sahkanItemTinjauan({ prompt: ' Saya boleh guna AI ', scale_min: 0, scale_max: 10, points: ['T2', 'T1', 'T1'] });
+  check('item sah: teks dipangkas', ok.item?.prompt === 'Saya boleh guna AI');
+  check('item sah: titik unik dan tersusun', JSON.stringify(ok.item?.points) === '["T1","T2"]');
+  check('lalai titik T1,T2,T3', JSON.stringify(sahkanItemTinjauan({ prompt: 'x', scale_min: 1, scale_max: 5 }).item?.points) === '["T1","T2","T3"]');
+  check('tolak teks kosong', sahkanItemTinjauan({ prompt: '  ', scale_min: 1, scale_max: 5 }).item === null);
+  check('tolak scale_min 2', sahkanItemTinjauan({ prompt: 'x', scale_min: 2, scale_max: 5 }).item === null);
+  check('tolak scale_max 11', sahkanItemTinjauan({ prompt: 'x', scale_min: 0, scale_max: 11 }).item === null);
+  check('tolak titik T4', sahkanItemTinjauan({ prompt: 'x', scale_min: 1, scale_max: 5, points: ['T4'] }).item === null);
+  check('tolak titik kosong', sahkanItemTinjauan({ prompt: 'x', scale_min: 1, scale_max: 5, points: [] }).item === null);
+  const skala = { scale_min: 0, scale_max: 10 };
+  check('nilai 0 dan 10 sah', nilaiTinjauanSah(skala, 0) === 0 && nilaiTinjauanSah(skala, 10) === 10);
+  check('nilai 11, -1, 2.5, "3" ditolak', [11, -1, 2.5, '3', null].every((v) => nilaiTinjauanSah(skala, v) === null));
+
+  const teks = 'code\tconstruct\tpoints\tmin\tmax\tlow\thigh\tprompt\n' +
+    'MAILS_01\tMAILS\tT1 T2\t0\t10\tTidak langsung\tSangat baik\tSaya boleh mengendalikan aplikasi AI.\n' +
+    '\n' +
+    'PIND_01\tPEMINDAHAN\tT3\t1\t5\tTidak pernah\tSangat kerap\tSaya telah menggunakan AI dalam kerja saya.';
+  const h = huraiBarisTinjauan(teks);
+  check('hurai: tajuk dan baris kosong diabaikan, 2 item', h.items.length === 2 && h.errors.length === 0);
+  check('hurai: titik T1 T2', JSON.stringify(h.items[0].points) === '["T1","T2"]');
+  check('hurai: skala 1 hingga 5', h.items[1].scale_min === 1 && h.items[1].scale_max === 5);
+  check('hurai: lajur kurang ditolak dengan nombor baris', huraiBarisTinjauan('a\tb\tT1').errors[0]?.row === 1);
+  check('hurai: tiada titik ditolak', huraiBarisTinjauan('a\tb\tX\t1\t5\tl\th\tteks').errors.length === 1);
+  const pergi = huraiBarisTinjauan(barisTinjauan(h.items));
+  check('hurai: pergi dan balik sama', JSON.stringify(pergi.items) === JSON.stringify(h.items));
+  check('hurai: hasil diterima pengesah pelayan', h.items.every((it) => sahkanItemTinjauan(it).item !== null));
+}
 
 console.log('');
 console.log('LULUS: ' + pass + '  GAGAL: ' + fail);

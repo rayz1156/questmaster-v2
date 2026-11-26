@@ -7,6 +7,7 @@
  * dengan pengesahan.
  */
 import { useCallback, useEffect, useState } from "react";
+import { barisTinjauan, huraiBarisTinjauan } from "@/lib/tinjauan-solo";
 import { Trash2, Copy, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useBahasa } from "@/lib/i18n/BahasaProvider";
@@ -115,6 +116,53 @@ export default function PanelCabaranSolo({ quizId }: { quizId: string }) {
       setSibuk(false);
     }
   };
+
+  /** KZ-UTT Fasa 2: item tinjauan (teks bertab) dan status kunci. */
+  const [teksTinjauan, setTeksTinjauan] = useState("");
+  const [bilItem, setBilItem] = useState(0);
+  const [tinjauanDikunci, setTinjauanDikunci] = useState(false);
+  const [ralatTinjauan, setRalatTinjauan] = useState<string | null>(null);
+
+  const muatTinjauan = useCallback(async () => {
+    try {
+      const json = await authedFetch(`/api/live/quizzes/${quizId}/survey`);
+      const item = Array.isArray(json.items) ? json.items : [];
+      setTeksTinjauan(barisTinjauan(item));
+      setBilItem(item.length);
+      setTinjauanDikunci(json.locked === true);
+    } catch {
+      // Panel utama sudah memaparkan ralat muat; tinjauan kekal kosong.
+    }
+  }, [authedFetch, quizId]);
+
+  const simpanTinjauan = async () => {
+    setRalatTinjauan(null);
+    setMesej(null);
+    const { items, errors } = huraiBarisTinjauan(teksTinjauan);
+    if (errors.length > 0) {
+      setRalatTinjauan(t("solo.surveyParseError", { row: errors[0].row, msg: errors[0].message }));
+      return;
+    }
+    setSibuk(true);
+    try {
+      const json = await authedFetch(`/api/live/quizzes/${quizId}/survey`, {
+        method: "PUT",
+        body: JSON.stringify({ items }),
+      });
+      const simpan = Array.isArray(json.items) ? json.items : [];
+      setTeksTinjauan(barisTinjauan(simpan));
+      setBilItem(simpan.length);
+      setMesej(t("solo.surveySavedNotice"));
+    } catch (e) {
+      setRalatTinjauan(e instanceof Error && e.message ? e.message : t("solo.loadFailed"));
+    } finally {
+      setSibuk(false);
+    }
+  };
+
+  useEffect(() => {
+    if (keadaan?.testMode) void muatTinjauan();
+  }, [keadaan?.testMode, muatTinjauan]);
 
   /** KZ-UTT: hidup/matikan mod ujian atau tukar titik dibuka (T1, T2, T3, ditutup). */
   const simpanUjian = async (perubahan: { testMode?: boolean; measurePoint?: string | null }) => {
@@ -262,6 +310,37 @@ export default function PanelCabaranSolo({ quizId }: { quizId: string }) {
                   </button>
                 );
               })}
+            </div>
+          )}
+          {keadaan.testMode && (
+            <div className="mt-4 border-t border-violet-200 pt-3">
+              <p className="text-[13px] font-semibold text-ink">{t("solo.surveyEditorTitle")}</p>
+              <p className="text-[12px] text-ink-faint mt-0.5">{t("solo.surveyEditorDesc")}</p>
+              <p className="text-[12px] text-ink mt-1">
+                {bilItem > 0 ? t("solo.surveyItemsCount", { n: bilItem }) : t("solo.surveyNone")}
+              </p>
+              {tinjauanDikunci && (
+                <p className="text-[12px] font-semibold text-amber-700 mt-1">{t("solo.surveyLocked")}</p>
+              )}
+              <textarea
+                value={teksTinjauan}
+                onChange={(e) => setTeksTinjauan(e.target.value)}
+                readOnly={tinjauanDikunci}
+                rows={6}
+                spellCheck={false}
+                className="mt-2 w-full rounded-xl border border-violet-200 bg-white px-3 py-2 text-[12px] font-mono text-ink outline-none focus:border-violet-500"
+              />
+              {ralatTinjauan && <p className="text-[12px] text-red-700 mt-1">{ralatTinjauan}</p>}
+              {!tinjauanDikunci && (
+                <button
+                  type="button"
+                  disabled={sibuk}
+                  onClick={() => void simpanTinjauan()}
+                  className="mt-2 px-3 py-1.5 rounded-lg text-white text-[12px] font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50"
+                >
+                  {t("solo.surveySaveItems")}
+                </button>
+              )}
             </div>
           )}
         </div>
