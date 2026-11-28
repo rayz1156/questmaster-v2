@@ -72,7 +72,7 @@ export function binaEmelSusulan(v: IsiSusulan): { subject: string; text: string;
   const perenggan = [
     `Assalamualaikum dan salam sejahtera ${v.nama},`,
     pembuka,
-    'Ia mengandungi beberapa soalan ringkas, mengambil masa kira-kira 10 hingga 15 minit, dan hanya perlu dijawab sekali.',
+    'Soalan dijawab dalam bentuk permainan lumba yang ringkas dan menarik. Kenderaan anda berhenti setiap kali soalan muncul, jadi anda boleh menjawab dengan tenang. Ia mengambil masa kira-kira 10 hingga 15 minit dan hanya perlu dijawab sekali.',
     `Mula di sini (log masuk dengan akaun Kuizen anda):\n${v.pautan}`,
     `Tarikh tutup: ${v.tutup}`,
     `Jika anda tidak mahu menerima e-mel susulan ini lagi, klik pautan ini. Akses anda kepada kelas tidak terjejas.\n${v.pautanBerhenti}`,
