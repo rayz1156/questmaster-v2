@@ -45,6 +45,7 @@ import {
 } from "./peer-tools";
 import { inviteEducator } from "./invite-tools";
 import { TOOLS_TAMBAHAN } from "./tambahan-tools";
+import { TOOLS_KAJIAN } from "./kajian-tools";
 import { failVideo, MESEJ_SEKAT_VIDEO } from "../sekatVideo";
 import {
   createCertificateTemplate,
@@ -2644,6 +2645,8 @@ export const TOOLS: ToolDef[] = [
   // Live Quiz, sijil, analitik, peserta) dalam fail berasingan supaya boleh
   // diuji tanpa pangkalan data.
   ...TOOLS_TAMBAHAN,
+  // KZ-UTT Fasa 4: pelan pengukuran, status susulan, eksport kajian.
+  ...TOOLS_KAJIAN,
 ];
 
 /** Tools yang kelihatan kepada peranan tertentu, dengan skop diambil kira. */

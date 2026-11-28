@@ -61,6 +61,20 @@ export async function POST(req: NextRequest) {
     .is('unsubscribed_at', null)
     .select('quiz_id');
   if (error) return ralatJson(error.message, 500);
+  // Persetujuan lalai: peserta tanpa baris persetujuan diberi baris baharu.
+  if ((data ?? []).length === 0) {
+    const { error: iErr } = await c.svc.from('qm_research_consents').upsert(
+      {
+        quiz_id: c.quizId,
+        user_id: c.userId,
+        decision: 'agree',
+        consent_version: 1,
+        ...kemas,
+      },
+      { onConflict: 'quiz_id,user_id', ignoreDuplicates: true },
+    );
+    if (iErr) return ralatJson(iErr.message, 500);
+  }
   // Sudah berhenti langganan sebelum ini: tarik diri masih boleh direkodkan.
   if ((data ?? []).length === 0 && body.withdraw === true) {
     const { error: wErr } = await c.svc

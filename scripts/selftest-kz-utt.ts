@@ -50,6 +50,7 @@ import {
   type RekodPeserta,
 } from '../src/lib/kajian-solo';
 import { binaEmelSusulan } from '../src/lib/kajian-solo-emel';
+import { bolehEksport, bolehEmel } from '../src/lib/kajian-solo-api';
 
 let pass = 0;
 let fail = 0;
@@ -272,10 +273,13 @@ console.log('KZ-UTT Fasa 2: item tinjauan');
   check('dijawab: lewat ditolak', !dijawab('b', UJIAN_HAD_DIJAWAB_MS + 1));
   check('dijawab: tiada pilihan ditolak', !dijawab(null, 1000) && !dijawab('', 1000));
 
-  check('pelan: e-mel tanpa teks persetujuan ditolak',
-    !!sahkanPelan({ emails_enabled: true, course_end_at: '2027-01-10T08:00:00Z' }).ralat);
-  check('pelan: e-mel tanpa tamat kursus ditolak',
-    !!sahkanPelan({ emails_enabled: true, consent_text: 'Saya bersetuju menyertai kajian ini.' }).ralat);
+  check('pelan: e-mel lalai hidup tanpa teks persetujuan', sahkanPelan({}).pelan?.emails_enabled === true);
+  check('pelan: false eksplisit mematikan e-mel', sahkanPelan({ emails_enabled: false }).pelan?.emails_enabled === false);
+  check('persetujuan lalai: tiada baris = boleh eksport dan e-mel', bolehEksport(null) && bolehEmel(null));
+  const p0 = { quiz_id: 'q', user_id: 'u', decision: 'agree' as const, consent_version: 1, decided_at: '', withdrawn_at: null, unsubscribed_at: null };
+  check('persetujuan: tolak dikecualikan', !bolehEksport({ ...p0, decision: 'decline' }) && !bolehEmel({ ...p0, decision: 'decline' }));
+  check('persetujuan: tarik diri dikecualikan', !bolehEksport({ ...p0, withdrawn_at: 'x' }));
+  check('persetujuan: berhenti langganan masih dieksport, tiada e-mel', bolehEksport({ ...p0, unsubscribed_at: 'x' }) && !bolehEmel({ ...p0, unsubscribed_at: 'x' }));
   check('pelan: tamat sebelum Modul 1 ditolak',
     !!sahkanPelan({ module1_start_at: '2027-01-10T00:00:00Z', course_end_at: '2027-01-05T00:00:00Z' }).ralat);
   check('pelan: sehari 30 s ditolak', !!sahkanPelan({ day_length_sec: 30 }).ralat);

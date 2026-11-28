@@ -5,12 +5,11 @@ import { requireQuizHost } from '@/lib/live-quiz';
 import { lindungFormula, petikCsv } from '@/lib/csvPeserta';
 import { LAJUR_EKSPORT, dijawab, hariDari, rujukanT3, tetingkapT2 } from '@/lib/kajian-solo';
 import {
-  LAJUR_PERSETUJUAN,
   bolehEksport,
   kodPeserta,
   muatPelan,
   muatRekodPeserta,
-  type Persetujuan,
+  petaPersetujuan,
 } from '@/lib/kajian-solo-api';
 
 export const runtime = 'nodejs';
@@ -34,7 +33,8 @@ type Larian = {
  *
  * - Tanpa nama: `participant` ialah kod stabil bagi kuiz ini (kodPeserta),
  *   bukan nama, e-mel atau user_id.
- * - Hanya peserta yang bersetuju dan belum tarik diri.
+ * - Semua peserta dianggap bersetuju secara lalai; yang menolak atau tarik
+ *   diri dikecualikan.
  * - `correct` dan `answered` (bukan markah) ialah pemboleh ubah analisis;
  *   tiada `score` atau `points` dieksport.
  * - `days_from_ref`: T1 dari mula Modul 1, T2 dari tamat kursus, T3 dari
@@ -48,24 +48,22 @@ export async function GET(req: NextRequest, { params }: { params: { quizId: stri
   const pelan = await muatPelan(svc, params.quizId);
   if (!pelan) return ralatJson('Set a measurement plan first.', 409);
 
-  const { data: setuju, error: sErr } = await svc
-    .from('qm_research_consents')
-    .select(LAJUR_PERSETUJUAN)
-    .eq('quiz_id', params.quizId);
-  if (sErr) return ralatJson(sErr.message, 500);
-  const layak = ((setuju ?? []) as Persetujuan[]).filter(bolehEksport).map((p) => p.user_id);
-
+  const pers = await petaPersetujuan(svc, params.quizId);
   const larian: Larian[] = [];
-  for (let i = 0; i < layak.length; i += 200) {
+  for (let dari = 0; ; dari += 1000) {
     const { data, error } = await svc
       .from('qm_solo_runs')
       .select('id, user_id, measure_point, question_ids, started_at, finished_at, status')
       .eq('quiz_id', params.quizId)
       .eq('test_mode', true)
-      .in('user_id', layak.slice(i, i + 200));
+      .not('user_id', 'is', null)
+      .order('started_at', { ascending: true })
+      .range(dari, dari + 999);
     if (error) return ralatJson(error.message, 500);
-    larian.push(...((data ?? []) as Larian[]));
+    larian.push(...((data ?? []) as Larian[]).filter((l) => bolehEksport(pers.get(l.user_id) ?? null)));
+    if (!data || data.length < 1000) break;
   }
+  const layak = Array.from(new Set(larian.map((l) => l.user_id)));
   const rekod = await muatRekodPeserta(svc, params.quizId, pelan.class_id, layak);
 
   const idLarian = larian.map((l) => l.id);

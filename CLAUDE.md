@@ -384,5 +384,14 @@ Pautan e-mel membawa `?titik=T2` atau `T3`. Titik itu hanya dipakai jika
 tetingkap peserta itu terbuka; jika tidak, titik pada kuiz (Fasa 1) dipakai.
 `day_length_sec` di bawah 86400 hanya untuk ujian penerimaan.
 
+Persetujuan LALAI SETUJU (keputusan Dr Hariz, 28 Nov 2026): tiada baris dalam
+`qm_research_consents` bermakna setuju. Teks persetujuan pilihan; jika diisi,
+peserta boleh menolak. E-mel susulan hidup secara lalai, dan setiap kuiz mod
+ujian berkelas mendapat pelan automatik (0086 dan laluan POST solo). Hanya
+`bolehEksport`/`bolehEmel` dalam `kajian-solo-api.ts` yang menentukan ini.
+T1 TIDAK ditutup automatik (keputusan yang sama); `module1_start_at` hanya
+rujukan `days_from_ref` untuk T1.
+
 Eksport (`/research/export`) tanpa nama: kod peserta ialah hash, bukan
-user_id. Hanya peserta `agree` yang belum tarik diri. Jangan tambah `score`.
+user_id. Yang menolak atau tarik diri dikecualikan. Jangan tambah `score`.
+Alat MCP dalam `src/lib/mcp/kajian-tools.ts` memanggil laluan yang sama.

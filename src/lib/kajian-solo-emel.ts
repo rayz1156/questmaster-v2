@@ -65,8 +65,8 @@ export function binaEmelSusulan(v: IsiSusulan): { subject: string; text: string;
     .slice(0, 200);
   const pembuka =
     v.titik === 'T2'
-      ? `Terima kasih kerana menyertai ${v.kursus}. Kursus telah tamat, dan kami menjemput anda menjawab ${label} bagi kajian latihan yang anda bersetuju sertai.`
-      : `Terima kasih kerana menyertai ${v.kursus}. Kami menjemput anda menjawab ${label} bagi kajian latihan yang anda bersetuju sertai, untuk melihat apa yang kekal selepas tempoh latihan.`;
+      ? `Terima kasih kerana menyertai ${v.kursus}. Kursus telah tamat, dan kami menjemput anda menjawab ${label} sebagai sebahagian daripada kajian latihan ini.`
+      : `Terima kasih kerana menyertai ${v.kursus}. Kami menjemput anda menjawab ${label} sebagai sebahagian daripada kajian latihan ini, untuk melihat apa yang kekal selepas tempoh latihan.`;
   const perenggan = [
     `Assalamualaikum dan salam sejahtera ${v.nama},`,
     pembuka,
@@ -117,7 +117,7 @@ export async function hantarSusulanKajian(
   if (!pelan || !pelan.emails_enabled) return { hasil: 'cancelled', sebab: 'emails_off' };
   const setuju = await muatPersetujuan(svc, f.quiz_id, f.user_id);
   if (!bolehEmel(setuju)) {
-    return { hasil: 'cancelled', sebab: setuju?.unsubscribed_at ? 'unsubscribed' : 'no_consent' };
+    return { hasil: 'cancelled', sebab: setuju?.unsubscribed_at && setuju.decision === 'agree' && !setuju.withdrawn_at ? 'unsubscribed' : 'no_consent' };
   }
   if (Date.parse(f.closes_at) <= sekarang) return { hasil: 'cancelled', sebab: 'closed' };
 

@@ -151,6 +151,17 @@ export async function POST(req: NextRequest, { params }: { params: { quizId: str
     .eq('id', params.quizId);
   if (error) return ralatJson(error.message, 500);
 
+  // KZ-UTT Fasa 4: kuiz mod ujian berkelas mendapat pelan pengukuran lalai
+  // (e-mel susulan hidup) jika belum ada. Pelan sedia ada tidak disentuh.
+  if (adaUjian && body.testMode === true) {
+    const { data: kq } = await svc.from('qm_live_quizzes').select('class_id').eq('id', params.quizId).maybeSingle();
+    if (kq?.class_id) {
+      await svc
+        .from('qm_solo_measure_plans')
+        .upsert({ quiz_id: params.quizId, class_id: kq.class_id, emails_enabled: true }, { onConflict: 'quiz_id', ignoreDuplicates: true });
+    }
+  }
+
   const selepas = await muatMedanSolo(params.quizId);
   return NextResponse.json({
     enabled,

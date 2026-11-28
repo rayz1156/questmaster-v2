@@ -53,14 +53,26 @@ export function perluPersetujuan(pelan: PelanPenuh | null, p: Persetujuan | null
   return !p || p.consent_version < pelan.consent_version;
 }
 
-/** Data peserta boleh dieksport (bersetuju dan belum tarik diri). */
+/**
+ * Data peserta boleh dieksport. Keputusan Boss Hariz (28 Nov 2026): semua
+ * peserta dianggap bersetuju secara lalai. Tiada baris persetujuan = setuju.
+ * Hanya penolakan eksplisit atau tarik diri mengecualikan peserta.
+ */
 export function bolehEksport(p: Persetujuan | null): boolean {
-  return !!p && p.decision === 'agree' && !p.withdrawn_at;
+  if (!p) return true;
+  return p.decision === 'agree' && !p.withdrawn_at;
 }
 
-/** Peserta boleh menerima e-mel kajian. */
+/** Peserta boleh menerima e-mel kajian (lalai ya, kecuali berhenti langganan). */
 export function bolehEmel(p: Persetujuan | null): boolean {
-  return bolehEksport(p) && !p!.unsubscribed_at;
+  return bolehEksport(p) && !p?.unsubscribed_at;
+}
+
+/** Peta persetujuan bagi satu kuiz (hanya peserta yang ada baris). */
+export async function petaPersetujuan(svc: SupaService, quizId: string): Promise<Map<string, Persetujuan>> {
+  const { data, error } = await svc.from('qm_research_consents').select(LAJUR_PERSETUJUAN).eq('quiz_id', quizId);
+  if (error) throw new Error(`Consent lookup failed: ${error.message}`);
+  return new Map(((data ?? []) as Persetujuan[]).map((p) => [p.user_id, p]));
 }
 
 /** Kod peserta tanpa nama untuk eksport: stabil bagi setiap kuiz, tidak boleh diterbalikkan. */

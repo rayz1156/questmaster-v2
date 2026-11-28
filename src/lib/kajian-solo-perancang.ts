@@ -14,7 +14,7 @@
  */
 import { getServiceSupabase } from '@/lib/supabase-route';
 import { susulanPerlu } from '@/lib/kajian-solo';
-import { LAJUR_PELAN, muatRekodPeserta, bolehEmel, type PelanPenuh, type Persetujuan, LAJUR_PERSETUJUAN } from '@/lib/kajian-solo-api';
+import { LAJUR_PELAN, muatRekodPeserta, bolehEmel, petaPersetujuan, type PelanPenuh } from '@/lib/kajian-solo-api';
 import { mulaPekerja } from '@/lib/sijil/pekerjaEmel';
 
 export const SELANG_PERANCANG_MS = 60_000;
@@ -30,13 +30,13 @@ export async function jalankanPerancang(sekarang = Date.now()): Promise<number> 
 
   let dimasukkan = 0;
   for (const pelan of (pelanSemua ?? []) as PelanPenuh[]) {
-    const { data: setuju, error: sErr } = await svc
-      .from('qm_research_consents')
-      .select(LAJUR_PERSETUJUAN)
-      .eq('quiz_id', pelan.quiz_id)
-      .eq('decision', 'agree');
-    if (sErr) throw new Error(`Consent lookup failed: ${sErr.message}`);
-    const layak = ((setuju ?? []) as Persetujuan[]).filter(bolehEmel).map((p) => p.user_id);
+    // Semua ahli kelas, kecuali yang menolak, tarik diri atau berhenti langganan.
+    const { data: ahli, error: aErr } = await svc.from('qm_class_members').select('user_id').eq('class_id', pelan.class_id);
+    if (aErr) throw new Error(`Membership lookup failed: ${aErr.message}`);
+    const pers = await petaPersetujuan(svc, pelan.quiz_id);
+    const layak = ((ahli ?? []) as { user_id: string }[])
+      .map((a) => a.user_id)
+      .filter((u) => bolehEmel(pers.get(u) ?? null));
     if (layak.length === 0) continue;
 
     const rekod = await muatRekodPeserta(svc, pelan.quiz_id, pelan.class_id, layak);

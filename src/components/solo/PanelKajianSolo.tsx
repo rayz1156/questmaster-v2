@@ -94,7 +94,7 @@ export default function PanelKajianSolo({ quizId }: { quizId: string }) {
       setM1(keInput(r.plan?.module1_start_at ?? null));
       setTamat(keInput(r.plan?.course_end_at ?? null));
       setTeks(r.plan?.consent_text ?? "");
-      setEmel(r.plan?.emails_enabled === true);
+      setEmel(r.plan ? r.plan.emails_enabled === true : true);
       setHari(String(r.plan?.day_length_sec ?? 86400));
       setRalat(null);
     } catch (e) {
@@ -260,7 +260,7 @@ export default function PanelKajianSolo({ quizId }: { quizId: string }) {
                       <tr key={p.userId} className="border-t border-slate-100 align-top">
                         <td className="py-1 pr-2 text-ink">{p.name || "-"}</td>
                         <td className="py-1 pr-2">
-                          {p.consent === "agree" ? t("solo.statusAgree") : p.consent === "decline" ? t("solo.statusDecline") : t("solo.statusPending")}
+                          {p.consent === "decline" ? t("solo.statusDecline") : p.consent === "agree" ? t("solo.statusAgree") : t("solo.statusDefault")}
                           {p.unsubscribed && <span className="block text-amber-700">{t("solo.statusUnsubscribed")}</span>}
                           {p.withdrawn && <span className="block text-red-700">{t("solo.statusWithdrawn")}</span>}
                         </td>

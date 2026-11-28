@@ -176,9 +176,8 @@ export function sahkanPelan(raw: unknown): {
       return { ralat: 'Consent text must be 20 to 5000 characters.' };
     }
   }
-  const emel = b.emails_enabled === true;
-  if (emel && !teks) return { ralat: 'Add the consent text before turning on follow-up emails.' };
-  if (emel && !tamat.nilai) return { ralat: 'Set the course end before turning on follow-up emails.' };
+  // Lalai hidup (keputusan Boss Hariz, 28 Nov 2026); hanya false eksplisit mematikan.
+  const emel = b.emails_enabled !== false;
   let hari = 86400;
   if (b.day_length_sec !== undefined && b.day_length_sec !== null) {
     hari = Number(b.day_length_sec);
