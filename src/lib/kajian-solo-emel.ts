@@ -58,22 +58,24 @@ export type IsiSusulan = {
 
 /** Kandungan e-mel BM. Tulen supaya diuji oleh skrip ujian kendiri. */
 export function binaEmelSusulan(v: IsiSusulan): { subject: string; text: string; html: string } {
-  const label = v.titik === 'T2' ? 'ujian pasca (T2)' : 'ujian susulan (T3)';
+  // Kerangka e-mel: susulan selepas latihan untuk menambah baik dan merancang
+  // latihan seterusnya (keputusan Boss Hariz, 28 Nov 2026). Pendedahan
+  // penyelidikan berada pada kotak tanda sebelum ujian pertama.
   const awalan = v.peringatan ? 'Peringatan: ' : '';
-  const subject = `${awalan}${v.titik === 'T2' ? 'Ujian pasca (T2)' : 'Ujian susulan (T3)'}: ${v.kursus}`
+  const subject = `${awalan}${v.titik === 'T2' ? 'Penilaian selepas latihan' : 'Susulan selepas latihan'}: ${v.kursus}`
     .replace(/[\r\n]+/g, ' ')
     .slice(0, 200);
   const pembuka =
     v.titik === 'T2'
-      ? `Terima kasih kerana menyertai ${v.kursus}. Kursus telah tamat, dan kami menjemput anda menjawab ${label} sebagai sebahagian daripada kajian latihan ini.`
-      : `Terima kasih kerana menyertai ${v.kursus}. Kami menjemput anda menjawab ${label} sebagai sebahagian daripada kajian latihan ini, untuk melihat apa yang kekal selepas tempoh latihan.`;
+      ? `Terima kasih kerana menyertai ${v.kursus}. Kami ingin mengetahui sejauh mana latihan ini membantu anda. Jawapan anda akan membantu kami menambah baik latihan ini dan merancang latihan seterusnya yang lebih sesuai dengan keperluan anda.`
+      : `Sudah beberapa bulan sejak anda menyertai ${v.kursus}. Kami ingin mengetahui apa yang masih anda ingat dan gunakan daripada latihan itu. Jawapan anda akan membantu kami merancang latihan susulan dan latihan seterusnya yang lebih bermanfaat.`;
   const perenggan = [
     `Assalamualaikum dan salam sejahtera ${v.nama},`,
     pembuka,
-    'Ujian ini mengandungi soalan pengetahuan dan beberapa soalan tinjauan ringkas, dan mengambil masa kira-kira 10 hingga 15 minit. Setiap peserta hanya boleh menjawab sekali.',
+    'Ia mengandungi beberapa soalan ringkas, mengambil masa kira-kira 10 hingga 15 minit, dan hanya perlu dijawab sekali.',
     `Mula di sini (log masuk dengan akaun Kuizen anda):\n${v.pautan}`,
     `Tarikh tutup: ${v.tutup}`,
-    `Jika anda tidak mahu menerima e-mel kajian lagi, klik pautan ini. Akses anda kepada kelas tidak terjejas.\n${v.pautanBerhenti}`,
+    `Jika anda tidak mahu menerima e-mel susulan ini lagi, klik pautan ini. Akses anda kepada kelas tidak terjejas.\n${v.pautanBerhenti}`,
     'Sekian, terima kasih.',
   ];
   const text = perenggan.join('\n\n');

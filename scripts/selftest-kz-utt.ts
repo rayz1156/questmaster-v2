@@ -296,12 +296,13 @@ console.log('KZ-UTT Fasa 2: item tinjauan');
     nama: 'Aminah', kursus: 'Latihan AI <b>', titik: 'T3', peringatan: true,
     pautan: 'https://kuizen.fun/solo/ABC123?titik=T3', tutup: '1 Mei 2027', pautanBerhenti: 'https://kuizen.fun/kajian/berhenti/x',
   });
-  check('emel: subjek peringatan T3', e.subject.startsWith('Peringatan: Ujian susulan (T3)'));
+  check('emel: subjek peringatan T3', e.subject.startsWith('Peringatan: Susulan selepas latihan'));
   check('emel: pautan main dan berhenti dalam teks', e.text.includes('?titik=T3') && e.text.includes('/kajian/berhenti/x'));
   check('emel: HTML di-escape', e.html.includes('Latihan AI &lt;b&gt;') && !e.html.includes('<b>'));
   check('emel: tiada em dash', !/—/.test(e.text + e.subject));
   const e2 = binaEmelSusulan({ nama: 'A', kursus: 'K', titik: 'T2', peringatan: false, pautan: 'https://x.y/a', tutup: 't', pautanBerhenti: 'https://x.y/b' });
-  check('emel: jemputan T2 tanpa awalan peringatan', e2.subject === 'Ujian pasca (T2): K');
+  check('emel: jemputan T2 tanpa awalan peringatan', e2.subject === 'Penilaian selepas latihan: K');
+  check('emel: tiada perkataan kajian', !/kajian/i.test(e.text + e.subject + e2.text));
 }
 
 console.log('');
