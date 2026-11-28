@@ -178,7 +178,7 @@ export async function hantarSusulanKajian(
     peringatan: Number(f.seq) > 0,
     pautan: `${site}/solo/${encodeURIComponent(kuiz.solo_code)}?titik=${f.point}`,
     tutup: tarikhMasaMy(Date.parse(f.closes_at)),
-    pautanBerhenti: `${site}/kajian/berhenti/${token}`,
+    pautanBerhenti: `${site}/susulan/berhenti/${token}`,
   });
   await smtp.t.sendMail({
     from: smtp.dari,
@@ -187,7 +187,7 @@ export async function hantarSusulanKajian(
     text: isi.text,
     html: isi.html,
     messageId: `<${b.idempotency_key.replace(/[^A-Za-z0-9.:-]/g, '')}@kuizen.fun>`,
-    headers: { 'List-Unsubscribe': `<${site}/kajian/berhenti/${token}>` },
+    headers: { 'List-Unsubscribe': `<${site}/susulan/berhenti/${token}>` },
   });
   return { hasil: 'sent' };
 }
