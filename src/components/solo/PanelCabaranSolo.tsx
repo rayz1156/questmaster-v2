@@ -8,6 +8,7 @@
  */
 import { useCallback, useEffect, useState } from "react";
 import { barisTinjauan, huraiBarisTinjauan } from "@/lib/tinjauan-solo";
+import PanelKajianSolo from "@/components/solo/PanelKajianSolo";
 import { Trash2, Copy, RotateCcw } from "lucide-react";
 import { supabase } from "@/lib/supabase";
 import { useBahasa } from "@/lib/i18n/BahasaProvider";
@@ -343,6 +344,7 @@ export default function PanelCabaranSolo({ quizId }: { quizId: string }) {
               )}
             </div>
           )}
+          {keadaan.testMode && <PanelKajianSolo quizId={quizId} />}
         </div>
       )}
 

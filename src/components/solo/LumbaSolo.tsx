@@ -81,6 +81,15 @@ interface InfoSolo {
   measurePoint: string | null;
   testOpen: boolean;
   alreadyDone: boolean;
+  /** KZ-UTT Fasa 4: persetujuan kajian (null jika pelan tiada teks). */
+  consent: { required: boolean; text: string | null; version: number } | null;
+}
+
+/** KZ-UTT Fasa 4: titik daripada pautan e-mel susulan (?titik=T2 atau T3). */
+function titikDariUrl(): "T2" | "T3" | null {
+  if (typeof window === "undefined") return null;
+  const v = new URLSearchParams(window.location.search).get("titik");
+  return v === "T2" || v === "T3" ? v : null;
 }
 
 interface SoalanAktif {
@@ -228,7 +237,11 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     setRalat(null);
     try {
       const hInfo = await pengepala();
-      const res = await fetch(`/api/solo/${encodeURIComponent(kod)}`, { cache: "no-store", headers: hInfo });
+      const titik = titikDariUrl();
+      const res = await fetch(`/api/solo/${encodeURIComponent(kod)}${titik ? `?titik=${titik}` : ""}`, {
+        cache: "no-store",
+        headers: hInfo,
+      });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         setRalat(typeof json.error === "string" ? json.error : t("solo.loadFailed"));
@@ -244,6 +257,14 @@ export default function LumbaSolo({ kod }: { kod: string }) {
         measurePoint: typeof json.measurePoint === "string" ? json.measurePoint : null,
         testOpen: json.testOpen !== false,
         alreadyDone: json.alreadyDone === true,
+        consent:
+          json.consent && typeof json.consent === "object"
+            ? {
+                required: json.consent.required === true,
+                text: typeof json.consent.text === "string" ? json.consent.text : null,
+                version: Number(json.consent.version) || 1,
+              }
+            : null,
       });
       setPapanSegar(Array.isArray(json.leaderboard) ? (json.leaderboard as BarisPapanUi[]) : []);
       setFasa("maklumat");
@@ -268,10 +289,15 @@ export default function LumbaSolo({ kod }: { kod: string }) {
       const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/start`, {
         method: "POST",
         headers: { ...h, "content-type": "application/json" },
-        body: JSON.stringify({ nickname }),
+        body: JSON.stringify({ nickname, titik: titikDariUrl() }),
       });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
+        // KZ-UTT Fasa 4: teks persetujuan baharu; muat semula untuk memaparkannya.
+        if (json.code === "CONSENT_REQUIRED") {
+          await muatInfo();
+          return;
+        }
         setRalat(typeof json.error === "string" ? json.error : t("solo.loadFailed"));
         setFasa("maklumat");
         return;
@@ -303,7 +329,35 @@ export default function LumbaSolo({ kod }: { kod: string }) {
     } finally {
       setSibuk(false);
     }
-  }, [kod, nickname, pengepala, t]);
+  }, [kod, nickname, pengepala, t, muatInfo]);
+
+  /** KZ-UTT Fasa 4: rekod keputusan persetujuan kajian, kemudian muat semula maklumat. */
+  const putuskanPersetujuan = useCallback(
+    async (setuju: boolean): Promise<void> => {
+      if (!info?.consent) return;
+      setSibuk(true);
+      setRalat(null);
+      try {
+        const h = await pengepala();
+        const res = await fetch(`/api/solo/${encodeURIComponent(kod)}/consent`, {
+          method: "POST",
+          headers: { ...h, "content-type": "application/json" },
+          body: JSON.stringify({ agree: setuju, version: info.consent.version }),
+        });
+        const json = await res.json().catch(() => ({}));
+        if (!res.ok && json.code !== "CONSENT_CHANGED") {
+          setRalat(typeof json.error === "string" ? json.error : t("solo.loadFailed"));
+          return;
+        }
+        await muatInfo();
+      } catch {
+        setRalat(t("solo.loadFailed"));
+      } finally {
+        setSibuk(false);
+      }
+    },
+    [info, kod, pengepala, t, muatInfo],
+  );
 
   /** Hidangkan soalan seterusnya daripada pelayan. */
   const mintaSoalan = useCallback(async (): Promise<void> => {
@@ -875,7 +929,31 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               </p>
             )}
 
-            {info?.testMode && !info.needLogin && (!info.testOpen || info.alreadyDone) ? (
+            {info?.testMode && !info.needLogin && info.consent?.required ? (
+              <div className="mt-4 space-y-3">
+                <p className="text-[13px] font-semibold text-ink">{t("solo.consentTitle")}</p>
+                <div className="max-h-[45vh] overflow-y-auto whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] leading-relaxed text-ink">
+                  {info.consent.text}
+                </div>
+                <p className="text-[12px] text-ink-faint">{t("solo.consentNote")}</p>
+                <button
+                  type="button"
+                  disabled={sibuk}
+                  onClick={() => void putuskanPersetujuan(true)}
+                  className="w-full px-4 py-2.5 rounded-xl text-white text-[14px] font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50"
+                >
+                  {t("solo.consentAgree")}
+                </button>
+                <button
+                  type="button"
+                  disabled={sibuk}
+                  onClick={() => void putuskanPersetujuan(false)}
+                  className="w-full px-4 py-2.5 rounded-xl text-[14px] font-semibold text-ink border border-slate-300 bg-white disabled:opacity-50"
+                >
+                  {t("solo.consentDecline")}
+                </button>
+              </div>
+            ) : info?.testMode && !info.needLogin && (!info.testOpen || info.alreadyDone) ? (
               <div className="mt-4">
                 <p className="text-[13px] text-ink-faint">
                   {info.alreadyDone ? t("solo.testDone") : t("solo.testNotOpen")}
@@ -885,7 +963,7 @@ export default function LumbaSolo({ kod }: { kod: string }) {
               <div className="mt-4 space-y-3">
                 <p className="text-[13px] text-ink-faint">{info.testMode ? t("solo.testLogin") : t("solo.needLogin")}</p>
                 <Link
-                  href={`/login?next=${encodeURIComponent(`/solo/${kod}`)}`}
+                  href={`/login?next=${encodeURIComponent(`/solo/${kod}${titikDariUrl() ? `?titik=${titikDariUrl()}` : ""}`)}`}
                   className="block text-center px-4 py-2.5 rounded-xl text-white text-[14px] font-semibold bg-gradient-to-r from-violet-600 to-indigo-600"
                 >
                   {t("solo.loginButton")}

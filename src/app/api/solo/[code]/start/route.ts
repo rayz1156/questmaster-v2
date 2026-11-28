@@ -12,7 +12,8 @@ import {
   semakMasukSolo,
   tamatkanGendala,
 } from '@/lib/lumba-solo-api';
-import { hashIp } from '@/lib/lumba-solo';
+import { hashIp, type TitikUkur } from '@/lib/lumba-solo';
+import { muatPelan, muatPersetujuan, perluPersetujuan, titikUntukPeserta } from '@/lib/kajian-solo-api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -31,6 +32,11 @@ export const fetchCache = 'force-no-store';
  * mesti sudah membuka satu titik (T1, T2 atau T3), dan setiap pengguna hanya
  * ada SATU larian bagi setiap titik. Larian yang belum selesai disambung
  * (token baharu, soalan seterusnya); larian yang sudah selesai ditolak 409.
+ *
+ * KZ-UTT Fasa 4: badan boleh membawa { titik: 'T2' | 'T3' } daripada pautan
+ * e-mel; titik itu dipakai jika tetingkap peserta terbuka mengikut pelan
+ * pengukuran. Jika pelan ada teks persetujuan dan peserta belum memberi
+ * keputusan, 409 CONSENT_REQUIRED dipulangkan dahulu.
  */
 export async function POST(req: NextRequest, { params }: { params: { code: string } }) {
   const svc = getServiceSupabase();
@@ -42,14 +48,21 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   const masuk = await semakMasukSolo(req, svc, kuiz);
   if (masuk.response) return masuk.response;
 
+  // KZ-UTT: titik bagi larian ini (Fasa 4: boleh berbeza bagi setiap peserta).
+  let titik: TitikUkur | null = kuiz.measure_point;
   if (kuiz.test_mode) {
     if (!masuk.user) {
       return ralatJson('Sign in to take this test.', 401, { code: 'LOGIN_REQUIRED' });
     }
-    if (!kuiz.measure_point) {
+    const pelan = await muatPelan(svc, kuiz.id);
+    if (perluPersetujuan(pelan, await muatPersetujuan(svc, kuiz.id, masuk.user.id))) {
+      return ralatJson('Please read the research consent first.', 409, { code: 'CONSENT_REQUIRED' });
+    }
+    titik = await titikUntukPeserta(svc, kuiz, masuk.user.id, body.titik, pelan);
+    if (!titik) {
       return ralatJson('This test is not open yet.', 409, { code: 'TEST_NOT_OPEN' });
     }
-    const sedia = await larianUjianSedia(svc, kuiz.id, masuk.user.id, kuiz.measure_point);
+    const sedia = await larianUjianSedia(svc, kuiz.id, masuk.user.id, titik);
     if (sedia) {
       if (sedia.status === 'finished') {
         return ralatJson('You have already completed this test.', 409, { code: 'TEST_DONE' });
@@ -91,7 +104,7 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
 
   const cipta = await ciptaLarian(svc, kuiz, nickname, masuk.user?.id ?? null, ipHash, {
     testMode: kuiz.test_mode,
-    measurePoint: kuiz.measure_point,
+    measurePoint: titik,
   });
   if (cipta.sebab === 'kurang') {
     return ralatJson('This quiz needs at least 3 multiple-choice questions.', 409);

@@ -364,3 +364,25 @@ daripada badan permintaan TIDAK pernah dipercayai.
 Jalankan `npx tsx scripts/selftest-live-quiz.ts` selepas menyentuh pemarkahan
 atau pemecah CSV. `npx tsc` dan `npm run build` tidak menangkap kesilapan
 formula.
+
+## Kajian T1, T2, T3 (KZ-UTT Fasa 4)
+
+Pelan pengukuran ada dalam `qm_solo_measure_plans` (migrasi 0085). Semua logik
+tetingkap dan jadual e-mel ada dalam SATU fail: `src/lib/kajian-solo.ts`.
+Laluan start, perancang, pekerja e-mel dan eksport memanggilnya. Jangan salin
+formula hari ke-80, 87, 97, 110 ke tempat lain.
+
+E-mel susulan memakai baris gilir sijil KZ-C (`kind = 'research_followup'`),
+supaya satu pekerja dan satu had kadar Emailit dikongsi. Perancang
+(`src/lib/kajian-solo-perancang.ts`) hanya mengisi baris gilir setiap minit;
+pekerja menyemak semula persetujuan, keahlian dan status jawapan sejurus
+sebelum menghantar. Indeks 0082 `qm_cert_email_queue_satu_aktif_nama`
+disempitkan kepada `kind = 'name_request'` dalam 0085; jika tidak, e-mel kajian
+bertembung dengan e-mel pengesahan nama.
+
+Pautan e-mel membawa `?titik=T2` atau `T3`. Titik itu hanya dipakai jika
+tetingkap peserta itu terbuka; jika tidak, titik pada kuiz (Fasa 1) dipakai.
+`day_length_sec` di bawah 86400 hanya untuk ujian penerimaan.
+
+Eksport (`/research/export`) tanpa nama: kod peserta ialah hash, bukan
+user_id. Hanya peserta `agree` yang belum tarik diri. Jangan tambah `score`.

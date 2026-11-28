@@ -36,6 +36,21 @@ import {
   UJIAN_SOALAN_TETINGKAH_MS,
 } from '../src/lib/lumba-solo';
 
+import {
+  dijawab,
+  hariDari,
+  rujukanT3,
+  sahkanPelan,
+  STANDARD_SUSULAN,
+  susulanPerlu,
+  tetingkapT2,
+  tetingkapT3,
+  titikTerbuka,
+  UJIAN_HAD_DIJAWAB_MS,
+  type RekodPeserta,
+} from '../src/lib/kajian-solo';
+import { binaEmelSusulan } from '../src/lib/kajian-solo-emel';
+
 let pass = 0;
 let fail = 0;
 function check(nama: string, ok: boolean): void {
@@ -196,6 +211,93 @@ console.log('KZ-UTT Fasa 2: item tinjauan');
   const pergi = huraiBarisTinjauan(barisTinjauan(h.items));
   check('hurai: pergi dan balik sama', JSON.stringify(pergi.items) === JSON.stringify(h.items));
   check('hurai: hasil diterima pengesah pelayan', h.items.every((it) => sahkanItemTinjauan(it).item !== null));
+}
+
+// ------------------------------------------------------------ Fasa 4
+{
+  console.log('\nFasa 4: pelan pengukuran dan susulan');
+  const H = 86_400_000;
+  const tamat = Date.parse('2027-01-10T08:00:00Z');
+  const pelan = { module1_start_at: '2027-01-05T00:00:00Z', course_end_at: new Date(tamat).toISOString(), day_length_sec: 86400 };
+  const kosong: RekodPeserta = { t1Selesai: null, t2Selesai: null, t3Selesai: null, sertai: null };
+
+  check('standard: T3 hari 80 hingga 110, peringatan 87 dan 97',
+    STANDARD_SUSULAN.t3BukaHari === 80 && STANDARD_SUSULAN.t3TutupHari === 110 &&
+    JSON.stringify(STANDARD_SUSULAN.t3EmelHari) === '[80,87,97]');
+  const t2 = tetingkapT2(pelan)!;
+  check('T2: buka pada tamat kursus, tutup 14 hari', t2.buka === tamat && t2.tutup === tamat + 14 * H);
+  check('T2: tiada tamat kursus, tiada tetingkap', tetingkapT2({ ...pelan, course_end_at: null }) === null);
+
+  const sertai = Date.parse('2027-01-01T00:00:00Z');
+  const t1 = Date.parse('2027-01-05T01:00:00Z');
+  const t2s = Date.parse('2027-01-10T09:00:00Z');
+  check('rujukan: T2 didahulukan', rujukanT3({ ...kosong, t1Selesai: t1, t2Selesai: t2s, sertai })?.sumber === 'T2');
+  check('rujukan: T1 bila tiada T2', rujukanT3({ ...kosong, t1Selesai: t1, sertai })?.sumber === 'T1');
+  check('rujukan: sertai bila tiada T1 dan T2', rujukanT3({ ...kosong, sertai })?.masa === sertai);
+  check('rujukan: tiada apa-apa, null', rujukanT3(kosong) === null);
+  const w3 = tetingkapT3(pelan, { ...kosong, t2Selesai: t2s, sertai })!;
+  check('T3: tetingkap hari 80 hingga 110 dari tamat T2', w3.buka === t2s + 80 * H && w3.tutup === t2s + 110 * H);
+
+  const r = { ...kosong, t1Selesai: t1, sertai };
+  check('T2 terbuka pada tamat kursus', titikTerbuka(pelan, r, 'T2', tamat));
+  check('T2 tutup tepat hari 14', !titikTerbuka(pelan, r, 'T2', tamat + 14 * H));
+  check('T3 belum terbuka hari 79', !titikTerbuka(pelan, r, 'T3', t1 + 79 * H));
+  check('T3 terbuka hari 80', titikTerbuka(pelan, r, 'T3', t1 + 80 * H));
+  check('T3 tutup hari 110', !titikTerbuka(pelan, r, 'T3', t1 + 110 * H));
+
+  check('susulan: sebelum hari 1 tiada e-mel', susulanPerlu(pelan, r, tamat + 0.5 * H).length === 0);
+  const s1 = susulanPerlu(pelan, r, tamat + 1 * H);
+  check('susulan: hari 1 jemputan T2 seq 0', s1.length === 1 && s1[0].point === 'T2' && s1[0].seq === 0 && s1[0].refSource === 'course_end');
+  const s7 = susulanPerlu(pelan, r, tamat + 8 * H);
+  check('susulan: hari 8 hanya peringatan T2 seq 1 (bukan dua serentak)', s7.length === 1 && s7[0].seq === 1);
+  check('susulan: T2 sudah dijawab, tiada e-mel T2',
+    susulanPerlu(pelan, { ...r, t2Selesai: tamat + 2 * H }, tamat + 8 * H).every((x) => x.point !== 'T2'));
+  check('susulan: selepas tetingkap T2 tutup, tiada e-mel T2', susulanPerlu(pelan, r, tamat + 15 * H).length === 0);
+  const s80 = susulanPerlu(pelan, r, t1 + 80 * H);
+  check('susulan: hari 80 jemputan T3 dari rujukan T1', s80.length === 1 && s80[0].point === 'T3' && s80[0].seq === 0 && s80[0].refSource === 'T1');
+  check('susulan: hari 90 peringatan pertama T3', susulanPerlu(pelan, r, t1 + 90 * H)[0]?.seq === 1);
+  check('susulan: hari 100 peringatan kedua T3', susulanPerlu(pelan, r, t1 + 100 * H)[0]?.seq === 2);
+  check('susulan: hari 110 tiada lagi', susulanPerlu(pelan, r, t1 + 110 * H).length === 0);
+  check('susulan: T3 dijawab, berhenti', susulanPerlu(pelan, { ...r, t3Selesai: t1 + 85 * H }, t1 + 90 * H).length === 0);
+  const sj = susulanPerlu(pelan, { ...kosong, sertai }, sertai + 80 * H);
+  check('susulan: tanpa T1/T2, T3 ikut tarikh sertai', sj.some((x) => x.point === 'T3' && x.refSource === 'join'));
+  check('susulan: closesAt selepas dueAt', [s1[0], s80[0]].every((x) => x.dueAt < x.closesAt));
+
+  const pendek = { ...pelan, day_length_sec: 60 };
+  check('ujian penerimaan: sehari 60 s, T2 tutup 14 minit', tetingkapT2(pendek)!.tutup - tamat === 14 * 60_000);
+  check('day_length_sec tidak sah jatuh ke 86400', tetingkapT2({ ...pelan, day_length_sec: 5 })!.tutup - tamat === 14 * H);
+  check('hariDari: 1.5 hari', hariDari(pelan, 0, 1.5 * H) === 1.5);
+
+  check('dijawab: pilihan dalam 46.5 s', dijawab('b', UJIAN_HAD_DIJAWAB_MS));
+  check('dijawab: lewat ditolak', !dijawab('b', UJIAN_HAD_DIJAWAB_MS + 1));
+  check('dijawab: tiada pilihan ditolak', !dijawab(null, 1000) && !dijawab('', 1000));
+
+  check('pelan: e-mel tanpa teks persetujuan ditolak',
+    !!sahkanPelan({ emails_enabled: true, course_end_at: '2027-01-10T08:00:00Z' }).ralat);
+  check('pelan: e-mel tanpa tamat kursus ditolak',
+    !!sahkanPelan({ emails_enabled: true, consent_text: 'Saya bersetuju menyertai kajian ini.' }).ralat);
+  check('pelan: tamat sebelum Modul 1 ditolak',
+    !!sahkanPelan({ module1_start_at: '2027-01-10T00:00:00Z', course_end_at: '2027-01-05T00:00:00Z' }).ralat);
+  check('pelan: sehari 30 s ditolak', !!sahkanPelan({ day_length_sec: 30 }).ralat);
+  const ok = sahkanPelan({
+    module1_start_at: '2027-01-05T00:00:00Z',
+    course_end_at: '2027-01-10T08:00:00Z',
+    consent_text: '  Saya bersetuju menyertai kajian ini.  ',
+    emails_enabled: true,
+  });
+  check('pelan sah: teks dipangkas, sehari lalai 86400',
+    ok.pelan?.consent_text === 'Saya bersetuju menyertai kajian ini.' && ok.pelan?.day_length_sec === 86400 && ok.pelan.emails_enabled);
+
+  const e = binaEmelSusulan({
+    nama: 'Aminah', kursus: 'Latihan AI <b>', titik: 'T3', peringatan: true,
+    pautan: 'https://kuizen.fun/solo/ABC123?titik=T3', tutup: '1 Mei 2027', pautanBerhenti: 'https://kuizen.fun/kajian/berhenti/x',
+  });
+  check('emel: subjek peringatan T3', e.subject.startsWith('Peringatan: Ujian susulan (T3)'));
+  check('emel: pautan main dan berhenti dalam teks', e.text.includes('?titik=T3') && e.text.includes('/kajian/berhenti/x'));
+  check('emel: HTML di-escape', e.html.includes('Latihan AI &lt;b&gt;') && !e.html.includes('<b>'));
+  check('emel: tiada em dash', !/—/.test(e.text + e.subject));
+  const e2 = binaEmelSusulan({ nama: 'A', kursus: 'K', titik: 'T2', peringatan: false, pautan: 'https://x.y/a', tutup: 't', pautanBerhenti: 'https://x.y/b' });
+  check('emel: jemputan T2 tanpa awalan peringatan', e2.subject === 'Ujian pasca (T2): K');
 }
 
 console.log('');

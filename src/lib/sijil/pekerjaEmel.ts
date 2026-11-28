@@ -31,6 +31,7 @@ import { MAKS_LAMPIRAN, pathSelamat } from '@/lib/sijil/emelSijil';
 import { emelSijil } from '@/lib/i18n/emel';
 import { formatTarikhBm } from '@/lib/sijil/janaPdf';
 import { janaToken, urlKemaskiniNama } from '@/lib/sijil/namaPenuh';
+import { hantarSusulanKajian, type SebabBatal } from '@/lib/kajian-solo-emel';
 
 export const MAX_CUBAAN = 5;
 
@@ -167,7 +168,9 @@ type BarisGilir = {
   class_id: string;
   participant_id: string | null;
   template_id: string | null;
-  kind: 'certificate' | 'name_updated' | 'name_request';
+  kind: 'certificate' | 'name_updated' | 'name_request' | 'research_followup';
+  /** KZ-UTT Fasa 4: baris susulan kajian bagi kind research_followup. */
+  followup_id: string | null;
   name_link_purpose: 'after_issue' | 'before_issue' | null;
   name_link_days: number | null;
   requested_by: string | null;
@@ -250,7 +253,15 @@ async function ciptaTokenNama(
 }
 
 /** Hantar satu baris. Membaling ralat untuk dikelaskan oleh pemanggil. */
-async function hantarBaris(svc: SupabaseClient, b: BarisGilir): Promise<{ hasil: 'sent' | 'cancelled'; lampiran: boolean }> {
+async function hantarBaris(
+  svc: SupabaseClient,
+  b: BarisGilir,
+): Promise<{ hasil: 'sent' | 'cancelled'; lampiran: boolean; sebab?: SebabBatal }> {
+  // KZ-UTT Fasa 4: e-mel susulan kajian berkongsi pekerja dan had kadar ini.
+  if (b.kind === 'research_followup') {
+    const h = await hantarSusulanKajian(svc, b, dapatkanPengangkut());
+    return h.hasil === 'sent' ? { hasil: 'sent', lampiran: false } : { hasil: 'cancelled', lampiran: false, sebab: h.sebab };
+  }
   type Sijil = {
     id: string; code: string; class_id: string; template_id: string; participant_id: string;
     name_snapshot: string; program_snapshot: string; issued_at: string | null; pdf_path: string | null; revoked_at: string | null;
@@ -501,7 +512,7 @@ async function gelung(k: KeadaanPekerja): Promise<void> {
       const tunggu = hantarTerakhir + selang - Date.now();
       if (tunggu > 0) await tidur(tunggu);
       hantarTerakhir = Date.now();
-      let keputusan: { hasil: 'sent' | 'cancelled'; lampiran: boolean };
+      let keputusan: { hasil: 'sent' | 'cancelled'; lampiran: boolean; sebab?: SebabBatal };
       try {
         keputusan = await hantarBaris(svc, b);
       } catch (e) {
@@ -522,15 +533,47 @@ async function gelung(k: KeadaanPekerja): Promise<void> {
               .eq('id', b.id),
           'kemas kini ralat baris gilir',
         );
-        if (jenis === 'sementara') console.warn(`[emel-sijil] ${b.certificate_id} cubaan ${b.attempts}: ${mesej}`);
+        if (!ulang && b.kind === 'research_followup' && b.followup_id) {
+          await denganUlang(
+            () =>
+              svc
+                .from('qm_research_followups')
+                .update({ status: 'failed', cancel_reason: mesej.slice(0, 200), updated_at: new Date().toISOString() })
+                .eq('id', b.followup_id as string),
+            'tanda susulan gagal',
+          );
+        }
+        if (jenis === 'sementara') console.warn(`[emel-sijil] ${b.certificate_id ?? b.followup_id} cubaan ${b.attempts}: ${mesej}`);
         continue;
       }
-      if (keputusan.hasil === 'sent') {
+      if (keputusan.hasil === 'sent' && b.kind === 'research_followup') {
+        await denganUlang(() => svc.rpc('qm_research_mark_sent', { p_queue: b.id }), 'tanda susulan dihantar');
+      } else if (keputusan.hasil === 'sent') {
         // Baris gilir 'sent' dan emailed_at dalam satu transaksi (S3).
         await denganUlang(
           () => svc.rpc('qm_mark_certificate_email_sent', { p_queue: b.id, p_had_attachment: keputusan.lampiran }),
           'tanda dihantar',
         );
+      } else if (b.kind === 'research_followup') {
+        const sebab = keputusan.sebab ?? 'not_found';
+        await denganUlang(
+          () =>
+            svc
+              .from('qm_certificate_email_queue')
+              .update({ status: 'cancelled', last_error: `Follow-up cancelled: ${sebab}.`, locked_at: null, updated_at: new Date().toISOString() })
+              .eq('id', b.id),
+          'tanda susulan dibatalkan',
+        );
+        if (b.followup_id) {
+          await denganUlang(
+            () =>
+              svc
+                .from('qm_research_followups')
+                .update({ status: 'cancelled', cancel_reason: sebab, updated_at: new Date().toISOString() })
+                .eq('id', b.followup_id as string),
+            'log susulan dibatalkan',
+          );
+        }
       } else {
         await denganUlang(
           () =>

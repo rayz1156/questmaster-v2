@@ -8,7 +8,8 @@ import {
   papanSolo,
   semakMasukSolo,
 } from '@/lib/lumba-solo-api';
-import { topengPapan } from '@/lib/lumba-solo';
+import { topengPapan, type TitikUkur } from '@/lib/lumba-solo';
+import { muatPelan, muatPersetujuan, perluPersetujuan, titikUntukPeserta } from '@/lib/kajian-solo-api';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,14 +38,30 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
   // (Bearer sah). Pengguna log masuk yang bukan ahli ditolak di /start (403).
   let needLogin = false;
   let alreadyDone = false;
+  // KZ-UTT Fasa 4: titik berkesan bagi pengguna ini (?titik= daripada e-mel)
+  // dan teks persetujuan kajian jika belum diputuskan.
+  let titik: TitikUkur | null = kuiz.measure_point;
+  let consent: { required: boolean; text: string | null; version: number } | null = null;
   if (kuiz.class_id || kuiz.test_mode) {
     const masuk = await semakMasukSolo(req, svc, kuiz);
     if (kuiz.class_id && masuk.response) papan = topengPapan(papan);
     needLogin = masuk.keputusan === 'perlu_log_masuk' || (kuiz.test_mode && !masuk.user);
     // KZ-UTT: beritahu klien jika pengguna sudah menamatkan titik semasa.
-    if (kuiz.test_mode && masuk.user && kuiz.measure_point) {
-      const sedia = await larianUjianSedia(svc, kuiz.id, masuk.user.id, kuiz.measure_point);
-      alreadyDone = sedia?.status === 'finished';
+    if (kuiz.test_mode && masuk.user) {
+      const pelan = await muatPelan(svc, kuiz.id);
+      titik = await titikUntukPeserta(svc, kuiz, masuk.user.id, req.nextUrl.searchParams.get('titik'), pelan);
+      if (pelan?.consent_text) {
+        const p = await muatPersetujuan(svc, kuiz.id, masuk.user.id);
+        consent = {
+          required: perluPersetujuan(pelan, p),
+          text: pelan.consent_text,
+          version: pelan.consent_version,
+        };
+      }
+      if (titik) {
+        const sedia = await larianUjianSedia(svc, kuiz.id, masuk.user.id, titik);
+        alreadyDone = sedia?.status === 'finished';
+      }
     }
   }
 
@@ -54,8 +71,9 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     needLogin,
     leaderboard: papan,
     testMode: kuiz.test_mode,
-    measurePoint: kuiz.measure_point,
-    testOpen: !kuiz.test_mode || kuiz.measure_point !== null,
+    measurePoint: titik,
+    testOpen: !kuiz.test_mode || titik !== null,
     alreadyDone,
+    consent,
   });
 }
