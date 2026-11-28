@@ -28,10 +28,11 @@ export async function POST(req: NextRequest, { params }: { params: { code: strin
   if (!masuk.user) return ralatJson('Sign in to take this test.', 401, { code: 'LOGIN_REQUIRED' });
 
   const pelan = await muatPelan(svc, kuiz.id);
-  if (!pelan?.consent_text) return ralatJson('This test has no research consent.', 409);
+  if (!pelan) return ralatJson('This test has no consent step.', 409);
 
   const body = await req.json().catch(() => ({}) as Record<string, unknown>);
-  if (typeof body.agree !== 'boolean') return ralatJson('agree must be true or false.', 400);
+  // Kotak tanda sahaja: hanya persetujuan diterima melalui laluan ini.
+  if (body.agree !== true) return ralatJson('Tick the box to continue.', 400);
   if (Number(body.version) !== pelan.consent_version) {
     return ralatJson('The consent text has changed. Please read it again.', 409, { code: 'CONSENT_CHANGED' });
   }

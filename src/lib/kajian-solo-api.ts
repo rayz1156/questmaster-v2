@@ -47,9 +47,14 @@ export async function muatPersetujuan(svc: SupaService, quizId: string, userId: 
   return (data ?? null) as Persetujuan | null;
 }
 
-/** Peserta perlu memberi keputusan persetujuan (baharu, atau versi teks berubah). */
+/**
+ * Peserta perlu menanda kotak persetujuan (keputusan Boss Hariz, 28 Nov 2026):
+ * setiap kuiz yang ada pelan memaparkan kotak tanda; jika pendidik tiada teks
+ * sendiri, ayat lalai (i18n solo.consentDefault) dipapar oleh klien. Peserta
+ * yang sudah ada baris lama tidak ditanya semula kecuali versi teks berubah.
+ */
 export function perluPersetujuan(pelan: PelanPenuh | null, p: Persetujuan | null): boolean {
-  if (!pelan || !pelan.consent_text) return false;
+  if (!pelan) return false;
   return !p || p.consent_version < pelan.consent_version;
 }
 

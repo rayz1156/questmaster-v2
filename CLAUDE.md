@@ -384,7 +384,8 @@ Pautan e-mel membawa `?titik=T2` atau `T3`. Titik itu hanya dipakai jika
 tetingkap peserta itu terbuka; jika tidak, titik pada kuiz (Fasa 1) dipakai.
 `day_length_sec` di bawah 86400 hanya untuk ujian penerimaan.
 
-Persetujuan LALAI SETUJU (keputusan Dr Hariz, 28 Nov 2026): tiada baris dalam
+Persetujuan: kotak tanda SETUJU SAHAJA sebelum ujian pertama (ayat lalai i18n
+`solo.consentDefault` jika pelan tiada teks). Data lama tanpa baris dalam
 `qm_research_consents` bermakna setuju. Teks persetujuan pilihan; jika diisi,
 peserta boleh menolak. E-mel susulan hidup secara lalai, dan setiap kuiz mod
 ujian berkelas mendapat pelan automatik (0086 dan laluan POST solo). Hanya

@@ -165,6 +165,8 @@ export default function LumbaSolo({ kod }: { kod: string }) {
   const [nilaiTinjauan, setNilaiTinjauan] = useState<Record<string, number>>({});
   const [hantarTinjauanSibuk, setHantarTinjauanSibuk] = useState(false);
   const [info, setInfo] = useState<InfoSolo | null>(null);
+  /** KZ-UTT: kotak tanda persetujuan. */
+  const [ditanda, setDitanda] = useState(false);
   const [ralat, setRalat] = useState<string | null>(null);
   const [nickname, setNickname] = useState("");
   const [bisu, setBisu] = useState(false);
@@ -931,26 +933,25 @@ export default function LumbaSolo({ kod }: { kod: string }) {
 
             {info?.testMode && !info.needLogin && info.consent?.required ? (
               <div className="mt-4 space-y-3">
-                <p className="text-[13px] font-semibold text-ink">{t("solo.consentTitle")}</p>
-                <div className="max-h-[45vh] overflow-y-auto whitespace-pre-line rounded-xl border border-slate-200 bg-slate-50 p-3 text-[13px] leading-relaxed text-ink">
-                  {info.consent.text}
-                </div>
+                <label className="flex items-start gap-3 rounded-xl border border-violet-200 bg-violet-50 p-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={ditanda}
+                    onChange={(e) => setDitanda(e.target.checked)}
+                    className="mt-0.5 h-5 w-5 shrink-0 accent-violet-600"
+                  />
+                  <span className="whitespace-pre-line text-[13px] leading-relaxed text-ink">
+                    {info.consent.text || t("solo.consentDefault")}
+                  </span>
+                </label>
                 <p className="text-[12px] text-ink-faint">{t("solo.consentNote")}</p>
                 <button
                   type="button"
-                  disabled={sibuk}
+                  disabled={sibuk || !ditanda}
                   onClick={() => void putuskanPersetujuan(true)}
                   className="w-full px-4 py-2.5 rounded-xl text-white text-[14px] font-semibold bg-gradient-to-r from-violet-600 to-indigo-600 disabled:opacity-50"
                 >
-                  {t("solo.consentAgree")}
-                </button>
-                <button
-                  type="button"
-                  disabled={sibuk}
-                  onClick={() => void putuskanPersetujuan(false)}
-                  className="w-full px-4 py-2.5 rounded-xl text-[14px] font-semibold text-ink border border-slate-300 bg-white disabled:opacity-50"
-                >
-                  {t("solo.consentDecline")}
+                  {t("solo.consentContinue")}
                 </button>
               </div>
             ) : info?.testMode && !info.needLogin && (!info.testOpen || info.alreadyDone) ? (

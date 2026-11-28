@@ -50,7 +50,7 @@ export async function GET(req: NextRequest, { params }: { params: { code: string
     if (kuiz.test_mode && masuk.user) {
       const pelan = await muatPelan(svc, kuiz.id);
       titik = await titikUntukPeserta(svc, kuiz, masuk.user.id, req.nextUrl.searchParams.get('titik'), pelan);
-      if (pelan?.consent_text) {
+      if (pelan) {
         const p = await muatPersetujuan(svc, kuiz.id, masuk.user.id);
         consent = {
           required: perluPersetujuan(pelan, p),
