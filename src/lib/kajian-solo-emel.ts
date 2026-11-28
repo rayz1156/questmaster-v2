@@ -67,8 +67,8 @@ export function binaEmelSusulan(v: IsiSusulan): { subject: string; text: string;
     .slice(0, 200);
   const pembuka =
     v.titik === 'T2'
-      ? `Terima kasih kerana menyertai ${v.kursus}. Kami ingin mengetahui sejauh mana latihan ini membantu anda. Jawapan anda akan membantu kami menambah baik latihan ini dan merancang latihan seterusnya yang lebih sesuai dengan keperluan anda.`
-      : `Sudah beberapa bulan sejak anda menyertai ${v.kursus}. Kami ingin mengetahui apa yang masih anda ingat dan gunakan daripada latihan itu. Jawapan anda akan membantu kami merancang latihan susulan dan latihan seterusnya yang lebih bermanfaat.`;
+      ? `Terima kasih kerana menyertai kursus ${v.kursus}. Penilaian ini ialah susulan kepada kursus yang anda sertai itu. Kami ingin mengetahui sejauh mana latihan tersebut membantu anda. Jawapan anda akan membantu kami menambah baik latihan ini dan merancang latihan seterusnya yang lebih sesuai dengan keperluan anda.`
+      : `Sudah beberapa bulan sejak anda menyertai kursus ${v.kursus}. Penilaian ini ialah susulan kepada kursus yang anda sertai itu. Kami ingin mengetahui apa yang masih anda ingat dan gunakan daripada latihan itu. Jawapan anda akan membantu kami merancang latihan susulan dan latihan seterusnya yang lebih bermanfaat.`;
   const perenggan = [
     `Assalamualaikum dan salam sejahtera ${v.nama},`,
     pembuka,
@@ -149,6 +149,16 @@ export async function hantarSusulanKajian(
     .maybeSingle();
   if (!kuiz?.solo_code || !kuiz.solo_enabled) return { hasil: 'cancelled', sebab: 'no_link' };
   const { data: kelas } = await svc.from('qm_classes').select('name').eq('id', f.class_id).maybeSingle();
+  // Nama kursus rasmi: medan "course" templat sijil terbaharu kelas, jika ada;
+  // jika tidak, nama kelas.
+  const { data: tpl } = await svc
+    .from('qm_certificate_templates')
+    .select('fields')
+    .eq('class_id', f.class_id)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  const kursusSijil = String(((tpl?.fields ?? {}) as Record<string, unknown>).course ?? '').trim();
   const { data: prof } = await svc.from('qm_profiles').select('display_name').eq('id', f.user_id).maybeSingle();
 
   const { data: pengguna, error: uErr } = await svc.auth.admin.getUserById(String(f.user_id));
@@ -173,7 +183,7 @@ export async function hantarSusulanKajian(
   const site = (process.env.NEXT_PUBLIC_SITE_URL || 'https://kuizen.fun').replace(/\/$/, '');
   const isi = binaEmelSusulan({
     nama: prof?.display_name || 'peserta',
-    kursus: kelas?.name || kuiz.title,
+    kursus: kursusSijil || kelas?.name || kuiz.title,
     titik: f.point as 'T2' | 'T3',
     peringatan: Number(f.seq) > 0,
     pautan: `${site}/solo/${encodeURIComponent(kuiz.solo_code)}?titik=${f.point}`,

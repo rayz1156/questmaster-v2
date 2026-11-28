@@ -299,6 +299,7 @@ console.log('KZ-UTT Fasa 2: item tinjauan');
   check('emel: subjek peringatan T3', e.subject.startsWith('Peringatan: Susulan selepas latihan'));
   check('emel: pautan main dan berhenti dalam teks', e.text.includes('?titik=T3') && e.text.includes('/susulan/berhenti/x'));
   check('emel: HTML di-escape', e.html.includes('Latihan AI &lt;b&gt;') && !e.html.includes('<b>'));
+  check('emel: sebut susulan kepada kursus bernama', e.text.includes('kursus Latihan AI <b>') && e.text.includes('susulan kepada kursus'));
   check('emel: sebut permainan', e.text.includes('permainan lumba'));
   check('emel: tiada em dash', !/—/.test(e.text + e.subject));
   const e2 = binaEmelSusulan({ nama: 'A', kursus: 'K', titik: 'T2', peringatan: false, pautan: 'https://x.y/a', tutup: 't', pautanBerhenti: 'https://x.y/b' });
