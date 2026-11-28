@@ -3154,7 +3154,7 @@ export const ms: Kamus = {
     hintKeys: 'Kenderaan anda hanyut di selekoh, jadi terus mengemudi! Gerakkan tetikus ke kiri atau kanan tengah, atau guna anak panah / A D. Klik tahan atau W untuk pecut, S brek. Jawab dengan kekunci 1 hingga 4.',
     hintTouch: 'Kenderaan anda hanyut di selekoh, jadi terus mengemudi! Tahan jari di kiri atau kanan tengah untuk stereng (tahan juga memecut). Ketik jawapan bila soalan muncul.',
     testBadge: 'Ujian {p}',
-    testIntro: 'Ini ujian kajian. Kenderaan berhenti setiap kali soalan muncul, jadi jawab dengan tenang. Anda ada satu percubaan sahaja, dan jawapan betul tidak dipaparkan.',
+    testIntro: 'Ini penilaian latihan. Kenderaan berhenti setiap kali soalan muncul, jadi jawab dengan tenang. Anda ada satu percubaan sahaja, dan jawapan betul tidak dipaparkan.',
     testNotOpen: 'Ujian ini belum dibuka. Sila tunggu arahan fasilitator.',
     testDone: 'Anda sudah menamatkan ujian ini. Terima kasih.',
     testLogin: 'Log masuk dengan akaun anda sendiri untuk menjawab ujian ini.',

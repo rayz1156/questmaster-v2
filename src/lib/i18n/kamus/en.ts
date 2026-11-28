@@ -3191,7 +3191,7 @@ export const en = {
     hintKeys: 'Your vehicle drifts on bends, so keep steering! Move the mouse left or right of centre, or use arrow keys / A D. Hold click or W to boost, S to brake. Answer with keys 1 to 4.',
     hintTouch: 'Your vehicle drifts on bends, so keep steering! Hold your finger left or right of centre to steer (holding also boosts). Tap an answer when a question appears.',
     testBadge: 'Test {p}',
-    testIntro: 'This is a research test. The vehicle stops whenever a question appears, so take your time. You have one attempt, and correct answers are not shown.',
+    testIntro: 'This is a training assessment. The vehicle stops whenever a question appears, so take your time. You have one attempt, and correct answers are not shown.',
     testNotOpen: 'This test is not open yet. Please wait for your facilitator.',
     testDone: 'You have already completed this test. Thank you.',
     testLogin: 'Sign in with your own account to take this test.',
